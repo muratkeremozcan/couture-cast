@@ -10,7 +10,7 @@
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import type * as ReactNativeModule from 'react-native'
 import React from 'react'
-import { screen, fireEvent, waitFor } from '@testing-library/react'
+import { screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { describe, expect, it, beforeAll, beforeEach, afterEach, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
@@ -241,10 +241,38 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
   })
 
   it('toggling hourly weather records the open interaction', async () => {
+    const weatherSnapshot = mockRitualResponse.data.weather
+    server.use(
+      http.get('*/api/v1/ritual', () =>
+        HttpResponse.json({
+          data: {
+            ...mockRitualResponse.data,
+            weather: {
+              ...weatherSnapshot,
+              hourly: weatherSnapshot.hourly.map((hour, index) => {
+                if (index === 0) {
+                  return { ...hour, condition: 'snow', precipitationProbability: 0.8 }
+                }
+                if (index === 1) {
+                  return { ...hour, condition: 'clear', precipitationProbability: 0.004 }
+                }
+                return hour
+              }),
+            },
+          },
+        })
+      )
+    )
     await render(<TabOneScreen />)
     const weather = await screen.findByTestId('weather-header')
     await userEvent.click(weather)
-    expect(screen.getAllByTestId('hourly-item')).toHaveLength(48)
+    const hours = screen.getAllByTestId('hourly-item')
+    expect(hours).toHaveLength(48)
+    const [snow, nearZero] = hours
+    expect(snow).toHaveAccessibleName(/Snowy.*Rain or snow looks likely/i)
+    expect(within(snow!).getByText('Rain or snow looks likely')).toBeVisible()
+    expect(nearZero).toHaveAccessibleName(/Dry weather/i)
+    expect(within(nearZero!).queryByText(/Rain or snow/)).toBeNull()
     expect(mockCapture).toHaveBeenCalledWith('hero_interaction', {
       interactionType: 'ribbon_toggle',
       isExpanded: true,
@@ -382,7 +410,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     expect(requestedLocale).toBe('tr-TR')
     expect(screen.getByText('Açık')).toBeTruthy()
     await userEvent.click(screen.getByTestId('weather-header'))
-    expect(screen.getByText('Saatlik tahmin')).toBeTruthy()
+    expect(screen.getByText('Saatlik hava durumu')).toBeTruthy()
   })
 
   it('renders localized API fixtures selected by the locale query parameter', async () => {

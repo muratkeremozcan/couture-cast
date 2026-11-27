@@ -148,7 +148,7 @@ test.describe('Guest preview and first garment with verified auth', () => {
 
       const tagging = page.getByRole('dialog', { name: 'Organize Garment Tags' })
       await tagging.getByRole('radio', { name: 'Top', exact: true }).click()
-      await tagging.getByRole('button', { name: 'Confirm & Save Tags' }).click()
+      await tagging.getByRole('button', { name: 'Save tags' }).click()
       await expect(tagging).toBeHidden()
 
       const garments = await prisma.garmentItem.findMany({ where: { user_id: userId } })
@@ -200,7 +200,9 @@ test.describe('Guest preview and first garment with verified auth', () => {
     await expect(requestCamera).toBeVisible()
     expect(await cameraRequests(page)).toBe(0)
     await requestCamera.click()
-    await expect(step.getByRole('alert')).toContainText('You can still import files')
+    await expect(step.getByRole('alert')).toContainText(
+      'You can pick a file or try the sample closet.'
+    )
     expect(await cameraRequests(page)).toBe(1)
 
     await step.getByRole('button', { name: 'Add a piece' }).click()

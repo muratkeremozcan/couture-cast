@@ -182,7 +182,7 @@ export const deDE: GuestPreviewStrings = {
     precipPreparedness: {
       low: 'Nur bei starkem Regen',
       medium: 'Wenn Regen wahrscheinlich ist',
-      high: 'Schon bei geringer Regenwahrscheinlichkeit',
+      high: 'Ich packe oft',
     },
     weather: {
       'cool-windy': 'Kühl und windig',
@@ -253,15 +253,13 @@ export const deDE: GuestPreviewStrings = {
     'layer-cold': '{garment}: wärmt unter {threshold}.',
     'layer-wind':
       '{garment}: hält Wind mit {windSpeed} m/s ab, mehr als Ihre Toleranz von {windThreshold} m/s.',
-    'layer-rain':
-      '{rainPercent}. Deine Regeneinstellung: {rainThresholdPercent}. {garment} hält dich trocken.',
+    'layer-rain': '{rainPercent}. {garment} hält dich trocken.',
     'no-layer': 'Es ist {range} genug, um auf eine Außenschicht zu verzichten.',
     'layer-unavailable':
       'Diese Beispielgarderobe hat keine Außenschicht mit dem Schutz, den dieses Wetter braucht.',
     'wind-within':
       'Wind mit {windSpeed} m/s liegt innerhalb Ihrer Toleranz von {windThreshold} m/s.',
-    'rain-within':
-      '{rainPercent}. Deine Regeneinstellung: {rainThresholdPercent}. Du brauchst keine Regenkleidung.',
+    'rain-within': '{rainPercent}. Du kannst die Regenkleidung daheim lassen.',
     'liked-first': 'Ihnen gefällt {look}, daher kommt dieser Look zuerst.',
     'stale-selection':
       'Ihr vorheriger Look passt nicht mehr zu diesen Einstellungen, daher wird {look} gezeigt.',

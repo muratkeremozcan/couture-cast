@@ -877,7 +877,7 @@ describe('WardrobeOnboardingPage', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Garment 1: needs tags' }))
     await screen.findByRole('radio', { name: /Top/ })
-    await user.click(screen.getByRole('button', { name: 'Confirm & Save Tags' }))
+    await user.click(screen.getByRole('button', { name: 'Save tags' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-status-region')).toHaveTextContent(

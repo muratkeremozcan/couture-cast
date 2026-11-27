@@ -179,7 +179,7 @@ export const itIT: GuestPreviewStrings = {
     precipPreparedness: {
       low: 'Solo con pioggia forte',
       medium: 'Quando la pioggia è probabile',
-      high: 'Con qualsiasi probabilità di pioggia',
+      high: 'Spesso',
     },
     weather: {
       'cool-windy': 'Fresco e ventoso',
@@ -250,15 +250,13 @@ export const itIT: GuestPreviewStrings = {
     'layer-cold': '{garment} aggiunge calore sotto {threshold}.',
     'layer-wind':
       '{garment} blocca il vento a {windSpeed} m/s, oltre la tua tolleranza di {windThreshold} m/s.',
-    'layer-rain':
-      '{rainPercent}. La tua impostazione per la pioggia: {rainThresholdPercent}. Porta con te questo capo: {garment}.',
+    'layer-rain': '{rainPercent}. Porta con te questo capo: {garment}.',
     'no-layer': 'Con tempo {range} puoi fare a meno del capospalla.',
     'layer-unavailable':
       'Questo guardaroba di esempio non ha un capospalla con la protezione che serve con questo tempo.',
     'wind-within':
       'Vento a {windSpeed} m/s: entro la tua tolleranza di {windThreshold} m/s.',
-    'rain-within':
-      '{rainPercent}. La tua impostazione per la pioggia: {rainThresholdPercent}. Puoi lasciare a casa l’impermeabile.',
+    'rain-within': '{rainPercent}. Puoi lasciare a casa l’impermeabile.',
     'liked-first': 'Hai messo Mi piace a {look}, quindi compare per primo.',
     'stale-selection':
       'Il look scelto prima non è più adatto a queste impostazioni, quindi ti mostriamo {look}.',

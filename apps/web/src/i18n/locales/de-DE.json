@@ -93,7 +93,7 @@
           "shoes": "Schuhe",
           "accessory": "Accessoire"
         },
-        "starterWardrobe": "Starter-Garderobe-Auswahl",
+        "starterWardrobe": "Mit Beispielteilen",
         "reshuffle": {
           "action": "Neu mischen",
           "loading": "Wird neu gemischt…",
@@ -302,7 +302,7 @@
       "deleteConfirmTitle": "Diese Kapsel löschen?",
       "deleteConfirmBody": "Damit wird die Kapsel entfernt. Deine Kleidungsstücke bleiben erhalten.",
       "nameLabel": "Kapselname",
-      "namePlaceholder": "Business Casual",
+      "namePlaceholder": "Schulwoche",
       "descriptionLabel": "Beschreibung",
       "descriptionPlaceholder": "Optionale Beschreibung",
       "garmentsLabel": "Kleidungsstücke",
@@ -401,7 +401,7 @@
       "title": "Richte deinen Kleiderschrank ein",
       "garmentFallback": "Kleidungsstück {{position}}",
       "permissionTitle": "Zugriff erlauben",
-      "permissionAction": "Kamera- und Fotozugriff erlauben",
+      "permissionAction": "Zugriff erlauben",
       "permissionBody": "Erlaube der App den Zugriff auf Kamera oder Fotos, um ein Stück hinzuzufügen.",
       "permissionDenied": "Kamera und Fotos sind gesperrt. Wähle eine Datei oder probier den Beispielschrank.",
       "useStarterWardrobe": "Beispielschrank nutzen",
@@ -417,7 +417,7 @@
       "announcements": {
         "permissionRequesting": "Kamerazugriff wird angefordert…",
         "permissionGranted": "Kamerazugriff gewährt. Erfasse deine Kleidungsstücke.",
-        "permissionDenied": "Kamerazugriff nicht verfügbar. Importiere Fotos oder nutze die Starter-Garderobe.",
+        "permissionDenied": "Wir können deine Kamera nicht öffnen. Wähle Fotos aus oder probiere den Beispielschrank.",
         "tagging": "Alle Kleidungsstücke erfasst. Bestätige die Tags, um fortzufahren.",
         "silhouette": "Richte deine Silhouette ein.",
         "garmentTagged": "{{garment}} getaggt."
@@ -438,7 +438,7 @@
       "myFormGuidance": "Trage schlicht weiße oder schwarze Kleidung vor einem einfarbigen Hintergrund für die beste Überlagerung.",
       "myFormConfirm": "Ich trage schlicht weiße oder schwarze Kleidung",
       "myFormRetry": "Upload wiederholen",
-      "myFormRemove": "Mein-Form-Foto entfernen",
+      "myFormRemove": "Foto entfernen",
       "processing": "Dein Foto wird verarbeitet…",
       "ready": "Mein-Form-Foto bereit",
       "loading": "Deine Silhouette wird geladen…",
@@ -579,7 +579,7 @@
       "suggestedReview": "(Bitte prüfen, Vorschlag: {{value}})",
       "materialClear": "Nicht sicher / Leeren",
       "cancel": "Abbrechen",
-      "save": "Tags bestätigen und speichern",
+      "save": "Tags speichern",
       "saving": "Wird gespeichert...",
       "errors": {
         "suggestionUnavailable": "Vorschlag nicht verfügbar",
@@ -827,7 +827,7 @@
       "descriptionWorking": "Beschreibung wird vorbereitet…",
       "descriptionFailed": "Es konnte keine Beschreibung erstellt werden. Du kannst eine eigene schreiben.",
       "captionLabel": "Beschreibung (optional)",
-      "editText": "Titel und Beschreibung bearbeiten",
+      "editText": "Text bearbeiten",
       "saveText": "Änderungen speichern",
       "savingText": "Wird gespeichert…",
       "editSaved": "Änderungen gespeichert.",
@@ -1126,11 +1126,9 @@
     }
   },
   "landing": {
-    "tagline": "Wetterbewusste Garderobenpläne für jeden Weg",
     "hero": {
       "eyebrow": "Tägliches Ritual",
-      "headline": "Plane selbstbewusste Outfits in unter 90 Sekunden.",
-      "body": "CoutureCast verbindet hyperlokales Wetter, dein Garderobenarchiv und Einblicke aus der Community zu Looks, die zum Weg, zum Termin und zur Stimmung passen."
+      "headline": "Plane selbstbewusste Outfits in unter 90 Sekunden."
     },
     "lookbook": {
       "eyebrow": "Lookbook Prism",
@@ -1143,36 +1141,7 @@
         "advisory": "Hinweis: {{type}}",
         "adjustOutfit": "Outfit anpassen"
       },
-      "demo": {
-        "heading": "Tägliches Ritual",
-        "timeCity": "08:30 Uhr • NYC",
-        "temperature": "18 °C",
-        "humidity": "Milde Luftfeuchtigkeit • 65 %",
-        "change": "+3 °C gegenüber dem gestrigen Arbeitsweg",
-        "primaryLook": "Empfohlener Hauptlook",
-        "matchScore": "Übereinstimmung: {{score}}",
-        "garments": {
-          "blazer": "Onyx-Blazer",
-          "scarf": "Seidenschal in Merlot",
-          "loafers": "Lederloafer"
-        },
-        "lookA": {
-          "label": "LOOK A (Hauptlook)",
-          "title": "Blazer & Seidenstrick",
-          "body": "Wärmegrad passend für frischen Morgenwind."
-        },
-        "lookB": {
-          "label": "LOOK B (Alternative)",
-          "title": "Trenchcoat & Merino-Cardigan",
-          "body": "Mehr Windschutz mit wasserabweisender Hülle."
-        }
-      },
       "recommendations": {
-        "personal": {
-          "eyebrow": "Bereit für den Arbeitsweg",
-          "title": "Zweireihiger Blazer & Seidenstrick",
-          "description": "Abgestimmt auf 18 °C bei der Zugfahrt am Morgen und das klimatisierte Büro danach."
-        },
         "community": {
           "eyebrow": "Beliebt in der Community",
           "title": "Pariser Mischung aus Seide & Kaschmir",

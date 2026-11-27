@@ -16,12 +16,16 @@ const nativePath = 'apps/mobile/assets/locales'
 const exportPath = 'apps/api/src/modules/share-cards/assets'
 
 const sharedKeys = [
+  'commerce.premium.planner.starterWardrobe',
   'community.calm.climateEmpty',
   'community.compose.altHint',
   'community.compose.altPlaceholder',
   'community.compose.altSuggested',
   'community.filters.explainer',
   'community.filters.label',
+  'community.notifications.signinCodeInvalid',
+  'community.notifications.signinDenied',
+  'community.notifications.signinUnavailable',
   'community.report.description',
   'home.today.weatherUnavailable',
   'looks.freePlan.line',
@@ -33,29 +37,39 @@ const sharedKeys = [
   'shareCard.render',
   'shareCard.sourceUnavailable',
   'shareCard.storage',
+  'wardrobe.capsules.namePlaceholder',
 ]
 const sharedButtons = [
+  'community.compose.editText',
   'home.spotlightTeaser.cta',
   'home.today.addFirstPiece',
   'shareCard.launcher',
 ]
 const webKeys = [
   'settings.profile.browserLanguageHelp',
+  'wardrobe.hub.accountFailed',
+  'wardrobe.hub.accountFailedShort',
   'wardrobe.hub.emptyBody',
   'wardrobe.hub.emptyTitle',
   'wardrobe.hub.loading',
   'wardrobe.hub.refreshFailed',
   'wardrobe.hub.setupFailed',
   'wardrobe.hub.statusRefreshFailed',
+  'wardrobe.hub.taggingSlow',
   'wardrobe.onboarding.errors.loadFailed',
   'wardrobe.onboarding.errors.saveFailed',
   'wardrobe.onboarding.errors.stale',
+  'wardrobe.onboarding.announcements.permissionDenied',
   'wardrobe.onboarding.permissionBody',
   'wardrobe.onboarding.permissionDenied',
+  'wardrobe.onboarding.permissionTitle',
 ]
 const nativeKeys = [
   'hero.hourly_forecast',
   'hero.load_error',
+  'hero.wetWeatherChance.likely',
+  'hero.wetWeatherChance.none',
+  'hero.wetWeatherChance.possible',
   'wardrobe.empty_desc',
   'wardrobe.empty_title',
   'wardrobe.hub.loading',
@@ -63,18 +77,23 @@ const nativeKeys = [
   'wardrobe.onboarding.errors.save_failed',
   'wardrobe.onboarding.permission_body',
   'wardrobe.onboarding.permission_denied',
+  'wardrobe.tagging.poll_timeout',
 ]
 const webButtons = [
   'wardrobe.hub.emptyAction',
   'wardrobe.onboarding.addAnother',
-  'wardrobe.onboarding.permissionTitle',
+  'wardrobe.onboarding.permissionAction',
   'wardrobe.onboarding.useStarterWardrobe',
+  'wardrobe.silhouette.myFormRemove',
+  'wardrobe.tagEditor.save',
 ]
 const nativeButtons = [
   'wardrobe.add_garment',
   'wardrobe.onboarding.add_another',
   'wardrobe.onboarding.permission_title',
   'wardrobe.onboarding.use_starter_wardrobe',
+  'wardrobe.silhouette.my_form_remove',
+  'wardrobe.tagging.save',
 ]
 
 const copyAt = (catalog, key) =>

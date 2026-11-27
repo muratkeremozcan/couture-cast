@@ -55,7 +55,12 @@
         "critical": "Kritik"
       }
     },
-    "no_location": "Günlük kombinler almak için konumunuzu ekleyin"
+    "no_location": "Günlük kombinler almak için konumunuzu ekleyin",
+    "wetWeatherChance": {
+      "none": "Yağışsız hava",
+      "possible": "Yağmur veya kar yağabilir",
+      "likely": "Yağmur veya kar bekleniyor"
+    }
   },
   "widget": {
     "now": "ŞİMDİ",
@@ -218,7 +223,7 @@
       "material": "Kumaş/Materyal",
       "comfort_range": "Konfor Aralığı",
       "not_sure": "Emin değilim / Temizle",
-      "save": "Onayla ve Kaydet",
+      "save": "Etiketleri kaydet",
       "saving": "Kaydediliyor...",
       "ai_suggested": "YZ Önerisi: {{value}}",
       "loading": "Parçan yükleniyor...",
@@ -276,7 +281,7 @@
       "deleteConfirmTitle": "Bu kapsül silinsin mi?",
       "deleteConfirmBody": "Bu işlem kapsülü kaldırır. Gardırobundaki parçalar kalır.",
       "nameLabel": "Kapsül adı",
-      "namePlaceholder": "Ofis rahatlığı",
+      "namePlaceholder": "Okul haftası",
       "descriptionLabel": "Açıklama",
       "descriptionPlaceholder": "İsteğe bağlı açıklama",
       "garmentsLabel": "Parçalar",
@@ -400,7 +405,7 @@
       "my_form_guidance": "En temiz kaplama için düz beyaz veya siyah kıyafet giyip düz bir arka plan kullanın.",
       "my_form_confirm": "Düz beyaz veya siyah kıyafet giyiyorum",
       "my_form_retry": "Yüklemeyi tekrar dene",
-      "my_form_remove": "Formum fotoğrafını kaldır",
+      "my_form_remove": "Fotoğrafı kaldır",
       "processing": "Fotoğrafınız işleniyor...",
       "ready": "Formum fotoğrafı hazır",
       "errors": {
@@ -697,7 +702,7 @@
         "errorLoad": "Haftalık planlayıcınız yüklenemedi.",
         "retry": "Tekrar dene",
         "disabled": "7 günlük planlayıcı geçici olarak kullanılamıyor. Hesabınız normal şekilde çalışmaya devam ediyor.",
-        "starterWardrobe": "Başlangıç gardırobundan oluşturuldu.",
+        "starterWardrobe": "Örnek parçalar var",
         "day": {
           "error": {
             "title": "Bu gün oluşturulamadı.",
@@ -901,7 +906,7 @@
       "descriptionWorking": "Açıklama hazırlanıyor…",
       "descriptionFailed": "Açıklama önerilemedi. Kendi açıklamanı yazabilirsin.",
       "captionLabel": "Açıklama (isteğe bağlı)",
-      "editText": "Başlığı ve açıklamayı düzenle",
+      "editText": "Metni düzenle",
       "saveText": "Değişiklikleri kaydet",
       "savingText": "Kaydediliyor…",
       "editSaved": "Değişiklikler kaydedildi.",

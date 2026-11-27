@@ -55,7 +55,12 @@
         "critical": "Critical"
       }
     },
-    "no_location": "Add your location to get daily outfits"
+    "no_location": "Add your location to get daily outfits",
+    "wetWeatherChance": {
+      "none": "Dry weather",
+      "possible": "Rain or snow may fall",
+      "likely": "Rain or snow looks likely"
+    }
   },
   "widget": {
     "now": "NOW",
@@ -218,7 +223,7 @@
       "material": "Material",
       "comfort_range": "Comfort Range",
       "not_sure": "Not sure / Clear",
-      "save": "Confirm & Save Tags",
+      "save": "Save tags",
       "saving": "Saving...",
       "ai_suggested": "AI suggested: {{value}}",
       "loading": "Loading your garment...",
@@ -276,7 +281,7 @@
       "deleteConfirmTitle": "Delete this capsule?",
       "deleteConfirmBody": "This removes the capsule. Your wardrobe garments stay.",
       "nameLabel": "Capsule name",
-      "namePlaceholder": "Work casual",
+      "namePlaceholder": "School week",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Optional description",
       "garmentsLabel": "Garments",
@@ -400,7 +405,7 @@
       "my_form_guidance": "Wear plain white or black clothing against a plain background for the cleanest overlay.",
       "my_form_confirm": "I'm wearing plain white or black clothing",
       "my_form_retry": "Retry upload",
-      "my_form_remove": "Remove My Form photo",
+      "my_form_remove": "Remove photo",
       "processing": "Processing your photo...",
       "ready": "My Form photo ready",
       "errors": {
@@ -697,7 +702,7 @@
         "errorLoad": "Unable to load your weekly planner.",
         "retry": "Retry",
         "disabled": "The 7-day planner is temporarily unavailable. Your account keeps working normally.",
-        "starterWardrobe": "Built from a starter wardrobe.",
+        "starterWardrobe": "Uses sample pieces",
         "day": {
           "error": {
             "title": "This day could not be generated.",
@@ -901,7 +906,7 @@
       "descriptionWorking": "Preparing a description…",
       "descriptionFailed": "Could not suggest a description. You can still write your own.",
       "captionLabel": "Description (optional)",
-      "editText": "Edit title and description",
+      "editText": "Edit text",
       "saveText": "Save changes",
       "savingText": "Saving…",
       "editSaved": "Changes saved.",

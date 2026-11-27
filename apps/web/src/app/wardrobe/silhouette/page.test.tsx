@@ -100,7 +100,7 @@ describe('7.11 Silhouette route (D6)', () => {
 
     render(<WardrobeSilhouettePage />)
 
-    expect(screen.getByText('Loading your wardrobe...')).toHaveAttribute('role', 'status')
+    expect(screen.getByText('Loading your closet')).toHaveAttribute('role', 'status')
     expect(screen.queryByTestId('silhouette-panel-stub')).toBeNull()
 
     await act(async () => {
@@ -112,7 +112,7 @@ describe('7.11 Silhouette route (D6)', () => {
       'data-user-id',
       'member-1'
     )
-    expect(screen.queryByText('Loading your wardrobe...')).toBeNull()
+    expect(screen.queryByText('Loading your closet')).toBeNull()
     expect(screen.queryByTestId('silhouette-sign-in')).toBeNull()
   })
 
@@ -139,7 +139,7 @@ describe('7.11 Silhouette route (D6)', () => {
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(
-      'Unable to load your account, so Silhouette settings are unavailable right now.'
+      "We can't load your account. Reload the page to change your fit settings."
     )
     expect(screen.queryByTestId('silhouette-panel-stub')).toBeNull()
 
@@ -167,7 +167,7 @@ describe('7.11 Silhouette route (D6)', () => {
       resolveCurrentUserId.mockReturnValueOnce(account.promise)
 
       render(<WardrobeSilhouettePage />)
-      expect(screen.getByText('Loading your wardrobe...')).toBeVisible()
+      expect(screen.getByText('Loading your closet')).toBeVisible()
 
       act(() => {
         window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)

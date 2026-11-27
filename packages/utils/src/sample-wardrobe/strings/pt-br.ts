@@ -177,7 +177,7 @@ export const ptBR: GuestPreviewStrings = {
     precipPreparedness: {
       low: 'Só com chuva forte',
       medium: 'Quando a chuva é provável',
-      high: 'Com qualquer chance de chuva',
+      high: 'Levo com frequência',
     },
     weather: {
       'cool-windy': 'Fresco e com vento',
@@ -248,15 +248,13 @@ export const ptBR: GuestPreviewStrings = {
     'layer-cold': '{garment} aquece abaixo de {threshold}.',
     'layer-wind':
       '{garment} bloqueia vento de {windSpeed} m/s, acima da sua tolerância de {windThreshold} m/s.',
-    'layer-rain':
-      '{rainPercent}. Seu ajuste de chuva: {rainThresholdPercent}. Leve a peça para ficar seco: {garment}.',
+    'layer-rain': '{rainPercent}. Leve esta peça para se proteger: {garment}.',
     'no-layer': 'Com tempo {range}, dá para dispensar a camada externa.',
     'layer-unavailable':
       'Este guarda-roupa de exemplo não tem camada externa com a proteção que este tempo pede.',
     'wind-within':
       'Vento de {windSpeed} m/s está dentro da sua tolerância de {windThreshold} m/s.',
-    'rain-within':
-      '{rainPercent}. Seu ajuste de chuva: {rainThresholdPercent}. Pode deixar a capa de chuva em casa.',
+    'rain-within': '{rainPercent}. Pode deixar a capa de chuva em casa.',
     'liked-first': 'Você curtiu {look}, então ele aparece primeiro.',
     'stale-selection':
       'O look que você escolheu antes não combina mais com essas configurações, então mostramos {look}.',

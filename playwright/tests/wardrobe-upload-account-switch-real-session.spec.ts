@@ -162,7 +162,7 @@ async function expectHubSignedIn(page: Page) {
     page.getByTestId('app-header').getByTestId('garment-capture-open')
   ).toHaveJSProperty('tagName', 'BUTTON')
   await expect(
-    page.getByText('Unable to load your account', { exact: false })
+    page.getByText("We can't load your account", { exact: false })
   ).toHaveCount(0)
   await expect(page.getByText('Your session expired', { exact: false })).toHaveCount(0)
   await expect(page.getByText("We can't check your closet setup yet.")).toHaveCount(0)
@@ -222,7 +222,7 @@ async function expectMemberBProfile(screen: Locator) {
 async function expectSilhouetteFollowsMemberB(page: Page, screen: Locator) {
   await expect(page).toHaveURL('/wardrobe/silhouette')
   await expect(
-    page.getByText('Unable to load your account', { exact: false })
+    page.getByText("We can't load your account", { exact: false })
   ).toHaveCount(0)
   await expect(page.getByText('Your session expired', { exact: false })).toHaveCount(0)
   await expectMemberBProfile(screen)

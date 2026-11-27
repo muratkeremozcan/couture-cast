@@ -107,7 +107,7 @@ describe('SignupForm', () => {
         'Compte créé. Connectez-vous avec votre adresse e-mail pour continuer.'
       )
       expect(screen.getByTestId('signup-sign-in-to-continue').textContent).toBe(
-        'Se connecter pour continuer'
+        'Connecte-toi'
       )
     } finally {
       await getI18n().changeLanguage('en-US')
@@ -141,14 +141,14 @@ describe('SignupForm', () => {
     })
     fireEvent.submit(screen.getByRole('button', { name: 'Create account' }))
 
-    expect(screen.queryByText('Guardian invitation')).not.toBeInTheDocument()
+    expect(screen.queryByText('Invite a guardian')).not.toBeInTheDocument()
 
     await waitFor(() => {
       expect(submitSignup).toHaveBeenCalledWith({
         email: 'teen@example.com',
         birthdate: '2011-04-15',
       })
-      expect(screen.getByText('Guardian invitation')).toBeInTheDocument()
+      expect(screen.getByText('Invite a guardian')).toBeInTheDocument()
     })
 
     fireEvent.change(screen.getByLabelText('Guardian email'), {
@@ -285,7 +285,7 @@ describe('SignupForm guardian invitation failures', () => {
       target: { value: '2011-04-15' },
     })
     fireEvent.submit(screen.getByRole('button', { name: 'Create account' }))
-    await screen.findByText('Guardian invitation')
+    await screen.findByText('Invite a guardian')
   }
 
   it('rejects a malformed guardian email before sending anything', async () => {

@@ -22408,6 +22408,9 @@ weekends and going out.
   [acceptance plan](../test-artifacts/test-design-7-17-teen-voice-copy.md).
 - [Shared copy checks](../../packages/utils/src/sample-wardrobe/strings.spec.ts) and
   [share export checks](../../apps/api/src/modules/share-cards/share-card-renderer.spec.ts).
+- [Locale coverage](../../scripts/ci/teen-voice-copy.test.mjs),
+  [Today](../../playwright/tests/calm-today.spec.ts), and
+  [Looks plan](../../playwright/tests/looks-plan.spec.ts).
 - [Web first run](../../playwright/tests/guest-preview.spec.ts) and
   [Android large text](../../maestro/subflows/teen-voice-enlarged-text.yaml).
 - [Step 70](#step-70-calm-today-with-one-primary-job) covers the first view of Today.

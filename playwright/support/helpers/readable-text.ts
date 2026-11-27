@@ -5,7 +5,8 @@ import { expect } from '../fixtures/merged-fixtures'
 export async function expectReadable(control: Locator) {
   await expect(control).toBeVisible()
   await control.scrollIntoViewIfNeeded()
-  const overflow = await control.evaluate((element) => {
+  const overflow = await control.evaluate(async (element) => {
+    await document.fonts.ready
     const bounds = element.getBoundingClientRect()
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
     const clipped: string[] = []

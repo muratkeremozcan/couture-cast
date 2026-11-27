@@ -176,7 +176,7 @@ export const enCA: GuestPreviewStrings = {
     precipPreparedness: {
       low: 'Only for heavy rain',
       medium: 'When rain is likely',
-      high: 'For any chance of rain',
+      high: 'I pack often',
     },
     weather: {
       'cool-windy': 'Cool and windy',
@@ -247,15 +247,13 @@ export const enCA: GuestPreviewStrings = {
     'layer-cold': '{garment} adds warmth below {threshold}.',
     'layer-wind':
       '{garment} blocks wind of {windSpeed} m/s, above your {windThreshold} m/s tolerance.',
-    'layer-rain':
-      '{rainPercent}. Your rain setting: {rainThresholdPercent}. Bring {garment} to stay dry.',
+    'layer-rain': '{rainPercent}. Bring {garment} to stay dry.',
     'no-layer': 'It is {range} enough to skip an outer layer.',
     'layer-unavailable':
       'This sample wardrobe has no layer with the protection this weather needs.',
     'wind-within':
       'Wind of {windSpeed} m/s is within your {windThreshold} m/s tolerance.',
-    'rain-within':
-      '{rainPercent}. Your rain setting: {rainThresholdPercent}. You can skip your rain gear.',
+    'rain-within': '{rainPercent}. You can skip your rain gear.',
     'liked-first': 'You liked {look}, so it comes first.',
     'stale-selection':
       'Your earlier look no longer suits these settings, so {look} is shown.',

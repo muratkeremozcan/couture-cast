@@ -55,7 +55,12 @@
         "critical": "Crítica"
       }
     },
-    "no_location": "Agrega tu ubicación para recibir tus atuendos del día"
+    "no_location": "Agrega tu ubicación para recibir tus atuendos del día",
+    "wetWeatherChance": {
+      "none": "Tiempo seco",
+      "possible": "Puede llover o nevar",
+      "likely": "Es probable que llueva o nieve"
+    }
   },
   "widget": {
     "now": "AHORA",
@@ -218,7 +223,7 @@
       "material": "Material",
       "comfort_range": "Rango de confort",
       "not_sure": "No estoy seguro / Limpiar",
-      "save": "Confirmar y guardar etiquetas",
+      "save": "Guardar etiquetas",
       "saving": "Guardando...",
       "ai_suggested": "Sugerido por IA: {{value}}",
       "loading": "Cargando tu prenda...",
@@ -276,7 +281,7 @@
       "deleteConfirmTitle": "¿Eliminar esta cápsula?",
       "deleteConfirmBody": "Esto elimina la cápsula. Tus prendas permanecen.",
       "nameLabel": "Nombre de la cápsula",
-      "namePlaceholder": "Casual de oficina",
+      "namePlaceholder": "Semana de clases",
       "descriptionLabel": "Descripción",
       "descriptionPlaceholder": "Descripción opcional",
       "garmentsLabel": "Prendas",
@@ -400,7 +405,7 @@
       "my_form_guidance": "Usa ropa lisa blanca o negra frente a un fondo liso para la mejor superposición.",
       "my_form_confirm": "Estoy usando ropa lisa blanca o negra",
       "my_form_retry": "Reintentar carga",
-      "my_form_remove": "Quitar foto Mi Forma",
+      "my_form_remove": "Quitar foto",
       "processing": "Procesando tu foto...",
       "ready": "Foto Mi Forma lista",
       "errors": {
@@ -697,7 +702,7 @@
         "errorLoad": "No se pudo cargar tu planificador semanal.",
         "retry": "Reintentar",
         "disabled": "El planificador de 7 días no está disponible por el momento. Tu cuenta sigue funcionando con normalidad.",
-        "starterWardrobe": "Creado a partir de un armario inicial.",
+        "starterWardrobe": "Incluye prendas de ejemplo",
         "day": {
           "error": {
             "title": "No se pudo generar este día.",
@@ -901,7 +906,7 @@
       "descriptionWorking": "Preparando una descripción…",
       "descriptionFailed": "No pudimos sugerir una descripción. Puedes escribir la tuya.",
       "captionLabel": "Descripción (opcional)",
-      "editText": "Editar título y descripción",
+      "editText": "Editar texto",
       "saveText": "Guardar cambios",
       "savingText": "Guardando…",
       "editSaved": "Cambios guardados.",

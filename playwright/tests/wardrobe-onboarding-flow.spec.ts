@@ -61,7 +61,7 @@ async function captureAndTagOneGarment(page: Page) {
       .getByRole('radiogroup', { name: 'Garment Category' })
       .getByRole('radio', { name: 'Top', exact: true })
       .click()
-    await taggingDialog.getByRole('button', { name: 'Confirm & Save Tags' }).click()
+    await taggingDialog.getByRole('button', { name: 'Save tags' }).click()
     await expect(taggingDialog).not.toBeVisible()
 
     await expect(

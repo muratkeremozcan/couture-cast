@@ -821,9 +821,7 @@ describe('WardrobePage direct garment entry', () => {
 
     const tagging = await screen.findByRole('dialog', { name: 'Organize Garment Tags' })
     expect(window.location.search).toBe('?from=home')
-    await user.click(
-      await within(tagging).findByRole('button', { name: 'Confirm & Save Tags' })
-    )
+    await user.click(await within(tagging).findByRole('button', { name: 'Save tags' }))
     const error = await screen.findByRole('alert')
     expect(error).toHaveTextContent('Refresh rejected')
     expect(error).toHaveTextContent('Showing your saved garments. Refresh failed.')
@@ -994,7 +992,7 @@ describe('WardrobePage tag confirmation', () => {
     render(<WardrobePage />)
     await user.click(await screen.findByRole('button', { name: 'Needs tags' }))
     await screen.findByText('Organize Garment Tags')
-    await user.click(await screen.findByRole('button', { name: 'Confirm & Save Tags' }))
+    await user.click(await screen.findByRole('button', { name: 'Save tags' }))
     return user
   }
 
@@ -1280,7 +1278,7 @@ describe('WardrobePage processing poll', () => {
     await user.click(screen.getByRole('button', { name: 'Done' }))
 
     expect(
-      await screen.findByText(/Smart tagging is taking longer than expected/)
+      await screen.findByText('Tags are taking a while. You can still see your piece.')
     ).toBeInTheDocument()
     expect(listGarmentsFromWeb).toHaveBeenCalledTimes(5)
     expect(screen.queryByRole('button', { name: 'Needs tags' })).not.toBeInTheDocument()
@@ -1469,7 +1467,7 @@ describe('WardrobePage commit deduplication', () => {
     releasePoll([garmentFixture('garment-poll', 'awaiting_tags')])
     await screen.findByText('Organize Garment Tags')
 
-    await user.click(await screen.findByRole('button', { name: 'Confirm & Save Tags' }))
+    await user.click(await screen.findByRole('button', { name: 'Save tags' }))
 
     await waitFor(() =>
       expect(screen.queryByText('Organize Garment Tags')).not.toBeInTheDocument()
@@ -1863,7 +1861,7 @@ describe('WardrobePage screen gate', () => {
     await waitFor(() => expect(keptUserId()).toBe('user-fixture-b'))
     // CC-7.11 D6: no Silhouette button reads the account on the Closet any more; B's account
     // answered, so no account error shows either.
-    expect(screen.queryByText(/Unable to load your account/)).toBeNull()
+    expect(screen.queryByText(/We can't load your account/)).toBeNull()
     const storedUserIds = remember.mock.calls
       .filter(([, screenName, part]) => screenName === 'closet' && part === 'closet')
       .map(([, , , value]) => (value as { userId: string | null }).userId)

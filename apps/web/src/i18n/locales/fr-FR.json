@@ -93,7 +93,7 @@
           "shoes": "Chaussures",
           "accessory": "Accessoire"
         },
-        "starterWardrobe": "Sélection de garde-robe de départ",
+        "starterWardrobe": "Avec des vêtements d’exemple",
         "reshuffle": {
           "action": "Remélanger",
           "loading": "Remélange en cours…",
@@ -302,7 +302,7 @@
       "deleteConfirmTitle": "Supprimer cette capsule ?",
       "deleteConfirmBody": "Cela supprime la capsule. Vos vêtements sont conservés.",
       "nameLabel": "Nom de la capsule",
-      "namePlaceholder": "Décontracté bureau",
+      "namePlaceholder": "Semaine de cours",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Description facultative",
       "garmentsLabel": "Vêtements",
@@ -401,7 +401,7 @@
       "title": "Configurez votre garde-robe",
       "garmentFallback": "Vêtement {{position}}",
       "permissionTitle": "Autoriser l’accès",
-      "permissionAction": "Autoriser l’accès à l’appareil photo et aux photos",
+      "permissionAction": "Autoriser l’accès",
       "permissionBody": "Donne à l’appli accès à ta caméra ou à tes photos pour ajouter une pièce.",
       "permissionDenied": "On n’a pas accès à ta caméra ni à tes photos. Choisis un fichier ou essaie la garde-robe d’exemple.",
       "useStarterWardrobe": "Utiliser l’exemple",
@@ -417,7 +417,7 @@
       "announcements": {
         "permissionRequesting": "Demande d'accès à la caméra…",
         "permissionGranted": "Accès à la caméra accordé. Capturez vos vêtements.",
-        "permissionDenied": "Accès à la caméra indisponible. Importez des photos ou utilisez la garde-robe de démarrage.",
+        "permissionDenied": "On ne peut pas ouvrir ton appareil photo. Choisis des photos ou essaie la garde-robe d’exemple.",
         "tagging": "Tous les vêtements sont capturés. Confirmez les étiquettes pour continuer.",
         "silhouette": "Configurez votre silhouette.",
         "garmentTagged": "{{garment}} étiqueté."
@@ -438,7 +438,7 @@
       "myFormGuidance": "Portez des vêtements unis blancs ou noirs devant un fond uni pour une superposition plus nette.",
       "myFormConfirm": "Je porte des vêtements unis blancs ou noirs",
       "myFormRetry": "Réessayer le téléversement",
-      "myFormRemove": "Supprimer la photo Ma Silhouette",
+      "myFormRemove": "Retirer la photo",
       "processing": "Traitement de votre photo…",
       "ready": "Photo Ma Silhouette prête",
       "loading": "Chargement de votre silhouette…",
@@ -579,7 +579,7 @@
       "suggestedReview": "(À vérifier, suggestion : {{value}})",
       "materialClear": "Je ne sais pas / Effacer",
       "cancel": "Annuler",
-      "save": "Confirmer et enregistrer les étiquettes",
+      "save": "Enregistrer les étiquettes",
       "saving": "Enregistrement...",
       "errors": {
         "suggestionUnavailable": "Suggestion indisponible",
@@ -827,7 +827,7 @@
       "descriptionWorking": "Préparation de la description…",
       "descriptionFailed": "Impossible de suggérer une description. Vous pouvez écrire la vôtre.",
       "captionLabel": "Description (facultative)",
-      "editText": "Modifier le titre et la description",
+      "editText": "Modifier le texte",
       "saveText": "Enregistrer les modifications",
       "savingText": "Enregistrement…",
       "editSaved": "Modifications enregistrées.",
@@ -1126,11 +1126,9 @@
     }
   },
   "landing": {
-    "tagline": "Des plans de garde-robe adaptés à la météo pour chaque trajet",
     "hero": {
       "eyebrow": "Rituel quotidien",
-      "headline": "Planifiez des tenues assurées en moins de 90 secondes.",
-      "body": "CoutureCast combine la météo hyperlocale, les archives de votre garde-robe et les idées de la communauté pour recommander des looks adaptés au trajet, à la réunion et à l'ambiance."
+      "headline": "Planifiez des tenues assurées en moins de 90 secondes."
     },
     "lookbook": {
       "eyebrow": "Lookbook Prism",
@@ -1143,36 +1141,7 @@
         "advisory": "Avis : {{type}}",
         "adjustOutfit": "Ajuster la tenue"
       },
-      "demo": {
-        "heading": "Rituel quotidien",
-        "timeCity": "08 h 30 • NYC",
-        "temperature": "18 °C",
-        "humidity": "Humidité modérée • 65 %",
-        "change": "+3 °C par rapport au trajet d’hier",
-        "primaryLook": "Look principal recommandé",
-        "matchScore": "Correspondance : {{score}}",
-        "garments": {
-          "blazer": "Blazer onyx",
-          "scarf": "Foulard en soie merlot",
-          "loafers": "Mocassins en cuir"
-        },
-        "lookA": {
-          "label": "LOOK A (principal)",
-          "title": "Blazer et maille de soie",
-          "body": "Niveau de chaleur adapté au vent frais du matin."
-        },
-        "lookB": {
-          "label": "LOOK B (alternative)",
-          "title": "Trench et cardigan en mérinos",
-          "body": "Meilleure protection contre le vent avec une coque déperlante."
-        }
-      },
       "recommendations": {
-        "personal": {
-          "eyebrow": "Prêt pour le trajet",
-          "title": "Blazer croisé et maille de soie",
-          "description": "Pensé pour un trajet en train à 18 °C le matin, puis un bureau climatisé."
-        },
         "community": {
           "eyebrow": "Tendance dans la communauté",
           "title": "Mélange parisien soie et cachemire",

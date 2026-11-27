@@ -378,15 +378,15 @@ export const badgeTranslations: Record<
   'en-US': {
     wind_layer: {
       label: 'Wind layer',
-      bullets: ['Suggest a wind-blocking layer because winds are high'],
+      bullets: ['A jacket can block the wind.'],
     },
     rain_ready: {
       label: 'Rain-ready',
-      bullets: ['Recommend rain-resistant outerwear or bringing an umbrella'],
+      bullets: ['Pack a raincoat or an umbrella.'],
     },
     evening_chill: {
       label: 'Evening chill',
-      bullets: ['Wear warm layers as temperature drops in the evening'],
+      bullets: ['Wear a warm layer tonight.'],
     },
     commute_warmth: {
       label: 'Morning layers',
@@ -394,15 +394,15 @@ export const badgeTranslations: Record<
     },
     sun_protection: {
       label: 'Sun protection',
-      bullets: ['Light-colored and UV-protective elements recommended'],
+      bullets: ['Wear a hat in the sun.'],
     },
     light_layers: {
       label: 'Light layers',
-      bullets: ['Light layers are sufficient for mild and pleasant day'],
+      bullets: ['Wear light layers.'],
     },
     breathable_comfort: {
       label: 'Breathable comfort',
-      bullets: ['Breathable garments recommended for hot conditions'],
+      bullets: ['Wear light clothes to stay cool.'],
     },
     daily_base: {
       label: 'Daily base',
@@ -416,15 +416,15 @@ export const badgeTranslations: Record<
   'en-CA': {
     wind_layer: {
       label: 'Wind layer',
-      bullets: ['Suggest a wind-blocking layer because winds are high'],
+      bullets: ['A jacket can block the wind.'],
     },
     rain_ready: {
       label: 'Rain-ready',
-      bullets: ['Recommend rain-resistant outerwear or bringing an umbrella'],
+      bullets: ['Pack a raincoat or an umbrella.'],
     },
     evening_chill: {
       label: 'Evening chill',
-      bullets: ['Wear warm layers as temperature drops in the evening'],
+      bullets: ['Wear a warm layer tonight.'],
     },
     commute_warmth: {
       label: 'Morning layers',
@@ -432,15 +432,15 @@ export const badgeTranslations: Record<
     },
     sun_protection: {
       label: 'Sun protection',
-      bullets: ['Light-colored and UV-protective elements recommended'],
+      bullets: ['Wear a hat in the sun.'],
     },
     light_layers: {
       label: 'Light layers',
-      bullets: ['Light layers are sufficient for mild and pleasant day'],
+      bullets: ['Wear light layers.'],
     },
     breathable_comfort: {
       label: 'Breathable comfort',
-      bullets: ['Breathable garments recommended for hot conditions'],
+      bullets: ['Wear light clothes to stay cool.'],
     },
     daily_base: {
       label: 'Daily base',
@@ -454,17 +454,15 @@ export const badgeTranslations: Record<
   'es-419': {
     wind_layer: {
       label: 'Cortaviento',
-      bullets: ['Se sugiere una capa cortavientos debido a los fuertes vientos'],
+      bullets: ['Lleva una chaqueta para el viento.'],
     },
     rain_ready: {
       label: 'Para lluvia',
-      bullets: [
-        'Se recomienda ropa exterior resistente a la lluvia o llevar un paraguas',
-      ],
+      bullets: ['Lleva un impermeable o paraguas.'],
     },
     evening_chill: {
       label: 'Fresco nocturno',
-      bullets: ['Usa capas abrigadas ya que la temperatura baja por la tarde/noche'],
+      bullets: ['Abrígate esta noche.'],
     },
     commute_warmth: {
       label: 'Capas para la mañana',
@@ -472,15 +470,15 @@ export const badgeTranslations: Record<
     },
     sun_protection: {
       label: 'Protección solar',
-      bullets: ['Se recomiendan prendas de colores claros y protección UV'],
+      bullets: ['Usa un sombrero al sol.'],
     },
     light_layers: {
       label: 'Capas ligeras',
-      bullets: ['Capas ligeras son suficientes para un día templado y agradable'],
+      bullets: ['Usa capas ligeras.'],
     },
     breathable_comfort: {
       label: 'Comodidad transpirable',
-      bullets: ['Prendas transpirables recomendadas para condiciones calurosas'],
+      bullets: ['Usa ropa ligera para no pasar calor.'],
     },
     daily_base: {
       label: 'Base diaria',
@@ -494,15 +492,15 @@ export const badgeTranslations: Record<
   'fr-CA': {
     wind_layer: {
       label: 'Coupe-vent',
-      bullets: ['Suggérer une couche coupe-vent en raison des vents forts'],
+      bullets: ['Prends un coupe-vent.'],
     },
     rain_ready: {
       label: 'Prêt pour la pluie',
-      bullets: ['Recommander un vêtement imperméable ou d’apporter un parapluie'],
+      bullets: ['Prends un imperméable ou un parapluie.'],
     },
     evening_chill: {
       label: 'Fraîcheur du soir',
-      bullets: ['Porter des couches chaudes car la température baisse en soirée'],
+      bullets: ['Mets une couche chaude ce soir.'],
     },
     commute_warmth: {
       label: 'Couches du matin',
@@ -510,15 +508,15 @@ export const badgeTranslations: Record<
     },
     sun_protection: {
       label: 'Protection solaire',
-      bullets: ['Vêtements clairs et protection UV recommandés'],
+      bullets: ['Mets un chapeau au soleil.'],
     },
     light_layers: {
       label: 'Couches légères',
-      bullets: ['Des couches légères suffisent pour une journée douce et agréable'],
+      bullets: ['Mets des couches légères.'],
     },
     breathable_comfort: {
       label: 'Confort respirant',
-      bullets: ['Vêtements respirants recommandés pour les temps chauds'],
+      bullets: ['Mets des vêtements légers pour rester au frais.'],
     },
     daily_base: {
       label: 'Base quotidienne',
@@ -532,15 +530,15 @@ export const badgeTranslations: Record<
   'fr-FR': {
     wind_layer: {
       label: 'Coupe-vent',
-      bullets: ['Suggérer une couche coupe-vent en raison des vents forts'],
+      bullets: ['Prends un coupe-vent.'],
     },
     rain_ready: {
       label: 'Prêt pour la pluie',
-      bullets: ['Recommander un vêtement imperméable ou d’apporter un parapluie'],
+      bullets: ['Prends un imperméable ou un parapluie.'],
     },
     evening_chill: {
       label: 'Fraîcheur du soir',
-      bullets: ['Porter des couches chaudes car la température baisse en soirée'],
+      bullets: ['Mets une couche chaude ce soir.'],
     },
     commute_warmth: {
       label: 'Couches du matin',
@@ -548,15 +546,15 @@ export const badgeTranslations: Record<
     },
     sun_protection: {
       label: 'Protection solaire',
-      bullets: ['Vêtements clairs et protection UV recommandés'],
+      bullets: ['Mets un chapeau au soleil.'],
     },
     light_layers: {
       label: 'Couches légères',
-      bullets: ['Des couches légères suffisent pour une journée douce et agréable'],
+      bullets: ['Mets des couches légères.'],
     },
     breathable_comfort: {
       label: 'Confort respirant',
-      bullets: ['Vêtements respirants recommandés pour les temps chauds'],
+      bullets: ['Mets des vêtements légers pour rester au frais.'],
     },
     daily_base: {
       label: 'Base quotidienne',
@@ -570,15 +568,15 @@ export const badgeTranslations: Record<
   'tr-TR': {
     wind_layer: {
       label: 'Rüzgarlık',
-      bullets: ['Yüksek rüzgar nedeniyle rüzgar kesici bir katman önerilir'],
+      bullets: ['Rüzgâr için bir ceket al.'],
     },
     rain_ready: {
       label: 'Yağmura hazırlık',
-      bullets: ['Şemsiye getirilmesi veya yağmura dayanıklı dış giyim önerilir'],
+      bullets: ['Yağmurluk ya da şemsiye al.'],
     },
     evening_chill: {
       label: 'Akşam serinliği',
-      bullets: ['Akşam sıcaklık düştüğü için sıcak katmanlar giyin'],
+      bullets: ['Bu akşam kalın bir şey giy.'],
     },
     commute_warmth: {
       label: 'Sabah için katlar',
@@ -586,15 +584,15 @@ export const badgeTranslations: Record<
     },
     sun_protection: {
       label: 'Güneş koruması',
-      bullets: ['Açık renkli ve UV korumalı kıyafetler önerilir'],
+      bullets: ['Güneşte şapka tak.'],
     },
     light_layers: {
       label: 'Hafif katmanlar',
-      bullets: ['Ilık ve hoş bir gün için hafif katmanlar yeterlidir'],
+      bullets: ['İnce katlar giy.'],
     },
     breathable_comfort: {
       label: 'Nefes alabilir konfor',
-      bullets: ['Sıcak koşullar için nefes alabilir giysiler önerilir'],
+      bullets: ['Serin kalmak için ince giysiler giy.'],
     },
     daily_base: {
       label: 'Günlük temel',
@@ -608,15 +606,15 @@ export const badgeTranslations: Record<
   'de-DE': {
     wind_layer: {
       label: 'Windschutz',
-      bullets: ['Empfehlen Sie eine windabweisende Schicht, da die Winde stark sind'],
+      bullets: ['Nimm eine Jacke als Windschutz mit.'],
     },
     rain_ready: {
       label: 'Regenfest',
-      bullets: ['Regenbeständige Oberbekleidung oder Regenschirm empfohlen'],
+      bullets: ['Nimm eine Regenjacke oder einen Schirm mit.'],
     },
     evening_chill: {
       label: 'Abendkühle',
-      bullets: ['Tragen Sie warme Schichten, wenn die Temperaturen am Abend sinken'],
+      bullets: ['Zieh heute Abend etwas Warmes an.'],
     },
     commute_warmth: {
       label: 'Schichten am Morgen',
@@ -624,15 +622,15 @@ export const badgeTranslations: Record<
     },
     sun_protection: {
       label: 'Sonnenschutz',
-      bullets: ['Helle und UV-schützende Kleidungsstücke empfohlen'],
+      bullets: ['Setz in der Sonne einen Hut auf.'],
     },
     light_layers: {
       label: 'Leichte Schichten',
-      bullets: ['Leichte Schichten reichen für einen milden und angenehmen Tag aus'],
+      bullets: ['Zieh dünne Schichten an.'],
     },
     breathable_comfort: {
       label: 'Atmungsaktiver Komfort',
-      bullets: ['Atmungsaktive Kleidungsstücke für heiße Bedingungen empfohlen'],
+      bullets: ['Zieh leichte Sachen an. So bleibst du kühl.'],
     },
     daily_base: {
       label: 'Tägliche Basis',
@@ -646,15 +644,15 @@ export const badgeTranslations: Record<
   'it-IT': {
     wind_layer: {
       label: 'Strato antivento',
-      bullets: ['Suggerisci uno strato antivento poiché i venti sono forti'],
+      bullets: ['Porta una giacca per il vento.'],
     },
     rain_ready: {
       label: 'Pronto per la pioggia',
-      bullets: ['Consiglia capispalla resistenti alla pioggia o ombrello'],
+      bullets: ['Porta un impermeabile o un ombrello.'],
     },
     evening_chill: {
       label: 'Fresco serale',
-      bullets: ['Indossa strati caldi poiché la temperatura scende in serata'],
+      bullets: ['Vestiti al caldo stasera.'],
     },
     commute_warmth: {
       label: 'Strati per il mattino',
@@ -662,15 +660,15 @@ export const badgeTranslations: Record<
     },
     sun_protection: {
       label: 'Protezione solare',
-      bullets: ['Consigliati capi chiari e protettivi dai raggi UV'],
+      bullets: ['Metti un cappello al sole.'],
     },
     light_layers: {
       label: 'Strati leggeri',
-      bullets: ['Gli strati leggeri sono sufficienti per una giornata mite e piacevole'],
+      bullets: ['Vestiti a strati leggeri.'],
     },
     breathable_comfort: {
       label: 'Comfort traspirante',
-      bullets: ['Consigliati capi traspiranti per le condizioni calde'],
+      bullets: ['Metti abiti leggeri per stare al fresco.'],
     },
     daily_base: {
       label: 'Base quotidiana',
@@ -684,15 +682,15 @@ export const badgeTranslations: Record<
   'pt-BR': {
     wind_layer: {
       label: 'Corta-vento',
-      bullets: ['Recomenda-se um casaco corta-vento porque os ventos estão fortes'],
+      bullets: ['Leve um casaco para o vento.'],
     },
     rain_ready: {
       label: 'Pronto para chuva',
-      bullets: ['Recomenda-se casaco impermeável ou guarda-chuva'],
+      bullets: ['Leve uma capa de chuva ou um guarda-chuva.'],
     },
     evening_chill: {
       label: 'Frio da noite',
-      bullets: ['Use casaco ou camadas quentes, pois a temperatura cai à noite'],
+      bullets: ['Vista algo quente esta noite.'],
     },
     commute_warmth: {
       label: 'Camadas para a manhã',
@@ -700,15 +698,15 @@ export const badgeTranslations: Record<
     },
     sun_protection: {
       label: 'Proteção solar',
-      bullets: ['Recomenda-se roupas de cores claras e proteção UV'],
+      bullets: ['Use um chapéu no sol.'],
     },
     light_layers: {
       label: 'Camadas leves',
-      bullets: ['Camadas leves são suficientes para um dia ameno e agradável'],
+      bullets: ['Vista camadas leves.'],
     },
     breathable_comfort: {
       label: 'Conforto respirável',
-      bullets: ['Recomenda-se roupas respiráveis para o clima quente'],
+      bullets: ['Use roupas leves para se refrescar.'],
     },
     daily_base: {
       label: 'Base diária',
@@ -722,15 +720,15 @@ export const badgeTranslations: Record<
   'pt-PT': {
     wind_layer: {
       label: 'Corta-vento',
-      bullets: ['Recomenda-se um casaco corta-vento porque os ventos estão fortes'],
+      bullets: ['Leva um casaco para o vento.'],
     },
     rain_ready: {
       label: 'Pronto para a chuva',
-      bullets: ['Recomenda-se casaco impermeável ou guarda-chuva'],
+      bullets: ['Leva um impermeável ou um guarda-chuva.'],
     },
     evening_chill: {
       label: 'Frio da noite',
-      bullets: ['Use casaco ou camadas quentes, pois a temperatura cai à noite'],
+      bullets: ['Veste algo quente esta noite.'],
     },
     commute_warmth: {
       label: 'Camadas para a manhã',
@@ -738,15 +736,15 @@ export const badgeTranslations: Record<
     },
     sun_protection: {
       label: 'Proteção solar',
-      bullets: ['Recomenda-se roupas de cores claras e proteção UV'],
+      bullets: ['Usa um chapéu ao sol.'],
     },
     light_layers: {
       label: 'Camadas leves',
-      bullets: ['Camadas leves são suficientes para um dia ameno e agradável'],
+      bullets: ['Veste camadas leves.'],
     },
     breathable_comfort: {
       label: 'Conforto respirável',
-      bullets: ['Recomenda-se roupas respiráveis para o clima quente'],
+      bullets: ['Veste roupa leve para te refrescares.'],
     },
     daily_base: {
       label: 'Base diária',

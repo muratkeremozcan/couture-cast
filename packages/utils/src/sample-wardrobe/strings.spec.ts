@@ -9,6 +9,7 @@ import {
   formatPreviewString,
   formatSampleExplanation,
   formatSampleTemperature,
+  getWeatherChance,
   getGuestPreviewStrings,
   resolveGuestPreviewLocale,
   sampleGarmentText,
@@ -41,6 +42,19 @@ const slug = (id: string) => id.slice('sample:x:'.length)
 const enUS = GUEST_PREVIEW_STRINGS['en-US']
 const adultSituations =
   /\b(?:commut(?:e|es|er|ers|ing)|offices?|meetings?|workdays?|workwear)\b/i
+
+it.each([
+  [Number.NaN, 'none'],
+  [0.49, 'none'],
+  [0.5, 'possible'],
+  [49, 'possible'],
+  [50, 'likely'],
+] as const)(
+  '[7.17-COPY-002] turns a %s precipitation chance into %s',
+  (percent, chance) => {
+    expect(getWeatherChance(percent)).toBe(chance)
+  }
+)
 
 describe('guest preview strings (U-CATALOG-STRINGS)', () => {
   it.each(['en-US', 'en-CA'] as const)(
@@ -284,7 +298,7 @@ describe('guest preview formatter', () => {
     expect(text).toEqual([
       'Cool and windy example, feels like 48°F.',
       'At about average comfort, that reads as cold weather.',
-      'Rain may fall. Your rain setting: When rain is likely. You can skip your rain gear.',
+      'Rain may fall. You can skip your rain gear.',
       'Wool overcoat adds warmth below 59°F.',
       'Wool overcoat blocks wind of 6.5 m/s, above your 5 m/s tolerance.',
     ])

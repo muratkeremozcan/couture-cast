@@ -258,7 +258,7 @@ test.describe('CC-7.15 Calm Community @local-lane', () => {
       await post.click({ trial: true })
 
       const empty = page.getByTestId('community-feed-empty')
-      await expect(empty).toContainText('Noch keine Looks in deiner Klimazone')
+      await expect(empty).toContainText('Noch keine Outfits für dein Wetter')
       const emptyAction = empty.getByRole('button')
       await expect(emptyAction).toHaveAccessibleName('Alle Klimazonen ansehen')
       await assertFitsPhone(emptyAction, 320)

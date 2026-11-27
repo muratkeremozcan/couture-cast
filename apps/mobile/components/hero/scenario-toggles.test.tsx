@@ -36,11 +36,11 @@ describe('ScenarioToggles long localized labels', () => {
     for (const key of Object.keys(labelOverrides)) delete labelOverrides[key]
   })
 
-  // The longest scenario labels across the 10 locales: it-IT, pt-PT and fr-FR.
+  // Long scenario labels from the updated locale catalogs.
   it.each([
-    ['Pendolarismo mattutino', 'Mezzogiorno', 'Piani serali'],
-    ['Percurso da manhã', 'Meio-dia', 'Planos para a noite'],
-    ['Trajet du matin', 'Midi', 'Projets de soirée'],
+    ['Prima di scuola', 'Mezzogiorno', 'Per uscire'],
+    ['Antes das aulas', 'Meio-dia', 'Para sair'],
+    ['Avant les cours', 'Midi', 'Pour sortir'],
   ])('6.5-MOB-POLISH-08 keeps %s, %s and %s on one line', (morning, midday, evening) => {
     setLabels(morning, midday, evening)
     renderOnPhone()
@@ -70,10 +70,10 @@ describe('ScenarioToggles long localized labels', () => {
   })
 
   it('6.5-MOB-POLISH-09 spreads short labels across the full row', () => {
-    setLabels('Morning commute', 'Midday', 'Evening plans')
+    setLabels('Before school', 'Midday', 'Going out')
     renderOnPhone()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Morning commute' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Before school' }))
     const row = screen.getByTestId('scenario-toggles').getBoundingClientRect()
     const first = screen.getByTestId('scenario-toggle-morning').getBoundingClientRect()
     const last = screen.getByTestId('scenario-toggle-evening').getBoundingClientRect()

@@ -180,7 +180,7 @@ export const frFR: GuestPreviewStrings = {
     precipPreparedness: {
       low: 'Seulement en cas de forte pluie',
       medium: 'Quand la pluie est probable',
-      high: 'Au moindre risque de pluie',
+      high: 'Souvent',
     },
     weather: {
       'cool-windy': 'Frais et venteux',
@@ -251,15 +251,13 @@ export const frFR: GuestPreviewStrings = {
     'layer-cold': '{garment} : apporte de la chaleur sous {threshold}.',
     'layer-wind':
       '{garment} : coupe un vent de {windSpeed} m/s, au-delà de votre tolérance de {windThreshold} m/s.',
-    'layer-rain':
-      '{rainPercent}. Ton réglage de pluie : {rainThresholdPercent}. Prends ce vêtement pour rester au sec : {garment}.',
+    'layer-rain': '{rainPercent}. Prends ce vêtement pour rester au sec : {garment}.',
     'no-layer': 'Il fait {range}, une couche extérieure est inutile.',
     'layer-unavailable':
       "Cette garde-robe d'exemple n'a aucune couche extérieure offrant la protection nécessaire par ce temps.",
     'wind-within':
       'Un vent de {windSpeed} m/s ne dépasse pas votre tolérance de {windThreshold} m/s.',
-    'rain-within':
-      '{rainPercent}. Ton réglage de pluie : {rainThresholdPercent}. Tu peux laisser ton imper à la maison.',
+    'rain-within': '{rainPercent}. Tu peux laisser ton imper à la maison.',
     'liked-first': 'Vous avez aimé {look}, donc ce look passe en premier.',
     'stale-selection':
       'Votre look précédent ne convient plus à ces réglages, voici donc {look}.',

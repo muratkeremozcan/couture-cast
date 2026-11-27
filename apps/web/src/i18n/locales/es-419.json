@@ -93,7 +93,7 @@
           "shoes": "Calzado",
           "accessory": "Accesorio"
         },
-        "starterWardrobe": "Selección de guardarropa inicial",
+        "starterWardrobe": "Incluye prendas de ejemplo",
         "reshuffle": {
           "action": "Repetir combinación",
           "loading": "Generando nueva combinación…",
@@ -302,7 +302,7 @@
       "deleteConfirmTitle": "¿Eliminar esta cápsula?",
       "deleteConfirmBody": "Esto elimina la cápsula. Tus prendas permanecen.",
       "nameLabel": "Nombre de la cápsula",
-      "namePlaceholder": "Casual de oficina",
+      "namePlaceholder": "Semana de clases",
       "descriptionLabel": "Descripción",
       "descriptionPlaceholder": "Descripción opcional",
       "garmentsLabel": "Prendas",
@@ -401,7 +401,7 @@
       "title": "Configura tu clóset",
       "garmentFallback": "Prenda {{position}}",
       "permissionTitle": "Permitir acceso",
-      "permissionAction": "Permite el acceso a la cámara y las fotos",
+      "permissionAction": "Permitir acceso",
       "permissionBody": "Dale a la app acceso a tu cámara o fotos para agregar una prenda.",
       "permissionDenied": "No podemos abrir tu cámara ni tus fotos. Elige un archivo o prueba el clóset de muestra.",
       "useStarterWardrobe": "Usar clóset de muestra",
@@ -417,7 +417,7 @@
       "announcements": {
         "permissionRequesting": "Solicitando acceso a la cámara…",
         "permissionGranted": "Acceso a la cámara concedido. Captura tus prendas.",
-        "permissionDenied": "Acceso a la cámara no disponible. Importa fotos o usa el armario inicial.",
+        "permissionDenied": "No podemos abrir tu cámara. Elige fotos o prueba el clóset de ejemplo.",
         "tagging": "Todas las prendas capturadas. Confirma las etiquetas para continuar.",
         "silhouette": "Configura tu silueta.",
         "garmentTagged": "{{garment}} etiquetada."
@@ -438,7 +438,7 @@
       "myFormGuidance": "Usa ropa blanca o negra lisa sobre un fondo liso para lograr la superposición más precisa.",
       "myFormConfirm": "Estoy usando ropa blanca o negra lisa",
       "myFormRetry": "Reintentar carga",
-      "myFormRemove": "Eliminar foto Mi Forma",
+      "myFormRemove": "Quitar foto",
       "processing": "Procesando tu foto…",
       "ready": "Foto Mi Forma lista",
       "loading": "Cargando tu silueta…",
@@ -579,7 +579,7 @@
       "suggestedReview": "(Revisar, sugerencia: {{value}})",
       "materialClear": "No estoy seguro / Borrar",
       "cancel": "Cancelar",
-      "save": "Confirmar y guardar etiquetas",
+      "save": "Guardar etiquetas",
       "saving": "Guardando...",
       "errors": {
         "suggestionUnavailable": "Sugerencia no disponible",
@@ -827,7 +827,7 @@
       "descriptionWorking": "Preparando una descripción…",
       "descriptionFailed": "No pudimos sugerir una descripción. Puedes escribir la tuya.",
       "captionLabel": "Descripción (opcional)",
-      "editText": "Editar título y descripción",
+      "editText": "Editar texto",
       "saveText": "Guardar cambios",
       "savingText": "Guardando…",
       "editSaved": "Cambios guardados.",
@@ -1126,11 +1126,9 @@
     }
   },
   "landing": {
-    "tagline": "Planes de vestuario según el clima para cada trayecto",
     "hero": {
       "eyebrow": "Ritual diario",
-      "headline": "Planea atuendos con confianza en menos de 90 segundos.",
-      "body": "CoutureCast combina el clima hiperlocal, el archivo de tu vestuario y la experiencia de la comunidad para recomendar looks que respetan el trayecto, la reunión y tu estilo."
+      "headline": "Planea atuendos con confianza en menos de 90 segundos."
     },
     "lookbook": {
       "eyebrow": "Lookbook Prism",
@@ -1143,36 +1141,7 @@
         "advisory": "Aviso: {{type}}",
         "adjustOutfit": "Ajustar outfit"
       },
-      "demo": {
-        "heading": "Ritual diario",
-        "timeCity": "08:30 a. m. • NYC",
-        "temperature": "18 °C",
-        "humidity": "Humedad moderada • 65 %",
-        "change": "+3 °C respecto al trayecto de ayer",
-        "primaryLook": "Look principal recomendado",
-        "matchScore": "Coincidencia: {{score}}",
-        "garments": {
-          "blazer": "Blazer ónix",
-          "scarf": "Pañuelo de seda color merlot",
-          "loafers": "Mocasines de cuero"
-        },
-        "lookA": {
-          "label": "LOOK A (principal)",
-          "title": "Blazer y tejido de seda",
-          "body": "Nivel de abrigo ajustado al viento fresco de la mañana."
-        },
-        "lookB": {
-          "label": "LOOK B (alternativa)",
-          "title": "Gabardina y cárdigan de merino",
-          "body": "Más protección contra el viento con una capa resistente al agua."
-        }
-      },
       "recommendations": {
-        "personal": {
-          "eyebrow": "Listo para el trayecto",
-          "title": "Blazer cruzado y tejido de seda",
-          "description": "Pensado para un trayecto en tren a 18 °C por la mañana que termina en una oficina con aire acondicionado."
-        },
         "community": {
           "eyebrow": "Tendencia en la comunidad",
           "title": "Mezcla parisina de seda y cachemira",

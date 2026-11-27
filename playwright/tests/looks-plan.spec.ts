@@ -9,7 +9,7 @@
 // CC-7.17 copy acceptance: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
 import type { Page } from '@playwright/test'
 import { expect, test } from '../support/fixtures/merged-fixtures'
-import { waitForShellSettled } from '../support/helpers/app-shell'
+import { SCHEMES, waitForShellSettled } from '../support/helpers/app-shell'
 import { FOLD_VIEWPORT, foldBand } from '../support/helpers/five-tab'
 import { expectReadable } from '../support/helpers/readable-text'
 import {
@@ -32,25 +32,29 @@ const FREE_LINE = 'With Premium, you can plan what to wear all week.'
 test.describe('CC-7.17 German Plan at 320 px @local-lane', () => {
   test.use({ locale: 'de-DE', viewport: { width: 320, height: 640 } })
 
-  test('[7.17-LAYOUT-001] the localized Plan preview wraps and its upgrade stays reachable', async ({
-    page,
-  }) => {
-    await page.goto('/looks?segment=plan')
-    await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
-    await expect(page.locator('html')).toHaveAttribute('lang', 'de-DE')
-    const preview = page.getByTestId('plan-free-preview')
-    await expectReadable(
-      preview.getByText(
-        'Mit Premium kannst du deine Outfits für die ganze Woche planen.',
-        {
-          exact: true,
-        }
-      )
-    )
-    const upgrade = preview.getByTestId('plan-upgrade')
-    await expectReadable(upgrade)
-    await upgrade.click({ trial: true })
-  })
+  for (const colorScheme of SCHEMES) {
+    test.describe(colorScheme, () => {
+      test.use({ colorScheme })
+
+      test('[7.17-LAYOUT-001] the localized Plan preview wraps and its upgrade stays reachable', async ({
+        page,
+      }) => {
+        await page.goto('/looks?segment=plan')
+        await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+        await expect(page.locator('html')).toHaveAttribute('lang', 'de-DE')
+        const preview = page.getByTestId('plan-free-preview')
+        await expectReadable(
+          preview.getByText(
+            'Mit Premium kannst du deine Outfits für die ganze Woche planen.',
+            { exact: true }
+          )
+        )
+        const upgrade = preview.getByTestId('plan-upgrade')
+        await expectReadable(upgrade)
+        await upgrade.click({ trial: true })
+      })
+    })
+  }
 })
 
 const OLD_LOCK_IDS = [

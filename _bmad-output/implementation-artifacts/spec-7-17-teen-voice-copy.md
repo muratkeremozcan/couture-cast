@@ -3,14 +3,14 @@ title: 'Story CC-7.17: Teen voice and copy'
 type: feature
 ticket: '7-17-teen-voice-copy'
 created: '2026-11-27'
-status: in-progress
+status: built
 baseline_revision: 'a80ed17fda2d24ff748219c3983e01ed937bd384'
 route: full
 route_source: auto
 risk: medium
 review: thorough
 review_source: pinned
-lenses_ran: []
+lenses_ran: [independent-full-review, codex-security-diff]
 review_loop_iteration: 0
 context:
   - '_bmad-output/planning-artifacts/epics.md'
@@ -64,9 +64,9 @@ Preserve the existing layout test IDs. Confirm effective content on both clients
 
 - [x] Document second person, short sentences, familiar situations, picture-backed garment terms,
       and words for weather and fit.
-- [ ] Given a member reads app-written English in the five tabs or first run, then prose reads at
+- [x] Given a member reads app-written English in the five tabs or first run, then prose reads at
       US grade six or below and button labels use up to three words.
-- [ ] Given a member opens Home, browseable samples or a share card, then the copy uses everyday
+- [x] Given a member opens Home, browseable samples or a share card, then the copy uses everyday
       settings such as school, weekends and going out.
 - [ ] Given a member uses any of the ten supported locales, then changed strings load in that
       locale, and long labels can wrap at 320 px or dp in both themes.
@@ -84,7 +84,30 @@ strings. The copy-free output matched for garment selection, badge keys and fore
 
 ## Plan change log
 
+The hourly forecast uses the same chance buckets as sample looks. Its labels say rain or snow
+because the live forecast can include either. Sample explanations show the result of the rain
+setting without repeating the setting label. The existing thresholds still pick the outfit.
+
 ## Review triage log
+
+The independent full review and Codex Security used `a80ed17fda2d24ff748219c3983e01ed937bd384`
+through `90eac8cd4ddf486b896a25f3ad6de7f81184127c`. Codex Security completed 93 static worklist
+receipts, with 24 inventory exclusions and zero reportable findings.
+Review found six high, four medium and one low item.
+
+| Finding | Verdict | Action                                                                                              |
+| ------- | ------- | --------------------------------------------------------------------------------------------------- |
+| P1-1    | High    | Use 8 dp spacing for the hourly card and pass the design token guard.                               |
+| P1-2    | High    | Translate the web permission action under the button's actual key.                                  |
+| P1-3    | High    | Migrate web unit expectations to the rendered copy.                                                 |
+| P1-4    | High    | Migrate mobile unit expectations to the rendered copy.                                              |
+| P1-5    | High    | Migrate Playwright selectors and refresh reviewed baselines from CI.                                |
+| P1-6    | High    | Migrate Maestro assertions for the Turkish Today and German Community runs.                         |
+| P2-1    | Medium  | Handle nonfinite and trace chances, wrap longer forecast labels, and name rain and snow accurately. |
+| P2-2    | Medium  | Update the capsule placeholder, remaining old prompts, long buttons and badge fallback text.        |
+| P2-3    | Medium  | Finish the Italian and Brazilian Portuguese copy and expand locale and narrow-layout coverage.      |
+| P2-4    | Medium  | Drop the rain setting interpolation from explanation templates to eliminate the blank label.        |
+| P3-1    | Low     | Update Step 74 links, stale test copy and sprint status.                                            |
 
 ## Verification
 

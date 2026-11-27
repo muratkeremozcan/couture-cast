@@ -19,6 +19,14 @@ describe('federated sign-in strings', () => {
     }
   })
 
+  it.each(Object.keys(FEDERATED_SIGNIN_STRINGS))(
+    '[7.17-I18N-001] %s keeps the address in the guardian invite confirmation',
+    (locale) => {
+      const { inviteSent } = getFederatedSignInStrings(locale)
+      expect(inviteSent.match(/\{\w+\}/g)).toEqual(['{email}'])
+    }
+  )
+
   it.each([
     ['es-419', 'es-419'],
     ['es', 'es-419'],
@@ -53,10 +61,14 @@ describe('federated sign-in strings', () => {
     '%s says to sign in again once the account is approved',
     (locale) => {
       const strings = getFederatedSignInStrings(locale)
+      expect(strings.createdGuardianPending).toContain(
+        'Ton parent ou tuteur doit l’approuver'
+      )
+      expect(strings.awaitingGuardian).toContain(
+        'Ton parent ou tuteur doit encore approuver ton compte'
+      )
       for (const key of ['createdGuardianPending', 'awaitingGuardian'] as const)
-        expect(strings[key], key).toMatch(
-          /puis reconnectez-vous une fois votre compte approuvé\.$/
-        )
+        expect(strings[key], key).toMatch(/reconnecte-toi après son accord\.$/)
     }
   )
 })

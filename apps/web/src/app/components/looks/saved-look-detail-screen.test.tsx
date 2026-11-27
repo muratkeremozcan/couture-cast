@@ -337,7 +337,7 @@ describe('7.12 saved look detail (D5)', () => {
     )
     renderDetail()
     expect(await screen.findByTestId('saved-look-detail-needs-review')).toHaveTextContent(
-      'You changed tags on a piece in this look.'
+      'You changed a tag on a piece.'
     )
     expect(screen.queryByTestId('saved-look-detail-missing')).toBeNull()
   })

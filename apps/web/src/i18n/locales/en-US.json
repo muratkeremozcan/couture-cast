@@ -93,7 +93,7 @@
           "shoes": "Shoes",
           "accessory": "Accessory"
         },
-        "starterWardrobe": "Starter wardrobe pick",
+        "starterWardrobe": "Uses sample pieces",
         "reshuffle": {
           "action": "Reshuffle",
           "loading": "Reshuffling…",
@@ -302,7 +302,7 @@
       "deleteConfirmTitle": "Delete this capsule?",
       "deleteConfirmBody": "This removes the capsule. Your wardrobe garments stay.",
       "nameLabel": "Capsule name",
-      "namePlaceholder": "Work casual",
+      "namePlaceholder": "School week",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Optional description",
       "garmentsLabel": "Garments",
@@ -401,7 +401,7 @@
       "title": "Set up your closet",
       "garmentFallback": "Garment {{position}}",
       "permissionTitle": "Allow access",
-      "permissionAction": "Allow camera and photo access",
+      "permissionAction": "Allow access",
       "permissionBody": "Give the app access to your camera or photos to add a piece.",
       "permissionDenied": "We can't open your camera or photos. You can pick a file or try the sample closet.",
       "useStarterWardrobe": "Use sample closet",
@@ -417,7 +417,7 @@
       "announcements": {
         "permissionRequesting": "Requesting camera access…",
         "permissionGranted": "Camera access granted. Capture your garments.",
-        "permissionDenied": "Camera access unavailable. Import photos or use the starter wardrobe.",
+        "permissionDenied": "We can't open your camera. Pick photos or try the sample closet.",
         "tagging": "All garments captured. Confirm tags to continue.",
         "silhouette": "Set up your silhouette.",
         "garmentTagged": "{{garment}} tagged."
@@ -438,7 +438,7 @@
       "myFormGuidance": "Wear plain white or black clothing against a plain background for the cleanest overlay.",
       "myFormConfirm": "I'm wearing plain white or black clothing",
       "myFormRetry": "Retry upload",
-      "myFormRemove": "Remove My Form photo",
+      "myFormRemove": "Remove photo",
       "processing": "Processing your photo…",
       "ready": "My Form photo ready",
       "loading": "Loading your silhouette…",
@@ -579,7 +579,7 @@
       "suggestedReview": "(Needs review suggested: {{value}})",
       "materialClear": "Not sure / Clear",
       "cancel": "Cancel",
-      "save": "Confirm & Save Tags",
+      "save": "Save tags",
       "saving": "Saving...",
       "errors": {
         "suggestionUnavailable": "Suggestion unavailable",
@@ -827,7 +827,7 @@
       "descriptionWorking": "Preparing a description…",
       "descriptionFailed": "Could not suggest a description. You can still write your own.",
       "captionLabel": "Description (optional)",
-      "editText": "Edit title and description",
+      "editText": "Edit text",
       "saveText": "Save changes",
       "savingText": "Saving…",
       "editSaved": "Changes saved.",
@@ -1126,11 +1126,9 @@
     }
   },
   "landing": {
-    "tagline": "Weather-aware wardrobe plans for every commute",
     "hero": {
       "eyebrow": "Daily ritual",
-      "headline": "Plan confident outfits in under 90 seconds.",
-      "body": "CoutureCast blends hyperlocal weather, your wardrobe archive, and community insight to recommend looks that respect the commute, the meeting, and the vibe."
+      "headline": "Plan confident outfits in under 90 seconds."
     },
     "lookbook": {
       "eyebrow": "Lookbook Prism",
@@ -1143,36 +1141,7 @@
         "advisory": "{{type}} advisory",
         "adjustOutfit": "Adjust outfit"
       },
-      "demo": {
-        "heading": "Daily Hero Ritual",
-        "timeCity": "08:30 AM • NYC",
-        "temperature": "18°C",
-        "humidity": "Mild Humidity • 65%",
-        "change": "+3°C from yesterday commute",
-        "primaryLook": "Primary Recommended Look",
-        "matchScore": "Match Score: {{score}}",
-        "garments": {
-          "blazer": "Onyx Blazer",
-          "scarf": "Merlot Silk Scarf",
-          "loafers": "Leather Loafers"
-        },
-        "lookA": {
-          "label": "LOOK A (Primary)",
-          "title": "Blazer & Silk Knit",
-          "body": "Warmth level tuned for brisk morning wind."
-        },
-        "lookB": {
-          "label": "LOOK B (Alternative)",
-          "title": "Trench & Merino Cardigan",
-          "body": "Higher wind protection with water-resistant shell."
-        }
-      },
       "recommendations": {
-        "personal": {
-          "eyebrow": "Commute Ready",
-          "title": "Double-Breasted Blazer & Silk Knit",
-          "description": "Optimized for 18°C morning train commute transitioning into air-conditioned office."
-        },
         "community": {
           "eyebrow": "Community Trending",
           "title": "Parisian Silk & Cashmere Blend",

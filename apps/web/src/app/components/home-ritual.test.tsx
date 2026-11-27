@@ -813,7 +813,7 @@ it('shows inline Needs review badge for unresolved Home saved looks and avoids s
 
     await waitFor(() =>
       expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
-        'Review it to make sure it still fits.'
+        'Check if the look still works for you.'
       )
     )
     expect(screen.getByTestId('guest-preview-look-name').textContent).toBe(beforeLook)

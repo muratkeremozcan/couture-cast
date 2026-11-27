@@ -176,7 +176,11 @@ describe('Step 58 follow-up: mount-time reads recover when the verified identity
     render(<WardrobePage />)
 
     expect(await screen.findByText(SIGNED_OUT_MESSAGE)).toBeInTheDocument()
-    expect(await screen.findByText(/Unable to load your account, so/)).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        "We can't load your account. Reload the page to change your fit settings."
+      )
+    ).toBeInTheDocument()
     expect(
       await screen.findByText("We can't check your closet setup yet.")
     ).toBeInTheDocument()
@@ -197,7 +201,7 @@ describe('Step 58 follow-up: mount-time reads recover when the verified identity
     publishIdentity('member-a')
 
     await waitFor(() =>
-      expect(screen.queryByText(/Unable to load your account/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/We can't load your account/)).not.toBeInTheDocument()
     )
     expect(await screen.findByText('No pieces yet')).toBeInTheDocument()
     openMore()
@@ -208,7 +212,7 @@ describe('Step 58 follow-up: mount-time reads recover when the verified identity
     )
     expect(screen.queryByRole('link', { name: 'Set up your closet' })).toBeNull()
     expect(screen.queryByText(SIGNED_OUT_MESSAGE)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Unable to load your account/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/We can't load your account/)).not.toBeInTheDocument()
     expect(
       screen.queryByText("We can't check your closet setup yet.")
     ).not.toBeInTheDocument()

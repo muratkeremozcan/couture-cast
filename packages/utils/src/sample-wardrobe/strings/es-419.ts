@@ -180,7 +180,7 @@ export const es419: GuestPreviewStrings = {
     precipPreparedness: {
       low: 'Solo con lluvia intensa',
       medium: 'Cuando es probable que llueva',
-      high: 'Ante cualquier probabilidad de lluvia',
+      high: 'Suelo llevarla',
     },
     weather: {
       'cool-windy': 'Fresco y ventoso',
@@ -251,15 +251,13 @@ export const es419: GuestPreviewStrings = {
     'layer-cold': '{garment} da abrigo por debajo de {threshold}.',
     'layer-wind':
       '{garment} bloquea un viento de {windSpeed} m/s, por encima de tu tolerancia de {windThreshold} m/s.',
-    'layer-rain':
-      '{rainPercent}. Tu ajuste de lluvia: {rainThresholdPercent}. Lleva {garment} para no mojarte.',
+    'layer-rain': '{rainPercent}. Lleva {garment} para no mojarte.',
     'no-layer': 'Con clima {range}, no hace falta una capa exterior.',
     'layer-unavailable':
       'Este guardarropa de ejemplo no tiene una capa exterior con la protección que pide este clima.',
     'wind-within':
       'Un viento de {windSpeed} m/s está dentro de tu tolerancia de {windThreshold} m/s.',
-    'rain-within':
-      '{rainPercent}. Tu ajuste de lluvia: {rainThresholdPercent}. Puedes dejar en casa la ropa para la lluvia.',
+    'rain-within': '{rainPercent}. Puedes dejar la ropa para la lluvia en casa.',
     'liked-first': 'Te gustó {look}, así que aparece primero.',
     'stale-selection':
       'Tu conjunto anterior ya no es adecuado para esta configuración, así que se muestra {look}.',

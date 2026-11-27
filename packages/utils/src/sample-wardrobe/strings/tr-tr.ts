@@ -175,7 +175,7 @@ export const trTR: GuestPreviewStrings = {
     precipPreparedness: {
       low: 'Yalnızca şiddetli yağmurda',
       medium: 'Yağmur olasılığı yüksekse',
-      high: 'En küçük yağmur ihtimalinde',
+      high: 'Sık sık alırım',
     },
     weather: {
       'cool-windy': 'Serin ve rüzgârlı',
@@ -246,15 +246,13 @@ export const trTR: GuestPreviewStrings = {
     'layer-cold': '{garment}, {threshold} altında sıcak tutar.',
     'layer-wind':
       '{garment}, {windSpeed} m/s rüzgârı keser; bu, {windThreshold} m/s olan toleransınızın üzerinde.',
-    'layer-rain':
-      '{rainPercent}. Yağmur ayarın: {rainThresholdPercent}. Kuru kalmak için bu parçayı al: {garment}.',
+    'layer-rain': '{rainPercent}. Kuru kalmak için bu parçayı al: {garment}.',
     'no-layer': 'Hava {range}, dış giyime gerek yok.',
     'layer-unavailable':
       'Bu örnek gardıropta bu havanın gerektirdiği korumayı sağlayan dış giyim yok.',
     'wind-within':
       '{windSpeed} m/s rüzgâr, {windThreshold} m/s olan toleransınızın içinde.',
-    'rain-within':
-      '{rainPercent}. Yağmur ayarın: {rainThresholdPercent}. Yağmurluğunu evde bırakabilirsin.',
+    'rain-within': '{rainPercent}. Yağmurluğunu evde bırakabilirsin.',
     'liked-first': 'Beğendiğiniz için öne alındı: {look}.',
     'stale-selection':
       'Önceki görünümünüz bu ayarlara artık uymuyor, bu yüzden şu görünüm gösteriliyor: {look}.',

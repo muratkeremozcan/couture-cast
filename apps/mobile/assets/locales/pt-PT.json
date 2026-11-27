@@ -55,7 +55,12 @@
         "critical": "Crítico"
       }
     },
-    "no_location": "Adicione a sua localização para receber sugestões de roupa diárias"
+    "no_location": "Adicione a sua localização para receber sugestões de roupa diárias",
+    "wetWeatherChance": {
+      "none": "Tempo seco",
+      "possible": "Pode chover ou nevar",
+      "likely": "É provável que chova ou neve"
+    }
   },
   "widget": {
     "now": "AGORA",
@@ -218,7 +223,7 @@
       "material": "Material",
       "comfort_range": "Intervalo de conforto",
       "not_sure": "Não tenho certeza / Limpar",
-      "save": "Confirmar e guardar",
+      "save": "Guardar etiquetas",
       "saving": "A guardar...",
       "ai_suggested": "Sugerido por IA: {{value}}",
       "loading": "A carregar a sua peça...",
@@ -276,7 +281,7 @@
       "deleteConfirmTitle": "Eliminar esta cápsula?",
       "deleteConfirmBody": "Isto remove a cápsula. As tuas peças permanecem.",
       "nameLabel": "Nome da cápsula",
-      "namePlaceholder": "Casual de escritório",
+      "namePlaceholder": "Semana de aulas",
       "descriptionLabel": "Descrição",
       "descriptionPlaceholder": "Descrição opcional",
       "garmentsLabel": "Peças",
@@ -400,7 +405,7 @@
       "my_form_guidance": "Vista roupa lisa branca ou preta contra um fundo liso para a sobreposição mais nítida.",
       "my_form_confirm": "Estou a vestir roupa lisa branca ou preta",
       "my_form_retry": "Tentar envio novamente",
-      "my_form_remove": "Remover fotografia My Form",
+      "my_form_remove": "Remover fotografia",
       "processing": "A processar a sua fotografia...",
       "ready": "Fotografia My Form pronta",
       "errors": {
@@ -697,7 +702,7 @@
         "errorLoad": "Não foi possível carregar o seu planeador semanal.",
         "retry": "Tentar novamente",
         "disabled": "O planeador de 7 dias está temporariamente indisponível. A sua conta continua a funcionar normalmente.",
-        "starterWardrobe": "Criado a partir de um roupeiro inicial.",
+        "starterWardrobe": "Com peças de exemplo",
         "day": {
           "error": {
             "title": "Não foi possível gerar este dia.",
@@ -901,7 +906,7 @@
       "descriptionWorking": "A preparar uma descrição…",
       "descriptionFailed": "Não foi possível sugerir uma descrição. Podes escrever a tua.",
       "captionLabel": "Descrição (opcional)",
-      "editText": "Editar título e descrição",
+      "editText": "Editar texto",
       "saveText": "Guardar alterações",
       "savingText": "A guardar…",
       "editSaved": "Alterações guardadas.",

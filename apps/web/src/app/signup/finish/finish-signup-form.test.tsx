@@ -12,11 +12,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type * as NextNavigation from 'next/navigation'
-import {
-  AGE_GATE_MESSAGES,
-  evaluateBirthdateInput,
-  getFederatedSignInStrings,
-} from '@couture/utils'
+import { evaluateBirthdateInput, getFederatedSignInStrings } from '@couture/utils'
 import { getI18n } from '../../../i18n'
 import type * as CoutureUtils from '@couture/utils'
 import type * as WebSession from '../../../lib/web-session'
@@ -157,13 +153,13 @@ describe('D3: the email signup inline birthdate messages, announced', () => {
     }
   )
 
-  it("under policy required_13_15 a birthdate 13 to 15 announces evaluateBirthdateInput's guardian message", async () => {
+  it('announces the guardian approval notice under the required policy for a 13 to 15 birthdate', async () => {
     agePolicy.current = 'required_13_15'
     const field = await renderForm()
     fireEvent.change(field, { target: { value: birthdate(14) } })
-    const expected = evaluateBirthdateInput(birthdate(14)).message
-    expect(expected).toBe(AGE_GATE_MESSAGES.guardianRequired)
-    const shown = await screen.findByText(expected!)
+    const shown = await screen.findByText('You need your guardian’s approval.', {
+      exact: true,
+    })
     expect(liveRegionOf(shown)).not.toBeNull()
   })
 

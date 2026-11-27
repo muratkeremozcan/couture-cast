@@ -55,7 +55,12 @@
         "critical": "Critique"
       }
     },
-    "no_location": "Ajoutez votre emplacement pour recevoir vos tenues du jour"
+    "no_location": "Ajoutez votre emplacement pour recevoir vos tenues du jour",
+    "wetWeatherChance": {
+      "none": "Temps sec",
+      "possible": "Il pourrait pleuvoir ou neiger",
+      "likely": "Il risque de pleuvoir ou de neiger"
+    }
   },
   "widget": {
     "now": "MAINTENANT",
@@ -218,7 +223,7 @@
       "material": "Matériau",
       "comfort_range": "Plage de confort",
       "not_sure": "Pas sûr / Effacer",
-      "save": "Confirmer et enregistrer",
+      "save": "Enregistrer les étiquettes",
       "saving": "Enregistrement...",
       "ai_suggested": "Suggéré par l'IA : {{value}}",
       "loading": "Chargement de votre vêtement...",
@@ -276,7 +281,7 @@
       "deleteConfirmTitle": "Supprimer cette capsule?",
       "deleteConfirmBody": "Cela supprime la capsule. Vos vêtements sont conservés.",
       "nameLabel": "Nom de la capsule",
-      "namePlaceholder": "Tenue de bureau décontractée",
+      "namePlaceholder": "Semaine d’école",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Description facultative",
       "garmentsLabel": "Vêtements",
@@ -400,7 +405,7 @@
       "my_form_guidance": "Portez des vêtements unis blancs ou noirs devant un arrière-plan uni pour la meilleure superposition.",
       "my_form_confirm": "Je porte des vêtements unis blancs ou noirs",
       "my_form_retry": "Réessayer le téléversement",
-      "my_form_remove": "Supprimer la photo Ma Silhouette",
+      "my_form_remove": "Retirer la photo",
       "processing": "Traitement de votre photo...",
       "ready": "Photo Ma Silhouette prête",
       "errors": {
@@ -697,7 +702,7 @@
         "errorLoad": "Impossible de charger votre planificateur hebdomadaire.",
         "retry": "Réessayer",
         "disabled": "Le planificateur sur 7 jours est temporairement indisponible. Votre compte continue de fonctionner normalement.",
-        "starterWardrobe": "Créé à partir d'une garde-robe de départ.",
+        "starterWardrobe": "Avec des vêtements d’exemple",
         "day": {
           "error": {
             "title": "Impossible de générer ce jour.",
@@ -901,7 +906,7 @@
       "descriptionWorking": "Préparation de la description…",
       "descriptionFailed": "Impossible de suggérer une description. Vous pouvez écrire la vôtre.",
       "captionLabel": "Description (facultative)",
-      "editText": "Modifier le titre et la description",
+      "editText": "Modifier le texte",
       "saveText": "Enregistrer les modifications",
       "savingText": "Enregistrement…",
       "editSaved": "Modifications enregistrées.",

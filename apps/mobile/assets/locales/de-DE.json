@@ -55,7 +55,12 @@
         "critical": "Kritisch"
       }
     },
-    "no_location": "Fügen Sie Ihren Standort hinzu, um tägliche Outfits zu erhalten"
+    "no_location": "Fügen Sie Ihren Standort hinzu, um tägliche Outfits zu erhalten",
+    "wetWeatherChance": {
+      "none": "Trockenes Wetter",
+      "possible": "Regen oder Schnee möglich",
+      "likely": "Regen oder Schnee wahrscheinlich"
+    }
   },
   "widget": {
     "now": "JETZT",
@@ -218,7 +223,7 @@
       "material": "Material",
       "comfort_range": "Komfortbereich",
       "not_sure": "Nicht sicher / Löschen",
-      "save": "Bestätigen & Speichern",
+      "save": "Tags speichern",
       "saving": "Speichern...",
       "ai_suggested": "KI-Vorschlag: {{value}}",
       "loading": "Dein Kleidungsstück wird geladen …",
@@ -276,7 +281,7 @@
       "deleteConfirmTitle": "Diese Kapsel löschen?",
       "deleteConfirmBody": "Damit wird die Kapsel entfernt. Deine Kleidungsstücke bleiben erhalten.",
       "nameLabel": "Kapselname",
-      "namePlaceholder": "Business Casual",
+      "namePlaceholder": "Schulwoche",
       "descriptionLabel": "Beschreibung",
       "descriptionPlaceholder": "Optionale Beschreibung",
       "garmentsLabel": "Kleidungsstücke",
@@ -400,7 +405,7 @@
       "my_form_guidance": "Trage schlichte weiße oder schwarze Kleidung vor einem schlichten Hintergrund für die beste Überlagerung.",
       "my_form_confirm": "Ich trage schlichte weiße oder schwarze Kleidung",
       "my_form_retry": "Upload wiederholen",
-      "my_form_remove": "Meine-Form-Foto entfernen",
+      "my_form_remove": "Foto entfernen",
       "processing": "Dein Foto wird verarbeitet...",
       "ready": "Meine-Form-Foto bereit",
       "errors": {
@@ -697,7 +702,7 @@
         "errorLoad": "Dein Wochenplaner konnte nicht geladen werden.",
         "retry": "Erneut versuchen",
         "disabled": "Der 7-Tage-Planer ist vorübergehend nicht verfügbar. Dein Konto funktioniert weiterhin normal.",
-        "starterWardrobe": "Aus einer Start-Garderobe erstellt.",
+        "starterWardrobe": "Mit Beispielteilen",
         "day": {
           "error": {
             "title": "Dieser Tag konnte nicht erstellt werden.",
@@ -901,7 +906,7 @@
       "descriptionWorking": "Beschreibung wird vorbereitet…",
       "descriptionFailed": "Es konnte keine Beschreibung erstellt werden. Du kannst eine eigene schreiben.",
       "captionLabel": "Beschreibung (optional)",
-      "editText": "Titel und Beschreibung bearbeiten",
+      "editText": "Text bearbeiten",
       "saveText": "Änderungen speichern",
       "savingText": "Wird gespeichert…",
       "editSaved": "Änderungen gespeichert.",

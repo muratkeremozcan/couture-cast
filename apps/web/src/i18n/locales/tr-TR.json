@@ -93,7 +93,7 @@
           "shoes": "Ayakkabı",
           "accessory": "Aksesuar"
         },
-        "starterWardrobe": "Başlangıç gardırobu seçimi",
+        "starterWardrobe": "Örnek parçalar var",
         "reshuffle": {
           "action": "Yeniden karıştır",
           "loading": "Yeniden karıştırılıyor…",
@@ -302,7 +302,7 @@
       "deleteConfirmTitle": "Bu kapsül silinsin mi?",
       "deleteConfirmBody": "Bu işlem kapsülü kaldırır. Gardırobundaki parçalar kalır.",
       "nameLabel": "Kapsül adı",
-      "namePlaceholder": "Ofis rahatlığı",
+      "namePlaceholder": "Okul haftası",
       "descriptionLabel": "Açıklama",
       "descriptionPlaceholder": "İsteğe bağlı açıklama",
       "garmentsLabel": "Parçalar",
@@ -401,7 +401,7 @@
       "title": "Gardırobunu oluştur",
       "garmentFallback": "Kıyafet {{position}}",
       "permissionTitle": "Erişime izin ver",
-      "permissionAction": "Kamera ve fotoğraf erişimine izin ver",
+      "permissionAction": "Erişime izin ver",
       "permissionBody": "Parça eklemek için uygulamanın kamerana ya da fotoğraflarına erişmesine izin ver.",
       "permissionDenied": "Kamerana veya fotoğraflarına erişemiyoruz. Dosya seçebilir ya da örnek dolabı deneyebilirsin.",
       "useStarterWardrobe": "Örnek dolabı kullan",
@@ -417,7 +417,7 @@
       "announcements": {
         "permissionRequesting": "Kamera erişimi isteniyor…",
         "permissionGranted": "Kamera erişimi verildi. Kıyafetlerini yakala.",
-        "permissionDenied": "Kamera erişimi kullanılamıyor. Fotoğraf içe aktar veya başlangıç gardırobunu kullan.",
+        "permissionDenied": "Kameranı açamıyoruz. Fotoğraf seç veya örnek dolabı dene.",
         "tagging": "Tüm kıyafetler yakalandı. Devam etmek için etiketleri onayla.",
         "silhouette": "Silüetini ayarla.",
         "garmentTagged": "{{garment}} etiketlendi."
@@ -438,7 +438,7 @@
       "myFormGuidance": "En temiz kaplama için düz beyaz veya siyah kıyafetler giy ve düz bir arka plan kullan.",
       "myFormConfirm": "Düz beyaz veya siyah kıyafet giyiyorum",
       "myFormRetry": "Yüklemeyi yeniden dene",
-      "myFormRemove": "Formum fotoğrafını kaldır",
+      "myFormRemove": "Fotoğrafı kaldır",
       "processing": "Fotoğrafın işleniyor…",
       "ready": "Formum fotoğrafı hazır",
       "loading": "Silüetin yükleniyor…",
@@ -579,7 +579,7 @@
       "suggestedReview": "(Kontrol et, öneri: {{value}})",
       "materialClear": "Emin değilim / Temizle",
       "cancel": "İptal",
-      "save": "Onayla ve etiketleri kaydet",
+      "save": "Etiketleri kaydet",
       "saving": "Kaydediliyor...",
       "errors": {
         "suggestionUnavailable": "Öneri kullanılamıyor",
@@ -827,7 +827,7 @@
       "descriptionWorking": "Açıklama hazırlanıyor…",
       "descriptionFailed": "Açıklama önerilemedi. Kendi açıklamanı yazabilirsin.",
       "captionLabel": "Açıklama (isteğe bağlı)",
-      "editText": "Başlığı ve açıklamayı düzenle",
+      "editText": "Metni düzenle",
       "saveText": "Değişiklikleri kaydet",
       "savingText": "Kaydediliyor…",
       "editSaved": "Değişiklikler kaydedildi.",
@@ -1126,11 +1126,9 @@
     }
   },
   "landing": {
-    "tagline": "Her yolculuk için hava durumuna uygun gardırop planları",
     "hero": {
       "eyebrow": "Günlük ritüel",
-      "headline": "90 saniyeden kısa sürede kendinden emin kombinler planla.",
-      "body": "CoutureCast, yerel hava durumunu, gardırop arşivini ve topluluk görüşlerini birleştirerek yola, toplantıya ve havana uygun kombinler önerir."
+      "headline": "90 saniyeden kısa sürede kendinden emin kombinler planla."
     },
     "lookbook": {
       "eyebrow": "Lookbook Prism",
@@ -1143,36 +1141,7 @@
         "advisory": "Duyuru: {{type}}",
         "adjustOutfit": "Kıyafeti ayarla"
       },
-      "demo": {
-        "heading": "Günlük ritüel",
-        "timeCity": "08:30 • NYC",
-        "temperature": "18 °C",
-        "humidity": "Ilık nem • %65",
-        "change": "Dünkü yolculuğa göre +3 °C",
-        "primaryLook": "Önerilen ana kombin",
-        "matchScore": "Uyum puanı: {{score}}",
-        "garments": {
-          "blazer": "Oniks blazer",
-          "scarf": "Bordo ipek eşarp",
-          "loafers": "Deri loafer"
-        },
-        "lookA": {
-          "label": "KOMBİN A (ana)",
-          "title": "Blazer ve ipek triko",
-          "body": "Serin sabah rüzgârına göre ayarlanmış sıcaklık düzeyi."
-        },
-        "lookB": {
-          "label": "KOMBİN B (alternatif)",
-          "title": "Trençkot ve merinos hırka",
-          "body": "Su itici dış katmanla daha fazla rüzgâr koruması."
-        }
-      },
       "recommendations": {
-        "personal": {
-          "eyebrow": "Yolculuğa hazır",
-          "title": "Kruvaze blazer ve ipek triko",
-          "description": "18 °C sabah tren yolculuğundan klimalı ofise geçiş için ayarlandı."
-        },
         "community": {
           "eyebrow": "Toplulukta gündemde",
           "title": "Paris usulü ipek ve kaşmir karışımı",

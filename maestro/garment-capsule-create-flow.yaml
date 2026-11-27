@@ -75,7 +75,7 @@ tags:
           while:
             visible:
               id: 'capsule-name-input'
-              text: '(?!Work casual$).+'
+              text: '(?!School week$).+'
           commands:
             - eraseText: 8
       - inputText: 'Maestro capsule'

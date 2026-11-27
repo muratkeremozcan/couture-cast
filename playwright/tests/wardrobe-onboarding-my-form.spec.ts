@@ -179,7 +179,7 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
         await expect(silhouette.getByText('My Form photo', { exact: true })).toBeVisible()
         await expect(silhouette.getByAltText('My Form')).toBeVisible()
         await expect(
-          silhouette.getByRole('button', { name: 'Remove My Form photo' })
+          silhouette.getByRole('button', { name: 'Remove photo' })
         ).toBeVisible()
       })
 

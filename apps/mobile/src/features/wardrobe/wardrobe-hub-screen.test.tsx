@@ -1806,7 +1806,7 @@ describe('WardrobeHubScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('wardrobe-error-banner')).toHaveTextContent(
-        'Smart tagging is taking longer than expected.'
+        'Tags are taking a while. You can still see your piece.'
       )
     })
     await browserUser.click(screen.getByTestId('garment-capture-done'))

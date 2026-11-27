@@ -12,11 +12,7 @@ import { elevationStyle } from '@/src/theme/tokens'
 import { weatherConditionGlyphs } from './weather-glyphs'
 import { useTranslation } from 'react-i18next'
 import i18n from '@/src/lib/i18n'
-import {
-  formatRainChance,
-  formatWeatherAltText,
-  getGuestPreviewStrings,
-} from '@couture/utils'
+import { formatWeatherAltText, getWeatherChance } from '@couture/utils'
 import { getTemperatureUnit } from '@/src/lib/formatters'
 
 type HourlyForecastRibbonProps = {
@@ -50,7 +46,7 @@ export function HourlyForecastRibbon({
   const [isExpanded, setIsExpanded] = useState(false)
   const palette = useHeroPalette()
   const { width, fontScale } = useWindowDimensions()
-  const cardWidth = Math.min(width - 32, 88 * Math.max(1, fontScale))
+  const cardWidth = Math.min(Math.max(104, width - 32), 112 * Math.max(1, fontScale))
 
   const handleToggle = () => {
     const nextState = !isExpanded
@@ -118,10 +114,8 @@ export function HourlyForecastRibbon({
           const locale =
             resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
             defaultSupportedLocale
-          const rainChance = formatRainChance(
-            item.precipitationProbability * 100,
-            getGuestPreviewStrings(locale)
-          )
+          const chance = getWeatherChance(item.precipitationProbability * 100)
+          const wetWeather = t(`hero.wetWeatherChance.${chance}`)
           const condition = t(`hero.conditions.${item.condition}`, {
             defaultValue: item.condition,
           })
@@ -133,7 +127,7 @@ export function HourlyForecastRibbon({
             temperature,
             unit,
             locale,
-            descriptor: `${formatHour(item.forecastAt, timeZone)}, ${rainChance}`,
+            descriptor: `${formatHour(item.forecastAt, timeZone)}, ${wetWeather}`,
           })
 
           return (
@@ -163,12 +157,12 @@ export function HourlyForecastRibbon({
               <Text style={[styles.tempText, { color: palette.ink }]} accessible={false}>
                 {formatTemperature(item.temperature)}
               </Text>
-              {item.precipitationProbability > 0 && (
+              {chance !== 'none' && (
                 <Text
                   style={[styles.precipText, { color: palette.inkSoft }]}
                   accessible={false}
                 >
-                  {rainChance}
+                  {wetWeather}
                 </Text>
               )}
             </View>
@@ -218,7 +212,7 @@ const styles = StyleSheet.create({
   itemCard: {
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 8,
     alignItems: 'center',
     gap: 4,

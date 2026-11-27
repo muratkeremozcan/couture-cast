@@ -27,7 +27,7 @@
       "wind": "Ventania",
       "unknown": "Desconhecido"
     },
-    "hourly_forecast": "Previsão por hora",
+    "hourly_forecast": "Tempo por hora",
     "expand_hours": "Expandir ({{hours}} h)",
     "collapse": "Recolher",
     "load_error": "Não deu para carregar seus looks.",
@@ -55,7 +55,12 @@
         "critical": "Crítico"
       }
     },
-    "no_location": "Adicione sua localização para receber looks diários"
+    "no_location": "Adicione sua localização para receber looks diários",
+    "wetWeatherChance": {
+      "none": "Tempo seco",
+      "possible": "Pode chover ou nevar",
+      "likely": "É provável que chova ou neve"
+    }
   },
   "widget": {
     "now": "AGORA",
@@ -218,7 +223,7 @@
       "material": "Material",
       "comfort_range": "Faixa de conforto",
       "not_sure": "Não tenho certeza / Limpar",
-      "save": "Confirmar e salvar",
+      "save": "Salvar etiquetas",
       "saving": "Salvando...",
       "ai_suggested": "Sugerido por IA: {{value}}",
       "loading": "Carregando sua peça...",
@@ -276,7 +281,7 @@
       "deleteConfirmTitle": "Eliminar esta cápsula?",
       "deleteConfirmBody": "Isso remove a cápsula. Suas peças permanecem.",
       "nameLabel": "Nome da cápsula",
-      "namePlaceholder": "Casual de trabalho",
+      "namePlaceholder": "Semana de aula",
       "descriptionLabel": "Descrição",
       "descriptionPlaceholder": "Descrição opcional",
       "garmentsLabel": "Peças",
@@ -400,7 +405,7 @@
       "my_form_guidance": "Use roupas lisas brancas ou pretas contra um fundo liso para a sobreposição mais nítida.",
       "my_form_confirm": "Estou usando roupas lisas brancas ou pretas",
       "my_form_retry": "Tentar novamente o envio",
-      "my_form_remove": "Remover foto My Form",
+      "my_form_remove": "Remover foto",
       "processing": "Processando sua foto...",
       "ready": "Foto My Form pronta",
       "errors": {
@@ -697,7 +702,7 @@
         "errorLoad": "Não foi possível carregar seu planejador semanal.",
         "retry": "Tentar novamente",
         "disabled": "O planejador de 7 dias está temporariamente indisponível. Sua conta continua funcionando normalmente.",
-        "starterWardrobe": "Criado a partir de um guarda-roupa inicial.",
+        "starterWardrobe": "Com peças de exemplo",
         "day": {
           "error": {
             "title": "Não foi possível gerar este dia.",
@@ -751,7 +756,7 @@
     "calm": {
       "post": "Publicar",
       "nearYou": "Perto de você",
-      "climateEmpty": "Ainda não há looks para o seu clima",
+      "climateEmpty": "Ainda não há looks para esse tempo",
       "seeAllClimates": "Ver todos os climas",
       "cardActions": "Opções da publicação",
       "dismissChallenge": "Ocultar desafio",
@@ -901,7 +906,7 @@
       "descriptionWorking": "Preparando uma descrição…",
       "descriptionFailed": "Não foi possível sugerir uma descrição. Você pode escrever a sua.",
       "captionLabel": "Descrição (opcional)",
-      "editText": "Editar título e descrição",
+      "editText": "Editar texto",
       "saveText": "Salvar alterações",
       "savingText": "Salvando…",
       "editSaved": "Alterações salvas.",

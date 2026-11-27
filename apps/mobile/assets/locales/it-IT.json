@@ -55,7 +55,12 @@
         "critical": "Critica"
       }
     },
-    "no_location": "Aggiungi la tua posizione per ricevere gli outfit del giorno"
+    "no_location": "Aggiungi la tua posizione per ricevere gli outfit del giorno",
+    "wetWeatherChance": {
+      "none": "Tempo asciutto",
+      "possible": "Potrebbe piovere o nevicare",
+      "likely": "Probabilmente pioverà o nevicherà"
+    }
   },
   "widget": {
     "now": "ORA",
@@ -218,7 +223,7 @@
       "material": "Materiale",
       "comfort_range": "Gamma di comfort",
       "not_sure": "Non sicuro / Cancella",
-      "save": "Conferma e salva",
+      "save": "Salva i tag",
       "saving": "Salvataggio...",
       "ai_suggested": "Suggerito da IA: {{value}}",
       "loading": "Caricamento del tuo capo...",
@@ -276,7 +281,7 @@
       "deleteConfirmTitle": "Eliminare questa capsula?",
       "deleteConfirmBody": "Questo rimuove la capsula. I tuoi capi restano.",
       "nameLabel": "Nome della capsula",
-      "namePlaceholder": "Casual da ufficio",
+      "namePlaceholder": "Settimana di scuola",
       "descriptionLabel": "Descrizione",
       "descriptionPlaceholder": "Descrizione facoltativa",
       "garmentsLabel": "Capi",
@@ -400,7 +405,7 @@
       "my_form_guidance": "Indossa abiti bianchi o neri a tinta unita su uno sfondo neutro per la sovrapposizione più nitida.",
       "my_form_confirm": "Indosso abiti bianchi o neri a tinta unita",
       "my_form_retry": "Riprova caricamento",
-      "my_form_remove": "Rimuovi la foto My Form",
+      "my_form_remove": "Rimuovi foto",
       "processing": "Elaborazione della tua foto...",
       "ready": "Foto My Form pronta",
       "errors": {
@@ -697,7 +702,7 @@
         "errorLoad": "Impossibile caricare il tuo pianificatore settimanale.",
         "retry": "Riprova",
         "disabled": "Il pianificatore di 7 giorni non è temporaneamente disponibile. Il tuo account continua a funzionare normalmente.",
-        "starterWardrobe": "Creato a partire da un guardaroba di partenza.",
+        "starterWardrobe": "Con capi di esempio",
         "day": {
           "error": {
             "title": "Impossibile generare questo giorno.",
@@ -901,7 +906,7 @@
       "descriptionWorking": "Preparazione della descrizione…",
       "descriptionFailed": "Non è stato possibile suggerire una descrizione. Puoi scriverne una tu.",
       "captionLabel": "Descrizione (facoltativa)",
-      "editText": "Modifica titolo e descrizione",
+      "editText": "Modifica testo",
       "saveText": "Salva modifiche",
       "savingText": "Salvataggio…",
       "editSaved": "Modifiche salvate.",
@@ -1144,7 +1149,7 @@
       "sampleLook": "Outfit di esempio",
       "editSample": "Modifica l’esempio",
       "addFirstPiece": "Aggiungi un capo",
-      "weatherUnavailable": "Meteo non disponibile",
+      "weatherUnavailable": "Ancora niente meteo",
       "recentPieces": "Capi recenti"
     },
     "spotlightTeaser": {
