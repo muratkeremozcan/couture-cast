@@ -408,8 +408,11 @@ test.describe('CC-7.21 first-run save with verified auth', () => {
           expect(look).toBeDefined()
           expect(look?.comfort).toBeNull()
           expect(extra).toEqual([])
+          const card = page.getByTestId(`saved-look-card-${look!.id}`)
+          // The Saved feed settles the capsule read before it shows the card.
+          await expect(card).toBeVisible()
           await page.reload()
-          await page.getByTestId(`saved-look-card-${look!.id}`).click()
+          await card.click()
           const detail = page.getByTestId('saved-look-detail')
           await expect(detail).toBeVisible()
           const pieces = detail.locator('[data-slot-item-id]')
