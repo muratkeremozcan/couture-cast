@@ -129,6 +129,13 @@ supporting changes. Its one low-severity finding is recorded as P2-1.
 | P3-2    | A consent refusal ends the review attempt.                                                                      |
 | P3-3    | Sprint status and Step 78 link to the implementation and acceptance evidence.                                   |
 
+The first CodeRabbit review is [review 6093980602](https://github.com/muratkeremozcan/couture-cast/pull/305#pullrequestreview-6093980602).
+The follow-up keeps Save look only available when account style is unavailable, and treats a
+consent refusal as terminal. Cancel discards the matching offer, including when account settings
+failed to load or Android closes the route. The guardian step waits for the current save intent,
+and signup conflict recovery uses the verified guardian status. The Save sheet shows offline
+feedback, and the acceptance journeys verify cancellation and wait for the saved detail.
+
 ## Design Notes
 
 The 30-second median describes time to the complete look for a visitor who proceeds through the

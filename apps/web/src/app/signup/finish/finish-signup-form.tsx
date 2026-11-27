@@ -167,6 +167,9 @@ export function FinishSignupForm({
           setMessage(strings.alreadyRegistered)
           await continueToApp()
           return
+        case 'awaiting_guardian':
+          setPhase({ kind: 'awaiting_guardian', accountId: result.accountId })
+          return
         case 'underage':
           // The age refusal outranks the preview's self-reported gate (6.16 D2), and any guest
           // preview stored on this device goes with it, whichever door started (D3).

@@ -208,6 +208,7 @@ export function GuestPreview() {
   }
 
   const beginSave = (action: 'create_account' | 'sign_in') => {
+    if (!online) return false
     const next = update((current) => beginGuestLookSave(current, result))
     setSavePreviewStartedAt(null)
     if (!next) {
@@ -408,6 +409,7 @@ export function GuestPreview() {
       )}
       <GuestPreviewSaveSheet
         isOpen={savePreviewStartedAt === state.startedAt}
+        offline={!online}
         strings={strings}
         invokerRef={saveInvoker}
         onClose={() => setSavePreviewStartedAt(null)}

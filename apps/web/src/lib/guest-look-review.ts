@@ -2,6 +2,7 @@
 
 import { requestStyleProfile } from '@couture/api-client'
 import type { GuestLookReviewClient } from '@couture/utils'
+import { isConsentRejection } from './guest-preview'
 import { createWebApiClient } from './api-client'
 import { createSavedLookFromWeb } from './saved-looks'
 import { saveWebStyleProfileForScope } from './style-profile'
@@ -35,4 +36,12 @@ export async function verifiedGuestLookClient(
         idempotencyKey,
       }),
   }
+}
+
+export function isGuestLookRefusal(error: unknown): boolean {
+  // Saved Look requests expose the HTTP status after normalizing the API response.
+  return (
+    isConsentRejection(error) ||
+    (error instanceof Error && 'status' in error && error.status === 403)
+  )
 }

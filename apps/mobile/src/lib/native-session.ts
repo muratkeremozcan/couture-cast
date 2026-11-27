@@ -389,7 +389,10 @@ async function finishNativeOtpVerification(
       )
     throw new NativeSignInError('denied', 'This account is unavailable.')
   }
-  if (await needsGuardianInvitation(accessToken, fromPreview))
+  const needsInvitation = await needsGuardianInvitation(accessToken, fromPreview)
+  if (needsInvitation === null)
+    throw new NativeSignInError('unavailable', 'Session verification is unavailable.')
+  if (needsInvitation)
     throw new NativeSignInError(
       'awaiting_guardian',
       'A guardian has to approve this account.'
@@ -605,9 +608,9 @@ async function settleFederatedSession(
 ): Promise<NativeOAuthOutcome> {
   const first = await verifyWithRetry(next)
   if (first === 'member') {
-    return (await needsGuardianInvitation(next.access_token, fromPreview))
-      ? { kind: 'awaiting_guardian' }
-      : { kind: 'member' }
+    const needsInvitation = await needsGuardianInvitation(next.access_token, fromPreview)
+    if (needsInvitation === null) return { kind: 'unavailable' }
+    return needsInvitation ? { kind: 'awaiting_guardian' } : { kind: 'member' }
   }
   if (first === 'unavailable') return { kind: 'unavailable' }
   let status
@@ -743,7 +746,10 @@ async function needsGuardianInvitation(accessToken: string, fromPreview: boolean
     (await (await import('./post-signin-destination.js')).hasGuestLookSave())
   )
     return false
-  return awaitingGuardian(accessToken)
+  return fetchMobileFederatedSignupStatus(accessToken).then(
+    ({ status }) => status === 'awaiting_guardian',
+    () => null
+  )
 }
 
 /**
@@ -780,11 +786,34 @@ export async function readNativeFederatedIdentity(): Promise<{
 export type NativeFederatedFinishResult =
   | { kind: 'created'; account: SignupResponse }
   | { kind: 'signed_in' }
+  | { kind: 'awaiting_guardian'; accountId: string }
   | { kind: 'underage' }
   | { kind: 'guardian_minor' }
   | { kind: 'refused' }
   | { kind: 'no_session' }
   | { kind: 'unavailable' }
+
+async function recoverNativeFederatedSignup(
+  accessToken: string,
+  fromPreview: boolean
+): Promise<NativeFederatedFinishResult> {
+  const client = await nativeSupabase()
+  const { data } = await client.auth.getSession()
+  if (!data.session) return { kind: 'no_session' }
+  if (data.session.access_token !== accessToken) return { kind: 'unavailable' }
+  const outcome = await settleFederatedSession(data.session, fromPreview)
+  if (outcome.kind === 'member') {
+    await clearFederatedFinishMarker()
+    return { kind: 'signed_in' }
+  }
+  if (outcome.kind === 'awaiting_guardian') {
+    const accountId = await fetchNativeAwaitingGuardianAccount(accessToken)
+    const current = await readNativeFederatedIdentity()
+    if (accountId && current?.accessToken === accessToken)
+      return { kind: 'awaiting_guardian', accountId }
+  }
+  return outcome.kind === 'refused' ? { kind: 'refused' } : { kind: 'unavailable' }
+}
 
 /**
  * Story 6.17 D3: submits the birthdate for the waiting identity, then verifies the new account
@@ -801,17 +830,8 @@ export async function finishNativeFederatedSignup(
     account = await submitMobileFederatedSignup(identity.accessToken, { birthdate })
   } catch (error) {
     const status = error instanceof FederatedSignupError ? error.status : undefined
-    if (status === 409) {
-      const client = await nativeSupabase()
-      const { data } = await client.auth.getSession()
-      if (!data.session) return { kind: 'no_session' }
-      const outcome = await settleFederatedSession(data.session, fromPreview)
-      if (outcome.kind === 'member') {
-        await clearFederatedFinishMarker()
-        return { kind: 'signed_in' }
-      }
-      return outcome.kind === 'refused' ? { kind: 'refused' } : { kind: 'unavailable' }
-    }
+    if (status === 409)
+      return recoverNativeFederatedSignup(identity.accessToken, fromPreview)
     if (status === 403) {
       if (
         error instanceof FederatedSignupError &&

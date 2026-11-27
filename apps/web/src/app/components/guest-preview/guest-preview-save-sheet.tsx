@@ -12,12 +12,14 @@ const accountDoors = [
 
 export function GuestPreviewSaveSheet({
   isOpen,
+  offline,
   strings,
   invokerRef,
   onClose,
   onChoose,
 }: {
   isOpen: boolean
+  offline: boolean
   strings: GuestPreviewStrings
   invokerRef: RefObject<HTMLButtonElement | null>
   onClose: () => void
@@ -39,12 +41,22 @@ export function GuestPreviewSaveSheet({
         return Boolean(door && onChoose(door.action))
       }}
     >
+      {offline && (
+        <p
+          role="status"
+          data-testid="guest-preview-offline"
+          className="text-sm text-danger-ink"
+        >
+          {strings.chrome.connectionNeeded}
+        </p>
+      )}
       <div className="mt-4 flex flex-wrap gap-3">
         {accountDoors.map(({ href, action, id }) => (
           <Link
             key={id}
             href={href}
             data-testid={`guest-preview-${id}`}
+            aria-disabled={offline || undefined}
             className={`inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-semibold ${action === 'create_account' ? 'bg-inverse text-on-inverse' : 'border border-line-strong bg-page text-ink'}`}
             onClick={(event) => {
               if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {

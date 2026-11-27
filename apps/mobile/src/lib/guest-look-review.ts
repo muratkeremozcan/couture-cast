@@ -1,5 +1,6 @@
 import { requestStyleProfile } from '@couture/api-client'
 import type { GuestLookReviewClient } from '@couture/utils'
+import { isConsentRejection } from './guest-preview'
 import { createMobileApiClient } from './api-client'
 import { mobileApplicationUserId, resolveMobileAccessToken } from './mobile-auth'
 import { createSavedLookFromMobile } from './saved-looks'
@@ -31,4 +32,12 @@ export async function verifiedGuestLookClient(
         idempotencyKey,
       }),
   }
+}
+
+export function isGuestLookRefusal(error: unknown): boolean {
+  // Saved Look requests expose the HTTP status after normalizing the API response.
+  return (
+    isConsentRejection(error) ||
+    (error instanceof Error && 'status' in error && error.status === 403)
+  )
 }

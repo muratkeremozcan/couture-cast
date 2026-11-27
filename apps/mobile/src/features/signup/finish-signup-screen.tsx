@@ -48,7 +48,7 @@ export type FinishSignupExit =
 
 type FinishSignupScreenProps = {
   fromPreview?: boolean
-  savingGuestLook?: boolean
+  savingGuestLook?: boolean | null
   /** The route navigates; this screen stays router-free. */
   onExit: (exit: FinishSignupExit) => void
   /** Story 6.16 D2: an age refusal outranks the preview's self-reported gate. */
@@ -104,7 +104,7 @@ function useFinishStepChrome({
   phase: Phase['kind']
   message: string | null
   inlineError: string | null
-  savingGuestLook: boolean
+  savingGuestLook: boolean | null
   onTitleChange?: (title: string) => void
 }) {
   const { i18n } = useTranslation()
@@ -249,6 +249,9 @@ export function FinishSignupScreen({
           return
         case 'signed_in':
           onExit('continue')
+          return
+        case 'awaiting_guardian':
+          setPhase({ kind: 'awaiting_guardian', accountId: result.accountId })
           return
         case 'underage':
           onUnderage()
@@ -415,7 +418,7 @@ function GuardianStep({
 }: {
   phase: GuardianPhase
   inviteGuardian: (input: GuardianInvitationInput) => Promise<GuardianInvitationResponse>
-  savingGuestLook: boolean
+  savingGuestLook: boolean | null
   onLeave: () => void
 }) {
   const styles = useStyles()
@@ -442,7 +445,9 @@ function GuardianStep({
         accessibilityRole="button"
         testID="guardian-step-continue"
         onPress={onLeave}
-        style={styles.button}
+        style={[styles.button, savingGuestLook === null && styles.disabled]}
+        disabled={savingGuestLook === null}
+        accessibilityState={{ disabled: savingGuestLook === null }}
       >
         <Text style={styles.buttonText}>
           {savingGuestLook ? strings.continue : strings.guardianStepLeave}

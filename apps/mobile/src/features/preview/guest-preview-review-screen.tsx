@@ -22,7 +22,7 @@ import {
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { useStatusBar } from '@/components/save-feedback'
 import { savedLookRoute, savedLooksRoute } from '@/src/features/looks/looks-routes'
-import { verifiedGuestLookClient } from '@/src/lib/guest-look-review'
+import { verifiedGuestLookClient, isGuestLookRefusal } from '@/src/lib/guest-look-review'
 import { notifyMobileSavedLooksChanged } from '@/src/lib/saved-looks'
 import {
   isConsentRejection,
@@ -40,7 +40,7 @@ import { PreviewButton, previewStyles, type PreviewPalette } from './guest-previ
 
 type ReviewStatus =
   | { kind: 'loading' }
-  | { kind: 'load-failed' }
+  | { kind: 'load-failed' | 'look-rejected' }
   | ActiveReview
   | { kind: 'saved' | 'kept' | 'rejected' }
 
@@ -53,6 +53,7 @@ type ActiveReview = {
 type LookReview = {
   intent: GuestLookSaveIntent
   accountStyle: StyleProfileAnswers | null
+  styleUnavailable: boolean
   client: Awaited<ReturnType<typeof verifiedGuestLookClient>>
 }
 
@@ -63,11 +64,19 @@ async function loadAccountReview(
   const client = intent ? await verifiedGuestLookClient(verified.memberId) : null
   const [account, accountStyle] = await Promise.all([
     verified.read(),
-    client?.readStyle() ?? null,
+    client?.readStyle().catch(() => undefined) ?? null,
   ])
   return {
     account,
-    lookReview: intent && client ? { intent, accountStyle, client } : null,
+    lookReview:
+      intent && client
+        ? {
+            intent,
+            accountStyle: accountStyle ?? null,
+            styleUnavailable: accountStyle === undefined,
+            client,
+          }
+        : null,
   }
 }
 
@@ -273,16 +282,15 @@ export function GuestPreviewReviewScreen() {
     try {
       saved = await commit(verified)
     } catch (error) {
-      if (isConsentRejection(error)) saved = 'rejected'
+      if (isGuestLookRefusal(error)) saved = 'rejected'
     } finally {
       inFlight.current = false
     }
     if (!mounted.current || client.current !== verified) return
     if (!lookClient.isCurrent() || saved === null) return cancelLookReview()
     if (saved === 'rejected') {
-      store.clear()
       setLookReview(null)
-      setStatus({ kind: 'rejected' })
+      setStatus({ kind: 'look-rejected' })
       return
     }
     if (!saved) {
@@ -410,6 +418,20 @@ export function GuestPreviewReviewScreen() {
           onCancel={cancelLookReview}
         />
       )}
+      {status.kind === 'look-rejected' && (
+        <>
+          <Text accessibilityRole="alert" style={{ color: palette.dangerInk }}>
+            {strings.review.rejected}
+          </Text>
+          <PreviewButton
+            label={strings.review.continue}
+            testID="guest-preview-review-rejected-continue"
+            onPress={cancelLookReview}
+            palette={palette}
+            primary
+          />
+        </>
+      )}
       {status.kind === 'saved' || status.kind === 'kept' || status.kind === 'rejected' ? (
         <>
           <Text
@@ -467,6 +489,12 @@ function ReviewChoices({
   onCancel: () => void
   palette: PreviewPalette
 }) {
+  const labels = reviewActionLabels(
+    strings,
+    lookReview !== null,
+    status.kind === 'saving',
+    saveChoice
+  )
   return (
     <>
       <ComfortColumn
@@ -476,7 +504,9 @@ function ReviewChoices({
         palette={palette}
         testID="guest-preview-review-account"
         styleRows={
-          lookReview ? guestLookStyleRows(lookReview.accountStyle, locale) : undefined
+          lookReview && !lookReview.styleUnavailable
+            ? guestLookStyleRows(lookReview.accountStyle, locale)
+            : undefined
         }
       />
       <ComfortColumn
@@ -489,6 +519,11 @@ function ReviewChoices({
           lookReview ? guestLookStyleRows(lookReview.intent.style, locale) : undefined
         }
       />
+      {lookReview?.styleUnavailable && (
+        <Text accessibilityLiveRegion="polite" style={{ color: palette.ink }}>
+          {strings.review.loadFailed}
+        </Text>
+      )}
       {status.kind === 'failed' ? (
         <Text
           testID="guest-preview-review-failed"
@@ -499,27 +534,19 @@ function ReviewChoices({
         </Text>
       ) : null}
       <PreviewButton
-        label={
-          status.kind === 'saving' && saveChoice !== false
-            ? strings.review.saving
-            : lookReview
-              ? strings.firstRun.saveWithSettings
-              : strings.review.use
-        }
+        label={labels.use}
         onPress={onUse}
         testID="guest-preview-review-use"
         palette={palette}
-        disabled={status.kind === 'saving' || saveChoice === false}
+        disabled={
+          Boolean(lookReview?.styleUnavailable) ||
+          status.kind === 'saving' ||
+          saveChoice === false
+        }
         primary
       />
       <PreviewButton
-        label={
-          status.kind === 'saving' && saveChoice === false
-            ? strings.review.saving
-            : lookReview
-              ? strings.firstRun.saveOnly
-              : strings.review.keep
-        }
+        label={labels.keep}
         onPress={onKeep}
         testID="guest-preview-review-keep"
         palette={palette}
@@ -536,4 +563,26 @@ function ReviewChoices({
       )}
     </>
   )
+}
+
+function reviewActionLabels(
+  strings: GuestPreviewStrings,
+  savingLook: boolean,
+  busy: boolean,
+  saveChoice: boolean | null
+) {
+  return {
+    use:
+      busy && saveChoice !== false
+        ? strings.review.saving
+        : savingLook
+          ? strings.firstRun.saveWithSettings
+          : strings.review.use,
+    keep:
+      busy && saveChoice === false
+        ? strings.review.saving
+        : savingLook
+          ? strings.firstRun.saveOnly
+          : strings.review.keep,
+  }
 }

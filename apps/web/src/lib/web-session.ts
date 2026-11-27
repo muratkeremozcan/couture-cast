@@ -424,7 +424,13 @@ export async function verifyWebOtp(email: string, token: string, fromPreview = f
       )
     throw new WebSignInError('denied', 'This account is unavailable.')
   }
-  if (await needsGuardianInvitation(data.session.access_token, fromPreview))
+  const needsInvitation = await needsGuardianInvitation(
+    data.session.access_token,
+    fromPreview
+  )
+  if (needsInvitation === null)
+    throw new WebSignInError('unavailable', 'Session verification is unavailable.')
+  if (needsInvitation)
     throw new WebSignInError(
       'awaiting_guardian',
       'A guardian has to approve this account.'
@@ -438,7 +444,10 @@ async function needsGuardianInvitation(accessToken: string, fromPreview: boolean
     (await (await import('./post-signin-destination')).hasGuestLookSave())
   )
     return false
-  return awaitingGuardian(accessToken)
+  return fetchWebFederatedSignupStatus(accessToken).then(
+    ({ status }) => status === 'awaiting_guardian',
+    () => null
+  )
 }
 
 /**
@@ -610,9 +619,12 @@ async function settleFederatedSession(
   try {
     await accept(session)
     if (member) {
-      return (await needsGuardianInvitation(session.access_token, fromPreview))
-        ? { kind: 'awaiting_guardian' }
-        : { kind: 'member' }
+      const needsInvitation = await needsGuardianInvitation(
+        session.access_token,
+        fromPreview
+      )
+      if (needsInvitation === null) return { kind: 'unavailable' }
+      return needsInvitation ? { kind: 'awaiting_guardian' } : { kind: 'member' }
     }
   } catch (failure) {
     if (!sessionDenied(failure)) return { kind: 'unavailable' }
@@ -736,11 +748,33 @@ export async function readWebFederatedIdentity(): Promise<{
 export type WebFederatedFinishResult =
   | { kind: 'created'; account: SignupResponse }
   | { kind: 'signed_in' }
+  | { kind: 'awaiting_guardian'; accountId: string }
   | { kind: 'underage' }
   | { kind: 'guardian_minor' }
   | { kind: 'refused' }
   | { kind: 'no_session' }
   | { kind: 'unavailable' }
+
+async function recoverWebFederatedSignup(
+  accessToken: string,
+  fromPreview: boolean
+): Promise<WebFederatedFinishResult> {
+  const { data } = await webSupabase().auth.getSession()
+  if (!data.session) return { kind: 'no_session' }
+  if (data.session.access_token !== accessToken) return { kind: 'unavailable' }
+  const outcome = await settleFederatedSession(data.session, fromPreview)
+  if (outcome.kind === 'member') {
+    clearFederatedFinishMarker()
+    return { kind: 'signed_in' }
+  }
+  if (outcome.kind === 'awaiting_guardian') {
+    const accountId = await fetchWebAwaitingGuardianAccount(accessToken)
+    const current = await readWebFederatedIdentity()
+    if (accountId && current?.accessToken === accessToken)
+      return { kind: 'awaiting_guardian', accountId }
+  }
+  return outcome.kind === 'refused' ? { kind: 'refused' } : { kind: 'unavailable' }
+}
 
 /**
  * Story 6.17 D3: submits the birthdate for the waiting identity. A created account is then
@@ -757,16 +791,8 @@ export async function finishWebFederatedSignup(
     account = await submitWebFederatedSignup(identity.accessToken, { birthdate })
   } catch (error) {
     const status = sessionStatus(error)
-    if (status === 409) {
-      const { data } = await webSupabase().auth.getSession()
-      if (!data.session) return { kind: 'no_session' }
-      const outcome = await settleFederatedSession(data.session, fromPreview)
-      if (outcome.kind === 'member') {
-        clearFederatedFinishMarker()
-        return { kind: 'signed_in' }
-      }
-      return outcome.kind === 'refused' ? { kind: 'refused' } : { kind: 'unavailable' }
-    }
+    if (status === 409)
+      return recoverWebFederatedSignup(identity.accessToken, fromPreview)
     if (status === 403) {
       if (
         error instanceof FederatedSignupError &&

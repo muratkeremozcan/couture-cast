@@ -24,7 +24,10 @@ import { AppPage, APP_MAIN_BASE_CLASS } from '../app-page'
 import { AppTopBar } from '../app-top-bar'
 import { savedLookHref, savedLooksHref } from '../looks/looks-address'
 import { useStatusBar } from '../save-feedback'
-import { verifiedGuestLookClient } from '../../../lib/guest-look-review'
+import {
+  verifiedGuestLookClient,
+  isGuestLookRefusal,
+} from '../../../lib/guest-look-review'
 import { notifySavedLooksChanged } from '../../../lib/saved-looks'
 import {
   isConsentRejection,
@@ -38,7 +41,7 @@ import { resolveWebSessionToken, webSessionIdentity } from '../../../lib/web-ses
 
 type ReviewStatus =
   | { kind: 'loading' }
-  | { kind: 'load-failed' }
+  | { kind: 'load-failed' | 'look-rejected' }
   | ActiveReview
   | { kind: 'saved' }
   | { kind: 'kept' }
@@ -53,6 +56,7 @@ type ActiveReview = {
 type LookReview = {
   intent: GuestLookSaveIntent
   accountStyle: StyleProfileAnswers | null
+  styleUnavailable: boolean
   client: Awaited<ReturnType<typeof verifiedGuestLookClient>>
 }
 
@@ -63,11 +67,19 @@ async function loadAccountReview(
   const client = intent ? await verifiedGuestLookClient(verified.memberId) : null
   const [account, accountStyle] = await Promise.all([
     verified.read(),
-    client?.readStyle() ?? null,
+    client?.readStyle().catch(() => undefined) ?? null,
   ])
   return {
     account,
-    lookReview: intent && client ? { intent, accountStyle, client } : null,
+    lookReview:
+      intent && client
+        ? {
+            intent,
+            accountStyle: accountStyle ?? null,
+            styleUnavailable: accountStyle === undefined,
+            client,
+          }
+        : null,
   }
 }
 
@@ -77,7 +89,9 @@ async function claimLookSave(
   isCurrent: () => boolean
 ) {
   const cached = store.snapshot()
-  const snapshot = cached.persistent ? await store.syncExternal() : cached
+  const snapshot = cached.persistent
+    ? await store.syncExternal({ onReadError: 'reject' })
+    : cached
   const pending = snapshot.state?.conversion
   if (
     !isCurrent() ||
@@ -89,6 +103,15 @@ async function claimLookSave(
   store.clear()
   await store.flush()
   return isCurrent()
+}
+
+async function discardLookOffer(store: GuestPreviewStore, key: string) {
+  const cached = store.snapshot()
+  const snapshot = cached.persistent
+    ? await store.syncExternal({ onReadError: 'reject' })
+    : cached
+  const pending = snapshot.state?.conversion
+  if (pending?.intent === GUEST_PREVIEW_SAVE_INTENT && pending.key === key) store.clear()
 }
 
 function isActiveReview(status: ReviewStatus): status is ActiveReview {
@@ -162,18 +185,21 @@ export function GuestPreviewReview() {
   const garmentIntent = useRef(false)
   const mounted = useRef(true)
   const [lookReview, setLookReview] = useState<LookReview | null>(null)
+  const [lookOfferKey, setLookOfferKey] = useState<string>()
   const saveChoice = useRef<boolean | null>(null)
   const scopeIsCurrent = useRef<(() => boolean) | null>(null)
 
   useEffect(() => {
     mounted.current = true
     let active = true
+    let offerKey: string | undefined
     const discard = () => {
       client.current = null
       scopeIsCurrent.current = null
       setLookReview(null)
       setStatus({ kind: 'loading' })
-      store.clear()
+      if (offerKey) void discardLookOffer(store, offerKey).catch(() => undefined)
+      else store.clear()
       router.replace('/')
     }
     void (async () => {
@@ -181,6 +207,8 @@ export function GuestPreviewReview() {
       if (!active) return
       const conversion = snapshot.state?.conversion
       const draft = guestPreviewReviewProposal(snapshot.state)
+      offerKey = draft?.intent?.key
+      setLookOfferKey(offerKey)
       garmentIntent.current = conversion?.intent === GUEST_PREVIEW_GARMENT_INTENT
       if (!draft) {
         router.replace('/')
@@ -240,7 +268,7 @@ export function GuestPreviewReview() {
     scopeIsCurrent.current = null
     setLookReview(null)
     setStatus({ kind: 'loading' })
-    store.clear()
+    if (lookOfferKey) void discardLookOffer(store, lookOfferKey).catch(() => undefined)
     router.replace('/')
   }
 
@@ -277,16 +305,15 @@ export function GuestPreviewReview() {
     try {
       saved = await commit(verified)
     } catch (error) {
-      if (isConsentRejection(error)) saved = 'rejected'
+      if (isGuestLookRefusal(error)) saved = 'rejected'
     } finally {
       inFlight.current = false
     }
     if (!mounted.current || client.current !== verified) return
     if (!lookClient.isCurrent() || saved === null) return cancelLookReview()
     if (saved === 'rejected') {
-      store.clear()
       setLookReview(null)
-      setStatus({ kind: 'rejected' })
+      setStatus({ kind: 'look-rejected' })
       return
     }
     if (!saved) {
@@ -386,8 +413,8 @@ export function GuestPreviewReview() {
     <AppPage>
       <AppTopBar
         title={strings.review.heading}
-        parentHref={lookReview ? undefined : '/'}
-        onBack={lookReview ? cancelLookReview : undefined}
+        parentHref={lookOfferKey ? undefined : '/'}
+        onBack={lookOfferKey ? cancelLookReview : undefined}
       />
       <main
         id="main-content"
@@ -430,6 +457,18 @@ export function GuestPreviewReview() {
             }}
             onCancel={cancelLookReview}
           />
+        )}
+        {status.kind === 'look-rejected' && (
+          <div className="space-y-3">
+            <p role="alert">{strings.review.rejected}</p>
+            <button
+              type="button"
+              onClick={cancelLookReview}
+              className="min-h-11 rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse"
+            >
+              {strings.review.continue}
+            </button>
+          </div>
         )}
         {status.kind === 'saved' ||
         status.kind === 'kept' ||
@@ -476,6 +515,12 @@ function ReviewChoices({
   onKeep: () => void
   onCancel: () => void
 }) {
+  const labels = reviewActionLabels(
+    strings,
+    lookReview !== null,
+    status.kind === 'saving',
+    saveChoice
+  )
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -485,7 +530,9 @@ function ReviewChoices({
           strings={strings}
           testId="guest-preview-review-account"
           styleRows={
-            lookReview ? guestLookStyleRows(lookReview.accountStyle, locale) : undefined
+            lookReview && !lookReview.styleUnavailable
+              ? guestLookStyleRows(lookReview.accountStyle, locale)
+              : undefined
           }
         />
         <ComfortColumn
@@ -498,6 +545,7 @@ function ReviewChoices({
           }
         />
       </div>
+      {lookReview?.styleUnavailable && <p role="status">{strings.review.loadFailed}</p>}
       {status.kind === 'failed' ? (
         <p role="alert" data-testid="guest-preview-review-failed">
           {lookReview ? strings.firstRun.reviewFailed : strings.review.failed}
@@ -506,17 +554,17 @@ function ReviewChoices({
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          disabled={status.kind === 'saving' || saveChoice === false}
+          disabled={
+            Boolean(lookReview?.styleUnavailable) ||
+            status.kind === 'saving' ||
+            saveChoice === false
+          }
           aria-busy={status.kind === 'saving'}
           onClick={onUse}
           data-testid="guest-preview-review-use"
           className="min-h-11 rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse disabled:opacity-60"
         >
-          {status.kind === 'saving' && saveChoice !== false
-            ? strings.review.saving
-            : lookReview
-              ? strings.firstRun.saveWithSettings
-              : strings.review.use}
+          {labels.use}
         </button>
         <button
           type="button"
@@ -525,11 +573,7 @@ function ReviewChoices({
           data-testid="guest-preview-review-keep"
           className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink disabled:opacity-60"
         >
-          {status.kind === 'saving' && saveChoice === false
-            ? strings.review.saving
-            : lookReview
-              ? strings.firstRun.saveOnly
-              : strings.review.keep}
+          {labels.keep}
         </button>
         {lookReview && (
           <button
@@ -545,4 +589,26 @@ function ReviewChoices({
       </div>
     </>
   )
+}
+
+function reviewActionLabels(
+  strings: GuestPreviewStrings,
+  savingLook: boolean,
+  busy: boolean,
+  saveChoice: boolean | null
+) {
+  return {
+    use:
+      busy && saveChoice !== false
+        ? strings.review.saving
+        : savingLook
+          ? strings.firstRun.saveWithSettings
+          : strings.review.use,
+    keep:
+      busy && saveChoice === false
+        ? strings.review.saving
+        : savingLook
+          ? strings.firstRun.saveOnly
+          : strings.review.keep,
+  }
 }

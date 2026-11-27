@@ -39,7 +39,10 @@ export async function saveMobileStyleProfileForScope(
   scope: string,
   input: StyleProfilePatch
 ) {
-  if (currentMobileStyleScope() !== scope || !(await store.save(scope, input))) {
+  if (
+    currentMobileStyleScope() !== scope ||
+    !(await store.save(scope, input, { propagateError: true }))
+  ) {
     throw new Error('Unable to save style profile for this session.')
   }
 }

@@ -48,7 +48,10 @@ export async function saveWebStyleProfileForScope(
   scope: string,
   input: StyleProfilePatch
 ) {
-  if (currentWebStyleScope() !== scope || !(await store.save(scope, input))) {
+  if (
+    currentWebStyleScope() !== scope ||
+    !(await store.save(scope, input, { propagateError: true }))
+  ) {
     throw new Error('Unable to save style profile for this session.')
   }
 }
