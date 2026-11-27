@@ -340,9 +340,10 @@ export function EdgeToEdgeModal({
   const animationType = visible && presentation.open ? presentation.animation : requested
   const returnFocus = useRef(returnFocusRef)
   returnFocus.current = returnFocusRef
-  // D13: the opener takes focus as the layer closes. An iOS sheet that closes by `visible` and
-  // is still animating away hands it over once more on onDismiss, when VoiceOver can reach the
-  // screen again; Android, web and any unmount focus once.
+  const isVisible = useRef(visible)
+  isVisible.current = visible
+  // D13: Android restores focus as the layer closes. iOS repeats the handoff after dismissal,
+  // when VoiceOver can reach the screen. Web waits until the modal's focus trap is removed.
   const mounted = useRef(true)
   const focusOnDismiss = useRef<unknown>(null)
   useEffect(() => {
@@ -353,13 +354,16 @@ export function EdgeToEdgeModal({
   }, [])
   useEffect(() => {
     if (!visible) return
+    focusOnDismiss.current = null
     setOpenModals(1)
     return () => {
       setOpenModals(-1)
       const opener = returnFocus.current?.current
       if (opener == null) return
-      focusOpener(opener)
-      if (Platform.OS === 'ios' && mounted.current) focusOnDismiss.current = opener
+      const waitForDismiss =
+        mounted.current && (Platform.OS === 'ios' || Platform.OS === 'web')
+      if (waitForDismiss) focusOnDismiss.current = opener
+      if (Platform.OS !== 'web' || !waitForDismiss) focusOpener(opener)
     }
   }, [visible])
   return (
@@ -369,7 +373,7 @@ export function EdgeToEdgeModal({
       onDismiss={() => {
         const opener = focusOnDismiss.current
         focusOnDismiss.current = null
-        focusOpener(opener)
+        if (!isVisible.current) focusOpener(opener)
         onDismiss?.()
       }}
       animationType={animationType}

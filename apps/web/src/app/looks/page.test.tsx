@@ -732,6 +732,7 @@ describe('7.12 Looks Saved grid and paging (D2, D3)', () => {
       expect(list).toHaveBeenLastCalledWith({
         owner: FIXTURE_PROFILE_ID,
         sort: 'created_desc',
+        includeToday: true,
         source: undefined,
         limit: 50,
         offset: 50,

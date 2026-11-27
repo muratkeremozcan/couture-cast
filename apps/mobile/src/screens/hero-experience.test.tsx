@@ -301,6 +301,9 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     expect(sheet.contains(title)).toBe(true)
     const handle = title.closest<HTMLElement>('[data-testid="layer-swipe-handle"]')
     expect(handle, 'the title sits in the swipe handle').not.toBeNull()
+    await waitFor(() =>
+      expect(screen.getByTestId('today-outfit-swap-option-0')).toHaveFocus()
+    )
     mockCapture.mockClear()
 
     await dragFrom(title, { dy: LAYER_SWIPE_CLOSE_PX / 2 })

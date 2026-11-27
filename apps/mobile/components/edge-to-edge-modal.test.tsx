@@ -133,6 +133,33 @@ beforeEach(() => {
   keyboardViews.length = 0
 })
 
+it('restores web focus after dismissal and ignores a late dismissal while reopened', async () => {
+  const focus = vi.fn()
+  const opener = { current: { focus } }
+  const layer = (visible: boolean) => (
+    <EdgeToEdgeModal
+      {...LAYER}
+      returnFocusRef={opener}
+      visible={visible}
+      animationType="slide"
+    >
+      <Text>Sheet</Text>
+    </EdgeToEdgeModal>
+  )
+  const { rerender } = render(layer(true))
+
+  rerender(layer(false))
+  const firstDismiss = lastModalProps()?.onDismiss
+  expect(firstDismiss).toBeTypeOf('function')
+  expect(focus).not.toHaveBeenCalled()
+  rerender(layer(true))
+  act(() => (firstDismiss as () => void)())
+  expect(focus).not.toHaveBeenCalled()
+
+  rerender(layer(false))
+  await waitFor(() => expect(focus).toHaveBeenCalledOnce())
+})
+
 describe('R52 EdgeToEdgeModal', () => {
   it('is a transparent modal whose window covers the status and navigation bars', () => {
     render(

@@ -54,6 +54,16 @@ export async function startTodayVisualFixtures({
       })
       const body = await actual.json()
       if (actual.ok) {
+        // Chicago's seeded rain entry represents 10°C in the centered capture. Its position
+        // in the local morning shifts with the seed time. Keep real timestamps for the
+        // hourly ribbon and give every possible scenario the same representative conditions.
+        const { weather } = body.data
+        const rain = weather.hourly.find(
+          (entry) => entry.temperature === 10 && entry.condition === 'rain'
+        )
+        if (!rain)
+          throw new Error('The Today visual fixture needs the seeded 10°C rain hour')
+        weather.hourly = weather.hourly.map(({ forecastAt }) => ({ ...rain, forecastAt }))
         const empty = selected === 'empty'
         const filename = selected === 'missing' ? 'missing.png' : 'photo.png'
         for (const outfit of body.data.outfits) {

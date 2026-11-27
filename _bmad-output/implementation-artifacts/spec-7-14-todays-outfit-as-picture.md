@@ -3,7 +3,7 @@ title: "Story CC-7.14: Today's outfit as a picture"
 type: feature
 ticket: '7-14-todays-outfit-as-picture'
 created: '2026-11-26'
-status: built
+status: done
 baseline_revision: 'a519243dbec677047f5f4aefadd9eb6a26d62b2d'
 route: full
 route_source: auto
@@ -93,11 +93,11 @@ Follow the Epic 7 trio rules. TEA owns tests, visual fixtures, snapshots, and CI
       `today-outfit-swap` and `today-outfit-swap-option-N` on both platforms.
 - [x] Enable `today-primary-action` for Wear this and `today-outfit-details` for disclosure.
       Reuse app shell focus, status, signing and tab navigation; rebuild generated contracts.
-- [ ] Coordinate the [test plan](../test-artifacts/test-design-7-14-todays-outfit-as-picture.md).
+- [x] Coordinate the [test plan](../test-artifacts/test-design-7-14-todays-outfit-as-picture.md).
       Given the four visual fixtures, CI captures full views at 390 x 844 on web and
       360 x 640 dp on Android. A delayed photo preserves slot bounds, layout shift is at most
       0.1, and each slot target is at least 44 x 44 with an 8 px gap.
-- [ ] Complete Step 71 and mark this story done before the final push.
+- [x] Complete Step 71 and mark this story done before the final push.
 
 ## Implementation Notes
 
@@ -111,6 +111,7 @@ The response keeps the existing source enum, and current Looks explicitly opts i
 
 Native keeps its forecast-period picker inside Outfit details. The closed Today view stays within
 the existing seven-control budget, and opening details reveals the picker when periods differ.
+Both clients center a single row inside the fixed picture frame.
 
 ## Review Triage Log
 

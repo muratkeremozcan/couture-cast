@@ -398,62 +398,74 @@ describe('Screen budget: native Today', () => {
     30_000
   )
 
-  it('[7.14-PIC-002/005] a guardian-pending member wears a catalog outfit, retries safely and can View and Undo', async () => {
-    serveScreenBudgetFixture('guardian-pending', MEMBER)
-    const { store, handlers } = createSavedLooksMswHandlers()
-    const keys: (string | null)[] = []
-    store.onPost = (request) => {
-      keys.push(request.headers.get('idempotency-key'))
-    }
-    store.nextPostError = () =>
-      keys.length === 1
-        ? HttpResponse.json({ message: 'Save temporarily unavailable' }, { status: 503 })
-        : null
-    server.use(
-      ...handlers,
-      http.get('*/api/v1/ritual', () =>
-        HttpResponse.json({
-          data: {
-            ...mockRitualResponse.data,
-            outfits: mockRitualResponse.data.outfits.map((outfit) => ({
-              ...outfit,
-              garmentIds: ['default-top', 'default-shoes'],
-              displayGarments: [],
-              recommendationActionsAvailable: false,
-            })),
-          },
-        })
+  it.each(['view', 'undo'] as const)(
+    '[7.14-PIC-002/005] a guardian-pending member wears a catalog outfit, retries safely and can %s the save',
+    async (action) => {
+      serveScreenBudgetFixture('guardian-pending', MEMBER)
+      const { store, handlers } = createSavedLooksMswHandlers()
+      const keys: (string | null)[] = []
+      store.onPost = (request) => {
+        keys.push(request.headers.get('idempotency-key'))
+      }
+      store.nextPostError = () =>
+        keys.length === 1
+          ? HttpResponse.json(
+              { message: 'Save temporarily unavailable' },
+              { status: 503 }
+            )
+          : null
+      server.use(
+        ...handlers,
+        http.get('*/api/v1/ritual', () =>
+          HttpResponse.json({
+            data: {
+              ...mockRitualResponse.data,
+              outfits: mockRitualResponse.data.outfits.map((outfit) => ({
+                ...outfit,
+                garmentIds: ['default-top', 'default-shoes'],
+                displayGarments: [],
+                recommendationActionsAvailable: false,
+              })),
+            },
+          })
+        )
       )
-    )
-    renderToday()
-    expect(await screen.findByTestId('today-outfit-catalog-0')).toBeVisible()
-    expect(screen.getByTestId('today-outfit-catalog-1')).toBeVisible()
-    expect(screen.getByTestId('today-outfit-picture').querySelector('img')).toBeNull()
-    press(screen.getByTestId('today-outfit-details'))
-    expect(screen.getByTestId('outfit-comfort-notes')).toBeVisible()
-    expect(screen.queryByTestId('shop-this-look-block')).toBeNull()
-    expect(screen.queryByTestId('outfit-share-card-open')).toBeNull()
-    press(screen.getByTestId('today-outfit-details'))
+      renderToday()
+      expect(await screen.findByTestId('today-outfit-catalog-0')).toBeVisible()
+      expect(screen.getByTestId('today-outfit-catalog-1')).toBeVisible()
+      expect(screen.getByTestId('today-outfit-picture').querySelector('img')).toBeNull()
+      press(screen.getByTestId('today-outfit-details'))
+      expect(screen.getByTestId('outfit-comfort-notes')).toBeVisible()
+      expect(screen.queryByTestId('shop-this-look-block')).toBeNull()
+      expect(screen.queryByTestId('outfit-share-card-open')).toBeNull()
+      press(screen.getByTestId('today-outfit-details'))
 
-    press(screen.getByTestId('today-primary-action'))
-    press(await screen.findByTestId('status-bar-action-retry'))
-    const view = await screen.findByTestId('status-bar-action-view')
-    expect(keys).toHaveLength(2)
-    expect(keys[0]).toBeTruthy()
-    expect(keys[1]).toBe(keys[0])
-    expect(store.items).toHaveLength(1)
-    const look = store.items[0]!
-    expect(look.wornOn).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    expect(look.composition.map(({ category, kind }) => [category, kind])).toEqual([
-      ['top', 'catalog'],
-      ['shoes', 'catalog'],
-    ])
-    routerMock.push.mockClear()
-    press(view)
-    expect(routerMock.push).toHaveBeenCalledOnce()
-    press(screen.getByTestId('status-bar-action-undo'))
-    await waitFor(() => expect(store.items).toHaveLength(0))
-  }, 30_000)
+      press(screen.getByTestId('today-primary-action'))
+      press(await screen.findByTestId('status-bar-action-retry'))
+      const feedbackAction = await screen.findByTestId(`status-bar-action-${action}`)
+      expect(keys).toHaveLength(2)
+      expect(keys[0]).toBeTruthy()
+      expect(keys[1]).toBe(keys[0])
+      expect(store.items).toHaveLength(1)
+      const look = store.items[0]!
+      expect(look.wornOn).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(look.composition.map(({ category, kind }) => [category, kind])).toEqual([
+        ['top', 'catalog'],
+        ['shoes', 'catalog'],
+      ])
+      routerMock.push.mockClear()
+      press(feedbackAction)
+      if (action === 'view') {
+        expect(routerMock.push).toHaveBeenCalledExactlyOnceWith({
+          pathname: '/saved-look/[savedLookId]',
+          params: { savedLookId: look.id },
+        })
+      } else {
+        await waitFor(() => expect(store.items).toHaveLength(0))
+      }
+    },
+    30_000
+  )
 
   for (const [id, fixture] of AUDITS) {
     it(`[P0] [${id}] native today (${fixture}) is within the screen budget`, async () => {
