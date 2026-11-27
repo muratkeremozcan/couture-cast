@@ -49,19 +49,32 @@ diagnose() {
 # activities close onto it and the home task stays in the back.
 park_backdrop() {
   "$ADB" shell am start -W -a android.settings.SETTINGS > /dev/null || return 1
-  app_window_tracked "the Settings backdrop"
+  app_window_tracked "the Settings backdrop" recover-launcher
 }
 
 # app_window_tracked WHAT: accessibility tracks an active app window, as TalkBack
 # needs for every test window. Fails with a diagnostic after $window_wait seconds.
 app_window_tracked() {
+  local context=$1 recovery=${2:-} windows
   for _ in $(seq 1 "$window_wait"); do
-    if "$ADB" shell dumpsys accessibility | grep -qE 'A11yWindow\[.*type=TYPE_APPLICATION.*active=true'; then
-      return 0
+    if windows=$("$ADB" shell dumpsys accessibility); then
+      if grep -qE 'A11yWindow\[.*type=TYPE_APPLICATION.*active=true' <<< "$windows"; then
+        return 0
+      fi
+      # Run 46063348342: a Pixel Launcher ANR held focus over the Settings backdrop.
+      # Clear that specific emulator dialog once, before either instrumentation run.
+      if [ "$recovery" = recover-launcher ] &&
+        grep -qE "A11yWindow\[.*title=Pixel Launcher isn't responding,.*type=TYPE_SYSTEM,.*active=true" <<< "$windows"; then
+        recovery=
+        diagnose pixel-launcher-anr
+        echo '::warning::Pixel Launcher ANR blocked Settings. Stopping the launcher and reopening Settings.'
+        "$ADB" shell am force-stop com.google.android.apps.nexuslauncher || break
+        "$ADB" shell am start -W -a android.settings.SETTINGS > /dev/null || break
+      fi
     fi
     sleep 1
   done
-  echo "::error::accessibility tracks no active app window under $1; TalkBack cannot focus a test window." >&2
+  echo "::error::accessibility tracks no active app window under $context; TalkBack cannot focus a test window." >&2
   diagnose no-app-window
   return 1
 }
