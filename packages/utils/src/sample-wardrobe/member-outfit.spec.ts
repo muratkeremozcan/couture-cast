@@ -1,10 +1,14 @@
+// Learning path Step 75: Find mini skirts, tights and socks.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-75-find-mini-skirts-tights-and-socks
 import { describe, expect, it } from 'vitest'
 import { saveSampleBookmark } from './bookmarks'
 import { SAMPLE_CATALOG } from './catalog'
 import {
+  applyMemberSampleGarment,
   COMMUNITY_SAMPLE_WEATHER_BY_BAND,
   communitySampleOutfits,
   createMemberSampleOutfit,
+  memberSampleWardrobeChoices,
   reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
   swapMemberSampleGarment,
@@ -12,6 +16,9 @@ import {
   updateMemberSampleOutfit,
 } from './member-outfit'
 import { SAMPLE_WEATHER_KEYS, sampleSwapCandidates, selectSampleOutfit } from './selector'
+
+const miniSkirt = SAMPLE_CATALOG.garments.find(({ id }) => id === 'sample:g:mini-skirt')!
+const socks = SAMPLE_CATALOG.garments.find(({ id }) => id === 'sample:g:ribbed-socks')!
 
 describe('member sample outfit', () => {
   it.each([
@@ -115,6 +122,61 @@ describe('member sample outfit', () => {
     expect(undoMemberSampleSwaps(changed).garments).toEqual(sample.garments)
   })
 
+  it('[7.18-PICK-001] replaces a present slot and keeps the other pieces', () => {
+    const original = createMemberSampleOutfit('mild-dry')
+    const lookId = memberSampleWardrobeChoices(original).get(miniSkirt.id)
+    expect(lookId).toBe('sample:l:office-oxford')
+    const selected = applyMemberSampleGarment(original, miniSkirt, lookId!)
+    expect(selected.garments.map(({ id }) => id)).toEqual([
+      'sample:g:oxford-shirt',
+      'sample:g:mini-skirt',
+      'sample:g:loafers',
+    ])
+  })
+
+  it('[7.18-PICK-001] opens the eligible mini skirt look when the slot is missing', () => {
+    const original = createMemberSampleOutfit('cool-windy')
+    expect(original.look?.id).toBe('sample:l:winter-knit')
+    const lookId = memberSampleWardrobeChoices(original).get(miniSkirt.id)
+    expect(lookId).toBe('sample:l:mini-and-tights')
+    const selected = applyMemberSampleGarment(original, miniSkirt, lookId!)
+    expect(selected.garments.map(({ id }) => id)).toContain('sample:g:opaque-tights')
+    expect(selected.garments.map(({ id }) => id)).toContain(miniSkirt.id)
+    expect(selected.input.swaps).toEqual({})
+  })
+
+  it('[7.18-PICK-001] uses an eligible accessory slot when no look includes the selected socks', () => {
+    const original = createMemberSampleOutfit('mild-dry')
+    expect(original.garments.some(({ category }) => category === 'accessory')).toBe(false)
+    const lookId = memberSampleWardrobeChoices(original).get(socks.id)
+    expect(lookId).toBe('sample:l:wrap-day')
+    const selected = applyMemberSampleGarment(original, socks, lookId!)
+    expect(selected.input.swaps[lookId!]).toEqual({ accessory: socks.id })
+    expect(selected.garments.map(({ id }) => id)).toContain(socks.id)
+  })
+
+  it('[7.18-PICK-001] omits an unavailable piece and keeps the result for a stale look', () => {
+    const original = updateMemberSampleOutfit(createMemberSampleOutfit(), {
+      collection: 'menswear',
+    })
+    expect(memberSampleWardrobeChoices(original).has(miniSkirt.id)).toBe(false)
+    expect(
+      applyMemberSampleGarment(original, miniSkirt, 'sample:l:mini-and-tights')
+    ).toBe(original)
+    expect(swapMemberSampleGarment(original, 'accessory', socks.id)).toBe(original)
+  })
+
+  it('[7.18-SWAP-001] leaves the same choice and the previous swap intact', () => {
+    const original = createMemberSampleOutfit('mild-dry')
+    const selected = swapMemberSampleGarment(original, 'bottom', miniSkirt.id)
+    expect(selected).not.toBe(original)
+    expect(swapMemberSampleGarment(selected, 'bottom', miniSkirt.id)).toBe(selected)
+    expect(applyMemberSampleGarment(selected, miniSkirt, 'sample:l:office-oxford')).toBe(
+      selected
+    )
+    expect(undoMemberSampleSwaps(selected).garments).toEqual(original.garments)
+  })
+
   it('keeps an empty result stable when no sample look is available', () => {
     const empty = selectSampleOutfit(createMemberSampleOutfit().input, {
       ...SAMPLE_CATALOG,
@@ -123,6 +185,7 @@ describe('member sample outfit', () => {
     expect(empty.look).toBeNull()
     expect(rotateMemberSampleOutfit(empty)).toBe(empty)
     expect(swapMemberSampleGarment(empty, 'shoes', 'sample:g:loafers')).toBe(empty)
+    expect(memberSampleWardrobeChoices(empty).size).toBe(0)
     expect(undoMemberSampleSwaps(empty)).toBe(empty)
   })
 })

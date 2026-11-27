@@ -4,20 +4,18 @@
 import { useRef, useState } from 'react'
 import {
   formatPreviewString,
-  SAMPLE_CATALOG,
   SAMPLE_COLLECTION_FILTERS,
-  SAMPLE_GARMENT_CATEGORIES,
   sampleGarmentText,
+  sampleWardrobeCategories,
+  sampleWardrobeItems,
   type GuestPreviewStrings,
   type SampleCollectionFilter,
   type SampleGarment,
-  type SampleGarmentCategory,
+  type SampleWardrobeFilter,
 } from '@couture/utils'
 import { AccessibleModal } from '../accessible-modal'
 import { GuestPreviewChoiceGroup } from './guest-preview-choice-group'
 import { SampleGarmentArt } from './sample-garment-art'
-
-type CategoryFilter = SampleGarmentCategory | 'all'
 
 export function GuestPreviewWardrobe({
   strings,
@@ -28,65 +26,58 @@ export function GuestPreviewWardrobe({
   onInspect,
   onBackToOutfit,
   onCategory,
+  inPicker = false,
 }: {
   strings: GuestPreviewStrings
   collection: SampleCollectionFilter
-  /** Garments that can replace a slot of the current outfit in this context. */
-  usableIds: ReadonlySet<string>
+  usableIds: Pick<ReadonlySet<string>, 'has'>
   onCollection: (collection: SampleCollectionFilter) => void
   onUse: (garment: SampleGarment) => void
-  onInspect: () => void
+  onInspect?: () => void
   onBackToOutfit: () => void
-  onCategory: () => void
+  onCategory?: () => void
+  inPicker?: boolean
 }) {
-  const [category, setCategory] = useState<CategoryFilter>('all')
+  const [category, setCategory] = useState<SampleWardrobeFilter>('all')
   const [open, setOpen] = useState<SampleGarment | null>(null)
   const invoker = useRef<HTMLElement | null>(null)
   const { values } = strings
-  const items = SAMPLE_CATALOG.garments.filter(
-    (garment) =>
-      (category === 'all' || garment.category === category) &&
-      (collection === 'all' || garment.collections.includes(collection))
-  )
+  const items = sampleWardrobeItems(category, collection)
   const openText = open ? sampleGarmentText(open, strings) : null
 
   return (
     <section
-      aria-labelledby="guest-preview-wardrobe-heading"
+      aria-labelledby={inPicker ? undefined : 'guest-preview-wardrobe-heading'}
       data-testid="guest-preview-wardrobe"
       className="space-y-5"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2
-          id="guest-preview-wardrobe-heading"
-          className="text-2xl font-semibold text-ink"
-        >
-          {strings.wardrobe.heading}
-        </h2>
-        <button
-          type="button"
-          onClick={onBackToOutfit}
-          data-testid="guest-preview-back-to-outfit"
-          className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
-        >
-          {strings.wardrobe.backToOutfit}
-        </button>
-      </div>
+      {!inPicker && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2
+            id="guest-preview-wardrobe-heading"
+            className="text-2xl font-semibold text-ink"
+          >
+            {strings.wardrobe.heading}
+          </h2>
+          <button
+            type="button"
+            onClick={onBackToOutfit}
+            data-testid="guest-preview-back-to-outfit"
+            className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
+          >
+            {strings.wardrobe.backToOutfit}
+          </button>
+        </div>
+      )}
       <GuestPreviewChoiceGroup
         legend={strings.wardrobe.category}
         name="category"
         testId="guest-preview-category"
         value={category}
-        options={[
-          { value: 'all' as const, label: strings.wardrobe.allCategories },
-          ...SAMPLE_GARMENT_CATEGORIES.map((key) => ({
-            value: key,
-            label: values.categoryTitle[key],
-          })),
-        ]}
+        options={sampleWardrobeCategories(strings)}
         onChange={(next) => {
           setCategory(next)
-          onCategory()
+          onCategory?.()
         }}
       />
       <GuestPreviewChoiceGroup
@@ -122,7 +113,7 @@ export function GuestPreviewWardrobe({
                 onClick={(event) => {
                   invoker.current = event.currentTarget
                   setOpen(garment)
-                  onInspect()
+                  onInspect?.()
                 }}
                 className="flex min-h-11 w-full flex-col items-center gap-2 rounded-xl border border-line bg-card p-3 text-center hover:border-line-strong"
               >
@@ -185,9 +176,7 @@ export function GuestPreviewWardrobe({
                 // Story CC-7.9 D3: gold is the screen's main action only; this is a neutral outline.
                 className="min-h-11 w-full rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
               >
-                {formatPreviewString(strings.outfit.swap, {
-                  category: values.category[open.category],
-                })}
+                {strings.wardrobe.useItem}
               </button>
             ) : null}
           </div>

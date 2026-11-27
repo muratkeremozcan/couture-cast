@@ -11,8 +11,10 @@ import {
 import {
   formatPreviewString,
   sampleGarmentText,
+  todayCatalogSlot,
   todaySlotCatalogItem,
   type GuestPreviewStrings,
+  type SampleSwapOptions,
   type TodaySlot,
 } from '@couture/utils'
 import {
@@ -24,7 +26,10 @@ import { useHeroPalette } from '@/components/hero/hero-theme'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 import { usePhotoBeforeExpiry } from '@/src/hooks/use-photo-before-expiry'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
-import { SampleGarmentArt } from '@/src/features/preview/guest-preview-parts'
+import {
+  PreviewSampleSwapRows,
+  SampleGarmentArt,
+} from '@/src/features/preview/guest-preview-parts'
 import { useTokens } from '@/src/theme/tokens'
 
 type Button = ComponentRef<typeof Pressable>
@@ -141,11 +146,13 @@ export function TodayOutfitPicture({
   slots,
   strings,
   getOptions,
+  getSampleOptions,
   onChoose,
 }: {
   slots: readonly TodaySlot[]
   strings: GuestPreviewStrings
-  getOptions: (index: number) => readonly TodaySlot[]
+  getOptions?: (index: number) => readonly TodaySlot[]
+  getSampleOptions?: (index: number) => SampleSwapOptions | undefined
   onChoose: (index: number, slot: TodaySlot) => void
 }) {
   const palette = useHeroPalette()
@@ -159,8 +166,38 @@ export function TodayOutfitPicture({
   const firstOption = useRef<Button | null>(null)
   const current = swappingIndex !== null ? slots[swappingIndex] : undefined
   const category = current ? strings.values.category[current.category] : ''
-  const options = current && swappingIndex !== null ? getOptions(swappingIndex) : []
+  const options = swappingIndex !== null ? (getOptions?.(swappingIndex) ?? []) : []
+  const sampleOptions =
+    swappingIndex !== null ? getSampleOptions?.(swappingIndex) : undefined
   const title = formatPreviewString(strings.outfit.swapTitle, { category })
+
+  const renderOption = (
+    slot: TodaySlot,
+    index: number,
+    selected: boolean,
+    name = slotName(slot, strings),
+    ref?: React.Ref<Button>
+  ) => (
+    <Pressable
+      key={slot.itemId}
+      ref={index === 0 ? firstOption : ref}
+      testID={`today-outfit-swap-option-${index}`}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      aria-checked={selected}
+      style={[styles.option, { borderColor: palette.line }]}
+      onPress={() => {
+        if (swappingIndex !== null && !selected) onChoose(swappingIndex, slot)
+        setSwappingIndex(null)
+      }}
+    >
+      <OptionArt slot={slot} />
+      <Text style={[styles.optionLabel, { color: palette.ink }]}>{name}</Text>
+      {selected && (
+        <Text style={{ color: palette.inkMuted }}>{strings.outfit.current}</Text>
+      )}
+    </Pressable>
+  )
 
   return (
     <>
@@ -228,38 +265,35 @@ export function TodayOutfitPicture({
                 {title}
               </Text>
             </LayerSwipeHandle>
-            <ScrollView accessibilityRole="radiogroup" aria-labelledby={titleId}>
-              {options.map((slot, index) => (
-                <Pressable
-                  key={slot.itemId}
-                  ref={index === 0 ? firstOption : undefined}
-                  testID={`today-outfit-swap-option-${index}`}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: index === 0 }}
-                  aria-checked={index === 0}
-                  style={[styles.option, { borderColor: palette.line }]}
-                  onPress={() => {
-                    if (swappingIndex !== null && index > 0) onChoose(swappingIndex, slot)
-                    setSwappingIndex(null)
-                  }}
-                >
-                  <OptionArt slot={slot} />
-                  <Text style={[styles.optionLabel, { color: palette.ink }]}>
-                    {slotName(slot, strings)}
+            {sampleOptions ? (
+              <ScrollView style={styles.sampleSwapScroll}>
+                <PreviewSampleSwapRows
+                  options={sampleOptions}
+                  label={title}
+                  strings={strings}
+                  palette={palette}
+                  showMoreTestId="today-outfit-swap-show-more"
+                  renderOption={(garment, index, selected, ref) =>
+                    renderOption(
+                      todayCatalogSlot(garment),
+                      index,
+                      selected,
+                      sampleGarmentText(garment, strings).name,
+                      ref
+                    )
+                  }
+                />
+              </ScrollView>
+            ) : (
+              <ScrollView accessibilityRole="radiogroup" aria-labelledby={titleId}>
+                {options.map((slot, index) => renderOption(slot, index, index === 0))}
+                {options.length === 1 && (
+                  <Text style={{ color: palette.inkMuted }}>
+                    {strings.outfit.noSuitableAlternative}
                   </Text>
-                  {index === 0 && (
-                    <Text style={{ color: palette.inkMuted }}>
-                      {strings.outfit.current}
-                    </Text>
-                  )}
-                </Pressable>
-              ))}
-              {options.length === 1 && (
-                <Text style={{ color: palette.inkMuted }}>
-                  {strings.outfit.noSuitableAlternative}
-                </Text>
-              )}
-            </ScrollView>
+                )}
+              </ScrollView>
+            )}
             <Pressable
               accessibilityRole="button"
               style={[styles.close, { borderColor: palette.lineStrong }]}
@@ -301,6 +335,7 @@ const styles = StyleSheet.create({
     maxHeight: '72%',
   },
   title: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
+  sampleSwapScroll: { flexGrow: 0, flexShrink: 1 },
   option: {
     minHeight: 44,
     flexDirection: 'row',

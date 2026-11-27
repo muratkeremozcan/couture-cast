@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Learning path Step 75: Find mini skirts, tights and socks.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-75-find-mini-skirts-tights-and-socks
 // Story CC-7.12 test owner (TEA): 7.12-NAT-023 (D7: the Home sample save confirmation gains View,
 // which opens the saved look's own screen) and 7.12-NAT-031 (D11: Plan your week opens the Looks
 // tab on Plan in one press).
@@ -61,6 +63,93 @@ describe('MemberSampleOutfit (mobile)', () => {
     restoreTokenResolver?.()
     restoreTokenResolver = undefined
     setMobileApplicationUserId(null)
+  })
+
+  it('[7.18-PICK-001/SAVE-001/SWAP-001] previews and saves a mini skirt with socks in Cool weather', async () => {
+    const { store, handlers } = createSavedLooksMswHandlers()
+    server.use(...handlers)
+    const view = await render(
+      <SaveFeedbackProvider>
+        <MemberSampleOutfit
+          owner="mobile-member-1"
+          error="no-location"
+          busy={false}
+          onRetry={vi.fn()}
+        />
+      </SaveFeedbackProvider>
+    )
+
+    await userEvent.click(screen.getByTestId('home-edit-sample'))
+    await userEvent.click(screen.getByTestId('sample-weather-cool-windy'))
+    expect(screen.getByTestId('guest-preview-weather-chip')).toHaveTextContent(
+      'Cool and windy'
+    )
+
+    for (const { filter, id, label } of [
+      { filter: 'skirts', id: 'mini-skirt', label: 'Mini skirt' },
+      { filter: 'tights', id: 'opaque-tights', label: 'Opaque tights' },
+    ]) {
+      await userEvent.click(screen.getByTestId('guest-preview-browse-wardrobe'))
+      expect(screen.getByTestId('guest-preview-collection-all')).toBeChecked()
+      const category = screen.getByTestId(`guest-preview-category-${filter}`)
+      await userEvent.click(category)
+      expect(category).toBeChecked()
+      await userEvent.click(screen.getByTestId(`guest-preview-item-${id}`))
+      const detail = await screen.findByTestId('guest-preview-item-detail')
+      expect(within(detail).getByRole('heading', { name: label })).toBeVisible()
+      expect(within(detail).getByTestId('sample-garment-art')).toBeVisible()
+      await userEvent.click(within(detail).getByTestId('guest-preview-use-item'))
+      expect(await screen.findByTestId(`guest-preview-garment-${id}`)).toBeVisible()
+    }
+
+    const swapTrigger = screen.getByTestId('guest-preview-swap-accessory')
+    await userEvent.click(swapTrigger)
+    const sheet = await screen.findByTestId('guest-preview-swap-sheet')
+    const selected = within(sheet).getByRole('radio', { checked: true })
+    expect(selected).toHaveAccessibleName(/Opaque tights.*current/i)
+    const socks = within(sheet).getByRole('group', { name: 'Socks' })
+    expect(within(socks).getByRole('radio', { name: 'Ribbed socks' })).toBeVisible()
+    await userEvent.click(selected)
+    await waitFor(() =>
+      expect(screen.queryByTestId('guest-preview-swap-sheet')).toBeNull()
+    )
+    expect(screen.getByTestId('guest-preview-garment-opaque-tights')).toBeVisible()
+
+    await userEvent.click(swapTrigger)
+    await userEvent.click(
+      await screen.findByTestId('guest-preview-swap-option-ribbed-socks')
+    )
+    expect(await screen.findByTestId('guest-preview-garment-ribbed-socks')).toBeVisible()
+    expect(screen.queryByTestId('guest-preview-garment-opaque-tights')).toBeNull()
+    await userEvent.click(await screen.findByTestId('sample-save-look'))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Saved to your looks.'
+      )
+    )
+    expect(store.items).toEqual([
+      expect.objectContaining({
+        collection: 'all',
+        weather: 'cool-windy',
+        swaps: expect.objectContaining({ accessory: 'sample:g:ribbed-socks' }),
+        composition: expect.arrayContaining([
+          expect.objectContaining({ itemId: 'sample:g:mini-skirt' }),
+          expect.objectContaining({ itemId: 'sample:g:ribbed-socks' }),
+        ]),
+      }),
+    ])
+
+    await userEvent.click(swapTrigger)
+    await userEvent.click(
+      await screen.findByTestId('guest-preview-swap-option-opaque-tights')
+    )
+    expect(await screen.findByTestId('guest-preview-garment-opaque-tights')).toBeVisible()
+    const saved = within(await screen.findByTestId('sample-saved-looks'))
+    await userEvent.click(saved.getByRole('button', { name: /^Mini skirt and tights$/ }))
+    expect(await screen.findByTestId('guest-preview-garment-mini-skirt')).toBeVisible()
+    expect(screen.getByTestId('guest-preview-garment-ribbed-socks')).toBeVisible()
+    expect(screen.queryByTestId('guest-preview-garment-opaque-tights')).toBeNull()
+    await view.unmount()
   })
 
   it('covers shuffle/swap Undo, preferences/weather/reset, Save/Undo, remote-delete revalidation, 409 tombstone, and Remove/Retry/Undo', async () => {

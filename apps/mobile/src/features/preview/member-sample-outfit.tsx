@@ -1,22 +1,23 @@
 import { router } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { useEffect, useRef, useState, type ComponentRef } from 'react'
+import { StyleSheet, Text, View, type Pressable } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { SavedLookContract } from '@couture/api-client/contracts/http'
 import {
+  applyMemberSampleGarment,
   buildHomeSampleSavedLookInput,
   createAnnouncementToken,
   createIdempotencyKey,
   createMemberSampleOutfit,
   getGuestPreviewStrings,
   isOfflineError,
+  memberSampleWardrobeChoices,
   popLookUndoSnapshot,
   pushLookUndoSnapshot,
   reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
   sampleLookText,
-  sampleSwapCandidates,
-  SAMPLE_CATALOG,
+  sampleOutfitSwapOptions,
   savedLookMatchesHomeSample,
   savedLookToSampleBookmark,
   swapMemberSampleGarment,
@@ -55,7 +56,13 @@ import {
 import { savedLookRoute } from '@/src/features/looks/looks-routes'
 import { NavRow } from '@/src/components/nav-row'
 import { TAB_BODY_INSET } from '@/src/theme/tokens'
-import { PreviewButton, PreviewOutfit, PreviewSwapSheet } from './guest-preview-parts'
+import {
+  focusPreviewButton,
+  PreviewButton,
+  PreviewOutfit,
+  PreviewSwapSheet,
+  PreviewWardrobe,
+} from './guest-preview-parts'
 import { SampleIdeaControls } from './sample-idea-controls'
 
 function buildMobileSampleAttemptKey(
@@ -170,6 +177,18 @@ export function MemberSampleOutfit({
   const [result, setResult] = useState(createMemberSampleOutfit)
   const [editorOpen, setEditorOpen] = useState(false)
   const [category, setCategory] = useState<SampleGarmentCategory | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const pickerOpener = useRef<ComponentRef<typeof Pressable>>(null)
+  const pickerBack = useRef<ComponentRef<typeof Pressable>>(null)
+  const wasPickerOpen = useRef(false)
+  useEffect(() => {
+    if (!pickerOpen && !wasPickerOpen.current) return
+    wasPickerOpen.current = pickerOpen
+    const frame = requestAnimationFrame(() =>
+      focusPreviewButton(pickerOpen ? pickerBack.current : pickerOpener.current)
+    )
+    return () => cancelAnimationFrame(frame)
+  }, [pickerOpen])
   const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>([])
   const [bookmarkRevision, setBookmarkRevision] = useState(0)
   const [bookmarkStorage, setBookmarkStorage] = useState<
@@ -342,11 +361,18 @@ export function MemberSampleOutfit({
     })
   }
   const lookId = result.look?.id
-  const currentId = result.garments.find((garment) => garment.category === category)?.id
   const garmentsSignature = result.garments.map((garment) => garment.id).join(',')
+  const wardrobeChoices = pickerOpen ? memberSampleWardrobeChoices(result) : undefined
 
   const editor = (
     <>
+      <PreviewButton
+        buttonRef={pickerOpener}
+        label={strings.outfit.browseWardrobe}
+        onPress={() => setPickerOpen(true)}
+        testID="guest-preview-browse-wardrobe"
+        palette={palette}
+      />
       <PreviewOutfit
         result={result}
         strings={strings}
@@ -652,10 +678,7 @@ export function MemberSampleOutfit({
       />
       <PreviewSwapSheet
         category={category}
-        candidates={
-          category ? sampleSwapCandidates(SAMPLE_CATALOG, category, result.input) : []
-        }
-        currentId={currentId}
+        {...sampleOutfitSwapOptions(result, category)}
         strings={strings}
         palette={palette}
         onChoose={(id) => {
@@ -697,16 +720,9 @@ export function MemberSampleOutfit({
       <TodayOutfitPicture
         slots={result.garments.map(todayCatalogSlot)}
         strings={strings}
-        getOptions={(index) => {
-          const current = result.garments[index]
-          if (!current) return []
-          const alternatives = sampleSwapCandidates(
-            SAMPLE_CATALOG,
-            current.category,
-            result.input
-          ).filter((piece) => piece.id !== current.id)
-          return [current, ...alternatives].map(todayCatalogSlot)
-        }}
+        getSampleOptions={(index) =>
+          sampleOutfitSwapOptions(result, result.garments[index]?.category ?? null)
+        }
         onChoose={(_, slot) =>
           pushUndoAndUpdate(
             swapMemberSampleGarment(result, slot.category, slot.itemId),
@@ -739,11 +755,42 @@ export function MemberSampleOutfit({
         testID="home-edit-sample"
         palette={palette}
         expanded={editorOpen}
-        onPress={() => setEditorOpen((open) => !open)}
+        onPress={() => {
+          setPickerOpen(false)
+          setEditorOpen((open) => !open)
+        }}
         primary={weatherAvailable}
         todayPrimary={weatherAvailable}
       />
-      {editorOpen && editor}
+      {editorOpen &&
+        (wardrobeChoices ? (
+          <PreviewWardrobe
+            strings={strings}
+            palette={palette}
+            collection={result.input.collection}
+            usableIds={wardrobeChoices}
+            backButtonRef={pickerBack}
+            onCollection={(collection) => {
+              lookUndoStackRef.current = []
+              statusBar.dismissNotice()
+              updateResult((current) => updateMemberSampleOutfit(current, { collection }))
+            }}
+            onUse={(garment) => {
+              const targetLookId = wardrobeChoices.get(garment.id)
+              if (targetLookId) {
+                pushUndoAndUpdate(
+                  applyMemberSampleGarment(result, garment, targetLookId),
+                  t('feedback.pieceSwapped'),
+                  'swap'
+                )
+              }
+              setPickerOpen(false)
+            }}
+            onBackToOutfit={() => setPickerOpen(false)}
+          />
+        ) : (
+          editor
+        ))}
     </View>
   )
 }

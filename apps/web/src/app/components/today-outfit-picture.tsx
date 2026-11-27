@@ -4,12 +4,15 @@ import { useEffect, useId, useRef, useState } from 'react'
 import {
   formatPreviewString,
   sampleGarmentText,
+  todayCatalogSlot,
   todaySlotCatalogItem,
   type GuestPreviewStrings,
+  type SampleSwapOptions,
   type TodaySlot,
 } from '@couture/utils'
 import { AccessibleModal } from './accessible-modal'
 import { SampleGarmentArt } from './guest-preview/sample-garment-art'
+import { SampleSwapRows } from './guest-preview/sample-swap-rows'
 
 function slotName(slot: TodaySlot, strings: GuestPreviewStrings) {
   const item = todaySlotCatalogItem(slot)
@@ -71,11 +74,13 @@ export function TodayOutfitPicture({
   slots,
   strings,
   getOptions,
+  getSampleOptions,
   onChoose,
 }: {
   slots: readonly TodaySlot[]
   strings: GuestPreviewStrings
-  getOptions: (index: number) => readonly TodaySlot[]
+  getOptions?: (index: number) => readonly TodaySlot[]
+  getSampleOptions?: (index: number) => SampleSwapOptions | undefined
   onChoose: (index: number, slot: TodaySlot) => void
 }) {
   const [swappingIndex, setSwappingIndex] = useState<number | null>(null)
@@ -84,7 +89,39 @@ export function TodayOutfitPicture({
   const titleId = useId()
   const current = swappingIndex !== null ? slots[swappingIndex] : undefined
   const category = current ? strings.values.category[current.category] : ''
-  const options = current && swappingIndex !== null ? getOptions(swappingIndex) : []
+  const options = swappingIndex !== null ? (getOptions?.(swappingIndex) ?? []) : []
+  const sampleOptions =
+    swappingIndex !== null ? getSampleOptions?.(swappingIndex) : undefined
+  const title = formatPreviewString(strings.outfit.swapTitle, { category })
+
+  const renderOption = (
+    slot: TodaySlot,
+    index: number,
+    selected: boolean,
+    name = slotName(slot, strings)
+  ) => (
+    <button
+      type="button"
+      key={slot.itemId}
+      ref={index === 0 ? firstOption : undefined}
+      data-testid={`today-outfit-swap-option-${index}`}
+      role="radio"
+      aria-checked={selected}
+      className="flex min-h-11 w-full items-center gap-3 rounded-lg border border-line-strong px-2 py-1 text-start text-sm hover:border-ink"
+      onClick={() => {
+        if (swappingIndex !== null && !selected) onChoose(swappingIndex, slot)
+        setSwappingIndex(null)
+      }}
+    >
+      <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-card-muted">
+        <SlotArt slot={slot} />
+      </span>
+      <span>{name}</span>
+      {selected && (
+        <span className="text-xs text-ink-muted">{strings.outfit.current}</span>
+      )}
+    </button>
+  )
 
   return (
     <>
@@ -113,46 +150,42 @@ export function TodayOutfitPicture({
         isOpen={current !== undefined}
         onClose={() => setSwappingIndex(null)}
         titleId={titleId}
-        title={formatPreviewString(strings.outfit.swapTitle, { category })}
+        title={title}
         invokingElementRef={invoker}
         initialFocusRef={firstOption}
         closeLabel={strings.chrome.close}
       >
-        <div
-          data-testid="today-outfit-swap"
-          role="radiogroup"
-          aria-labelledby={titleId}
-          className="space-y-2"
-        >
-          {options.map((slot, index) => (
-            <button
-              type="button"
-              key={slot.itemId}
-              ref={index === 0 ? firstOption : undefined}
-              data-testid={`today-outfit-swap-option-${index}`}
-              role="radio"
-              aria-checked={index === 0}
-              className="flex min-h-11 w-full items-center gap-3 rounded-lg border border-line-strong px-2 py-1 text-start text-sm hover:border-ink"
-              onClick={() => {
-                if (swappingIndex !== null && index > 0) onChoose(swappingIndex, slot)
-                setSwappingIndex(null)
-              }}
-            >
-              <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-card-muted">
-                <SlotArt slot={slot} />
-              </span>
-              <span>{slotName(slot, strings)}</span>
-              {index === 0 && (
-                <span className="text-xs text-ink-muted">{strings.outfit.current}</span>
-              )}
-            </button>
-          ))}
-          {options.length === 1 && (
-            <p className="text-sm text-ink-muted">
-              {strings.outfit.noSuitableAlternative}
-            </p>
-          )}
-        </div>
+        {sampleOptions ? (
+          <SampleSwapRows
+            options={sampleOptions}
+            label={title}
+            strings={strings}
+            testId="today-outfit-swap"
+            showMoreTestId="today-outfit-swap-show-more"
+            renderOption={(garment, index, selected) =>
+              renderOption(
+                todayCatalogSlot(garment),
+                index,
+                selected,
+                sampleGarmentText(garment, strings).name
+              )
+            }
+          />
+        ) : (
+          <div
+            data-testid="today-outfit-swap"
+            role="radiogroup"
+            aria-labelledby={titleId}
+            className="space-y-2"
+          >
+            {options.map((slot, index) => renderOption(slot, index, index === 0))}
+            {options.length === 1 && (
+              <p className="text-sm text-ink-muted">
+                {strings.outfit.noSuitableAlternative}
+              </p>
+            )}
+          </div>
+        )}
       </AccessibleModal>
     </>
   )

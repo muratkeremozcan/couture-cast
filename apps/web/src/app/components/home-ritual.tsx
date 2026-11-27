@@ -11,19 +11,20 @@ import {
   type ScenarioOutfit,
 } from '@couture/api-client/contracts/http'
 import {
+  applyMemberSampleGarment,
   buildHomeSampleSavedLookInput,
   createAnnouncementToken,
   createIdempotencyKey,
   createMemberSampleOutfit,
   getGuestPreviewStrings,
   isOfflineError,
+  memberSampleWardrobeChoices,
   popLookUndoSnapshot,
   pushLookUndoSnapshot,
   reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
   sampleLookText,
-  sampleSwapCandidates,
-  SAMPLE_CATALOG,
+  sampleOutfitSwapOptions,
   savedLookMatchesHomeSample,
   savedLookToSampleBookmark,
   swapMemberSampleGarment,
@@ -64,6 +65,8 @@ import {
 import { HomeCloset, useHomeWardrobe } from './home-closet'
 import { GuestPreviewOutfit } from './guest-preview/guest-preview-outfit'
 import { GuestPreviewSwapDialog } from './guest-preview/guest-preview-swap-dialog'
+import { GuestPreviewWardrobe } from './guest-preview/guest-preview-wardrobe'
+import { AccessibleModal } from './accessible-modal'
 import { SampleIdeaControls } from './guest-preview/sample-idea-controls'
 import { SaveFeedbackProvider, useStatusBar } from './save-feedback'
 import { TodayLiveOutfit } from './today-live-outfit'
@@ -195,6 +198,8 @@ function SampleOutfitInner({
     retainedSample?.owner === owner ? retainedSample.result : createMemberSampleOutfit()
   )
   const [category, setCategory] = useState<SampleGarmentCategory | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const pickerOpener = useRef<HTMLButtonElement>(null)
   const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>([])
   const [bookmarksPersistent, setBookmarksPersistent] = useState(true)
   const [bookmarkRevision, setBookmarkRevision] = useState(0)
@@ -365,10 +370,20 @@ function SampleOutfitInner({
     })
   }
   const lookId = result.look?.id
-  const currentId = result.garments.find((garment) => garment.category === category)?.id
   const garmentsSignature = result.garments.map((garment) => garment.id).join(',')
+  const wardrobeChoices = pickerOpen ? memberSampleWardrobeChoices(result) : undefined
   const editor = (
     <>
+      <button
+        ref={pickerOpener}
+        type="button"
+        data-testid="guest-preview-browse-wardrobe"
+        aria-haspopup="dialog"
+        className={linkClass}
+        onClick={() => setPickerOpen(true)}
+      >
+        {strings.outfit.browseWardrobe}
+      </button>
       <GuestPreviewOutfit
         nested
         result={result}
@@ -692,10 +707,7 @@ function SampleOutfitInner({
       />
       <GuestPreviewSwapDialog
         category={category}
-        currentId={currentId}
-        candidates={
-          category ? sampleSwapCandidates(SAMPLE_CATALOG, category, result.input) : []
-        }
+        {...sampleOutfitSwapOptions(result, category)}
         strings={strings}
         invokerRef={invoker}
         onChoose={(garmentId) => {
@@ -710,6 +722,40 @@ function SampleOutfitInner({
         }}
         onClose={() => setCategory(null)}
       />
+      <AccessibleModal
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        titleId="member-sample-wardrobe-title"
+        title={strings.wardrobe.heading}
+        invokingElementRef={pickerOpener}
+        presentation="screen"
+      >
+        {wardrobeChoices && (
+          <GuestPreviewWardrobe
+            inPicker
+            strings={strings}
+            collection={result.input.collection}
+            usableIds={wardrobeChoices}
+            onCollection={(collection) => {
+              lookUndoStackRef.current = []
+              statusBar.dismissNotice()
+              update(updateMemberSampleOutfit(result, { collection }))
+            }}
+            onUse={(garment) => {
+              const targetLookId = wardrobeChoices.get(garment.id)
+              if (targetLookId) {
+                pushUndoAndUpdate(
+                  applyMemberSampleGarment(result, garment, targetLookId),
+                  t('feedback.pieceSwapped'),
+                  'swap'
+                )
+              }
+              setPickerOpen(false)
+            }}
+            onBackToOutfit={() => setPickerOpen(false)}
+          />
+        )}
+      </AccessibleModal>
     </>
   )
   return (
@@ -728,16 +774,9 @@ function SampleOutfitInner({
       <TodayOutfitPicture
         slots={result.garments.map(todayCatalogSlot)}
         strings={strings}
-        getOptions={(index) => {
-          const current = result.garments[index]
-          if (!current) return []
-          const alternatives = sampleSwapCandidates(
-            SAMPLE_CATALOG,
-            current.category,
-            result.input
-          ).filter((piece) => piece.id !== current.id)
-          return [current, ...alternatives].map(todayCatalogSlot)
-        }}
+        getSampleOptions={(index) =>
+          sampleOutfitSwapOptions(result, result.garments[index]?.category ?? null)
+        }
         onChoose={(_, slot) =>
           pushUndoAndUpdate(
             swapMemberSampleGarment(result, slot.category, slot.itemId),
