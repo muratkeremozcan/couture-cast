@@ -3,7 +3,7 @@
 // app-top-bar.tsx and imports no router.
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
-import type { ReactNode, Ref } from 'react'
+import type { ComponentRef, ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -14,6 +14,7 @@ export interface AppTopBarProps {
   title: string
   /** Shows the back control; omitted on a tab root. */
   onBack?: () => void
+  backRef?: Ref<ComponentRef<typeof Pressable>>
   /** Replaces the plain title text (the share card focus heading registers itself this way). */
   titleNode?: ReactNode
   trailing?: ReactNode
@@ -34,6 +35,7 @@ export interface AppTopBarProps {
 export function AppTopBar({
   title,
   onBack,
+  backRef,
   titleNode,
   trailing,
   wrapTitle = false,
@@ -64,6 +66,7 @@ export function AppTopBar({
     >
       {onBack ? (
         <Pressable
+          ref={backRef}
           testID="app-top-bar-back"
           accessibilityRole="button"
           accessibilityLabel={backLabel}
@@ -72,6 +75,7 @@ export function AppTopBar({
           style={[
             styles.back,
             { minHeight: shell.touchTarget, minWidth: shell.touchTarget, gap: space[1] },
+            wrapTitle && styles.backWrap,
           ]}
         >
           <ShellIcon name="back" size={type.base.fontSize} color={colors.ink} />
@@ -80,6 +84,7 @@ export function AppTopBar({
               color: colors.ink,
               fontSize: type.sm.fontSize,
               fontWeight: fontWeight.medium,
+              flexShrink: 1,
             }}
           >
             {backLabel}
@@ -131,7 +136,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  trailingWrap: { maxWidth: '45%', flexShrink: 1 },
+  backWrap: { maxWidth: '40%' },
+  trailingWrap: { maxWidth: '55%', flexShrink: 1 },
   trailing: {
     flexDirection: 'row',
     alignItems: 'center',

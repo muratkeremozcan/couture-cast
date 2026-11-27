@@ -5,8 +5,9 @@
 appId: ${MAESTRO_APP_ID}
 ---
 - runFlow: ../story65/open-app.yaml
-- tapOn:
-    id: tab-settings
+- runFlow:
+    file: ../subflows/open-profile-topic.yaml
+    env: { PROFILE_TOPIC: 'premium' }
 - scrollUntilVisible:
     element:
       id: premium-status-line

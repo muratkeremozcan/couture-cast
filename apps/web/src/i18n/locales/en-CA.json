@@ -537,6 +537,9 @@
       "deleteUsageFailed": "Could not check where this piece is used. Try again."
     },
     "hub": {
+      "categoryAll": "All",
+      "categoryFilters": "Filter by category",
+      "setupProgress": "{{completed}} of {{total}} steps complete",
       "loading": "Loading your wardrobe...",
       "emptyTitle": "No garments added yet",
       "emptyBody": "Snap a photo of your favourite jacket, top, or dress to get started.",
@@ -556,7 +559,7 @@
         "pending_upload": "Uploading",
         "bytes_uploaded": "Uploaded",
         "processing": "Processing",
-        "awaiting_tags": "Awaiting tags",
+        "awaiting_tags": "Needs tags",
         "ready": "Ready",
         "failed": "Failed",
         "unknown": "In progress"
@@ -1037,6 +1040,45 @@
     }
   },
   "settings": {
+    "profile": {
+      "account": "Account",
+      "places": "Places",
+      "style": "Style",
+      "premium": "Premium",
+      "notifications": "Notifications",
+      "language": "Language",
+      "about": "About and privacy",
+      "unavailable": "Unavailable",
+      "notSet": "Not set",
+      "premiumActive": "Active",
+      "premiumFree": "Free",
+      "on": "On",
+      "off": "Off",
+      "learnMore": "Learn more",
+      "languageHelp": "Your browser sets the language.",
+      "browserLanguageHelp": "Change your preferred language in your browser’s settings, then reload CoutureCast.",
+      "aboutHelp": "Plan outfits for the weather and keep track of your closet.",
+      "themeHelp": "Choose colors for the app.",
+      "privacy": "Privacy policy",
+      "terms": "Terms of service",
+      "setup": {
+        "not_started": "Not started",
+        "in_progress": "In progress",
+        "completed": "Complete"
+      },
+      "languages": {
+        "en-US": "English (US)",
+        "en-CA": "English (Canada)",
+        "es-419": "Español (LatAm)",
+        "fr-CA": "Français (Canada)",
+        "fr-FR": "Français (Europe)",
+        "tr-TR": "Türkçe",
+        "de-DE": "Deutsch",
+        "it-IT": "Italiano",
+        "pt-BR": "Português (Brasil)",
+        "pt-PT": "Português (Portugal)"
+      }
+    },
     "title": "Profile",
     "account": "Your account",
     "style": {

@@ -20,7 +20,7 @@
 // the editor could reopen no longer surfaces a Reopen here (the saved look screen owns it).
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 import React, { useEffect, useRef } from 'react'
-import { userEvent as browserUser } from 'vitest/browser'
+import { page, userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import {
@@ -35,6 +35,7 @@ import {
 } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import type * as EdgeToEdgeModalModule from '@/components/edge-to-edge-modal'
+import type { renderStackTopBar } from '@/src/components/app-top-bar'
 import { setViewport } from '@/src/test-utils/viewport'
 
 vi.mock('expo-localization', () => ({
@@ -48,6 +49,24 @@ const routerMock = vi.hoisted(() => ({
 }))
 vi.mock('expo-router', async () => ({
   router: routerMock,
+  Stack: {
+    Screen: ({
+      options,
+    }: {
+      options?: { title?: string; header?: typeof renderStackTopBar }
+    }) =>
+      nativeStyleRuntime.renderHeader
+        ? options?.header?.({
+            options,
+            route: { key: 'test-garment-detail', name: 'wardrobe-garment' },
+            navigation: {
+              goBack: vi.fn(),
+              canGoBack: () => false,
+              getState: () => ({ routes: [] }),
+            },
+          })
+        : null,
+  },
   // Story 7.6: the hub flushes pending deletes when its screen blurs; these cases stay focused.
   useFocusEffect: (await import('../../test-utils/focus-effect.js')).useFocusEffect,
   // Story CC-7.11 D4: the hub puts Add and More in its tab top bar through setOptions.
@@ -69,11 +88,13 @@ vi.mock('expo-image-picker', () => imagePicker)
 const nativeModalAccessibility = vi.hoisted(() => ({ enabled: false }))
 const nativeStyleRuntime = vi.hoisted(() => ({
   enabled: false,
+  renderHeader: false,
   platform: 'ios' as 'ios' | 'android',
   files: new Map<string, string>(),
   read: vi.fn<(uri: string) => void>(),
   focus: vi.fn<(target: number) => void>(),
   focusHandles: new Map([
+    ['app-top-bar-back', 81],
     ['style-piece-open', 82],
     ['style-piece-refresh', 82],
     ['style-piece-close', 83],
@@ -257,9 +278,9 @@ import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import { TabTopBar, tabNavigation } from '@/src/test-utils/tab-navigation'
 import { WardrobeHubScreen } from './wardrobe-hub-screen'
+import { GarmentDetailScreen } from './garment-detail-screen'
 import {
   colorRoles,
-  getGuestPreviewStrings,
   SAMPLE_CATALOG,
   stylePieceAnchor,
   stylePieceLooks,
@@ -301,19 +322,9 @@ function fixtureWardrobePhoto(color: string) {
   }
 }
 
-/**
- * Story 7.5: the hub no longer prints raw garment ids, so a card is found by its testID and
- * an owner's wardrobe is told apart by the photo it shows (both owners share a garment id).
- */
-async function expectCardPhoto(id: string, url: string) {
-  await waitFor(() =>
-    expect(screen.getByTestId(`garment-card-${id}`).querySelector('img')).toHaveAttribute(
-      'src',
-      url
-    )
-  )
-  // Story CC-7.7: the card shows once the Closet gate's reads (inventory, onboarding) settle.
-  await waitFor(() => expect(screen.getByTestId(`garment-card-${id}`)).toBeVisible())
+async function expectDetailPhoto(url: string) {
+  const photo = await screen.findByTestId('garment-detail-photo')
+  await waitFor(() => expect(photo.querySelector('img')).toHaveAttribute('src', url))
 }
 
 function deferred() {
@@ -451,6 +462,7 @@ describe('WardrobeHubScreen', () => {
     setMobileApplicationUserId(null)
     nativeModalAccessibility.enabled = false
     nativeStyleRuntime.enabled = false
+    nativeStyleRuntime.renderHeader = false
     nativeStyleRuntime.platform = 'ios'
     nativeStyleRuntime.files.clear()
     nativeStyleRuntime.read.mockReset()
@@ -476,10 +488,54 @@ describe('WardrobeHubScreen', () => {
     renderScreen()
 
     const status = await screen.findByTestId('garment-status-awaiting_tags')
-    expect(status).toHaveTextContent('Waiting for tags')
+    expect(status).toHaveTextContent('Needs tags')
     await waitFor(() => expect(screen.getByTestId('garment-capture-open')).toBeVisible())
     // The tab's AppTopBar shows the Wardrobe title; the body has no second one.
     expect(screen.queryByText(i18n.t('wardrobe.title'))).toBeNull()
+  })
+
+  it('[P0] [7.16-CLO-001/002/003] filters Closet and keeps one setup progress row below the grid', async () => {
+    const garments = [
+      createReadyGarmentFixture({ id: 'filter-top', category: 'top' }),
+      createReadyGarmentFixture({ id: 'filter-bottom', category: 'bottom' }),
+      garmentFixture({ id: 'filter-needs-tags' }),
+      garmentFixture({ id: 'filter-failed', status: 'failed' }),
+      garmentFixture({ id: 'filter-processing', status: 'processing' }),
+    ]
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: garments })),
+      http.get('*/api/v1/wardrobe/onboarding', () =>
+        HttpResponse.json({ data: onboardingNotCompleted })
+      )
+    )
+    renderScreen()
+
+    const grid = await screen.findByTestId('closet-garment-grid')
+    const filters = screen.getByTestId('closet-category-filters')
+    const progress = await screen.findByTestId('closet-setup-progress')
+    expect(
+      filters.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(
+      grid.compareDocumentPosition(progress) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(screen.getAllByTestId('closet-setup-progress')).toHaveLength(1)
+    expect(within(grid).getByTestId('garment-status-awaiting_tags')).toHaveTextContent(
+      'Needs tags'
+    )
+    expect(within(grid).getByTestId('garment-status-failed')).toHaveTextContent('Failed')
+    expect(within(grid).getByTestId('garment-status-processing')).toHaveTextContent(
+      'Processing'
+    )
+    expect(within(grid).getAllByTestId(/^garment-status-/)).toHaveLength(3)
+
+    await browserUser.click(within(filters).getByTestId('closet-category-top'))
+    expect(within(grid).getByTestId('garment-open-filter-top')).toBeVisible()
+    expect(within(grid).queryByTestId('garment-open-filter-bottom')).toBeNull()
+    await browserUser.click(within(filters).getByTestId('closet-category-all'))
+    expect(within(grid).getByTestId('garment-open-filter-bottom')).toBeVisible()
+    await browserUser.click(within(progress).getByRole('link'))
+    expect(routerMock.push).toHaveBeenCalledWith('/wardrobe-onboarding')
   })
 
   it('7.7-NAT-003 [7.11 D4] the Closet gate waits for the inventory, never the onboarding read, then a refresh keeps the closet in place', async () => {
@@ -574,8 +630,8 @@ describe('WardrobeHubScreen', () => {
     const emptyState = screen.getByTestId('wardrobe-empty-state')
     const body = screen.getByTestId('screen-gate-body-closet')
     expect(body.firstElementChild).toBe(emptyState)
-    // Nothing follows the closet: no row, no list, no row error or Retry.
-    expect(body.lastElementChild).toBe(emptyState)
+    const progress = await screen.findByTestId('closet-setup-progress')
+    expect(body.lastElementChild).toBe(progress)
     expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
     expect(screen.queryByTestId('closet-saved-looks-list')).toBeNull()
     expect(screen.queryByTestId('saved-looks-retry')).toBeNull()
@@ -627,7 +683,7 @@ describe('WardrobeHubScreen', () => {
     expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
     act(() => releaseReads())
     await waitFor(() =>
-      expect(screen.getByTestId('screen-gate-body-closet').lastElementChild).toBe(
+      expect(screen.getByTestId('screen-gate-body-closet').firstElementChild).toBe(
         screen.getByTestId('wardrobe-empty-state')
       )
     )
@@ -635,9 +691,7 @@ describe('WardrobeHubScreen', () => {
     expect(savedLookReads).toBe(0)
   })
 
-  // CC-7.12 D8: the row below the closet is gone, so the gap is held by the gate body's own
-  // style and the closet is the body's only child for a member with saved looks.
-  it('[7.12-NAT-024] 7.7-NAT-004 keeps the 24-point gate body gap with the closet as its only child, no Saved Looks row below', async () => {
+  it('[7.12-NAT-024] 7.7-NAT-004 keeps the empty Closet and single setup row separated by its body gap', async () => {
     setMobileApplicationUserId('closet-gate-gap-owner')
     const { handlers } = createSavedLooksMswHandlers()
     server.use(...handlers)
@@ -649,8 +703,9 @@ describe('WardrobeHubScreen', () => {
     // The ScrollView's gap reaches only its direct children; the gate body carries its own.
     expect(emptyState.parentElement).toBe(body)
     expect(body.firstElementChild).toBe(emptyState)
-    expect(getComputedStyle(body).rowGap).toBe('24px')
-    expect(body.children).toHaveLength(1)
+    const progress = await screen.findByTestId('closet-setup-progress')
+    expect(body.lastElementChild).toBe(progress)
+    expect(getComputedStyle(body).rowGap).toBe('8px')
     expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
   })
 
@@ -727,20 +782,20 @@ describe('WardrobeHubScreen', () => {
       }),
       ...savedLooksHandlers
     )
-    renderScreen()
+    render(<GarmentDetailScreen garmentId={garmentA.id} />)
 
-    await expectCardPhoto(garmentA.id, garmentA.imageAccess!.url)
-    expect(screen.getByTestId('wardrobe-screen')).not.toHaveAttribute('aria-hidden')
+    await expectDetailPhoto(garmentA.imageAccess!.url)
+    const detail = screen.getByTestId('garment-detail')
+    expect(
+      detail.closest('[data-important-for-accessibility="no-hide-descendants"]')
+    ).toBeNull()
     await browserUser.click(
       await screen.findByRole('button', { name: 'Style this piece' })
     )
     const panel = await screen.findByTestId('style-piece-panel')
-    const wardrobe = screen.getByTestId('wardrobe-screen')
-    expect(wardrobe).toHaveAttribute('aria-hidden', 'true')
-    expect(wardrobe).toHaveAttribute(
-      'data-important-for-accessibility',
-      'no-hide-descendants'
-    )
+    expect(
+      detail.closest('[data-important-for-accessibility="no-hide-descendants"]')
+    ).toHaveAttribute('aria-hidden', 'true')
     const [firstLook] = await within(panel).findAllByTestId('style-piece-look')
     await browserUser.click(within(firstLook!).getByRole('button', { name: 'Save look' }))
     expect(await within(panel).findByTestId('style-piece-reopen')).toHaveAccessibleName(
@@ -751,12 +806,13 @@ describe('WardrobeHubScreen', () => {
       active = ownerB
       setMobileApplicationUserId(active)
     })
-    await expectCardPhoto(garmentB.id, garmentB.imageAccess.url)
+    await expectDetailPhoto(garmentB.imageAccess.url)
     expect(screen.queryByTestId('style-piece-panel')).toBeNull()
-    const currentWardrobe = screen.getByTestId('wardrobe-screen')
-    expect(currentWardrobe).not.toHaveAttribute('aria-hidden')
-    expect(currentWardrobe).toHaveAttribute('data-important-for-accessibility', 'auto')
-
+    expect(
+      screen
+        .getByTestId('garment-detail')
+        .closest('[data-important-for-accessibility="no-hide-descendants"]')
+    ).toBeNull()
     await browserUser.click(screen.getByRole('button', { name: 'Style this piece' }))
     const otherPanel = await screen.findByTestId('style-piece-panel')
     const otherAnchors = await within(otherPanel).findAllByTestId('style-piece-anchor')
@@ -778,7 +834,7 @@ describe('WardrobeHubScreen', () => {
       active = ownerA
       setMobileApplicationUserId(active)
     })
-    await expectCardPhoto(garmentA.id, garmentA.imageAccess!.url)
+    await expectDetailPhoto(garmentA.imageAccess!.url)
     expect(screen.queryByTestId('style-piece-panel')).toBeNull()
     await browserUser.click(screen.getByRole('button', { name: 'Style this piece' }))
     const restored = await screen.findByTestId('style-piece-panel')
@@ -803,7 +859,7 @@ describe('WardrobeHubScreen', () => {
       ),
       ...handlers
     )
-    renderScreen()
+    render(<GarmentDetailScreen garmentId={garment.id} />)
     await browserUser.click(await screen.findByTestId('style-piece-open'))
     const panel = await screen.findByTestId('style-piece-panel')
     await browserUser.click(
@@ -910,7 +966,7 @@ describe('WardrobeHubScreen', () => {
         }),
         ...handlers
       )
-      renderScreen()
+      render(<GarmentDetailScreen garmentId={garment.id} />)
       await browserUser.click(await screen.findByTestId('style-piece-open'))
       const panel = await screen.findByTestId('style-piece-panel')
       const reopen = await within(panel).findByTestId('style-piece-reopen')
@@ -967,7 +1023,7 @@ describe('WardrobeHubScreen', () => {
         return HttpResponse.json({ data: [garment] })
       })
     )
-    renderScreen()
+    render(<GarmentDetailScreen garmentId={garment.id} />)
     await browserUser.click(await screen.findByTestId('style-piece-open'))
     const panel = await screen.findByTestId('style-piece-panel')
     await browserUser.click(
@@ -1004,7 +1060,7 @@ describe('WardrobeHubScreen', () => {
     server.use(
       http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [garment] }))
     )
-    renderScreen()
+    render(<GarmentDetailScreen garmentId={ready.id} />)
     await browserUser.click(await screen.findByTestId('style-piece-open'))
     const panel = await screen.findByTestId('style-piece-panel')
     expect(await within(panel).findAllByTestId('style-piece-anchor')).toHaveLength(3)
@@ -1022,8 +1078,40 @@ describe('WardrobeHubScreen', () => {
     await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenCalledWith(82))
   })
 
+  it('returns accessibility focus to detail Back when the styled garment disappears', async () => {
+    nativeStyleRuntime.enabled = true
+    nativeStyleRuntime.renderHeader = true
+    setMobileApplicationUserId('style-missing-piece-owner')
+    const ready = createReadyGarmentFixture({
+      id: 'style-missing-piece',
+      imageAccess: fixtureWardrobePhoto('#223355'),
+    })
+    let exists = true
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({ data: exists ? [ready] : [] })
+      )
+    )
+    render(<GarmentDetailScreen garmentId={ready.id} />)
+    await browserUser.click(await screen.findByTestId('style-piece-open'))
+    const panel = await screen.findByTestId('style-piece-panel')
+    await within(panel).findAllByTestId('style-piece-anchor')
+
+    changeNativeAppState('background')
+    exists = false
+    changeNativeAppState('active')
+    expect(await within(panel).findByTestId('style-piece-unavailable')).toBeVisible()
+    expect(screen.getByTestId('garment-detail-missing')).toBeInTheDocument()
+
+    nativeStyleRuntime.focus.mockClear()
+    await browserUser.click(within(panel).getByTestId('style-piece-close'))
+    await waitFor(() => expect(screen.queryByTestId('style-piece-panel')).toBeNull())
+    expect(screen.getByTestId('app-top-bar-back')).toBeVisible()
+    await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(81))
+  })
+
   /**
-   * Story CC-7.11 D13: the iOS retry flow inside Style this piece. The card refreshes an unsigned
+   * Story CC-7.11 D13: the iOS retry flow inside Style this piece. Detail refreshes an unsigned
    * photo, the panel opens on a held photo check that fails, one retry stays unsigned and the next
    * renews the photo, so the selected weather option (84) takes focus. The dialog's onShow is held
    * (`holdShow`); `showAtOpen` reports it while the photo check is still running, otherwise the
@@ -1052,19 +1140,22 @@ describe('WardrobeHubScreen', () => {
     }
     const renewal = { ...ready, imageAccess: fixtureWardrobePhoto('#563312') }
     let garment: typeof ready = unsigned
-    let holdVerification = false
     const verification = deferred()
+    const unsignedRetry = deferred()
+    const renewalReply = deferred()
+    const requestedRenewal = vi.fn<(result: typeof ready) => void>()
+    let heldRead: ReturnType<typeof deferred> | undefined
     server.use(
       http.get('*/api/v1/wardrobe/garments', async () => {
         const current = garment
-        if (holdVerification) {
-          holdVerification = false
-          await verification.promise
-        }
+        const pending = heldRead
+        heldRead = undefined
+        if (pending === renewalReply) requestedRenewal(current)
+        await pending?.promise
         return HttpResponse.json({ data: [current] })
       })
     )
-    renderScreen()
+    render(<GarmentDetailScreen garmentId={ready.id} />)
     try {
       const cardRefresh = await screen.findByTestId('style-piece-refresh')
       expect(screen.queryByTestId('style-piece-open')).toBeNull()
@@ -1074,7 +1165,7 @@ describe('WardrobeHubScreen', () => {
       await waitFor(() => expect(opener).toBeEnabled())
 
       garment = failedPhoto
-      holdVerification = true
+      heldRead = verification
       nativeStyleRuntime.holdShow = true
       nativeStyleRuntime.focus.mockClear()
       await browserUser.click(opener)
@@ -1096,12 +1187,23 @@ describe('WardrobeHubScreen', () => {
       expect(await within(panel).findByTestId('style-piece-unavailable')).toBeVisible()
       await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(83))
       const retry = within(panel).getByTestId('style-piece-refresh')
+      const retryControl = page
+        .getByTestId('style-piece-panel')
+        .getByTestId('style-piece-refresh')
       garment = unsigned
-      await browserUser.click(retry)
+      heldRead = unsignedRetry
+      await retryControl.click()
+      await waitFor(() => expect(retry).toBeDisabled())
+      unsignedRetry.resolve()
       await waitFor(() => expect(retry).toBeEnabled())
       expect(within(panel).queryByTestId('style-piece-save')).toBeNull()
 
       garment = renewal
+      heldRead = renewalReply
+      await retryControl.click()
+      await waitFor(() =>
+        expect(requestedRenewal).toHaveBeenCalledExactlyOnceWith(renewal)
+      )
       const earlyFrame = frameBeforeCommit
         ? vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
             queueMicrotask(() => callback(performance.now()))
@@ -1110,7 +1212,7 @@ describe('WardrobeHubScreen', () => {
         : undefined
       let anchors: HTMLElement[]
       try {
-        await browserUser.click(retry)
+        renewalReply.resolve()
         anchors = await within(panel).findAllByTestId('style-piece-anchor')
       } finally {
         earlyFrame?.mockRestore()
@@ -1126,6 +1228,8 @@ describe('WardrobeHubScreen', () => {
       return { finishShow: finishShow!, panel }
     } finally {
       verification.resolve()
+      unsignedRetry.resolve()
+      renewalReply.resolve()
     }
   }
 
@@ -1183,7 +1287,7 @@ describe('WardrobeHubScreen', () => {
           return HttpResponse.json({ data: [garment] })
         })
       )
-      renderScreen()
+      render(<GarmentDetailScreen garmentId={garment.id} />)
       try {
         const opener = await screen.findByTestId('style-piece-open')
         await waitFor(() => expect(opener).toBeEnabled())
@@ -1227,7 +1331,7 @@ describe('WardrobeHubScreen', () => {
         return HttpResponse.json({ data: [garment] })
       })
     )
-    renderScreen()
+    render(<GarmentDetailScreen garmentId={garment.id} />)
     try {
       const opener = await screen.findByTestId('style-piece-open')
       verifying = true
@@ -1265,7 +1369,7 @@ describe('WardrobeHubScreen', () => {
         HttpResponse.json({ message: 'Unavailable' }, { status: 503 })
       )
     )
-    renderScreen()
+    render(<GarmentDetailScreen garmentId={garment.id} />)
     await browserUser.click(await screen.findByTestId('style-piece-open'))
     const panel = await screen.findByTestId('style-piece-panel')
     expect(await within(panel).findByRole('alert')).toHaveTextContent(
@@ -1278,192 +1382,6 @@ describe('WardrobeHubScreen', () => {
       within(look!).getByTestId('style-piece-option-sample:g:white-sneakers')
     )
     expect(within(look!).getByText('White sneakers', { exact: true })).toBeVisible()
-  })
-
-  it('queues a completed tagging poll until the styling modal is dismissed', async () => {
-    nativeStyleRuntime.enabled = true
-    nativeStyleRuntime.holdDismissal = true
-    setMobileApplicationUserId('style-native-queue-owner')
-    const garment = createReadyGarmentFixture({
-      id: 'style-native-queue-piece',
-      imageAccess: fixtureWardrobePhoto('#224466'),
-    })
-    let deferNextRead = false
-    let pollStarted = false
-    let settled = false
-    let releasePoll!: () => void
-    const pollReply = new Promise<void>((resolve) => {
-      releasePoll = resolve
-    })
-    const taggingId = 'style-native-pending-tags'
-    server.use(
-      http.get('*/api/v1/wardrobe/garments', async () => {
-        if (deferNextRead) {
-          deferNextRead = false
-          pollStarted = true
-          await pollReply
-          settled = true
-        }
-        return HttpResponse.json({
-          data: [
-            garment,
-            garmentFixture({
-              id: taggingId,
-              status: settled ? 'awaiting_tags' : 'processing',
-            }),
-          ],
-        })
-      }),
-      http.post(`*/api/v1/wardrobe/garments/${taggingId}/suggest-tags`, () =>
-        HttpResponse.json({
-          data: createSuggestGarmentTagsDataFixture({ garmentId: taggingId }),
-        })
-      )
-    )
-    renderScreen()
-    const checkStatus = await screen.findByRole('button', {
-      name: 'Check garment status',
-    })
-    deferNextRead = true
-    try {
-      await browserUser.click(checkStatus)
-      await waitFor(() => expect(pollStarted).toBe(true))
-      await browserUser.click(await screen.findByTestId('style-piece-open'))
-      const panel = await screen.findByTestId('style-piece-panel')
-      releasePoll()
-      await screen.findByTestId('garment-status-awaiting_tags')
-      expect(screen.queryByTestId('garment-tagging-modal')).toBeNull()
-
-      await browserUser.click(within(panel).getByTestId('style-piece-close'))
-      expect(screen.queryByTestId('style-piece-panel')).toBeNull()
-      expect(screen.queryByTestId('garment-tagging-modal')).toBeNull()
-      await waitFor(() =>
-        expect(nativeStyleRuntime.finishDismissal).toBeTypeOf('function')
-      )
-      act(() => nativeStyleRuntime.finishDismissal?.())
-      await waitFor(() =>
-        expect(screen.getByTestId('garment-tagging-modal')).toBeVisible()
-      )
-    } finally {
-      releasePoll()
-    }
-  })
-
-  it('rejects a late styling snapshot after the tagging poll has settled', async () => {
-    nativeStyleRuntime.enabled = true
-    setMobileApplicationUserId('style-native-inventory-race-owner')
-    const anchor = createReadyGarmentFixture({
-      id: 'style-native-inventory-anchor',
-      imageAccess: fixtureWardrobePhoto('#224466'),
-    })
-    const processing = garmentFixture({
-      id: 'style-native-inventory-poll',
-      status: 'processing',
-    })
-    const settled = createReadyGarmentFixture({ id: processing.id })
-    const photoCheck = deferred()
-    const poll = deferred()
-    const pollStarted = deferred()
-    const photoCheckStarted = deferred()
-    let reads = 0
-    server.use(
-      http.get('*/api/v1/wardrobe/garments', async () => {
-        const read = ++reads
-        if (read === 2) {
-          pollStarted.resolve()
-          await poll.promise
-          return HttpResponse.json({ data: [anchor, settled] })
-        }
-        if (read === 3) {
-          photoCheckStarted.resolve()
-          await photoCheck.promise
-        }
-        return HttpResponse.json({
-          data: read > 3 ? [settled] : [anchor, processing],
-        })
-      })
-    )
-    renderScreen()
-    try {
-      await browserUser.click(
-        await screen.findByRole('button', { name: 'Check garment status' })
-      )
-      await pollStarted.promise
-      await browserUser.click(await screen.findByTestId('style-piece-open'))
-      const panel = await screen.findByTestId('style-piece-panel')
-      await photoCheckStarted.promise
-      poll.resolve()
-      await waitFor(() =>
-        expect(screen.queryByTestId('garment-status-processing')).toBeNull()
-      )
-
-      photoCheck.resolve()
-      await waitFor(() => expect(within(panel).queryByRole('progressbar')).toBeNull())
-      expect(screen.queryByTestId('garment-status-processing')).toBeNull()
-      expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
-      await waitFor(() =>
-        expect(screen.getByTestId(`garment-card-${anchor.id}`)).toBeVisible()
-      )
-
-      await browserUser.click(within(panel).getByTestId('style-piece-refresh'))
-      await waitFor(() =>
-        expect(screen.queryByTestId(`garment-card-${anchor.id}`)).toBeNull()
-      )
-      expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
-    } finally {
-      poll.resolve()
-      photoCheck.resolve()
-    }
-  })
-
-  it('keeps a deleted styling garment hidden when an older poll snapshot settles', async () => {
-    nativeStyleRuntime.enabled = true
-    setMobileApplicationUserId('style-native-poll-race-owner')
-    const anchor = createReadyGarmentFixture({
-      id: 'style-native-poll-anchor',
-      imageAccess: fixtureWardrobePhoto('#224466'),
-    })
-    const processing = garmentFixture({
-      id: 'style-native-poll-garment',
-      status: 'processing',
-    })
-    const settled = createReadyGarmentFixture({ id: processing.id })
-    const poll = deferred()
-    const pollStarted = deferred()
-    let reads = 0
-    server.use(
-      http.get('*/api/v1/wardrobe/garments', async () => {
-        const read = ++reads
-        if (read === 2) {
-          pollStarted.resolve()
-          await poll.promise
-          return HttpResponse.json({ data: [anchor, settled] })
-        }
-        const data =
-          read === 1 ? [anchor, processing] : [read === 3 ? processing : settled]
-        return HttpResponse.json({ data })
-      })
-    )
-    renderScreen()
-    try {
-      await browserUser.click(
-        await screen.findByRole('button', { name: 'Check garment status' })
-      )
-      await pollStarted.promise
-      await browserUser.click(await screen.findByTestId('style-piece-open'))
-      const panel = await screen.findByTestId('style-piece-panel')
-      expect(await within(panel).findByTestId('style-piece-unavailable')).toBeVisible()
-      expect(screen.queryByTestId(`garment-card-${anchor.id}`)).toBeNull()
-
-      poll.resolve()
-      await waitFor(() =>
-        expect(screen.queryByTestId('garment-status-processing')).toBeNull()
-      )
-      expect(screen.queryByTestId(`garment-card-${anchor.id}`)).toBeNull()
-      expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
-    } finally {
-      poll.resolve()
-    }
   })
 
   it('withholds the empty state until the failed garment list is retried successfully', async () => {
@@ -1532,7 +1450,7 @@ describe('WardrobeHubScreen', () => {
       expect(screen.getByTestId('garment-status-processing')).toBeVisible()
     )
     expect(screen.queryByTestId('garment-capture-modal')).toBeNull()
-    await browserUser.click(screen.getByRole('button', { name: 'Check garment status' }))
+    await browserUser.click(screen.getByRole('button', { name: 'Processing' }))
     await waitFor(() => expect(screen.getByTestId('garment-tagging-modal')).toBeVisible())
     expect(routerMock.setParams).toHaveBeenCalledExactlyOnceWith({ entry: undefined })
   })
@@ -1870,7 +1788,7 @@ describe('WardrobeHubScreen', () => {
     await waitFor(() => {
       expect(screen.getByTestId('garment-card-garment-refreshed')).toBeInTheDocument()
     })
-    expect(screen.getAllByTestId('garment-status-ready')).toHaveLength(2)
+    expect(screen.getAllByTestId(/^garment-open-/)).toHaveLength(2)
     expect(screen.queryByTestId('garment-tagging-modal')).not.toBeInTheDocument()
   })
 
@@ -1900,7 +1818,7 @@ describe('WardrobeHubScreen', () => {
         })
       )
     )
-    await browserUser.click(screen.getByRole('button', { name: 'Check garment status' }))
+    await browserUser.click(screen.getByRole('button', { name: 'Processing' }))
     await waitFor(() => expect(screen.getByTestId('garment-tagging-modal')).toBeVisible())
   })
 
@@ -2211,7 +2129,7 @@ describe('WardrobeHubScreen', () => {
       const card = await screen.findByTestId('garment-card-focus-failed-piece')
       await waitFor(() => expect(card).toBeVisible())
       const replace = within(card).getByRole('button', {
-        name: getGuestPreviewStrings(i18n.language).firstUse.replaceGarment,
+        name: i18n.t('wardrobe.hub.status.failed'),
       })
       nativeStyleRuntime.nodeHandles.set(replace, REPLACE)
 
@@ -2245,11 +2163,15 @@ describe('WardrobeHubScreen', () => {
         ),
         ...handlers
       )
-      renderScreen()
-      const opener = await screen.findByTestId('style-piece-open')
+      const hub = renderHub(<WardrobeHubScreen />)
+      await screen.findByTestId(`garment-open-${garment.id}`)
       expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
       expect(screen.queryByTestId('saved-look-reopen')).toBeNull()
+      expect(screen.queryByTestId('style-piece-open')).toBeNull()
+      hub.unmount()
 
+      render(<GarmentDetailScreen garmentId={garment.id} />)
+      const opener = await screen.findByTestId('style-piece-open')
       await browserUser.click(opener)
       const panel = await screen.findByTestId('style-piece-panel')
       nativeStyleRuntime.focus.mockClear()
@@ -2354,9 +2276,7 @@ describe('WardrobeHubScreen', () => {
       await screen.findByTestId('garment-card-hub-blue-top')
 
       try {
-        await browserUser.click(
-          await screen.findByRole('button', { name: 'Check garment status' })
-        )
+        await browserUser.click(await screen.findByRole('button', { name: 'Processing' }))
         await pollStarted.promise
         act(() => notifyWardrobeChanged())
         await waitFor(() => expect(label()).toBe('Top · Wool'))

@@ -28,7 +28,12 @@ export const WEB_ANALYTICS_ROUTES = Object.freeze([
   '/preview/continue',
   '/privacy',
   '/settings',
-  // Story CC-7.11 D7: Profile > Style.
+  // Story CC-7.16: Profile topic routes.
+  '/settings/about',
+  '/settings/account',
+  '/settings/language',
+  '/settings/places',
+  '/settings/premium',
   '/settings/style',
   '/signin',
   '/signup',
@@ -60,7 +65,11 @@ export const MOBILE_ANALYTICS_ROUTES = Object.freeze([
   // Story CC-7.12 D5: a saved look's own screen.
   '/saved-look/[savedLookId]',
   '/settings',
-  // Story CC-7.11 D7: Profile > Style.
+  // Story CC-7.16: Profile topic routes.
+  '/settings-about',
+  '/settings-account',
+  '/settings-language',
+  '/settings-premium',
   '/settings-style',
   '/signin',
   '/signup',

@@ -56,14 +56,21 @@ tags:
 - assertVisible:
     id: 'today-outfit-slot-0'
 
-- tapOn:
+- assertNotVisible:
     id: 'header-info-modal'
+- runFlow:
+    file: subflows/open-profile-topic.yaml
+    env: { PROFILE_TOPIC: 'about' }
 - assertVisible:
-    id: 'information-modal'
+    id: 'settings-about-screen'
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'About and privacy'
 - tapOn:
-    id: 'information-modal-close'
+    id: 'app-top-bar-back'
 - assertVisible:
-    id: 'tab-home'
+    id: 'tab-settings'
+    selected: true
 
 - takeScreenshot:
     path: maestro/artifacts/accessibility-hardening

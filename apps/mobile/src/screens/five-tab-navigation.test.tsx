@@ -136,6 +136,10 @@ const D10_PARENTS: Readonly<
   'saved-look/[savedLookId]': { pathname: '/looks', params: { segment: 'saved' } },
   // The `planner` route redirects before it shows (7.12-NAT-033); its entry stays a fallback.
   planner: '/looks',
+  'settings-account': '/settings',
+  'settings-premium': '/settings',
+  'settings-language': '/settings',
+  'settings-about': '/settings',
   'settings-style': '/settings',
   'palette-advisor': '/settings',
   'notification-settings': '/settings',
@@ -376,11 +380,15 @@ describe('CC-7.11 native five tabs and the back pattern', () => {
       ['wardrobe-onboarding', routeTitle(WardrobeOnboardingRoute)],
       ['wardrobe-silhouette', routeTitle(WardrobeSilhouetteRoute)],
       ['wardrobe-capsules', i18n.t('wardrobe.capsules.title')],
-      ['settings-style', i18n.t('settings.style.title')],
+      ['settings-account', i18n.t('settings.profile.account')],
+      ['settings-premium', i18n.t('settings.profile.premium')],
+      ['settings-language', i18n.t('settings.profile.language')],
+      ['settings-about', i18n.t('settings.profile.about')],
+      ['settings-style', i18n.t('settings.profile.style')],
       ['guardian-dashboard', i18n.t('guardian.dashboard.title')],
       ['teen-dashboard', i18n.t('teen.dashboard.title')],
       ['notification-settings', i18n.t('community.notifications.title')],
-      ['locations', i18n.t('locations.title')],
+      ['locations', i18n.t('settings.profile.places')],
     ]
     // The builder and TEA title contract (spec Plan Change Log).
     expect(Object.fromEntries(titles)).toMatchObject({

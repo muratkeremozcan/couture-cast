@@ -174,7 +174,16 @@ async function completeRead(reply: PromiseWithResolvers<Response>, response: Res
 }
 
 const dialogName = { name: 'Style this piece' }
-const openButton = () => screen.findByRole('button', dialogName)
+async function openDetail() {
+  if (!screen.queryByTestId('garment-detail')) {
+    fireEvent.click(await screen.findByTestId(`garment-open-${garmentId}`))
+  }
+  return screen.findByTestId('garment-detail')
+}
+
+async function openButton() {
+  return within(await openDetail()).findByRole('button', dialogName)
+}
 
 async function startStyling() {
   const user = userEvent.setup()
@@ -422,7 +431,8 @@ describe('Wardrobe styling', () => {
       publishOwner(owner)
       render(<WardrobePage />)
       const user = userEvent.setup()
-      const refresh = await screen.findByRole('button', { name: 'Refresh photo' })
+      await openDetail()
+      const refresh = await screen.findByTestId('style-piece-refresh')
       expect(screen.queryByRole('button', dialogName)).toBeNull()
       await user.click(refresh)
       // While the photo refreshes the button stays focused and only reads as unavailable: a
@@ -617,12 +627,11 @@ describe('Wardrobe styling', () => {
     }
   )
 
-  it('changes the card action when its signed photo expires in the wardrobe', async () => {
-    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+  it('renews a signing lease close to expiry when opening the detail', async () => {
     const expiring = {
       ...garment,
       imageAccess: {
-        ...renewed.imageAccess,
+        ...garment.imageAccess!,
         expiresAt: new Date(Date.now() + 15_000).toISOString(),
       },
     }
@@ -631,11 +640,14 @@ describe('Wardrobe styling', () => {
       .mockImplementation(() => list(renewed))
     publishOwner(owner)
     render(<WardrobePage />)
-    await vi.waitFor(() => expect(screen.getByRole('button', dialogName)).toBeEnabled())
-    await act(async () => vi.advanceTimersByTimeAsync(15_000))
-    const refresh = screen.getByRole('button', { name: 'Refresh photo' })
-    fireEvent.click(refresh)
-    await vi.waitFor(() => expect(screen.getByRole('button', dialogName)).toBeEnabled())
+    const detail = await openDetail()
+    await waitFor(() =>
+      expect(within(detail).getByTestId('garment-detail-photo')).toHaveAttribute(
+        'src',
+        renewed.imageAccess.url
+      )
+    )
+    expect(await openButton()).toBeEnabled()
     expect(inventory).toHaveBeenCalledTimes(2)
   })
 
@@ -688,9 +700,7 @@ describe('Wardrobe styling', () => {
     expect(write).not.toHaveBeenCalledWith(storageKey, expect.anything())
     expect(remove).not.toHaveBeenCalledWith(storageKey)
     await user.keyboard('{Escape}')
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: '+ Add Garment' })).toHaveFocus()
-    )
+    await waitFor(() => expect(screen.getByTestId('app-top-bar-back')).toHaveFocus())
   })
 
   it('waits for the wardrobe GET before posting a saved look', async () => {

@@ -168,14 +168,14 @@ test.describe('CC-7.12 Plan for free and entitled members @local-lane', () => {
       await waitForShellSettled(page, fixture.router)
       await expect(segment(page, 'plan')).toHaveAttribute('aria-selected', 'true')
 
-      await expectFreePreview(page, '/settings#premium')
+      await expectFreePreview(page, '/settings/premium')
       // The preview answers the planner's own refusal, not a guess before the read.
       expect(plannerReads()).toBeGreaterThan(0)
       await expect(page.getByTestId('planner-days')).toHaveCount(0)
 
       fixture.setScreen('profile')
       await page.getByTestId('plan-upgrade').click()
-      await expect(page).toHaveURL(/\/settings#premium$/)
+      await expect(page).toHaveURL(/\/settings\/premium$/)
       await expect(page.getByTestId('premium-subscription-section')).toBeVisible()
       expect(unexpectedErrors()).toEqual([])
     }
@@ -426,12 +426,12 @@ test.describe('CC-7.12 guardian-pending teen @local-lane', () => {
       })
       await page.goto('/looks?segment=plan')
       await waitForShellSettled(page, fixture.router)
-      await expectFreePreview(page, '/settings#premium')
+      await expectFreePreview(page, '/settings/premium')
 
       // The existing teen purchase rules live in Profile's Premium section; Upgrade lands there.
       fixture.setScreen('profile')
       await page.getByTestId('plan-upgrade').click()
-      await expect(page).toHaveURL(/\/settings#premium$/)
+      await expect(page).toHaveURL(/\/settings\/premium$/)
       await expect(page.getByTestId('premium-subscription-section')).toBeVisible()
       expect(unexpectedErrors()).toEqual([])
     }

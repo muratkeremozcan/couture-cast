@@ -163,7 +163,7 @@ test.describe('Member Home and Planner recovery', () => {
         page.getByRole('combobox', { name: 'Search for a city' })
       ).toBeVisible()
       const target = new URL(page.url())
-      expect(target.pathname).toBe('/settings')
+      expect(target.pathname).toBe('/settings/places')
       // Story CC-7.12 D11: city setup returns to the Looks Plan segment (SET_CITY_FROM_PLANNER).
       expect(target.searchParams.get('returnTo')).toBe('/looks?segment=plan')
     }

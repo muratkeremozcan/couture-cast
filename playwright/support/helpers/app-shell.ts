@@ -18,6 +18,7 @@ import { placeholderContrastFailures, textContrastFailures } from './painted-con
 import {
   closeCommunitySocket,
   createShellRouter,
+  type ShellClosetFixture,
   type ShellCommunityFixture,
   type ShellMode,
   type ShellScreen,
@@ -57,6 +58,7 @@ export async function openFixtureShell(
     todayPhotoUrl?: string
     todayOffer?: ShopThisLook
     community?: ShellCommunityFixture
+    closet?: ShellClosetFixture
     /**
      * A returning member's stored session that the app still has to verify (`pending`, CC-7.7
      * D1), instead of the fixture bearer that is a member at first paint.
@@ -73,6 +75,7 @@ export async function openFixtureShell(
     todayPhotoUrl: options.todayPhotoUrl,
     todayOffer: options.todayOffer,
     community: options.community,
+    closet: options.closet,
   })
   // Story CC-7.12 (Step 69): the capsules list is a shell read now (Looks merges it into Saved,
   // and /looks/capsules reads it), so the router serves it and its own fallback route is gone.

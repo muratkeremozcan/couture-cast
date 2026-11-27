@@ -171,7 +171,11 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
         stubReadyGarmentWithPhoto(page, garmentId)
         await page.goto('/wardrobe')
 
-        await page.getByTestId('style-piece-open').first().click()
+        await page
+          .getByTestId(/^garment-open-/)
+          .first()
+          .click()
+        await page.getByTestId('garment-detail').getByTestId('style-piece-open').click()
         const dialog = page.getByRole('dialog', { name: 'Style this piece' })
         await expect(dialog).toBeVisible()
         await dialog.getByTestId('style-piece-weather-warm-rainy').click()
@@ -258,7 +262,14 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           // Verify saving and reloading directly inside the storage-blocked context (AC 3 & AC 6).
           // Style this piece still opens from the Closet.
           await secondPage.goto(`${baseURL}/wardrobe`)
-          await secondPage.getByTestId('style-piece-open').first().click()
+          await secondPage
+            .getByTestId(/^garment-open-/)
+            .first()
+            .click()
+          await secondPage
+            .getByTestId('garment-detail')
+            .getByTestId('style-piece-open')
+            .click()
           const blockedDialog = secondPage.getByRole('dialog', {
             name: 'Style this piece',
           })

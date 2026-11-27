@@ -61,7 +61,7 @@ function locationsSection(page: Page): Locator {
 }
 
 async function openLocations(page: Page): Promise<Locator> {
-  await page.goto('/settings')
+  await page.goto('/settings/places')
   await waitForAccessibilityReady(page)
   const section = locationsSection(page)
   await expect(section).toHaveAttribute('data-state', 'ready')
@@ -135,7 +135,7 @@ test.describe('1.2b client location capture @local-lane', () => {
 
       await log.step('the guided action opens Locations with search focused')
       await action.click()
-      await expect(page).toHaveURL(/\/settings\?addLocation=1/)
+      await expect(page).toHaveURL(/\/settings\/places\?addLocation=1/)
       const section = locationsSection(page)
       const search = section.getByRole('combobox', { name: 'Search for a city' })
       await expect(search).toBeFocused()

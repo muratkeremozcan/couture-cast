@@ -403,7 +403,7 @@ describe('WardrobePage garment card label', () => {
     expect(card).not.toHaveTextContent(tagged.id)
   })
 
-  it('labels a status the catalogs do not name with the localized fallback, never the raw code', async () => {
+  it('leaves an unfamiliar status off the card', async () => {
     // Review P2-11: the status list is an open set; a newer backend code is diagnostic data.
     const unfamiliar = garmentFixture('unfamiliar-status-1', 'ready', {
       status: 'quarantine_review' as GarmentItemContract['status'],
@@ -413,8 +413,7 @@ describe('WardrobePage garment card label', () => {
     render(<WardrobePage />)
 
     const card = await screen.findByTestId(`garment-card-${unfamiliar.id}`)
-    const chip = within(card).getByTestId('garment-status-quarantine_review')
-    expect(chip).toHaveTextContent(/^In progress$/)
+    expect(within(card).queryByTestId(/^garment-status-/)).toBeNull()
     expect(card).not.toHaveTextContent(/quarantine/i)
   })
 })
@@ -828,9 +827,7 @@ describe('WardrobePage direct garment entry', () => {
     const error = await screen.findByRole('alert')
     expect(error).toHaveTextContent('Refresh rejected')
     expect(error).toHaveTextContent('Showing your saved garments. Refresh failed.')
-    expect(
-      within(screen.getByTestId(`garment-card-${pending.id}`)).getByText('Ready')
-    ).toBeVisible()
+    expect(screen.getByTestId(`garment-open-${pending.id}`)).toBeVisible()
     expect(screen.getByRole('link', { name: "Back to today's outfit" })).toHaveAttribute(
       'href',
       '/'
@@ -856,13 +853,15 @@ describe('WardrobePage direct garment entry', () => {
       .mockResolvedValue([garmentFixture(processing.id, 'ready')])
     render(<WardrobePage />)
 
-    const check = await screen.findByRole('button', { name: 'Check garment status' })
+    const check = await screen.findByRole('button', {
+      name: /Processing\. Check garment status/,
+    })
     expect(window.location.search).toBe('?from=home')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await user.click(check)
 
     const card = screen.getByTestId(`garment-card-${processing.id}`)
-    expect(await within(card).findByText('Ready')).toBeVisible()
+    expect(await within(card).findByTestId(`garment-open-${processing.id}`)).toBeVisible()
     expect(screen.getByRole('link', { name: "Back to today's outfit" })).toBeVisible()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(uploadGarmentImageFromWeb).not.toHaveBeenCalled()
@@ -896,6 +895,31 @@ describe('WardrobePage direct garment entry', () => {
 
 describe('WardrobePage garment grid', () => {
   beforeEach(resetWardrobeMocks)
+
+  it('7.16 filters the Closet by category and restores the full grid with All', async () => {
+    const user = userEvent.setup()
+    listGarmentsFromWeb.mockResolvedValue([
+      garmentFixture('tee', 'ready', { category: 'top' }),
+      garmentFixture('trousers', 'ready', { category: 'bottom' }),
+    ])
+    render(<WardrobePage />)
+
+    const tops = await screen.findByTestId('closet-category-top')
+    const all = screen.getByTestId('closet-category-all')
+    expect(all).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('garment-card-tee')).toBeVisible()
+    expect(screen.getByTestId('garment-card-trousers')).toBeVisible()
+
+    await user.click(tops)
+    expect(tops).toHaveAttribute('aria-pressed', 'true')
+    expect(all).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('garment-card-tee')).toBeVisible()
+    expect(screen.queryByTestId('garment-card-trousers')).not.toBeInTheDocument()
+
+    await user.click(all)
+    expect(all).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('garment-card-trousers')).toBeVisible()
+  })
 
   it('opens the capture modal from the empty-state call to action', async () => {
     const user = userEvent.setup()
@@ -931,7 +955,9 @@ describe('WardrobePage garment grid', () => {
     listGarmentsFromWeb.mockResolvedValue([garmentFixture('garment-failed', 'failed')])
     render(<WardrobePage />)
 
-    const replace = await screen.findByRole('button', { name: 'Choose another photo' })
+    const replace = await screen.findByRole('button', {
+      name: /Failed\. Choose another photo/,
+    })
     await user.click(replace)
     expect(
       await screen.findByRole('dialog', { name: 'Garment Capture Flow' })
@@ -1081,6 +1107,8 @@ describe('WardrobePage processing poll', () => {
 
   it('does not let a styling snapshot undo a processing poll that settled first', async () => {
     const user = userEvent.setup()
+    const previousUrl = window.location.href
+    const previousHistory = window.history.state as unknown
     collapsePollSchedule()
     const poll = Promise.withResolvers<GarmentItemContract[]>()
     const styling = Promise.withResolvers<GarmentItemContract[]>()
@@ -1105,7 +1133,7 @@ describe('WardrobePage processing poll', () => {
     sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-styling-member')
     try {
       render(<WardrobePage />)
-      const openStyling = await screen.findByRole('button', { name: 'Style this piece' })
+      const openDetail = await screen.findByTestId(`garment-open-${anchor.id}`)
       await commitGarmentThroughCapture(
         user,
         processing,
@@ -1113,7 +1141,8 @@ describe('WardrobePage processing poll', () => {
       )
       await user.click(screen.getByRole('button', { name: 'Done' }))
       await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2))
-      await user.click(openStyling)
+      await user.click(openDetail)
+      await user.click(await screen.findByTestId('style-piece-open'))
       const panel = await screen.findByRole('dialog', { name: 'Style this piece' })
       await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(3))
       const card = screen.getByTestId(`garment-card-${processing.id}`)
@@ -1121,13 +1150,13 @@ describe('WardrobePage processing poll', () => {
         poll.resolve([anchor, ready])
         await poll.promise
       })
-      expect(within(card).getByTestId('garment-status-ready')).toBeVisible()
+      expect(within(card).getByTestId(`garment-open-${processing.id}`)).toBeEnabled()
 
       await act(async () => {
         styling.resolve([anchor, processing])
         await styling.promise
       })
-      expect(within(card).getByTestId('garment-status-ready')).toBeVisible()
+      expect(within(card).getByTestId(`garment-open-${processing.id}`)).toBeEnabled()
       expect(
         within(panel).queryByRole('img', { name: 'Your piece' })
       ).not.toBeInTheDocument()
@@ -1141,9 +1170,10 @@ describe('WardrobePage processing poll', () => {
         within(panel).queryByRole('img', { name: 'Your piece' })
       ).not.toBeInTheDocument()
       await user.keyboard('{Escape}')
-      expect(within(card).getByTestId('garment-status-ready')).toBeVisible()
+      expect(within(card).getByTestId(`garment-open-${processing.id}`)).toBeEnabled()
     } finally {
       cleanup()
+      window.history.replaceState(previousHistory, '', previousUrl)
       verifiedSession.owner = null
       sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
     }
@@ -1224,10 +1254,10 @@ describe('WardrobePage processing poll', () => {
     )
 
     // Same reason as above: the rendered status proves the poll settled.
-    await screen.findByTestId('garment-status-ready')
+    await screen.findByTestId('garment-open-garment-poll')
     await user.click(screen.getByRole('button', { name: 'Done' }))
 
-    expect(screen.getByTestId('garment-status-ready')).toBeInTheDocument()
+    expect(screen.getByTestId('garment-open-garment-poll')).toBeInTheDocument()
     expect(screen.queryByText('Organize Garment Tags')).not.toBeInTheDocument()
     // A single poll settles it; the ladder must not keep firing.
     expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2)
@@ -1261,7 +1291,9 @@ describe('WardrobePage processing poll', () => {
     listGarmentsFromWeb.mockResolvedValue([
       garmentFixture('garment-poll', 'awaiting_tags'),
     ])
-    await user.click(screen.getByRole('button', { name: 'Check garment status' }))
+    await user.click(
+      screen.getByRole('button', { name: /Processing\. Check garment status/ })
+    )
     expect(await screen.findByText('Organize Garment Tags')).toBeInTheDocument()
   })
 

@@ -4,6 +4,8 @@
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-70-calm-today-with-one-primary-job
 # Learning path Step 71: Today's outfit as a picture.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
+# Learning path Step 73: Calm Closet and Profile.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-73-calm-closet-and-profile
 # Story CC-7.9 test owner (TEA): 7.9-NVIS-001..008, AC2 and AC6, spec D11.
 # Test design: _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md.
 #
@@ -27,10 +29,22 @@ onFlowComplete:
   - runScript:
       file: subflows/set-system-appearance.js
       env: { APPEARANCE_ROUTE: 'status-bar', APPEARANCE_VALUE: 'false' }
+  - runScript:
+      file: subflows/set-system-appearance.js
+      env: { APPEARANCE_ROUTE: 'community-text', APPEARANCE_VALUE: 'false' }
+  - runFlow:
+      when:
+        true: ${output.restoreShellLocale === true}
+      file: subflows/set-locale.yaml
+      env: { LOCALE: 'en-US' }
 ---
 - runScript:
     file: subflows/set-today-visual-fixture.js
     env: { TODAY_VARIANT: 'full' }
+# The watchdog can kill Maestro before onFlowComplete restores display settings.
+- runScript:
+    file: subflows/set-system-appearance.js
+    env: { APPEARANCE_ROUTE: 'community-text', APPEARANCE_VALUE: 'false' }
 - runScript:
     file: subflows/set-system-appearance.js
     env: { APPEARANCE_ROUTE: 'night', APPEARANCE_VALUE: 'no' }
@@ -102,4 +116,20 @@ onFlowComplete:
 
 - tapOn:
     id: 'app-top-bar-back'
+- evalScript: ${output.restoreShellLocale = true}
+- runFlow:
+    file: subflows/set-locale.yaml
+    env: { LOCALE: 'de-DE' }
+- runScript:
+    file: subflows/set-system-appearance.js
+    env: { APPEARANCE_ROUTE: 'community-text', APPEARANCE_VALUE: 'true' }
 - runFlow: subflows/calm-community-enlarged-text.yaml
+- runFlow:
+    file: subflows/calm-closet-profile-enlarged-text.yaml
+    env: { SCHEME: 'light' }
+- runScript:
+    file: subflows/set-system-appearance.js
+    env: { APPEARANCE_ROUTE: 'night', APPEARANCE_VALUE: 'yes' }
+- runFlow:
+    file: subflows/calm-closet-profile-enlarged-text.yaml
+    env: { SCHEME: 'dark' }

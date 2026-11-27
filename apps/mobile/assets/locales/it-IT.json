@@ -65,6 +65,31 @@
     "precipitation": "Precipitazioni"
   },
   "settings": {
+    "profile": {
+      "account": "Account",
+      "places": "Luoghi",
+      "style": "Stile",
+      "premium": "Premium",
+      "notifications": "Notifiche",
+      "language": "Lingua",
+      "about": "Informazioni e privacy",
+      "unavailable": "Non disponibile",
+      "notSet": "Non impostato",
+      "premiumActive": "Attivo",
+      "premiumFree": "Gratuito",
+      "on": "Attive",
+      "off": "Disattivate",
+      "learnMore": "Scopri di più",
+      "aboutHelp": "Organizza il tuo guardaroba e pianifica cosa indossare in base al meteo.",
+      "themeHelp": "Scegli i colori dell’app.",
+      "privacy": "Informativa sulla privacy",
+      "terms": "Condizioni del servizio",
+      "setup": {
+        "not_started": "Da iniziare",
+        "in_progress": "In corso",
+        "completed": "Completata"
+      }
+    },
     "title": "Impostazioni",
     "account": {
       "label": "Account"
@@ -415,15 +440,18 @@
       "deleteUsageFailed": "Impossibile verificare dove è usato questo capo. Riprova."
     },
     "hub": {
+      "categoryAll": "Tutte",
+      "categoryFilters": "Filtra per categoria",
+      "setupProgress": "{{completed}} passaggi completati su {{total}}",
       "loading": "Caricamento del guardaroba",
       "saved_looks_failed": "Impossibile caricare i tuoi look salvati.",
       "status": {
         "pending_upload": "Caricamento in corso",
         "bytes_uploaded": "Caricamento in corso",
         "processing": "Elaborazione in corso",
-        "awaiting_tags": "In attesa dei tag",
+        "awaiting_tags": "Mancano le etichette",
         "ready": "Pronto",
-        "failed": "Caricamento non riuscito",
+        "failed": "Non riuscito",
         "unknown": "In corso"
       },
       "detailTitle": "Dettagli del capo"

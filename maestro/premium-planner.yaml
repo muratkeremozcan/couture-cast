@@ -43,42 +43,18 @@ tags:
 
 - runFlow: subflows/open-app.yaml
 
-- runFlow: subflows/open-settings.yaml
-
-# --- Decision 7: the entry point is a link row in Premium settings ------------
-
-# The row sits below the palette advisor row, well below the fold on a phone,
-# so it is scrolled into view rather than merely waited for. Same viewport
-# lesson `premium-subscription.yaml` and `palette-advisor.yaml` record:
-# `extendedWaitUntil: visible` requires the element inside the VIEWPORT, and
-# CI's `pixel_3a` profile is shorter than the local `medium_phone`.
-# No `centerElement`: this row sits at the end of the Settings list and can
-# never reach the middle of the screen. Maestro then spends five more settling
-# swipes before it accepts the row, and on a slow emulator those outlast the
-# timeout and the step reports a row it is showing as not found (Story 1.2b
-# R25 verification run). A fully visible row is what the tap below needs.
-- scrollUntilVisible:
-    element:
-      id: 'planner-link'
-    direction: DOWN
-    timeout: 15000
-    label: 'Planner entry row is reachable from settings'
-
-# Pin the list end. The row is at the bottom of Settings, where the scroll view
-# stops with the row clear of the tab bar. iOS judges visibility from unclipped
-# XCUI frames, so the step above can stop with the row half behind the tab bar
-# and the tap below would land on a tab (Story 1.2b R27). One more scroll to the
-# end settles the row in the same place on both platforms.
-- scroll
-
+# CC-7.16 moved the planner entry to Looks > Plan.
 - tapOn:
-    id: 'planner-link'
+    id: 'tab-looks'
     retryTapIfNoChange: true
-    label: 'Open the 7-day planner'
+- extendedWaitUntil:
+    visible:
+      id: 'looks-segment-plan'
+    timeout: 15000
+- tapOn:
+    id: 'looks-segment-plan'
+    retryTapIfNoChange: true
 
-# Story CC-7.12 (Step 69): the row opens the Looks tab on its Plan segment (the planner screen is
-# no longer pushed), and a non-entitled reader sees the free preview: one line, one Upgrade and
-# a sample week. The CC-7.11 locked panel (`planner-locked`, `planner-locked-cta`) is gone.
 - extendedWaitUntil:
     visible:
       id: 'plan-free-preview'
@@ -129,12 +105,3 @@ tags:
 
 - takeScreenshot:
     path: maestro/artifacts/premium-planner-free-preview
-
-# Leave the device as this flow found it. `open-settings.yaml` can pop a pushed
-# route on Android, but its iOS path cannot. CC-7.12: the row now switches tabs
-# instead of pushing, so this back only steps the Android tab history back.
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - back

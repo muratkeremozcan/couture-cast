@@ -456,6 +456,9 @@ jobs:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
           MOBILE_E2E_DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
           MOBILE_E2E_PLATFORM: android
+          # The visual flow captures twelve baselines plus enlarged-text proofs. A cold
+          # run reached the last proof at the default six-minute watchdog limit.
+          MOBILE_E2E_CI_FLOW_TIMEOUT_MS: ${{ matrix.lane == 'visual' && '450000' || '' }}
           # The action supplies the emulator, so the runner must not try to boot
           # a second one through scripts/start-android-emulator.sh.
           MOBILE_E2E_AUTO_BOOT_ANDROID: '0'

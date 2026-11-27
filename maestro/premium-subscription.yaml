@@ -42,7 +42,9 @@ tags:
 
 - runFlow: subflows/open-app.yaml
 
-- runFlow: subflows/open-settings.yaml
+- runFlow:
+    file: subflows/open-profile-topic.yaml
+    env: { PROFILE_TOPIC: 'premium' }
 
 # The Premium section is the sibling after the commerce section, below the
 # fold on phone screens; scroll it into view before asserting anything.

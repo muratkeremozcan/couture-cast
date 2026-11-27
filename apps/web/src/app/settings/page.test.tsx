@@ -39,15 +39,21 @@ import { currentWebSessionScope } from '../../lib/use-web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { settle } from '../../test-utils/request-barrier'
 import SettingsPage from './page'
+import AccountPage from './account/page'
+import AboutPage from './about/page'
+import LanguagePage from './language/page'
+import PlacesPage from './places/page'
+import PremiumPage from './premium/page'
 
 const navigation = vi.hoisted(() => ({ prerendering: false }))
+const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
 
 vi.mock('next/navigation', async () => {
   const { use } = await import('react')
   const unanswered = new Promise<never>(() => undefined)
   return {
     usePathname: () => '/settings',
-    useRouter: () => ({ push: vi.fn() }),
+    useRouter: () => router,
     useSearchParams: () => {
       // A statically rendered page bails out of search params during prerender: the reader
       // suspends until the client renders it.
@@ -108,6 +114,41 @@ function themeHandler() {
  */
 function locationsHandler() {
   return http.get('/api/v1/locations', () => HttpResponse.json({ data: [] }))
+}
+
+function profileSummaryHandlers() {
+  return [
+    locationsHandler(),
+    http.get('/api/v1/wardrobe/onboarding', () =>
+      HttpResponse.json({
+        data: {
+          status: 'not_started',
+          currentStep: 'permission',
+          usedStarterWardrobe: false,
+          garmentsCapturedCount: 0,
+          startedAt: null,
+          completedAt: null,
+          revision: 0,
+        },
+      })
+    ),
+    http.get('/api/v1/commerce/premium/access', () =>
+      HttpResponse.json({ data: { premium: false, source: 'none' } })
+    ),
+    http.get('/api/v1/community/notification-preferences', () =>
+      HttpResponse.json({
+        data: {
+          enabled: true,
+          pushEnabled: true,
+          quietHoursEnabled: false,
+          quietHoursStart: '22:00',
+          quietHoursEnd: '07:00',
+          timezone: 'America/Chicago',
+          revision: 'fixture',
+        },
+      })
+    ),
+  ]
 }
 
 const PROFILE_PATH = '/api/v1/user/profile'
@@ -256,6 +297,36 @@ describe('Web settings page', () => {
     expect(screen.getByTestId('sticky-bottom-nav')).toBeInTheDocument()
   })
 
+  it.each([
+    ['/settings?checkout=success#premium', '/settings/premium?checkout=success#premium'],
+    [
+      '/settings?addLocation=1&returnTo=%2Fcommunity#locations',
+      '/settings/places?addLocation=1&returnTo=%2Fcommunity#locations',
+    ],
+  ])('7.16 routes the saved entry %s to its destination', (entry, destination) => {
+    const previousUrl = window.location.href
+    const previousState: unknown = window.history.state
+    onTestFinished(() => window.history.replaceState(previousState, '', previousUrl))
+    router.replace.mockClear()
+    window.history.replaceState(null, '', entry)
+
+    render(<SettingsPage />)
+
+    expect(router.replace).toHaveBeenCalledExactlyOnceWith(destination)
+  })
+
+  it('7.16 reports the active browser language on the Language destination', async () => {
+    await getI18n().changeLanguage('de-DE')
+    render(<LanguagePage />)
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Sprache')
+    expect(screen.getByText('Deutsch', { exact: true })).toBeVisible()
+    expect(screen.getByTestId('settings-learn-more')).toHaveTextContent(
+      deDE.settings.profile.languageHelp
+    )
+    expect(screen.getByText(deDE.settings.profile.browserLanguageHelp)).not.toBeVisible()
+  })
+
   it('5.1-WEB-SETTINGS-02 renders the disclosure above the toggle, signed out, with no request', async () => {
     const seen = vi.fn()
     useMswHandlers(
@@ -265,7 +336,7 @@ describe('Web settings page', () => {
       })
     )
 
-    render(<SettingsPage />)
+    render(<AboutPage />)
 
     expect(
       screen.getByRole('heading', { name: 'Shopping and partners' })
@@ -299,7 +370,7 @@ describe('Web settings page', () => {
       })
     )
 
-    render(<SettingsPage />)
+    render(<AboutPage />)
 
     await waitFor(() => expect(toggle()).toBeEnabled())
     expect(toggle()).toBeChecked()
@@ -311,7 +382,7 @@ describe('Web settings page', () => {
     signIn()
     useMswHandlers(...preferenceHandlers({ initial: false }))
 
-    render(<SettingsPage />)
+    render(<AboutPage />)
 
     await waitFor(() => expect(toggle()).toBeEnabled())
     expect(toggle()).not.toBeChecked()
@@ -329,7 +400,7 @@ describe('Web settings page', () => {
       })
     )
 
-    render(<SettingsPage />)
+    render(<AboutPage />)
     await waitFor(() => expect(toggle()).toBeEnabled())
 
     fireEvent.click(toggle())
@@ -368,7 +439,7 @@ describe('Web settings page', () => {
       ...preferenceHandlers({ initial: false, onPut: (body) => bodies.push(body) })
     )
 
-    render(<SettingsPage />)
+    render(<AboutPage />)
     await waitFor(() => expect(toggle()).toBeEnabled())
 
     fireEvent.click(toggle())
@@ -386,7 +457,7 @@ describe('Web settings page', () => {
     signIn()
     useMswHandlers(...preferenceHandlers({ initial: true, putStatus: 500 }))
 
-    render(<SettingsPage />)
+    render(<AboutPage />)
     await waitFor(() => expect(toggle()).toBeEnabled())
 
     fireEvent.click(toggle())
@@ -426,7 +497,7 @@ describe('Web settings page', () => {
       })
     )
 
-    render(<SettingsPage />)
+    render(<AboutPage />)
     await waitFor(() => expect(toggle()).toBeEnabled())
 
     fireEvent.click(toggle())
@@ -449,7 +520,7 @@ describe('Web settings page', () => {
     signIn()
     useMswHandlers(...preferenceHandlers({ getStatus: 500 }))
 
-    render(<SettingsPage />)
+    render(<AboutPage />)
 
     const alert = await screen.findByRole('alert')
     // A failed read says so. It used to reuse the save string ("Unable to
@@ -462,14 +533,14 @@ describe('Web settings page', () => {
   })
 
   it('5.1-WEB-SETTINGS-A11Y-01 passes axe signed out and after a failed save', async () => {
-    const view = render(<SettingsPage />)
+    const view = render(<AboutPage />)
     await screen.findByTestId('commerce-signed-out-hint')
     await expectNoAxeViolations(view.container)
     view.unmount()
 
     signIn()
     useMswHandlers(...preferenceHandlers({ initial: true, putStatus: 500 }))
-    const signedIn = render(<SettingsPage />)
+    const signedIn = render(<AboutPage />)
     await waitFor(() => expect(toggle()).toBeEnabled())
     fireEvent.click(toggle())
     await screen.findByRole('alert')
@@ -498,7 +569,7 @@ describe('Web settings page', () => {
       })
     )
 
-    const view = render(<SettingsPage />)
+    const view = render(<AboutPage />)
     await waitFor(() => expect(toggle()).toBeDisabled())
     // Unmounting before the request reaches the handler would abort it unseen.
     await started.promise
@@ -510,54 +581,27 @@ describe('Web settings page', () => {
     expect(screen.queryByTestId('commerce-preferences-section')).not.toBeInTheDocument()
   })
 
-  /**
-   * Story 5.2 Decision 12: the Premium section is the second child section,
-   * after the commerce preferences. Both sections must render signed out (the
-   * unauthenticated axe run loads this page), each with its own disclosure.
-   */
-  it('5.2-WEB-SETTINGS-01 renders the Premium section after the commerce section', () => {
-    render(<SettingsPage />)
-
-    const commerce = screen.getByTestId('commerce-preferences-section')
-    const premium = screen.getByTestId('premium-subscription-section')
-    expect(
-      commerce.compareDocumentPosition(premium) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Premium' })).toBeInTheDocument()
-    const disclosure = screen.getByTestId('premium-disclosure')
-    expect(disclosure).toHaveTextContent('RevenueCat')
-    expect(disclosure).toHaveTextContent('Stripe')
-  })
-
-  /**
-   * Story 5.3 Decision 11: the theme gallery is the third child section, after the
-   * subscription one, because its locked state points at the subscribe controls that
-   * have to already be above it. All three sections must render signed out, each with
-   * its own disclosure; the unauthenticated axe run loads this page.
-   */
-  it('5.3-WEB-SETTINGS-01 renders the theme section after the Premium section', async () => {
-    render(<SettingsPage />)
-
+  it('5.2 and 5.3 keep the processor disclosure and subscribe controls before the palette gallery', async () => {
+    render(<PremiumPage />)
     const premium = screen.getByTestId('premium-subscription-section')
     const theme = screen.getByTestId('premium-theme-section')
     expect(
       premium.compareDocumentPosition(theme) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
-    expect(
-      screen.getByRole('heading', { name: 'Interface palettes' })
-    ).toBeInTheDocument()
+    const disclosure = screen.getByTestId('premium-disclosure')
+    expect(disclosure).toHaveTextContent('RevenueCat')
+    expect(disclosure).toHaveTextContent('Stripe')
     expect(screen.getByTestId('premium-theme-disclosure')).toHaveTextContent(
       'A palette changes colors only'
     )
-    // Signed out is a locked reader, not a broken one.
-    await screen.findByTestId('premium-theme-locked')
+    expect(await screen.findByTestId('premium-theme-locked')).toBeVisible()
   })
 
   it('5.1-WEB-SETTINGS-11 labels the toggle and describes it with the help text', async () => {
     signIn()
     useMswHandlers(...preferenceHandlers({}))
 
-    render(<SettingsPage />)
+    render(<AboutPage />)
 
     const labelled = await screen.findByRole('checkbox', {
       name: 'Show "Shop this look" suggestions',
@@ -584,54 +628,28 @@ describe('Web settings page', () => {
     expect(deDE.settings.title).not.toBe('Settings')
   })
 
-  /*
-   * Production follow-up (2026-11-19): Jade looked for her profile and found a
-   * page called Settings with no sign of her account. It is the Profile now, and
-   * it names the account above everything Settings held.
-   */
-  it('PROFILE-WEB-01 titles the page Profile and names the account above every section', async () => {
+  it('PROFILE-WEB-01 shows the member display name in the compact Profile', async () => {
     signIn()
     const bearers: (string | null)[] = []
-    // The first matching handler answers, so this one goes ahead of the default.
     useMswHandlers(
       profileHandler(undefined, (request) =>
         bearers.push(request.headers.get('authorization'))
       ),
-      ...preferenceHandlers({})
+      ...profileSummaryHandlers()
     )
-
     render(<SettingsPage />)
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Profile')
-    const account = await screen.findByTestId('profile-account')
-    expect(account).toHaveAccessibleName('Your account')
-    expect(screen.getByTestId('profile-account-name')).toHaveTextContent('Jade Rivers')
-    expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
-      'jade@example.test'
-    )
+    const account = await screen.findByTestId('profile-account-row')
+    await waitFor(() => expect(account).toHaveTextContent('Jade Rivers'))
+    expect(account).toHaveAttribute('href', '/settings/account')
+    expect(account).not.toHaveTextContent('jade@example.test')
     expect(bearers).toEqual(['Bearer test-token-member'])
-    for (const section of [
-      'locations-section',
-      'commerce-preferences-section',
-      'premium-subscription-section',
-      'premium-theme-section',
-    ]) {
-      expect(
-        account.compareDocumentPosition(screen.getByTestId(section)) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-        section
-      ).toBeTruthy()
-    }
   })
 
-  it('PROFILE-WEB-02 shows the email alone when the account has no display name', async () => {
+  it('PROFILE-WEB-02 shows the email alone on Account when the member has no display name', async () => {
     signIn()
-    useMswHandlers(
-      profileHandler({ displayName: null, email: 'jade@example.test' }),
-      ...preferenceHandlers({})
-    )
-
-    render(<SettingsPage />)
+    useMswHandlers(profileHandler({ displayName: null, email: 'jade@example.test' }))
+    render(<AccountPage />)
 
     expect(await screen.findByTestId('profile-account')).toHaveTextContent(
       'jade@example.test'
@@ -639,79 +657,82 @@ describe('Web settings page', () => {
     expect(screen.queryByTestId('profile-account-name')).toBeNull()
   })
 
-  it('PROFILE-WEB-03 names no account and asks for none when signed out', async () => {
+  it('7.16 reserves the Account email until its read settles and reports unavailability on failure', async () => {
+    signIn()
+    const read = deferred<void>()
+    onTestFinished(() => read.resolve())
+    useMswHandlers(
+      http.get(PROFILE_PATH, async () => {
+        await read.promise
+        return HttpResponse.json({ message: 'Profile unavailable' }, { status: 503 })
+      })
+    )
+    render(<AccountPage />)
+
+    expect(await screen.findByTestId('profile-account-reserved')).toBeInTheDocument()
+    expect(screen.getByTestId('profile-account')).toHaveAttribute('aria-busy', 'true')
+    read.resolve()
+
+    expect(await screen.findByTestId('profile-account-email')).toHaveTextContent(
+      'Unavailable'
+    )
+    expect(screen.getByTestId('profile-account')).toHaveAttribute('aria-busy', 'false')
+    expect(screen.queryByTestId('profile-account-name')).toBeNull()
+  })
+
+  it('7.16 shows the signed-out palette state when Premium rejects the theme read', async () => {
+    signIn()
+    useMswHandlers(
+      subscriptionHandler(),
+      http.get(THEME_PATH, () =>
+        HttpResponse.json(
+          { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' },
+          { status: 401 }
+        )
+      )
+    )
+    render(<PremiumPage />)
+
+    expect(await screen.findByTestId('premium-theme-locked')).toHaveTextContent(
+      'Sign in and subscribe to Premium'
+    )
+    expect(screen.queryByTestId('premium-theme-gallery')).toBeNull()
+    expect(screen.queryByTestId('premium-theme-error')).toBeNull()
+  })
+
+  it('7.16 distinguishes an unset name and primary place from a failed read', async () => {
+    signIn()
+    useMswHandlers(
+      profileHandler({ displayName: null, email: 'jade@example.test' }),
+      ...profileSummaryHandlers()
+    )
+    render(<SettingsPage />)
+
+    await waitFor(() =>
+      expect(screen.getByTestId('profile-account-row')).toHaveTextContent('Not set')
+    )
+    expect(screen.getByTestId('profile-places-row')).toHaveTextContent('Not set')
+  })
+
+  it('PROFILE-WEB-03 offers Profile destinations to a visitor without requesting member data', async () => {
     const asked = vi.fn()
     useMswHandlers(profileHandler(undefined, asked))
-
     render(<SettingsPage />)
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Profile')
-    await screen.findByTestId('locations-signed-out')
-    expect(screen.queryByTestId('profile-account')).toBeNull()
+    expect(await screen.findByTestId('profile-places-row')).toHaveAttribute(
+      'href',
+      '/settings/places'
+    )
+    expect(screen.getByTestId('profile-style-row')).toHaveAttribute(
+      'href',
+      '/settings/style'
+    )
+    expect(screen.getByTestId('profile-notifications-row')).toHaveAttribute(
+      'href',
+      '/notification-settings'
+    )
     expect(asked).not.toHaveBeenCalled()
-  })
-
-  it('7.11-CMP-PROFILE-STYLE-01 puts one Style row to /settings/style below the account header and above every section', async () => {
-    signIn()
-    useMswHandlers(...preferenceHandlers({}))
-
-    render(<SettingsPage />)
-
-    const account = await screen.findByTestId('profile-account')
-    const rows = screen.getAllByTestId('profile-style-row')
-    expect(rows).toHaveLength(1)
-    const style = rows[0]!
-    expect(style.tagName).toBe('A')
-    expect(style).toHaveAttribute('href', '/settings/style')
-    expect(style).toHaveAccessibleName('Style')
-    expect(
-      account.compareDocumentPosition(style) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
-    for (const section of [
-      'locations-section',
-      'commerce-preferences-section',
-      'premium-subscription-section',
-      'premium-theme-section',
-    ]) {
-      expect(
-        style.compareDocumentPosition(screen.getByTestId(section)) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-        section
-      ).toBeTruthy()
-    }
-  })
-
-  it('7.11-CMP-PROFILE-STYLE-02 keeps the Style row for a signed-out reader, first in the page body', async () => {
-    render(<SettingsPage />)
-
-    await screen.findByTestId('locations-signed-out')
-    const style = screen.getByTestId('profile-style-row')
-    expect(style).toHaveAttribute('href', '/settings/style')
-    expect(
-      style.compareDocumentPosition(screen.getByTestId('locations-section')) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
-  })
-  // Review #9: Notification settings is a Profile row too (the Community bell stays).
-  it('[Codex 7.11 #9] 7.11-CMP-PROFILE-NOTIF-01 puts one Notifications row to /notification-settings right after the Style row, above every section', async () => {
-    signIn()
-    useMswHandlers(...preferenceHandlers({}))
-
-    render(<SettingsPage />)
-
-    await screen.findByTestId('profile-account')
-    const rows = screen.getAllByTestId('profile-notifications-row')
-    expect(rows).toHaveLength(1)
-    const notifications = rows[0]!
-    expect(notifications.tagName).toBe('A')
-    expect(notifications).toHaveAttribute('href', '/notification-settings')
-    expect(notifications).toHaveAccessibleName('Community notifications')
-    const style = screen.getByTestId('profile-style-row')
-    expect(style.nextElementSibling).toBe(notifications)
-    expect(
-      notifications.compareDocumentPosition(screen.getByTestId('locations-section')) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
   })
 })
 
@@ -728,125 +749,52 @@ describe('7.7 Profile without flashes', () => {
     await getI18n().changeLanguage('en-US')
   })
 
-  it('7.7-CMP-010 a prerendered signed-out Profile already holds the Locations section above Shopping (Codex review P2-3)', () => {
+  it('7.7-CMP-010 first paint on Places includes the signed-out section chrome', () => {
     navigation.prerendering = true
-
-    const html = renderToString(<SettingsPage />)
-
-    // Only the guided-entry query waits for the client: the section's chrome and its signed-out
-    // hint are in the first HTML, so nothing is inserted above Shopping when the page hydrates.
-    // The hint is the guest stand-in, its words drawn by CSS (7.7-CMP-037).
-    const locations = html.indexOf('data-testid="locations-section"')
-    expect(locations).toBeGreaterThan(-1)
+    const html = renderToString(<PlacesPage />)
+    expect(html).toContain('data-testid="locations-section"')
     expect(html).toContain('data-guest-text="Sign in to manage your locations."')
-    expect(locations).toBeLessThan(
-      html.indexOf('data-testid="commerce-preferences-section"')
-    )
   })
 
-  it('7.7-CMP-011 a return to Profile shows every section from its snapshot in the first frame, at its scroll, while the reads refresh (Codex review P1-2)', async () => {
+  it('7.7-CMP-011 a warm Profile returns with its last summary before new reads answer', async () => {
     signIn()
     document.documentElement.setAttribute('data-session', 'member')
-    let held = false
-    const never = new Promise<never>(() => undefined)
-    const answered = (body: Parameters<typeof HttpResponse.json>[0]) => async () => {
-      if (held) await never
-      return HttpResponse.json(body)
-    }
-    const savedHome = {
-      id: 'loc-1',
-      label: 'Home',
-      locationKey: 'chicago-illinois-us-41-878n-87-630w',
-      latitude: 41.878,
-      longitude: -87.63,
-      timezone: 'America/Chicago',
-      city: 'Chicago',
-      region: 'Illinois',
-      country: 'US',
-      isPrimary: true,
-      sortOrder: 0,
-      createdAt: '2026-10-22T12:00:00.000Z',
-      updatedAt: '2026-10-22T12:00:00.000Z',
-    }
+    useMswHandlers(profileHandler(), ...profileSummaryHandlers())
+    const firstVisit = render(<SettingsPage />)
+    const account = await screen.findByTestId('profile-account-row')
+    await waitFor(() => expect(account).toHaveTextContent('Jade Rivers'))
+    firstVisit.unmount()
+
+    const accountRead = deferred<void>()
+    onTestFinished(() => accountRead.resolve(undefined))
+    const refresh = vi.fn()
     useMswHandlers(
-      http.get(
-        PROFILE_PATH,
-        answered({
+      http.get(PROFILE_PATH, async () => {
+        refresh()
+        await accountRead.promise
+        return HttpResponse.json({
           user: {
             id: 'member-1',
+            email: 'jade@example.test',
+            displayName: 'Jade Rivers',
             birthdate: null,
             role: 'guardian',
-            displayName: 'Jade Rivers',
-            email: 'jade@example.test',
           },
           linkedGuardians: [],
           linkedTeens: [],
         })
-      ),
-      http.get('/api/v1/locations', answered({ data: [savedHome] })),
-      http.get(PREFERENCES_PATH, answered({ data: { affiliateCtasEnabled: false } })),
-      http.get(
-        SUBSCRIPTION_PATH,
-        answered({
-          data: {
-            status: 'none',
-            store: null,
-            productId: null,
-            willRenew: null,
-            currentPeriodEnd: null,
-            syncedAt: null,
-            purchasesEnabled: true,
-          },
-        })
-      ),
-      // The access read rides beside the subscription and never holds the section.
-      http.get('/api/v1/commerce/premium/access', () => HttpResponse.error()),
-      http.get(
-        THEME_PATH,
-        answered({ data: { theme: null, isEntitled: false, themesEnabled: true } })
-      )
+      })
     )
-
-    // First visit: every read answers and the gate opens.
-    const firstVisit = render(<SettingsPage />)
-    await waitFor(() =>
-      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
-    )
-    expect(await screen.findByTestId('profile-account-email')).toHaveTextContent(
-      'jade@example.test'
-    )
-    await waitFor(() => expect(toggle()).toBeEnabled())
-    expect(screen.getByTestId('premium-status-line')).toBeVisible()
-    screenSnapshot.rememberScroll(currentWebSessionScope(), 'profile', 640)
-    firstVisit.unmount()
-
-    // The return: every read is held, so whatever shows came from the snapshot.
-    held = true
-    const restoredAt: string[] = []
-    vi.spyOn(window, 'scrollTo').mockImplementation(((x: number, y: number) => {
-      // The body is already there when the scroll is restored, so the offset is not clamped.
-      const email = document.querySelector('[data-testid="profile-account-email"]')
-      restoredAt.push(`${x},${y}:${email?.textContent ?? 'empty'}`)
-    }) as typeof window.scrollTo)
     render(<SettingsPage />)
 
-    expect(restoredAt).toEqual(['0,640:jade@example.test'])
     expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
-    expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
-    expect(screen.getByTestId('profile-account-name')).toHaveTextContent('Jade Rivers')
-    expect(screen.getByTestId('locations-section')).toHaveAttribute('data-state', 'ready')
-    expect(screen.getByTestId('location-item-label')).toHaveTextContent('Home')
-    expect(toggle()).toBeEnabled()
-    expect(toggle()).not.toBeChecked()
-    expect(screen.getByTestId('premium-status-line')).toBeVisible()
-    expect(screen.getByTestId('premium-theme-locked')).toBeVisible()
+    expect(screen.getByTestId('profile-account-row')).toHaveTextContent('Jade Rivers')
+    await waitFor(() => expect(refresh).toHaveBeenCalled())
   })
 
-  /** Every Profile read for one member, answered at once unless a test overrides it first. */
   function memberProfileReads(theme: { theme: string | null; isEntitled: boolean }) {
     return [
       profileHandler(),
-      locationsHandler(),
       subscriptionHandler(),
       http.get('/api/v1/commerce/premium/access', () => HttpResponse.error()),
       http.get(THEME_PATH, () =>
@@ -858,17 +806,21 @@ describe('7.7 Profile without flashes', () => {
     ]
   }
 
-  async function firstVisitSettles() {
-    const firstVisit = render(<SettingsPage />)
+  async function firstVisitSettles(topic: 'about' | 'premium' = 'about') {
+    const view = render(topic === 'about' ? <AboutPage /> : <PremiumPage />)
     await waitFor(() =>
       expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
     )
-    await waitFor(() => expect(toggle()).toBeEnabled())
-    return firstVisit
+    if (topic === 'about') await waitFor(() => expect(toggle()).toBeEnabled())
+    return view
   }
 
   const kept = <T,>(part: string) =>
-    screenSnapshot.recall<T>(currentWebSessionScope(), 'profile', part)
+    screenSnapshot.recall<T>(
+      currentWebSessionScope(),
+      part === 'theme' ? 'settings-premium' : 'settings-about',
+      part
+    )
 
   it('7.7-CMP-033 a palette saved while a return refreshes the theme keeps the saved palette when the older read answers (CodeRabbit r1 #12)', async () => {
     signIn()
@@ -890,12 +842,12 @@ describe('7.7 Profile without flashes', () => {
       ),
       ...memberProfileReads({ theme: null, isEntitled: true })
     )
-    ;(await firstVisitSettles()).unmount()
+    ;(await firstVisitSettles('premium')).unmount()
     expect(kept<{ theme: string | null }>('theme')?.theme).toBeNull()
 
     // The return shows the remembered gallery; its refresh is still out when the member saves.
     returning = true
-    render(<SettingsPage />)
+    render(<PremiumPage />)
     fireEvent.click(screen.getByTestId('premium-theme-option-jewel_radiance'))
     await waitFor(() =>
       expect(document.documentElement.getAttribute('data-theme')).toBe('jewel_radiance')
@@ -937,7 +889,7 @@ describe('7.7 Profile without flashes', () => {
 
     // The return shows the remembered opt-in at once, with no loading state, while it refreshes.
     returning = true
-    render(<SettingsPage />)
+    render(<AboutPage />)
     expect(toggle()).toBeEnabled()
     expect(toggle()).toBeChecked()
     fireEvent.click(toggle())
@@ -978,122 +930,45 @@ describe('7.7 Profile without flashes', () => {
     await waitFor(() => expect(kept('commerce')).toEqual({ enabled: false }))
   })
 
-  it('7.7-CMP-036 the Profile gate opens while the account read is out, and the account header keeps its space (real-session PS-2)', async () => {
+  it('7.7-CMP-036 waits for the cold Summary without mounting management reads', async () => {
     signIn()
     document.documentElement.setAttribute('data-session', 'member')
     const account = deferred<void>()
+    onTestFinished(() => account.resolve(undefined))
+    const management = vi.fn()
     useMswHandlers(
       http.get(PROFILE_PATH, async () => {
-        // The same request the session's verification makes, held as a slow check holds it.
         await account.promise
         return HttpResponse.json({
           user: {
             id: 'member-1',
-            birthdate: null,
-            role: 'guardian',
             displayName: 'Jade Rivers',
             email: 'jade@example.test',
-          },
-          linkedGuardians: [],
-          linkedTeens: [],
-        })
-      }),
-      ...memberProfileReads({ theme: null, isEntitled: false })
-    )
-    render(<SettingsPage />)
-
-    await waitFor(() =>
-      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
-    )
-    expect(screen.getByTestId('commerce-preferences-section')).toBeVisible()
-    await waitFor(() => expect(toggle()).toBeEnabled())
-    // The header's two lines are held above the sections, so it lands without pushing them.
-    const reserved = screen.getByTestId('profile-account-reserved')
-    expect(reserved).toHaveAttribute('aria-hidden', 'true')
-    expect(reserved.textContent?.trim()).toBe('')
-    expect(screen.queryByTestId('profile-account')).toBeNull()
-
-    await act(async () => {
-      account.resolve()
-      await account.promise
-    })
-    expect(await screen.findByTestId('profile-account-name')).toHaveTextContent(
-      'Jade Rivers'
-    )
-    expect(screen.queryByTestId('profile-account-reserved')).toBeNull()
-  })
-
-  it('7.9-CMP-SNAP-001 an email-only account that answered behind the closed gate takes only its line', async () => {
-    signIn()
-    document.documentElement.setAttribute('data-session', 'member')
-    const preferences = deferred<void>()
-    useMswHandlers(
-      // The shopping read holds the gate closed until the account has answered.
-      http.get(PREFERENCES_PATH, async () => {
-        await preferences.promise
-        return HttpResponse.json({ data: { affiliateCtasEnabled: true } })
-      }),
-      profileHandler({ displayName: null, email: 'jade@example.test' }),
-      ...memberProfileReads({ theme: null, isEntitled: false })
-    )
-    render(<SettingsPage />)
-
-    const account = await screen.findByTestId('profile-account')
-    expect(screen.getByTestId('screen-gate')).not.toHaveAttribute('data-ready')
-    await act(async () => {
-      preferences.resolve()
-      await preferences.promise
-    })
-    await waitFor(() =>
-      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
-    )
-    // CI snapshot on 3d7af2a2: the held name line left 28 px of blank page under the email.
-    expect(account).not.toHaveClass('min-h-12')
-    expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
-      /^jade@example\.test$/
-    )
-    expect(screen.queryByTestId('profile-account-name')).toBeNull()
-    expect(screen.queryByTestId('profile-account-reserved')).toBeNull()
-  })
-
-  it('7.9-CMP-SNAP-002 an email-only account that lands after the reveal keeps the two lines it held', async () => {
-    signIn()
-    document.documentElement.setAttribute('data-session', 'member')
-    const account = deferred<void>()
-    useMswHandlers(
-      http.get(PROFILE_PATH, async () => {
-        await account.promise
-        return HttpResponse.json({
-          user: {
-            id: 'member-1',
             birthdate: null,
             role: 'guardian',
-            displayName: null,
-            email: 'jade@example.test',
           },
           linkedGuardians: [],
           linkedTeens: [],
         })
       }),
-      ...memberProfileReads({ theme: null, isEntitled: false })
+      ...profileSummaryHandlers(),
+      http.get(PREFERENCES_PATH, management),
+      http.get(THEME_PATH, management),
+      http.get(SUBSCRIPTION_PATH, management)
     )
     render(<SettingsPage />)
-    await waitFor(() =>
-      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
-    )
-    expect(screen.getByTestId('profile-account-reserved')).toHaveClass('min-h-12')
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(screen.getByTestId('profile-account-row')).not.toBeVisible()
 
     await act(async () => {
-      account.resolve()
+      account.resolve(undefined)
       await account.promise
     })
-    // The sections below were already on screen, so the header never shrinks under them.
-    expect(await screen.findByTestId('profile-account')).toHaveClass('min-h-12')
-    expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
-      /^jade@example\.test$/
+    await waitFor(() =>
+      expect(screen.getByTestId('profile-account-row')).toHaveTextContent('Jade Rivers')
     )
-    expect(screen.queryByTestId('profile-account-name')).toBeNull()
-    expect(screen.queryByTestId('profile-account-reserved')).toBeNull()
+    expect(screen.getByTestId('profile-places-row')).toBeVisible()
+    expect(management).not.toHaveBeenCalled()
   })
 
   it('7.7-CMP-046 a preference read sent while a save is out never replaces the saved value, and a read sent after the save does (CodeRabbit r2 #4)', async () => {
@@ -1180,7 +1055,7 @@ describe('7.7 Profile without flashes', () => {
       }),
       ...memberProfileReads({ theme: null, isEntitled: true })
     )
-    await firstVisitSettles()
+    await firstVisitSettles('premium')
 
     // The member picks a palette; while that save is out, a language switch reads the theme again.
     // This Profile mounted without a theme snapshot, so that read is not an in-place refresh, and
@@ -1234,31 +1109,17 @@ describe('7.7 Profile without flashes', () => {
     expect(reads).toBe(3)
   })
 
-  it('7.7-CMP-048 the account header keeps its two lines after its read fails (CodeRabbit r2 #9)', async () => {
+  it('7.7-CMP-048 settles Profile when the account summary is unavailable', async () => {
     signIn()
     document.documentElement.setAttribute('data-session', 'member')
-    let profileReads = 0
     useMswHandlers(
-      http.get(PROFILE_PATH, () => {
-        profileReads += 1
-        return HttpResponse.json(
-          { statusCode: 500, message: 'Unavailable', error: 'Internal Server Error' },
-          { status: 500 }
-        )
-      }),
-      ...memberProfileReads({ theme: null, isEntitled: false })
+      http.get(PROFILE_PATH, () => HttpResponse.error()),
+      ...profileSummaryHandlers()
     )
-
-    // The read fails: the header's two lines stay held above the sections.
     render(<SettingsPage />)
-    await waitFor(() => expect(profileReads).toBe(1))
-    await settle()
-    const reserved = screen.getByTestId('profile-account-reserved')
-    expect(reserved).toHaveAttribute('aria-hidden', 'true')
-    expect(reserved).toHaveClass('min-h-12')
-    // An account with no display name keeps the footprint only once its reserved lines were on
-    // screen (7.9-CMP-SNAP-002); one that answered behind the closed gate takes only its email
-    // line (7.9-CMP-SNAP-001).
+    await waitFor(() => expect(screen.getByTestId('profile-account-row')).toBeVisible())
+    expect(screen.getByTestId('profile-places-row')).toBeVisible()
+    expect(screen.queryByText('jade@example.test')).toBeNull()
   })
 
   const SIGN_IN_HINTS = [
@@ -1274,7 +1135,13 @@ describe('7.7 Profile without flashes', () => {
   ]
 
   it('7.7-CMP-037 the first HTML paints the signed-out hints from CSS only: no Sign in words or hint ids in the document (real-session PS-1, PL-1)', () => {
-    const html = renderToString(<SettingsPage />)
+    const html = renderToString(
+      <>
+        <PlacesPage />
+        <AboutPage />
+        <PremiumPage />
+      </>
+    )
     const firstHtml = new DOMParser().parseFromString(html, 'text/html')
 
     // A member's page hides this first paint, but its text and ids were still in the document,
@@ -1316,7 +1183,13 @@ describe('7.7 Profile without flashes', () => {
       http.get('/api/v1/commerce/premium/access', () => never),
       http.get(THEME_PATH, () => never)
     )
-    const { container, unmount } = render(<SettingsPage />)
+    const { container, unmount } = render(
+      <>
+        <PlacesPage />
+        <AboutPage />
+        <PremiumPage />
+      </>
+    )
 
     expect(container.querySelector('[data-landing="guest"]')).toBeNull()
     expect(container.querySelector('[data-guest-text]')).toBeNull()
@@ -1327,7 +1200,13 @@ describe('7.7 Profile without flashes', () => {
     vi.unstubAllEnvs()
     window.sessionStorage.clear()
     document.documentElement.setAttribute('data-session', 'none')
-    render(<SettingsPage />)
+    render(
+      <>
+        <PlacesPage />
+        <AboutPage />
+        <PremiumPage />
+      </>
+    )
     for (const id of SIGNED_OUT_TEST_IDS)
       expect(await screen.findByTestId(id)).toBeVisible()
     expect(document.querySelector('[data-guest-text]')).toBeNull()

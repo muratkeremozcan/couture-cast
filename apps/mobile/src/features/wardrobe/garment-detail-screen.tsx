@@ -55,6 +55,8 @@ import {
   useStatusBar,
 } from '@/components/save-feedback'
 import { createSchemeStyles } from '@/components/themed'
+import { underModalAccessibility } from '@/components/edge-to-edge-modal'
+import { renderStackTopBar } from '@/src/components/app-top-bar'
 import {
   mobileApplicationUserId,
   mobileIdentityEpoch,
@@ -101,7 +103,11 @@ export function GarmentDetailScreen({
   /** Story CC-7.6 D10: test seam; defaults to the app's one garment deletion. */
   deletion?: MobileGarmentDeletion
 }) {
-  const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
+  const epoch = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileIdentityEpoch,
+    mobileIdentityEpoch
+  )
   // The root provider's floating bar sits under a pushed native stack screen on Android, so the
   // detail always owns its bar. It floats over this screen (the route zeroes the tab bar
   // clearance) and forwards announcements to the root provider when one is mounted. Keyed by
@@ -197,6 +203,12 @@ function MemberGarmentDetail({
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
   const [styleClosing, setStyleClosing] = useState(false)
   const styleButtonRef = useRef<ComponentRef<typeof Pressable> | null>(null)
+  const backButtonRef = useRef<ComponentRef<typeof Pressable> | null>(null)
+  const renderHeader = useCallback(
+    (props: Parameters<typeof renderStackTopBar>[0]) =>
+      renderStackTopBar(props, backButtonRef),
+    []
+  )
 
   const garment =
     closet.garments?.find((item) => item.id === garmentId && item.status === 'ready') ??
@@ -208,19 +220,61 @@ function MemberGarmentDetail({
 
   // Story CC-7.9 D6: the root stack's AppTopBar shows this title and the back control (back to
   // the hub, or the Wardrobe tab on a direct entry), so the body carries no second heading.
-  const header = <Stack.Screen options={{ title }} />
+  // A current read failure comes first: an id missing from an older read may be back.
+  const failed = closet.loadFailed && !closet.loading
+  const settled = closet.garments !== null && !failed
 
-  if (!garment) {
-    // A current read failure comes first: an id missing from an older read may be back.
-    const failed = closet.loadFailed && !closet.loading
-    const settled = closet.garments !== null && !failed
-    return (
+  return (
+    <>
+      <Stack.Screen options={{ title, header: renderHeader }} />
       <View
         style={[styles.screen, themed.screen]}
-        testID={settled ? 'garment-detail-missing' : 'garment-detail-loading'}
+        testID={
+          garment
+            ? undefined
+            : settled
+              ? 'garment-detail-missing'
+              : 'garment-detail-loading'
+        }
+        {...underModalAccessibility(Boolean(styleSelection))}
       >
-        {header}
-        {settled ? (
+        {garment ? (
+          <ScrollView contentContainerStyle={styles.content} testID="garment-detail">
+            <GarmentDetailPhoto
+              garment={garment}
+              label={title}
+              onRefresh={closet.reload}
+            />
+            <GarmentTagPanel
+              garment={garment}
+              owner={owner}
+              epoch={epoch}
+              onRefresh={closet.reload}
+              readFailed={closet.loadFailed && !closet.loading}
+              deletion={deletion}
+              onTagsSaved={(updated) => {
+                closet.replaceGarment(updated)
+                notifyWardrobeChanged()
+              }}
+              styleEntry={
+                <StylePieceEntry
+                  garment={garment}
+                  owner={owner}
+                  epoch={epoch}
+                  unavailable={closet.loadFailed}
+                  loading={closet.loading}
+                  labels={getStylePieceStrings(locale)}
+                  buttonRef={styleButtonRef}
+                  onRefresh={closet.reload}
+                  onOpen={(selection) => {
+                    if (styleSelection) return
+                    setStyleSelection(selection)
+                  }}
+                />
+              }
+            />
+          </ScrollView>
+        ) : settled ? (
           <Text style={[styles.missingText, themed.text]}>
             {t('wardrobe.detail.missing')}
           </Text>
@@ -246,50 +300,11 @@ function MemberGarmentDetail({
           />
         )}
       </View>
-    )
-  }
-
-  return (
-    <>
-      <View style={[styles.screen, themed.screen]}>
-        {header}
-        <ScrollView contentContainerStyle={styles.content} testID="garment-detail">
-          <GarmentDetailPhoto garment={garment} label={title} onRefresh={closet.reload} />
-          <GarmentTagPanel
-            garment={garment}
-            owner={owner}
-            epoch={epoch}
-            onRefresh={closet.reload}
-            readFailed={closet.loadFailed && !closet.loading}
-            deletion={deletion}
-            onTagsSaved={(updated) => {
-              closet.replaceGarment(updated)
-              notifyWardrobeChanged()
-            }}
-            styleEntry={
-              <StylePieceEntry
-                garment={garment}
-                owner={owner}
-                epoch={epoch}
-                unavailable={closet.loadFailed}
-                loading={closet.loading}
-                labels={getStylePieceStrings(locale)}
-                buttonRef={styleButtonRef}
-                onRefresh={closet.reload}
-                onOpen={(selection) => {
-                  if (styleSelection) return
-                  setStyleSelection(selection)
-                }}
-              />
-            }
-          />
-        </ScrollView>
-      </View>
 
       {owner && styleSelection && (
         <StylePiecePanel
           selection={styleSelection}
-          inWardrobe
+          inWardrobe={garment !== null}
           loadInventory={closet.loadInventory}
           visible={!styleClosing}
           owner={owner}
@@ -300,7 +315,10 @@ function MemberGarmentDetail({
             if (epoch !== mobileIdentityEpoch()) return
             setStyleSelection(null)
             setStyleClosing(false)
-            requestAnimationFrame(() => focusStylePieceControl(styleButtonRef.current))
+            requestAnimationFrame(() => {
+              if (epoch === mobileIdentityEpoch())
+                focusStylePieceControl(styleButtonRef.current ?? backButtonRef.current)
+            })
           }}
         />
       )}

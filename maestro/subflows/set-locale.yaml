@@ -34,11 +34,53 @@ appId: ${MAESTRO_APP_ID}
 # relative to the file it appears in, so the prefixed form looks for
 # `maestro/subflows/subflows/open-settings.yaml` and fails with "Invalid File
 # Path". Top-level flows in `maestro/` do need the `subflows/` prefix.
-- runFlow: open-settings.yaml
+- runFlow:
+    file: open-profile-topic.yaml
+    env: { PROFILE_TOPIC: 'language' }
+- scrollUntilVisible:
+    element:
+      id: 'locale-btn-${LOCALE}'
+    direction: DOWN
+    timeout: 15000
 
-- tapOn:
-    id: 'locale-btn-${LOCALE}'
-    retryTapIfNoChange: true
-    label: 'Switch the app locale to ${LOCALE}'
+# The heading can translate before the selection is persisted and the choices are enabled again.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: 'locale-btn-${LOCALE}'
+              enabled: true
+          commands:
+            - tapOn:
+                id: 'locale-btn-${LOCALE}'
+                label: 'Switch the app locale to ${LOCALE}'
+      - extendedWaitUntil:
+          visible:
+            id: 'locale-btn-${LOCALE}'
+            selected: true
+          timeout: 8000
+      - extendedWaitUntil:
+          visible:
+            id: 'locale-btn-(?!${LOCALE}).+'
+            enabled: true
+          timeout: 15000
+      - assertVisible:
+          id: 'locale-btn-${LOCALE}'
+          selected: true
 
-- waitForAnimationToEnd
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: 'settings-language-screen'
+          commands:
+            - tapOn:
+                id: 'app-top-bar-back'
+      - extendedWaitUntil:
+          visible:
+            id: 'settings-screen'
+          timeout: 5000

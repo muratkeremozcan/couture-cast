@@ -334,10 +334,8 @@ test.describe('CC-7.12 View opens the saved look @local-lane', () => {
     await page.goto('/wardrobe')
     await waitForShellSettled(page, fixture.router)
 
-    await page
-      .getByTestId('garment-card-shell-garment-1')
-      .getByTestId('style-piece-open')
-      .click()
+    await page.getByTestId('garment-open-shell-garment-1').click()
+    await page.getByTestId('garment-detail').getByTestId('style-piece-open').click()
     const panel = page.getByTestId('style-piece-panel')
     await expect(panel).toBeVisible()
     await panel.getByTestId('style-piece-save').first().click()

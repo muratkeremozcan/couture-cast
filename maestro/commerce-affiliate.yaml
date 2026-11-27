@@ -102,7 +102,9 @@ tags:
 
 # --- AC 3: the settings section discloses the integration --------------------
 
-- runFlow: subflows/open-settings.yaml
+- runFlow:
+    file: subflows/open-profile-topic.yaml
+    env: { PROFILE_TOPIC: 'about' }
 
 - extendedWaitUntil:
     visible: 'Shopping and partners'
@@ -232,7 +234,9 @@ tags:
 # Also leaves the shared fixture the way it was found, so a later flow on the
 # same account does not inherit an opt-out it never made.
 
-- runFlow: subflows/open-settings.yaml
+- runFlow:
+    file: subflows/open-profile-topic.yaml
+    env: { PROFILE_TOPIC: 'about' }
 
 - extendedWaitUntil:
     visible: 'Shopping and partners'

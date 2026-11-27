@@ -311,7 +311,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
           expect(action?.textContent).toBe('Add a location')
           expect(action).toHaveAttribute(
             'href',
-            '/settings?addLocation=1&returnTo=%2F#locations'
+            '/settings/places?addLocation=1&returnTo=%2F#locations'
           )
         } else {
           expect(action).toBeNull()

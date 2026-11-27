@@ -1,0 +1,1988 @@
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react'
+import { Linking, Pressable, ScrollView, StyleSheet } from 'react-native'
+import { useFocusEffect } from 'expo-router'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
+import { formatLocalizedList } from '@couture/utils'
+import {
+  defaultSupportedLocale,
+  resolveSupportedLocale,
+  type PremiumThemeKey,
+  type PremiumAccess,
+  type Subscription,
+  type SubscriptionPlan,
+  type SupportedLocale,
+} from '@couture/api-client/contracts/http'
+
+import { Text, View, createSchemeStyles } from '@/components/themed'
+import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
+import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
+import {
+  MobileAnalyticsDiagnosticsPanel,
+  isMobileAnalyticsDiagnosticsEnabled,
+} from '@/src/analytics/mobile-analytics-diagnostics'
+import {
+  trackMobileAlertReceived,
+  trackMobileLocaleSwitched,
+  trackMobilePremiumSubscribeTapped,
+} from '@/src/analytics/track-events'
+import { loadMobileApiHealth } from '@/src/lib/api-health'
+import {
+  getCommercePreferenceFromMobile,
+  updateCommercePreferenceFromMobile,
+} from '@/src/lib/commerce'
+import {
+  ensurePurchasesConfigured,
+  getPremiumAccessFromMobile,
+  getSubscriptionFromMobile,
+  isComplimentaryAccess,
+  isEntitledSubscription,
+  pollSubscriptionUntilEntitled,
+  purchasePremiumPlan,
+  refreshSubscriptionFromMobile,
+  resolvePremiumSectionState,
+  restorePremiumPurchases,
+  type PremiumSectionRenderState,
+  showManageSubscriptionsInStore,
+  type PurchasesAvailability,
+} from '@/src/lib/premium'
+import {
+  premiumThemeFailureReason,
+  setThemeFromMobile,
+  PREMIUM_THEME_KEYS,
+} from '@/src/lib/premium-theme'
+import {
+  mobileApplicationUserId,
+  mobileIdentityEpoch,
+  resolveMobileAccessToken,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
+import { getSavedSettings, saveSettings } from '@/src/lib/settings-storage'
+import { getUserProfileFromMobile, updatePreferredLocaleFromMobile } from '@/src/lib/user'
+import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
+import { useAppTheme } from '@/src/theme/theme-context'
+import { resolveThemePalette } from '@/src/theme/theme-palettes'
+import { TAB_BODY_INSET, useTokens } from '@/src/theme/tokens'
+
+/** Exported so the screen test advances virtual time by the real bound rather
+ *  than by a copy of it that silently stops matching when this changes. */
+export const API_HEALTH_TIMEOUT_MS = 5_000
+
+/** Wire status → `commerce.premium.status.*` catalog key. */
+const premiumStatusKeys = {
+  none: 'none',
+  active: 'active',
+  grace_period: 'gracePeriod',
+  expired: 'expired',
+  revoked: 'revoked',
+} as const
+
+/**
+ * The purchase/restore flow the Premium section is in. Exactly one renders at
+ * a time; `pending-approval` (StoreKit Ask to Buy) and `still-processing`
+ * (post-purchase poll hit its 2-minute cap) are terminal until the user acts
+ * again or the entitlement arrives on a later visit.
+ */
+type PremiumFlowState =
+  | 'idle'
+  | 'purchasing'
+  | 'restoring'
+  | 'activating'
+  | 'pending-approval'
+  | 'still-processing'
+  | 'purchase-error'
+
+const availableLocales = [
+  { code: 'en-US', label: 'English (US)' },
+  { code: 'en-CA', label: 'English (Canada)' },
+  { code: 'es-419', label: 'Español (LatAm)' },
+  { code: 'fr-CA', label: 'Français (Canada)' },
+  { code: 'fr-FR', label: 'Français (Europe)' },
+  { code: 'tr-TR', label: 'Türkçe' },
+  { code: 'de-DE', label: 'Deutsch' },
+  { code: 'it-IT', label: 'Italiano' },
+  { code: 'pt-BR', label: 'Português (Brasil)' },
+  { code: 'pt-PT', label: 'Português (Portugal)' },
+] satisfies readonly { code: SupportedLocale; label: string }[]
+
+/**
+ * Whether a member is signed in. The shopping preference and the subscription belong to
+ * a member, so a signed-out device has nothing to load and nothing has failed. Re-checked
+ * whenever the application user changes (sign-in, sign-out, account switch).
+ */
+// Retry delays for a session read that throws (keychain locked or busy).
+const SESSION_READ_RETRY_MS = [1_000, 2_000, 4_000]
+
+/**
+ * `false` only when the session read affirmatively finds no token. A read that throws
+ * is not proof of no session, so the state stays unknown (`null`, no signed-out hint and
+ * no member reads) and the read is retried a bounded number of times.
+ */
+function useMemberSignedIn(): boolean | null {
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  useEffect(() => {
+    let active = true
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    const check = (attempt = 0) => {
+      clearTimeout(retryTimer)
+      void resolveMobileAccessToken()
+        .then((token) => {
+          if (active) setSignedIn(Boolean(token))
+        })
+        .catch(() => {
+          const delay = SESSION_READ_RETRY_MS[attempt]
+          if (active && delay !== undefined) {
+            retryTimer = setTimeout(() => check(attempt + 1), delay)
+          }
+        })
+    }
+    check()
+    const unsubscribe = subscribeMobileApplicationUser(() => check())
+    return () => {
+      active = false
+      clearTimeout(retryTimer)
+      unsubscribe()
+    }
+  }, [])
+  return signedIn
+}
+
+/**
+ * Story CC-7.7 D5: how many times the member came back to Profile. Tabs stay mounted, so a
+ * return is a focus, never a mount; each one re-reads the sections in place. The first focus
+ * is the mount, whose reads are already running, and counts as zero.
+ */
+function useReturnFocusCount(): number {
+  const [returns, setReturns] = useState(0)
+  const leftRef = useRef(false)
+  useFocusEffect(
+    useCallback(() => {
+      if (leftRef.current) setReturns((count) => count + 1)
+      leftRef.current = false
+      return () => {
+        leftRef.current = true
+      }
+    }, [])
+  )
+  return returns
+}
+
+/**
+ * Story CC-7.7 D5: whether a return read that started under `identity` still belongs to the
+ * member on screen. A sign-out or account switch in between drops its answer.
+ */
+function isSameMember(identity: number, signedIn: boolean | null): boolean {
+  return signedIn === true && mobileIdentityEpoch() === identity
+}
+
+function TopicBody({
+  testID,
+  children,
+  liveFontScope,
+}: {
+  testID: string
+  children: ReactNode
+  liveFontScope?: string
+}) {
+  return (
+    <View style={styles.topic}>
+      {liveFontScope && <LiveFontMountMarker scope={liveFontScope} />}
+      <ScrollView
+        testID={testID}
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
+        {children}
+      </ScrollView>
+    </View>
+  )
+}
+
+function OwnerSettings({ children }: { children: ReactNode }) {
+  const epoch = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileIdentityEpoch,
+    mobileIdentityEpoch
+  )
+  return <View key={epoch}>{children}</View>
+}
+
+export function AccountSettingsScreen() {
+  return (
+    <TopicBody testID="settings-account-screen">
+      <OwnerSettings>
+        <ProfileAccountHeader />
+        <AccountDiagnostics />
+      </OwnerSettings>
+    </TopicBody>
+  )
+}
+
+export function PremiumSettingsScreen() {
+  return (
+    <TopicBody testID="settings-premium-screen">
+      <OwnerSettings>
+        <PremiumSettings />
+      </OwnerSettings>
+    </TopicBody>
+  )
+}
+
+function PremiumSettings() {
+  const signedIn = useMemberSignedIn()
+  const returns = useReturnFocusCount()
+  return (
+    <>
+      <PremiumSettingsSection signedIn={signedIn} returns={returns} />
+      <PremiumThemeSection returns={returns} />
+    </>
+  )
+}
+
+function SettingsHelp({ summary, children }: { summary: string; children: ReactNode }) {
+  const { t } = useTranslation()
+  const tone = useSettingsTone()
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        onPress={() => setExpanded((current) => !current)}
+        style={styles.learnMore}
+        testID="settings-learn-more"
+      >
+        <Text style={tone.helpText}>
+          {summary}{' '}
+          <Text style={[styles.actionText, styles.learnMoreLabel]}>
+            {t('settings.profile.learnMore')}
+          </Text>
+        </Text>
+      </Pressable>
+      {expanded ? children : null}
+    </>
+  )
+}
+
+export function AboutSettingsScreen() {
+  const { t } = useTranslation()
+  const tone = useSettingsTone()
+  return (
+    <TopicBody testID="settings-about-screen">
+      <Text accessibilityRole="header" style={styles.accountName}>
+        CoutureCast
+      </Text>
+      <Text style={[styles.disclosureText, tone.disclosureText]}>
+        {t('common.about_description')}
+      </Text>
+      {(['privacy', 'terms'] as const).map((topic) => (
+        <Pressable
+          key={topic}
+          accessibilityRole="link"
+          onPress={() => {
+            void Linking.openURL(`https://couture-cast-web.vercel.app/${topic}`).catch(
+              () => undefined
+            )
+          }}
+          style={[styles.actionButton, tone.actionButton]}
+        >
+          <Text style={styles.actionText}>{t(`settings.profile.${topic}`)}</Text>
+        </Pressable>
+      ))}
+      <OwnerSettings>
+        <ShoppingSettingsSection />
+      </OwnerSettings>
+    </TopicBody>
+  )
+}
+
+export function LanguageSettingsScreen() {
+  const tone = useSettingsTone()
+  const analytics = useMobileAnalytics()
+  const { announce } = useAccessibilityAnnouncer()
+  const { t, i18n } = useTranslation()
+  const [currentLocale, setCurrentLocale] = useState<SupportedLocale>(
+    resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
+      defaultSupportedLocale
+  )
+  const [isChangingLocale, setIsChangingLocale] = useState(false)
+  const [localeError, setLocaleError] = useState<string | null>(null)
+  const localeChangeInFlight = useRef(false)
+  const localeRevision = useRef(0)
+  useEffect(() => {
+    if (localeError) {
+      announce('error', localeError)
+    }
+  }, [announce, localeError])
+
+  useEffect(() => {
+    let isActive = true
+    const revision = localeRevision.current
+
+    void getSavedSettings().then(async (settings) => {
+      if (!isActive || revision !== localeRevision.current || !settings.locale) {
+        return
+      }
+
+      setCurrentLocale(settings.locale)
+      if (!settings.localeSyncPending || localeChangeInFlight.current) return
+      // Finish the pending sync before a new choice can write a different locale.
+      localeChangeInFlight.current = true
+      setIsChangingLocale(true)
+      try {
+        await updatePreferredLocaleFromMobile(settings.locale)
+        const didPersistSync = await saveSettings({ localeSyncPending: false })
+        if (!didPersistSync) {
+          throw new Error('Unable to persist locale synchronization state')
+        }
+      } catch {
+        if (isActive) {
+          setLocaleError(i18n.t('settings.locale_sync_error'))
+        }
+      } finally {
+        localeChangeInFlight.current = false
+        if (isActive) setIsChangingLocale(false)
+      }
+    })
+
+    return () => {
+      isActive = false
+    }
+  }, [i18n])
+
+  const handleLanguageChange = async (localeCode: SupportedLocale) => {
+    if (localeChangeInFlight.current || localeCode === currentLocale) {
+      return
+    }
+
+    localeChangeInFlight.current = true
+    localeRevision.current += 1
+    setIsChangingLocale(true)
+    setLocaleError(null)
+    const oldLocale =
+      resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
+      defaultSupportedLocale
+
+    try {
+      await i18n.changeLanguage(localeCode)
+      const didPersistLocale = await saveSettings({
+        locale: localeCode,
+        localeSyncPending: true,
+      })
+      if (!didPersistLocale) {
+        throw new Error('Unable to persist locale settings')
+      }
+      setCurrentLocale(localeCode)
+
+      trackMobileLocaleSwitched(analytics, {
+        userId: analytics.getDistinctId() || 'mobile-anonymous-user',
+        fromLocale: oldLocale,
+        toLocale: localeCode,
+      })
+
+      try {
+        await updatePreferredLocaleFromMobile(localeCode)
+        const didPersistSync = await saveSettings({ localeSyncPending: false })
+        if (!didPersistSync) {
+          throw new Error('Unable to persist locale synchronization state')
+        }
+      } catch {
+        setLocaleError(
+          t('settings.locale_sync_error', {
+            defaultValue:
+              'Language changed on this device. Profile sync will retry later.',
+          })
+        )
+      }
+    } catch {
+      await i18n.changeLanguage(oldLocale).catch(() => undefined)
+      setLocaleError(
+        t('settings.locale_change_error', {
+          defaultValue: 'Unable to change language. Please try again.',
+        })
+      )
+    } finally {
+      localeChangeInFlight.current = false
+      setIsChangingLocale(false)
+    }
+  }
+
+  return (
+    <TopicBody testID="settings-language-screen" liveFontScope="settings">
+      <View style={styles.settingsSection}>
+        <Text style={styles.sectionTitle} testID="settings-language-title">
+          {t('settings.language', { defaultValue: 'Language' })}
+        </Text>
+        <View style={styles.localeGrid}>
+          {availableLocales.map((locale) => {
+            const isSelected = currentLocale === locale.code
+            return (
+              <Pressable
+                key={locale.code}
+                style={[
+                  styles.localeButton,
+                  tone.localeButton,
+                  isSelected && tone.selectedLocaleButton,
+                ]}
+                disabled={isChangingLocale || isSelected}
+                onPress={() => {
+                  void handleLanguageChange(locale.code)
+                }}
+                testID={`locale-btn-${locale.code}`}
+                accessibilityRole="button"
+                aria-disabled={isChangingLocale || isSelected}
+                // ARIA allows aria-selected only on option/tab/row/gridcell/treeitem,
+                // so the web side uses aria-pressed.
+                accessibilityState={{ selected: isSelected }}
+                aria-pressed={isSelected}
+              >
+                <Text
+                  style={[
+                    styles.localeText,
+                    tone.localeText,
+                    isSelected && [styles.selectedLocaleText, tone.selectedLocaleText],
+                  ]}
+                >
+                  {t(`settings.languages.${locale.code}`, {
+                    defaultValue: locale.label,
+                  })}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </View>
+      </View>
+
+      {localeError ? (
+        <Text
+          style={[styles.errorText, tone.errorText]}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
+          {localeError}
+        </Text>
+      ) : null}
+    </TopicBody>
+  )
+}
+
+function ShoppingSettingsSection() {
+  const { t } = useTranslation()
+  const tone = useSettingsTone()
+  // `null` means "not known yet", which is not the same as "off". The toggle
+  // stays inert until the server has told us what the stored value is, so a
+  // failed read can never be mistaken for an opt-out the user did not make.
+  const [affiliateCtasEnabled, setAffiliateCtasEnabled] = useState<boolean | null>(null)
+  const [commerceStatus, setCommerceStatus] = useState<string | null>(null)
+  // An i18n key, translated at render: the load effect then depends on the session
+  // alone, and a language change cannot re-read the preference over an in-flight toggle.
+  const [commerceError, setCommerceError] = useState<
+    'commerce.settings.loadError' | 'commerce.settings.error' | null
+  >(null)
+  const commerceChangeInFlight = useRef(false)
+  // Advances when a toggle starts, so a return read that began before it never lands over it.
+  const commerceMutationRef = useRef(0)
+  const signedIn = useMemberSignedIn()
+  const signedInRef = useRef(signedIn)
+  signedInRef.current = signedIn
+  const returns = useReturnFocusCount()
+  useEffect(() => {
+    if (signedIn !== true) {
+      // Signed out (or not known yet): nothing to show, and nothing has failed.
+      setAffiliateCtasEnabled(null)
+      setCommerceError(null)
+      return
+    }
+    const controller = new AbortController()
+
+    void getCommercePreferenceFromMobile(controller.signal)
+      .then((preference) => {
+        if (!controller.signal.aborted) {
+          setAffiliateCtasEnabled(preference.affiliateCtasEnabled)
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setCommerceError(
+            // The catalog always carries this key: `commerce-locales.spec.ts`
+            // asserts an exact key tree across all ten locales, which is a
+            // stronger guarantee than an inline fallback that can drift.
+            //
+            // `loadError`, not `error`: this is the initial read, and `error`
+            // reads "Unable to update shopping preferences.", which names an
+            // action the user did not take and cannot retry from here.
+            'commerce.settings.loadError'
+          )
+        }
+      })
+
+    return () => controller.abort()
+  }, [signedIn])
+
+  // Story CC-7.7 D5: a return re-reads the preference in place. The switch keeps its state
+  // until the answer lands; a failed re-read leaves it as it was, and a toggle in flight wins.
+  useEffect(() => {
+    if (returns === 0 || signedInRef.current !== true || commerceChangeInFlight.current)
+      return
+    const controller = new AbortController()
+    const mutation = commerceMutationRef.current
+    const identity = mobileIdentityEpoch()
+    void getCommercePreferenceFromMobile(controller.signal)
+      .then((preference) => {
+        if (
+          controller.signal.aborted ||
+          commerceMutationRef.current !== mutation ||
+          !isSameMember(identity, signedInRef.current)
+        )
+          return
+        setAffiliateCtasEnabled(preference.affiliateCtasEnabled)
+        setCommerceError((current) =>
+          current === 'commerce.settings.loadError' ? null : current
+        )
+      })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [returns])
+
+  const handleAffiliateCtasToggle = async () => {
+    if (commerceChangeInFlight.current || affiliateCtasEnabled === null) {
+      return
+    }
+
+    const previous = affiliateCtasEnabled
+    const next = !previous
+    commerceChangeInFlight.current = true
+    commerceMutationRef.current += 1
+    // Optimistic, then reverted on failure. The alternative leaves the switch
+    // visually stuck under the user's finger for a whole round trip.
+    setAffiliateCtasEnabled(next)
+    setCommerceStatus(null)
+    setCommerceError(null)
+
+    try {
+      const preference = await updateCommercePreferenceFromMobile(next)
+      setAffiliateCtasEnabled(preference.affiliateCtasEnabled)
+      setCommerceStatus(t('commerce.settings.saved'))
+    } catch {
+      setAffiliateCtasEnabled(previous)
+      setCommerceError('commerce.settings.error')
+    } finally {
+      commerceChangeInFlight.current = false
+    }
+  }
+
+  return (
+    <View style={styles.settingsSection} testID="commerce-settings-section">
+      <Text style={styles.sectionTitle}>{t('commerce.settings.sectionTitle')}</Text>
+      <Text
+        style={[styles.disclosureText, tone.disclosureText]}
+        testID="commerce-settings-disclosure"
+      >
+        {t('commerce.settings.disclosure')}
+      </Text>
+      {signedIn === false ? (
+        <Text
+          style={[styles.helpText, tone.helpText]}
+          testID="commerce-settings-signed-out"
+        >
+          {t('commerce.settings.signedOutHint')}
+        </Text>
+      ) : (
+        <>
+          <Pressable
+            style={[
+              styles.commerceToggle,
+              tone.commerceToggle,
+              affiliateCtasEnabled ? tone.commerceToggleOn : null,
+            ]}
+            disabled={affiliateCtasEnabled === null}
+            onPress={() => {
+              void handleAffiliateCtasToggle()
+            }}
+            testID="commerce-opt-out-toggle"
+            accessibilityRole="switch"
+            aria-checked={affiliateCtasEnabled ?? false}
+            aria-disabled={affiliateCtasEnabled === null}
+            accessibilityLabel={t('commerce.settings.optOutLabel')}
+            accessibilityHint={t('commerce.settings.optOutHelp')}
+          >
+            <Text
+              style={[
+                styles.commerceToggleLabel,
+                affiliateCtasEnabled ? tone.commerceToggleOnLabel : null,
+              ]}
+            >
+              {t('commerce.settings.optOutLabel')}
+            </Text>
+          </Pressable>
+          <Text style={[styles.helpText, tone.helpText]}>
+            {t('commerce.settings.optOutHelp')}
+          </Text>
+          {commerceStatus ? (
+            <Text
+              style={[styles.statusText, tone.statusText]}
+              testID="commerce-settings-status"
+              accessibilityLiveRegion="polite"
+            >
+              {commerceStatus}
+            </Text>
+          ) : null}
+          {commerceError ? (
+            <Text
+              style={[styles.errorText, tone.errorText]}
+              testID="commerce-settings-error"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
+            >
+              {t(commerceError)}
+            </Text>
+          ) : null}
+        </>
+      )}
+    </View>
+  )
+}
+
+function AccountDiagnostics() {
+  const tone = useSettingsTone()
+  const analytics = useMobileAnalytics()
+  const { t } = useTranslation()
+  const [apiHealthMessage, setApiHealthMessage] = useState('Checking API health...')
+  const recordDiagnosticAlert = () => {
+    trackMobileAlertReceived(analytics, {
+      userId: analytics.getDistinctId() || 'mobile-anonymous-user',
+      alertType: 'weather_alert',
+      severity: 'warning',
+      weatherSeverity: 'storm_warning',
+    })
+  }
+
+  useEffect(() => {
+    // API health is a developer status line, so it only loads with diagnostics on.
+    if (!isMobileAnalyticsDiagnosticsEnabled) {
+      return
+    }
+    let isActive = true
+    const unavailableTimer = setTimeout(() => {
+      if (!isActive) {
+        return
+      }
+      setApiHealthMessage(
+        t('settings.api_health_unavailable', {
+          defaultValue: 'API health unavailable',
+        })
+      )
+    }, API_HEALTH_TIMEOUT_MS)
+
+    void loadMobileApiHealth()
+      .then((health) => {
+        clearTimeout(unavailableTimer)
+        if (!isActive) {
+          return
+        }
+        setApiHealthMessage(
+          t('settings.api_health_status', {
+            status: health.status,
+            defaultValue: `API health: ${health.status}`,
+          })
+        )
+      })
+      .catch(() => {
+        clearTimeout(unavailableTimer)
+        if (!isActive) {
+          return
+        }
+        setApiHealthMessage(
+          t('settings.api_health_unavailable', {
+            defaultValue: 'API health unavailable',
+          })
+        )
+      })
+
+    return () => {
+      isActive = false
+      clearTimeout(unavailableTimer)
+    }
+  }, [t])
+
+  return (
+    <>
+      {isMobileAnalyticsDiagnosticsEnabled ? (
+        <>
+          <Text style={styles.infoText}>{apiHealthMessage}</Text>
+          <Text style={styles.infoText}>
+            {t('settings.diagnostic_info', {
+              defaultValue:
+                'alert_received tracking is wired to real push notification receipt listeners.',
+            })}
+          </Text>
+          <Pressable
+            style={[styles.actionButton, tone.actionButton]}
+            onPress={recordDiagnosticAlert}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.diagnostic_alert_btn', {
+              defaultValue: 'Record weather alert analytics',
+            })}
+          >
+            <Text style={styles.actionText}>
+              {t('settings.diagnostic_alert_btn', {
+                defaultValue: 'Record weather alert analytics',
+              })}
+            </Text>
+          </Pressable>
+        </>
+      ) : null}
+      <MobileAnalyticsDiagnosticsPanel />
+    </>
+  )
+}
+
+function premiumStatusLine(
+  t: TFunction,
+  i18n: { resolvedLanguage?: string; language: string },
+  renderState: PremiumSectionRenderState,
+  subscription: Subscription | null
+): string | null {
+  if (renderState.kind === 'entitled') {
+    const locale =
+      resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
+      defaultSupportedLocale
+    const planLabel = renderState.plan
+      ? t(
+          renderState.plan === 'premium_monthly'
+            ? 'commerce.premium.planMonthly'
+            : 'commerce.premium.planAnnual'
+        )
+      : renderState.productId
+    return t(
+      `commerce.premium.status.${renderState.showGraceBanner ? 'gracePeriod' : 'active'}`,
+      {
+        plan: planLabel,
+        date: new Date(renderState.currentPeriodEnd).toLocaleDateString(locale, {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }),
+      }
+    )
+  }
+  if (renderState.kind === 'complimentary') {
+    return t('commerce.premium.status.complimentary')
+  }
+  if (renderState.kind === 'subscribe' && subscription) {
+    return t(`commerce.premium.status.${premiumStatusKeys[subscription.status]}`)
+  }
+  return null
+}
+
+/**
+ * Story 6.14: the processor disclosure, withheld from an unpaid complimentary member, who shares
+ * nothing with RevenueCat or Stripe and is offered nothing to buy. Until the session and the
+ * reads resolve it stays hidden, so a grantee never sees it appear and vanish; signed out it
+ * shows as before.
+ */
+function showPremiumDisclosure(
+  signedIn: boolean | null,
+  renderState: PremiumSectionRenderState
+): boolean {
+  if (renderState.kind === 'complimentary') return false
+  // Signed out shows it; an unresolved session or a pending read holds it back.
+  return signedIn === false || renderState.kind !== 'loading'
+}
+
+function PremiumDisclosure({ visible }: { visible: boolean }) {
+  const tone = useSettingsTone()
+  const { t } = useTranslation()
+  if (!visible) return null
+  return (
+    <Text
+      style={[styles.disclosureText, tone.disclosureText]}
+      testID="premium-settings-disclosure"
+    >
+      {t('commerce.premium.disclosure')}
+    </Text>
+  )
+}
+
+/** Story 6.14 D6: a paying member who also holds a complimentary grant. */
+function PremiumComplimentaryNote({ visible }: { visible: boolean }) {
+  const tone = useSettingsTone()
+  const { t } = useTranslation()
+  if (!visible) return null
+  return (
+    <Text style={[styles.helpText, tone.helpText]} testID="premium-complimentary-note">
+      {t('commerce.premium.complimentaryNote')}
+    </Text>
+  )
+}
+
+/** A store round trip is in flight; every premium control disables meanwhile. */
+function isPremiumFlowBusy(premiumFlow: PremiumFlowState): boolean {
+  return (
+    premiumFlow === 'purchasing' ||
+    premiumFlow === 'restoring' ||
+    premiumFlow === 'activating'
+  )
+}
+
+/**
+ * Premium subscription (Story 5.2), a sibling section after the commerce one.
+ * The disclosure names RevenueCat and Stripe per PRD NFR Security 4 and sits
+ * above every control, like the commerce section's. Purchases are never
+ * optimistic: the store's answer, not the tap, moves the UI. The status
+ * endpoint is not gated by the kill switch — a paying user always sees their
+ * subscription — while `purchasesEnabled` (the only kill-switch exposure)
+ * decides whether any subscribe control exists at all.
+ */
+function PremiumSettingsSection({
+  signedIn,
+  returns = 0,
+}: {
+  signedIn: boolean | null
+  /** Story CC-7.7 D5: returns to Profile; each re-reads the subscription in place. */
+  returns?: number
+}) {
+  const tone = useSettingsTone()
+  const analytics = useMobileAnalytics()
+  const { t, i18n } = useTranslation()
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
+  const [subscriptionLoadFailed, setSubscriptionLoadFailed] = useState(false)
+  const [premiumAccess, setPremiumAccess] = useState<PremiumAccess | null>(null)
+  // Story 6.14: the section holds its loading state until the access read settles, so a grantee
+  // never sees the free or ended state first.
+  const [accessSettled, setAccessSettled] = useState(false)
+  // `null` = the lazy SDK configure has not answered yet. The subscribe
+  // controls stay hidden until it has: rendering them first and swapping to
+  // the unavailable fallback after would flash a control that cannot work.
+  const [purchasesAvailability, setPurchasesAvailability] =
+    useState<PurchasesAvailability | null>(null)
+  const purchasesAvailabilityRef = useRef(purchasesAvailability)
+  purchasesAvailabilityRef.current = purchasesAvailability
+  const [premiumFlow, setPremiumFlow] = useState<PremiumFlowState>('idle')
+  const premiumFlowInFlight = useRef(false)
+  // Story CC-7.7: bumped when a purchase or restore starts and again when it ends. A return
+  // re-read captures it before its request; an answer that comes back after a store round trip
+  // started or ended predates that flow's own subscription read and is dropped.
+  const premiumFlowGeneration = useRef(0)
+  const premiumPollAbortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    if (signedIn !== true) {
+      setSubscription(null)
+      setSubscriptionLoadFailed(false)
+      // Story 6.14: the next account must never inherit this one's access answer.
+      setPremiumAccess(null)
+      setAccessSettled(false)
+      return
+    }
+    const controller = new AbortController()
+
+    void getSubscriptionFromMobile(controller.signal)
+      .then((current) => {
+        if (!controller.signal.aborted) {
+          setSubscription(current)
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setSubscriptionLoadFailed(true)
+        }
+      })
+
+    // Story 6.14 D6, TEA-07: the access source rides beside the subscription, and the store SDK
+    // waits for it. A complimentary member never configures RevenueCat and never sees a purchase
+    // control, not even while the read is pending. A failed read leaves the section as before
+    // (TEA-14). Otherwise entering this section IS the SDK's configuration moment (Decision 11:
+    // lazily on first entry, never at app launch). The memoized result makes re-entry free.
+    void getPremiumAccessFromMobile(controller.signal)
+      .catch(() => null)
+      .then(async (access) => {
+        if (controller.signal.aborted) return
+        setPremiumAccess(access)
+        setAccessSettled(true)
+        if (isComplimentaryAccess(access)) {
+          return
+        }
+        const availability = await ensurePurchasesConfigured()
+        if (!controller.signal.aborted) {
+          setPurchasesAvailability(availability)
+        }
+      })
+      .catch(() => undefined)
+
+    return () => {
+      controller.abort()
+      premiumPollAbortRef.current?.abort()
+    }
+  }, [signedIn])
+
+  // Story CC-7.7 D5: a return re-reads the subscription and the access source in place. The
+  // section keeps what it shows until an answer lands; a failed re-read changes nothing, and a
+  // store round trip in flight owns the section until it ends.
+  const signedInRef = useRef(signedIn)
+  signedInRef.current = signedIn
+  useEffect(() => {
+    if (returns === 0 || signedInRef.current !== true || premiumFlowInFlight.current)
+      return
+    const controller = new AbortController()
+    const identity = mobileIdentityEpoch()
+    const stillCurrent = () =>
+      !controller.signal.aborted && isSameMember(identity, signedInRef.current)
+    const flowGeneration = premiumFlowGeneration.current
+    void getSubscriptionFromMobile(controller.signal)
+      .then((refreshed) => {
+        if (!stillCurrent() || flowGeneration !== premiumFlowGeneration.current) return
+        setSubscription(refreshed)
+        setSubscriptionLoadFailed(false)
+      })
+      .catch(() => undefined)
+    void getPremiumAccessFromMobile(controller.signal)
+      .then(async (access) => {
+        if (!stillCurrent() || !access) return
+        setPremiumAccess(access)
+        // Access that stopped being complimentary needs the store's answer the first read
+        // skipped, or the subscribe controls never appear. Complimentary access still never
+        // configures the store.
+        if (isComplimentaryAccess(access) || purchasesAvailabilityRef.current !== null)
+          return
+        const availability = await ensurePurchasesConfigured()
+        if (stillCurrent()) setPurchasesAvailability(availability)
+      })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [returns])
+
+  /**
+   * Success-outcome follow-up only: refresh beats webhook latency, then the
+   * bounded poll (5-second interval, 2-minute hard stop) watches for the
+   * entitlement. A `none` mid-poll never renders as failure — the terminal
+   * cap state says "still processing", which is the truthful claim.
+   */
+  const watchEntitlementActivation = async () => {
+    setPremiumFlow('activating')
+    try {
+      const refreshed = await refreshSubscriptionFromMobile()
+      if (isEntitledSubscription(refreshed)) {
+        setSubscription(refreshed)
+        setPremiumFlow('idle')
+        return
+      }
+    } catch {
+      // The poll below is the retry mechanism.
+    }
+    const controller = new AbortController()
+    premiumPollAbortRef.current = controller
+    const activated = await pollSubscriptionUntilEntitled({ signal: controller.signal })
+    if (controller.signal.aborted) {
+      return
+    }
+    if (activated) {
+      setSubscription(activated)
+      setPremiumFlow('idle')
+    } else {
+      setPremiumFlow('still-processing')
+    }
+  }
+
+  const handlePremiumPurchase = async (plan: SubscriptionPlan) => {
+    if (premiumFlowInFlight.current) {
+      return
+    }
+    premiumFlowInFlight.current = true
+    premiumFlowGeneration.current += 1
+    setPremiumFlow('purchasing')
+    trackMobilePremiumSubscribeTapped(
+      analytics,
+      analytics.getDistinctId() || 'mobile-anonymous-user',
+      { plan, surface: 'mobile_settings' }
+    )
+
+    try {
+      const outcome = await purchasePremiumPlan(plan)
+      switch (outcome.kind) {
+        case 'success':
+          await watchEntitlementActivation()
+          break
+        case 'user-cancelled':
+          // A quiet return to idle: the user changed their mind, and an error
+          // banner over their own decision would read as a malfunction.
+          setPremiumFlow('idle')
+          break
+        case 'deferred':
+          setPremiumFlow('pending-approval')
+          break
+        case 'sdk-unavailable':
+          setPurchasesAvailability('unavailable')
+          setPremiumFlow('idle')
+          break
+        case 'error':
+          setPremiumFlow('purchase-error')
+          break
+      }
+    } finally {
+      premiumFlowInFlight.current = false
+      premiumFlowGeneration.current += 1
+    }
+  }
+
+  const handlePremiumRestore = async () => {
+    if (premiumFlowInFlight.current) {
+      return
+    }
+    premiumFlowInFlight.current = true
+    premiumFlowGeneration.current += 1
+    setPremiumFlow('restoring')
+
+    try {
+      const outcome = await restorePremiumPurchases()
+      if (outcome.kind === 'success') {
+        // Restore only syncs the store; the server subscription is the truth
+        // about what, if anything, came back.
+        try {
+          const refreshed = await refreshSubscriptionFromMobile()
+          setSubscription(refreshed)
+          setPremiumFlow('idle')
+        } catch {
+          setPremiumFlow('purchase-error')
+        }
+      } else if (outcome.kind === 'sdk-unavailable') {
+        setPurchasesAvailability('unavailable')
+        setPremiumFlow('idle')
+      } else {
+        setPremiumFlow('purchase-error')
+      }
+    } finally {
+      premiumFlowInFlight.current = false
+      premiumFlowGeneration.current += 1
+    }
+  }
+
+  const renderState = resolvePremiumSectionState(subscription, subscriptionLoadFailed, {
+    accessSettled,
+    access: premiumAccess,
+  })
+  const busy = isPremiumFlowBusy(premiumFlow)
+  const statusLine = premiumStatusLine(t, i18n, renderState, subscription)
+
+  return (
+    <View style={styles.settingsSection} testID="premium-settings-section">
+      <Text style={styles.sectionTitle}>{t('commerce.premium.sectionTitle')}</Text>
+      <PremiumDisclosure visible={showPremiumDisclosure(signedIn, renderState)} />
+      {signedIn === false ? (
+        <Text style={styles.premiumStatusLine} testID="premium-signed-out">
+          {t('commerce.premium.signedOutHint')}
+        </Text>
+      ) : null}
+      {signedIn === true && renderState.kind === 'load-error' ? (
+        <Text
+          style={[styles.errorText, tone.errorText]}
+          testID="premium-load-error"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
+          {t('commerce.premium.errorLoad')}
+        </Text>
+      ) : null}
+      {statusLine ? (
+        <Text style={styles.premiumStatusLine} testID="premium-status-line">
+          {statusLine}
+        </Text>
+      ) : null}
+      {renderState.kind === 'entitled' ? (
+        <>
+          <PremiumComplimentaryNote visible={renderState.complimentary} />
+          {renderState.showGraceBanner ? (
+            <Text
+              style={[styles.premiumGraceBanner, tone.premiumGraceBanner]}
+              testID="premium-grace-banner"
+              accessibilityLiveRegion="polite"
+            >
+              {t('commerce.premium.graceBanner')}
+            </Text>
+          ) : null}
+          {renderState.manageEntry === 'store' ? (
+            <Pressable
+              style={[styles.actionButton, tone.actionButton]}
+              onPress={() => {
+                void showManageSubscriptionsInStore()
+              }}
+              testID="premium-manage"
+              accessibilityRole="button"
+            >
+              <Text style={styles.actionText}>{t('commerce.premium.manage')}</Text>
+            </Pressable>
+          ) : null}
+          {renderState.manageEntry === 'web' ? (
+            <Text
+              style={[styles.helpText, tone.helpText]}
+              testID="premium-manage-web-hint"
+            >
+              {t('commerce.premium.manageInStore')}
+            </Text>
+          ) : null}
+        </>
+      ) : null}
+      {renderState.kind === 'subscribe' ? (
+        <>
+          {renderState.ended ? (
+            <Text style={[styles.helpText, tone.helpText]} testID="premium-ended-note">
+              {t('commerce.premium.endedNote')}
+            </Text>
+          ) : null}
+          {renderState.purchasesEnabled && purchasesAvailability === 'unavailable' ? (
+            <Text style={[styles.helpText, tone.helpText]} testID="premium-unavailable">
+              {t('commerce.premium.unavailableInBuild')}
+            </Text>
+          ) : null}
+          {purchasesAvailability !== null && purchasesAvailability !== 'unavailable' ? (
+            <PremiumSubscribeControls
+              purchasesEnabled={renderState.purchasesEnabled}
+              busy={busy}
+              premiumFlow={premiumFlow}
+              onPurchase={(plan) => {
+                void handlePremiumPurchase(plan)
+              }}
+              onRestore={() => {
+                void handlePremiumRestore()
+              }}
+            />
+          ) : null}
+        </>
+      ) : null}
+      <PremiumFlowMessages premiumFlow={premiumFlow} />
+    </View>
+  )
+}
+
+/**
+ * The three store CTAs. Purchases show a busy state instead of optimistic UI:
+ * `aria-busy`, which react-native-web projects onto the DOM.
+ */
+function PremiumSubscribeControls({
+  purchasesEnabled,
+  busy,
+  premiumFlow,
+  onPurchase,
+  onRestore,
+}: {
+  purchasesEnabled: boolean
+  busy: boolean
+  premiumFlow: PremiumFlowState
+  onPurchase: (plan: SubscriptionPlan) => void
+  onRestore: () => void
+}) {
+  const tone = useSettingsTone()
+  const { t } = useTranslation()
+  const plans = [
+    { plan: 'premium_monthly' as const, labelKey: 'commerce.premium.planMonthly' },
+    { plan: 'premium_annual' as const, labelKey: 'commerce.premium.planAnnual' },
+  ]
+
+  return (
+    <>
+      {/*
+        Only the BUY controls are behind the kill switch. Restore is not: it
+        mints no purchase, it re-reads what the store already sold this user.
+        Gating it too would mean a subscriber whose entitlement is missing from
+        our mirror cannot recover access while the switch is off, which is the
+        one thing AC 5 says must never happen. Decision 11 gates "the subscribe
+        CTA"; AC 1 lists restore as its own entry point.
+      */}
+      {purchasesEnabled ? (
+        <Text style={[styles.helpText, tone.helpText]}>
+          {t('commerce.premium.subscribe')}
+        </Text>
+      ) : null}
+      {(purchasesEnabled ? plans : []).map(({ plan, labelKey }) => (
+        <Pressable
+          key={plan}
+          style={[styles.actionButton, tone.actionButton]}
+          disabled={busy}
+          onPress={() => {
+            onPurchase(plan)
+          }}
+          testID={`premium-subscribe-${plan === 'premium_monthly' ? 'monthly' : 'annual'}`}
+          accessibilityRole="button"
+          aria-disabled={busy}
+          aria-busy={premiumFlow === 'purchasing'}
+        >
+          <Text style={styles.actionText}>{t(labelKey)}</Text>
+        </Pressable>
+      ))}
+      <Pressable
+        style={[styles.actionButton, tone.actionButton]}
+        disabled={busy}
+        onPress={onRestore}
+        testID="premium-restore"
+        accessibilityRole="button"
+        aria-disabled={busy}
+        aria-busy={premiumFlow === 'restoring'}
+      >
+        <Text style={styles.actionText}>{t('commerce.premium.restore')}</Text>
+      </Pressable>
+    </>
+  )
+}
+
+/**
+ * Exactly one flow message renders at a time; the error is an assertive alert
+ * (Decision 11) while the informational states announce politely.
+ */
+function PremiumFlowMessages({ premiumFlow }: { premiumFlow: PremiumFlowState }) {
+  const tone = useSettingsTone()
+  const { t } = useTranslation()
+
+  return (
+    <>
+      {premiumFlow === 'activating' ? (
+        <Text
+          style={[styles.statusText, tone.statusText]}
+          testID="premium-activating"
+          accessibilityLiveRegion="polite"
+        >
+          {t('commerce.premium.activating')}
+        </Text>
+      ) : null}
+      {premiumFlow === 'still-processing' ? (
+        <Text
+          style={[styles.statusText, tone.statusText]}
+          testID="premium-still-processing"
+          accessibilityLiveRegion="polite"
+        >
+          {t('commerce.premium.stillProcessing')}
+        </Text>
+      ) : null}
+      {premiumFlow === 'pending-approval' ? (
+        <Text
+          style={[styles.statusText, tone.statusText]}
+          testID="premium-pending-approval"
+          accessibilityLiveRegion="polite"
+        >
+          {t('commerce.premium.pendingApproval')}
+        </Text>
+      ) : null}
+      {premiumFlow === 'purchase-error' ? (
+        <Text
+          style={[styles.errorText, tone.errorText]}
+          testID="premium-purchase-error"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
+          {t('commerce.premium.errorPurchase')}
+        </Text>
+      ) : null}
+    </>
+  )
+}
+
+/**
+ * Exhaustive over the contract enum on purpose: a palette added to
+ * `premiumThemeKeySchema` fails to typecheck here until it has a name to
+ * render, so the mobile gallery cannot silently fall behind the contract.
+ */
+const PALETTE_LABEL_KEYS: Record<PremiumThemeKey, string> = {
+  jewel_radiance: 'commerce.premium.theme.names.jewelRadiance',
+  autumn_umber: 'commerce.premium.theme.names.autumnUmber',
+  winter_metallic: 'commerce.premium.theme.names.winterMetallic',
+}
+
+interface ThemeOption {
+  /** `null` is the implicit Default palette, which is also the reset control. */
+  key: PremiumThemeKey | null
+  /** The `testID` suffix and React key for this card. */
+  id: string
+  labelKey: string
+}
+
+/**
+ * The gallery, in render order: the three named palettes then Default.
+ *
+ * Default is a real fourth card rather than a separate "reset" button, so a
+ * subscriber who likes none of the three is not stuck with the last one they
+ * tried. It is never gated — it is the state a non-entitled user already has.
+ */
+const THEME_OPTIONS: readonly ThemeOption[] = [
+  ...PREMIUM_THEME_KEYS.map((key) => ({
+    key,
+    id: key,
+    labelKey: PALETTE_LABEL_KEYS[key],
+  })),
+  { key: null, id: 'default', labelKey: 'commerce.premium.theme.reset' },
+]
+
+/** The `nativeID` the disabled cards point `aria-describedby` at. */
+const THEME_UNAVAILABLE_HINT_ID = 'premium-theme-unavailable-hint'
+
+/**
+ * The palette names, joined the way the reader's language joins a list.
+ *
+ * The names arrive in the locked copy as one `{{palettes}}` interpolation built
+ * from `PREMIUM_THEME_KEYS`, so the gallery and the upsell copy share a source
+ * of truth and adding a palette does not mean hand-editing twenty localized
+ * sentences.
+ *
+ * Locale-aware joining rather than `join(', ')` because the join is not the same
+ * in every language this ships in: German wants "und", French "et", Turkish "ve",
+ * Spanish "y", and English and Canadian English disagree about the serial comma.
+ *
+ * `formatLocalizedList` rather than `Intl.ListFormat` directly. `Intl.ListFormat`
+ * is optional under ECMA-402 and Hermes ships without it, so constructing one here
+ * threw `TypeError: Cannot read property 'prototype' of undefined` on device. That
+ * took `PremiumThemeSection` down, and with it `SettingsScreen` and the whole tab
+ * layout, so every flow that reaches for `tab-settings` failed with a missing
+ * element rather than anything naming the real cause. The shared helper uses
+ * `Intl.ListFormat` where it exists and falls back where it does not, and is
+ * already load-bearing in this bundle through the alt-text helpers.
+ */
+function usePaletteNameList(): string {
+  const { t, i18n } = useTranslation()
+  const language = i18n.language
+
+  return useMemo(
+    () =>
+      formatLocalizedList(
+        PREMIUM_THEME_KEYS.map((key) => t(PALETTE_LABEL_KEYS[key])),
+        language
+      ),
+    [t, language]
+  )
+}
+
+function usePremiumThemeEntry(returns: number) {
+  const theme = useAppTheme()
+  const { status, reading, refresh } = theme
+  const [entryReadFinished, setEntryReadFinished] = useState(false)
+  const [hasShownTheme, setHasShownTheme] = useState(false)
+  const owner = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileApplicationUserId,
+    mobileApplicationUserId
+  )
+  useEffect(() => {
+    let active = true
+    void refresh().then(() => {
+      if (active) setEntryReadFinished(true)
+    })
+    return () => {
+      active = false
+    }
+  }, [refresh, owner, returns])
+  // The provider can hold the launch answer during this destination's first read.
+  // Once the destination has shown its own answer, keep it visible on warm refresh.
+  const entryReady = entryReadFinished && !reading && status !== 'loading'
+  useEffect(() => {
+    if (entryReady) setHasShownTheme(true)
+  }, [entryReady])
+  return { ...theme, status: hasShownTheme || entryReady ? status : ('loading' as const) }
+}
+
+/**
+ * Interface palettes (Story 5.3 Task 6), a sibling section immediately after the
+ * Premium one, which is where its locked copy points: "subscribe with the
+ * controls above" names `PremiumSubscribeControls`, rendered directly above on
+ * this same screen (Decision 12).
+ *
+ * Three things here are load-bearing rather than stylistic, and all three mirror
+ * the web section deliberately so the two surfaces cannot drift:
+ *
+ * - **Each card pins its own palette; the preview pins none.** A card advertises
+ *   the palette it offers, so it looks identical whether or not that palette is
+ *   the applied one. The preview reads `useAppTheme().palette`, which is the
+ *   applied one, so it is the single element on screen that actually changes when
+ *   a save lands — without it, AC 4's instant apply would be provable only in a
+ *   debugger.
+ * - **`primary` and `secondary` never carry text.** Two of the three `primary`
+ *   fills miss the 4.5:1 small-text floor against white (Decision 2), so they
+ *   render as swatch dots ringed in the card's own `cardText`: Autumn Umber's
+ *   Wheat and Winter Metallic's Platinum measure 1.68:1 and 1.36:1 against their
+ *   own card backgrounds, and the fill alone would leave no discernible boundary.
+ *   Every string in a card renders in `cardText` on `cardBg`, the pairing
+ *   measured at 8.01-11.58:1.
+ * - **Selection is never signalled by color alone.** The active card states
+ *   "Selected" in text and carries `aria-pressed`, so the palette
+ *   is decoration on top of a state that is already readable and announced.
+ *
+ * The section owns no fetch of its own: `AppThemeProvider` holds the one read and
+ * this calls `refresh()` on entry, so opening settings costs one round trip and
+ * the applied palette is the same fact here as everywhere else in the app.
+ */
+function PremiumThemeSection({ returns = 0 }: { returns?: number }) {
+  const tone = useSettingsTone()
+  const { t } = useTranslation()
+  const {
+    themeKey,
+    palette,
+    isEntitled,
+    themesEnabled,
+    status,
+    applyResolvedTheme,
+    applyFailure,
+  } = usePremiumThemeEntry(returns)
+  const palettes = usePaletteNameList()
+
+  /** The `id` of the card whose save is in flight, or null when idle. */
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  // Leaving the screen retires the pending save and its theme application.
+  const saveControllerRef = useRef<AbortController | null>(null)
+  useEffect(() => () => saveControllerRef.current?.abort(), [])
+
+  const showGallery = status === 'ready' && isEntitled
+  const showLocked = status === 'signed-out' || (status === 'ready' && !isEntitled)
+  const isSelectable = showGallery && themesEnabled
+  const showUnavailableNote = showGallery && !themesEnabled
+  const errorMessage =
+    saveError ?? (status === 'failed' ? t('commerce.premium.theme.loadError') : null)
+
+  const handleSelect = async (option: ThemeOption) => {
+    // Re-pressing the active card would issue a full PUT and emit a second
+    // `premium_theme_selected` for one real choice, inflating exactly the
+    // adoption count Decision 14 exists to measure. The server answers 200 for
+    // an unchanged value by design, so the client is the only place this can be
+    // suppressed.
+    if (savingId !== null || option.key === themeKey) {
+      return
+    }
+
+    const controller = new AbortController()
+    saveControllerRef.current = controller
+    setSavingId(option.id)
+    setSaveError(null)
+
+    try {
+      const saved = await setThemeFromMobile(option.key, controller.signal)
+      if (!controller.signal.aborted) {
+        applyResolvedTheme(saved)
+      }
+    } catch (error: unknown) {
+      if (!controller.signal.aborted) {
+        // The rejection re-resolves the section rather than only printing a line:
+        // a 403 means entitlement lapsed and a 503 means the kill switch flipped,
+        // and both are states this section already renders. Only an unclassified
+        // failure has a message, and it is the catalog's rather than the server's
+        // untranslated English (AC 7).
+        if (premiumThemeFailureReason(error) === 'unknown') {
+          setSaveError(t('commerce.premium.theme.saveError'))
+        }
+        applyFailure(error)
+      }
+    } finally {
+      if (saveControllerRef.current === controller) {
+        saveControllerRef.current = null
+      }
+      if (!controller.signal.aborted) {
+        setSavingId(null)
+      }
+    }
+  }
+
+  return (
+    <View style={styles.settingsSection} testID="premium-theme-section">
+      <Text style={styles.sectionTitle} testID="premium-theme-title">
+        {t('commerce.premium.theme.sectionTitle')}
+      </Text>
+      <SettingsHelp summary={t('settings.profile.themeHelp')}>
+        <Text
+          style={[styles.disclosureText, tone.disclosureText]}
+          testID="premium-theme-disclosure"
+        >
+          {t('commerce.premium.theme.disclosure')}
+        </Text>
+      </SettingsHelp>
+
+      {/*
+        The kill-switch note precedes the cards it explains and is what their
+        `aria-describedby`/`accessibilityHint` point at, so a disabled card is
+        never disabled without a stated reason.
+      */}
+      {showUnavailableNote ? (
+        <Text
+          style={[styles.helpText, tone.helpText]}
+          nativeID={THEME_UNAVAILABLE_HINT_ID}
+          testID="premium-theme-unavailable"
+        >
+          {t('commerce.premium.theme.unavailable')}
+        </Text>
+      ) : null}
+
+      {showGallery ? (
+        <>
+          <View style={styles.themeGallery} testID="premium-theme-gallery">
+            {THEME_OPTIONS.map((option) => (
+              <PaletteCard
+                key={option.id}
+                option={option}
+                isSelected={themeKey === option.key}
+                isSaving={savingId === option.id}
+                isSelectable={isSelectable}
+                onSelect={() => {
+                  void handleSelect(option)
+                }}
+              />
+            ))}
+          </View>
+          {/*
+            After the cards, not before them: the reader picks a palette and then
+            sees what it does. It reads the APPLIED palette from the context, which
+            is what makes the choice visible at all — every card pins its own.
+          */}
+          <View
+            style={[
+              styles.themePreview,
+              { backgroundColor: palette.cardBg, borderColor: palette.cardBorder },
+            ]}
+            testID="premium-theme-preview"
+          >
+            <View
+              style={[styles.themePreviewAccent, { backgroundColor: palette.primary }]}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              testID="premium-theme-preview-accent"
+            />
+            <Text style={[styles.themePreviewTitle, { color: palette.cardText }]}>
+              {t('commerce.premium.theme.preview.title')}
+            </Text>
+            <Text style={[styles.themePreviewBody, { color: palette.cardText }]}>
+              {t('commerce.premium.theme.preview.body')}
+            </Text>
+          </View>
+        </>
+      ) : null}
+
+      {/*
+        The locked upsell for a signed-out or non-entitled reader: the same panel
+        shape and copy the web section renders, pointing at the subscribe controls
+        directly above rather than carrying a CTA of its own. The body splits by
+        audience because "subscribe with the controls above" is true for a
+        signed-in reader and false for a signed-out one, who has to sign in first.
+      */}
+      {showLocked ? (
+        <View
+          style={[styles.themeLockedPanel, tone.themeLockedPanel]}
+          testID="premium-theme-locked"
+        >
+          <Text style={styles.themeLockedTitle}>
+            {t('commerce.premium.theme.locked.title')}
+          </Text>
+          <Text style={[styles.helpText, tone.helpText]}>
+            {t(
+              status === 'signed-out'
+                ? 'commerce.premium.theme.locked.signedOutBody'
+                : 'commerce.premium.theme.locked.body',
+              { palettes }
+            )}
+          </Text>
+        </View>
+      ) : null}
+
+      {errorMessage ? (
+        <Text
+          style={[styles.errorText, tone.errorText]}
+          testID="premium-theme-error"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
+          {errorMessage}
+        </Text>
+      ) : null}
+    </View>
+  )
+}
+
+/**
+ * One gallery card, painted in the palette it offers rather than the applied one.
+ *
+ * Selection is `accessibilityState.selected` for native and `aria-pressed` for the
+ * DOM: ARIA allows aria-selected only on option/tab/row/gridcell/treeitem.
+ */
+function PaletteCard({
+  option,
+  isSelected,
+  isSaving,
+  isSelectable,
+  onSelect,
+}: {
+  option: ThemeOption
+  isSelected: boolean
+  isSaving: boolean
+  isSelectable: boolean
+  onSelect: () => void
+}) {
+  const { t } = useTranslation()
+  // Story CC-7.9 D5: each card shows its palette in the OS scheme, as Community will.
+  const palette = resolveThemePalette(option.key, useTokens().scheme)
+  const name = t(option.labelKey)
+
+  return (
+    <Pressable
+      style={[
+        styles.themeCard,
+        { backgroundColor: palette.cardBg, borderColor: palette.cardBorder },
+        isSelected ? styles.themeCardSelected : null,
+        isSelectable ? null : styles.themeCardDisabled,
+      ]}
+      disabled={!isSelectable}
+      onPress={onSelect}
+      testID={`premium-theme-option-${option.id}`}
+      accessibilityRole="button"
+      accessibilityLabel={name}
+      accessibilityHint={
+        isSelectable ? undefined : t('commerce.premium.theme.unavailable')
+      }
+      accessibilityState={{ selected: isSelected }}
+      aria-pressed={isSelected}
+      aria-disabled={!isSelectable}
+      aria-busy={isSaving}
+      aria-describedby={isSelectable ? undefined : THEME_UNAVAILABLE_HINT_ID}
+    >
+      <View style={styles.themeCardHeader}>
+        {/*
+          The two swatches are the only place `primary` and `secondary` appear.
+          Both are ringed in `cardText` because Autumn Umber's Wheat and Winter
+          Metallic's Platinum measure 1.68:1 and 1.36:1 against their own card
+          backgrounds: the fill alone would leave no discernible boundary. The ring
+          sits at the same 8.01-11.58:1 as the card's text, clearing SC 1.4.11's
+          3:1 non-text floor with room to spare.
+        */}
+        <View
+          style={[
+            styles.themeSwatch,
+            { backgroundColor: palette.primary, borderColor: palette.cardText },
+          ]}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          testID={`premium-theme-swatch-primary-${option.id}`}
+        />
+        <View
+          style={[
+            styles.themeSwatch,
+            { backgroundColor: palette.secondary, borderColor: palette.cardText },
+          ]}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          testID={`premium-theme-swatch-secondary-${option.id}`}
+        />
+        <Text style={[styles.themeCardName, { color: palette.cardText }]}>{name}</Text>
+      </View>
+      <Text
+        style={[styles.themeCardState, { color: palette.cardText }]}
+        testID={`premium-theme-state-${option.id}`}
+      >
+        {isSelected
+          ? t('commerce.premium.theme.selected')
+          : t('commerce.premium.theme.select')}
+      </Text>
+    </Pressable>
+  )
+}
+
+function ProfileAccountHeader() {
+  const { t } = useTranslation()
+  const tone = useSettingsTone()
+  const signedIn = useMemberSignedIn()
+  const [account, setAccount] = useState<{
+    displayName: string | null
+    email: string
+  } | null>()
+  useFocusEffect(
+    useCallback(() => {
+      if (!signedIn) return
+      const identity = mobileIdentityEpoch()
+      const controller = new AbortController()
+      const stillCurrent = () =>
+        !controller.signal.aborted && identity === mobileIdentityEpoch()
+      const scopedFetch: typeof fetch = (input, init) =>
+        fetch(input, { ...init, signal: controller.signal })
+      void getUserProfileFromMobile(scopedFetch)
+        .then(({ user }) => {
+          if (!stillCurrent()) return
+          setAccount({ displayName: user.displayName?.trim() || null, email: user.email })
+        })
+        .catch(() => {
+          if (stillCurrent()) setAccount((previous) => previous ?? null)
+        })
+      return () => controller.abort()
+    }, [signedIn])
+  )
+
+  const loading = signedIn === null || (signedIn && account === undefined)
+  const shownAccount = signedIn ? account : null
+  return (
+    <View
+      style={[styles.settingsSection, styles.accountHeader]}
+      testID="profile-account"
+      accessibilityState={{ busy: loading }}
+    >
+      <Text style={[styles.accountCaption, tone.helpText]}>
+        {t('settings.profile.account')}
+      </Text>
+      {shownAccount?.displayName ? (
+        <Text style={styles.accountName} testID="profile-account-name">
+          {shownAccount.displayName}
+        </Text>
+      ) : null}
+      {loading ? (
+        <View testID="profile-account-reserved" style={styles.accountReserved} />
+      ) : (
+        <Text
+          style={
+            shownAccount?.displayName
+              ? [styles.accountEmail, tone.helpText]
+              : styles.accountName
+          }
+          testID="profile-account-email"
+        >
+          {shownAccount?.email ?? t('settings.profile.unavailable')}
+        </Text>
+      )}
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  topic: { flex: 1 },
+  // CC-7.9 small-phone capture: the body sat 16 inside the container and again inside a
+  // centered 90% section, about 33 from the edge. One inset now, the shared tab body inset.
+  container: {
+    flexGrow: 1,
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
+    paddingHorizontal: TAB_BODY_INSET,
+    paddingTop: 16,
+    paddingBottom: 32,
+  },
+  settingsSection: {
+    width: '100%',
+    marginTop: 8,
+    marginBottom: 16,
+    alignItems: 'stretch',
+    backgroundColor: 'transparent',
+  },
+  accountHeader: {
+    gap: 2,
+  },
+  accountReserved: { minHeight: 22 },
+  accountCaption: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  accountName: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  accountEmail: {
+    fontSize: 14,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    textAlign: 'left',
+  },
+  learnMore: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center' },
+  learnMoreLabel: { textDecorationLine: 'underline' },
+  localeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    backgroundColor: 'transparent',
+  },
+  localeButton: {
+    minHeight: 44,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  localeText: {
+    fontSize: 14,
+  },
+  selectedLocaleText: {
+    fontWeight: 'bold',
+  },
+  disclosureText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  commerceToggle: {
+    // Decision 17: at least 44 by 44 device-independent pixels.
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  commerceToggleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  helpText: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  premiumStatusLine: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  premiumGraceBanner: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  statusText: {
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  errorText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    maxWidth: '90%',
+  },
+  infoText: {
+    marginTop: 16,
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    maxWidth: '80%',
+  },
+  actionButton: {
+    minHeight: 44,
+    marginTop: 16,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  themeGallery: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+    backgroundColor: 'transparent',
+  },
+  themeCard: {
+    // Decision 17's 44-by-44 floor, same as every other control on this screen.
+    minHeight: 44,
+    flexGrow: 1,
+    flexBasis: '46%',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  themeCardSelected: {
+    // Selection is stated in words inside the card too; this is the redundant
+    // visual cue, never the only one.
+    borderWidth: 2,
+  },
+  themeCardDisabled: {
+    // Story CC-7.9 D5: 0.8 matches web's `disabled:opacity-80`, the lowest step that keeps
+    // every palette's cardText at 4.5:1 on its dimmed cardBg in both schemes (0.7 left light
+    // Jewel Radiance at 3.77:1).
+    opacity: 0.8,
+  },
+  themeCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'transparent',
+  },
+  themeSwatch: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  themeCardName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  themeCardState: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  themePreview: {
+    marginTop: 12,
+    gap: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  themePreviewAccent: {
+    width: 64,
+    height: 6,
+    borderRadius: 9999,
+  },
+  themePreviewTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  themePreviewBody: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  themeLockedPanel: {
+    marginTop: 12,
+    gap: 4,
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  themeLockedTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+})
+
+/**
+ * The OS light/dark colors for the settings styles above. Story CC-7.9 D3: a selected locale
+ * and the switched-on toggle are `inverse` with `onInverse` ink; gold stays with the roles.
+ */
+const useSettingsTone = createSchemeStyles((colors) => ({
+  localeButton: { borderColor: colors.lineStrong },
+  selectedLocaleButton: { borderColor: colors.inverse, backgroundColor: colors.inverse },
+  localeText: { color: colors.inkMuted },
+  selectedLocaleText: { color: colors.onInverse },
+  disclosureText: { color: colors.inkMuted },
+  helpText: { color: colors.inkMuted },
+  commerceToggle: { borderColor: colors.lineStrong },
+  commerceToggleOn: { borderColor: colors.inverse, backgroundColor: colors.inverse },
+  commerceToggleOnLabel: { color: colors.onInverse },
+  premiumGraceBanner: {
+    borderColor: colors.noticeLine,
+    backgroundColor: colors.noticeSurface,
+    color: colors.noticeInk,
+  },
+  statusText: { color: colors.successInk },
+  errorText: { color: colors.dangerInk },
+  themeLockedPanel: { borderColor: colors.line },
+  actionButton: { borderColor: colors.lineStrong },
+}))

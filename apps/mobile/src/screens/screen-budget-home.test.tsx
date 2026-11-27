@@ -475,12 +475,10 @@ describe('Screen budget: native Today', () => {
 
       const measurement = await measureNativeScreen('today')
       expectNativeMeasureFloors(measurement, 'today')
-      // The production header is drawn and its About control counts toward the fold.
-      expect(screen.getByTestId(ABOUT)).toBeVisible()
-      expect(
-        measurement.targetsAboveFold.map((target) => target.key),
-        'targets counted above the fold'
-      ).toContain(ABOUT)
+      expect(screen.queryByTestId(ABOUT)).toBeNull()
+      expect(measurement.targetsAboveFold.map((target) => target.key)).not.toContain(
+        ABOUT
+      )
       expect(measurement.todayHeight).toBeLessThanOrEqual(1688)
       expectNativeWithinBudget('today', fixture, measurement)
     }, 30_000)
@@ -662,14 +660,7 @@ describe('Screen budget: native Today', () => {
       })
 
       expect(targets.length, 'Today targets the probe pressed').toBeGreaterThan(0)
-      // The header's About control is pressed too, and its effect is the route to /modal.
-      expect(targets.map((target) => target.key)).toContain(ABOUT)
-      // The link cancels its own anchor navigation, so the route is the router call, not a link.
-      const about = results.find((result) => result.target.key === ABOUT)
-      expect(about?.error).toBeUndefined()
-      expect(about?.effects).toContain('outside call')
-      expect(about?.effects.filter((effect) => effect.startsWith('link '))).toEqual([])
-      expect(routerMock.push).toHaveBeenCalledWith('/modal')
+      expect(targets.map((target) => target.key)).not.toContain(ABOUT)
       expectNativeWithinBudget('today', fixture, {
         analyticsOnly: nativeAnalyticsOnly(results),
         errors: nativeProbeErrors(results),

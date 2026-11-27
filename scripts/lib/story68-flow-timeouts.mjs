@@ -170,7 +170,7 @@ export const SET_LOCALE_TAP_ATTEMPT_MS =
   3 * CONDITION_CHECK_MS + SET_LOCALE_SETTLE_WAIT_MS + 2_000
 export const SET_LOCALE_TAP_WORST_CASE_MS =
   SET_LOCALE_TAP_ATTEMPTS * SET_LOCALE_TAP_ATTEMPT_MS
-export const SET_LOCALE_OTHER_STEPS_MS = 4 * 17_000 + 15_000 + 2_000
+export const SET_LOCALE_OTHER_STEPS_MS = 4 * 17_000 + 4 * 15_000 + 4_000
 
 /**
  * tap-share.yaml, which every Story 6.9 fixture outcome flow runs for its one Share tap: the

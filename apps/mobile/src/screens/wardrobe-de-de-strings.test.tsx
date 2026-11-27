@@ -315,9 +315,8 @@ describe('7.9-NAT-005 native Wardrobe strings under de-DE', () => {
     expect(screen.getByTestId('garment-status-awaiting_tags')).toHaveTextContent(
       deDE.wardrobe.hub.status.awaiting_tags
     )
-    expect(screen.getAllByTestId('garment-status-ready')[0]).toHaveTextContent(
-      deDE.wardrobe.hub.status.ready
-    )
+    expect(screen.getAllByTestId(/^garment-open-/)[0]).toBeVisible()
+    expect(screen.queryByTestId('garment-status-ready')).toBeNull()
     expect(englishLeftOnScreen()).toEqual([])
 
     press(more)

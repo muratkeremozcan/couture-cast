@@ -73,7 +73,16 @@ const reference = profileStrings(CATALOGS['en-US'])
  * Looks is the fashion loanword German, Spanish, French and Portuguese use; Silhouette is the
  * German, French and Italian word; Style is the French word.
  */
-const SHARED_WORDS = new Set(['Community', 'Home', 'Looks', 'Silhouette', 'Style'])
+const SHARED_WORDS = new Set([
+  'Account',
+  'Community',
+  'Home',
+  'Looks',
+  'Notifications',
+  'Premium',
+  'Silhouette',
+  'Style',
+])
 
 describe('Profile and navigation locale parity (web)', () => {
   it('PROFILE-I18N-WEB-01 matches the canonical en-US strings', () => {
@@ -90,6 +99,41 @@ describe('Profile and navigation locale parity (web)', () => {
       'nav.community': 'Community',
       'nav.profile': 'Profile',
       'nav.navigatedTo': 'Navigated to {{label}} tab',
+      'settings.profile.account': 'Account',
+      'settings.profile.places': 'Places',
+      'settings.profile.style': 'Style',
+      'settings.profile.premium': 'Premium',
+      'settings.profile.notifications': 'Notifications',
+      'settings.profile.language': 'Language',
+      'settings.profile.about': 'About and privacy',
+      'settings.profile.unavailable': 'Unavailable',
+      'settings.profile.notSet': 'Not set',
+      'settings.profile.premiumActive': 'Active',
+      'settings.profile.premiumFree': 'Free',
+      'settings.profile.on': 'On',
+      'settings.profile.off': 'Off',
+      'settings.profile.learnMore': 'Learn more',
+      'settings.profile.languageHelp': 'Your browser sets the language.',
+      'settings.profile.browserLanguageHelp':
+        'Change your preferred language in your browser’s settings, then reload CoutureCast.',
+      'settings.profile.aboutHelp':
+        'Plan outfits for the weather and keep track of your closet.',
+      'settings.profile.themeHelp': 'Choose colors for the app.',
+      'settings.profile.privacy': 'Privacy policy',
+      'settings.profile.terms': 'Terms of service',
+      'settings.profile.setup.not_started': 'Not started',
+      'settings.profile.setup.in_progress': 'In progress',
+      'settings.profile.setup.completed': 'Complete',
+      'settings.profile.languages.en-US': 'English (US)',
+      'settings.profile.languages.en-CA': 'English (Canada)',
+      'settings.profile.languages.es-419': 'Español (LatAm)',
+      'settings.profile.languages.fr-CA': 'Français (Canada)',
+      'settings.profile.languages.fr-FR': 'Français (Europe)',
+      'settings.profile.languages.tr-TR': 'Türkçe',
+      'settings.profile.languages.de-DE': 'Deutsch',
+      'settings.profile.languages.it-IT': 'Italiano',
+      'settings.profile.languages.pt-BR': 'Português (Brasil)',
+      'settings.profile.languages.pt-PT': 'Português (Portugal)',
       'settings.title': 'Profile',
       'settings.account': 'Your account',
       // Story CC-7.11 D7: Profile > Style and its three rows.
@@ -119,7 +163,10 @@ describe('Profile and navigation locale parity (web)', () => {
     for (const locale of SUPPORTED_LOCALES.filter((tag) => !tag.startsWith('en-'))) {
       const strings = profileStrings(CATALOGS[locale])
       const untranslated = [...reference]
-        .filter(([key, english]) => strings.get(key) === english)
+        .filter(
+          ([key, english]) =>
+            !key.startsWith('settings.profile.languages.') && strings.get(key) === english
+        )
         .filter(([, english]) => !SHARED_WORDS.has(english))
         .map(([key]) => key)
       expect(untranslated, locale).toEqual([])

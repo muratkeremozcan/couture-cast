@@ -244,7 +244,7 @@ test('PL-1: a signed-in member who opens Settings in a new tab manages Locations
   await watchSectionStates(tab)
   const section = await expectMemberLocations(
     tab,
-    () => tab.goto('/settings'),
+    () => tab.goto('/settings/places'),
     'checking'
   )
   await expect(section.getByTestId('locations-empty')).toBeVisible()
@@ -257,7 +257,7 @@ test('PL-2: a member saves a city from Settings after a reload, and it is still 
   const account = await member(apiRequest)
   await signIn(page, account)
   await watchSectionStates(page)
-  await page.goto('/settings')
+  await page.goto('/settings/places')
   await expect(page.getByTestId('locations-section')).toHaveAttribute(
     'data-state',
     'ready'
@@ -331,7 +331,7 @@ deniedTest(
     const account = await member(apiRequest)
     await signIn(page, account)
     await watchSectionStates(page)
-    await page.goto('/settings')
+    await page.goto('/settings/places')
     const section = page.getByTestId('locations-section')
     await expect(section).toHaveAttribute('data-state', 'ready')
     const bearerBefore = await storedBearer(page)
@@ -429,7 +429,7 @@ test(
         listRequests.push(request)
     })
 
-    await tab.goto('/settings')
+    await tab.goto('/settings/places')
     const section = tab.getByTestId('locations-section')
     await expect(section).toHaveAttribute('data-state', 'load_failed')
     await expect(section.getByTestId('locations-load-error')).toHaveText(

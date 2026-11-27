@@ -76,7 +76,7 @@ async function openSettings(
 ): Promise<PreferenceExchange> {
   const load = watchPreferenceCall(interceptNetworkCall, 'GET')
 
-  await page.goto('/settings')
+  await page.goto('/settings/about')
 
   const exchange = await load
   await waitForAccessibilityReady(page)
@@ -204,54 +204,15 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     // control becomes interactive. A disabled checkbox is out of the tab order, so
     // tabbing before this lands on the nav.
     await expect(optOutToggle(page)).toBeEnabled()
-    // The Locations section renders its search only once its own list read
-    // answers, which can land after the preferences read. Tabbing before then
-    // skips straight from the skip link to the toggle.
-    await expect(page.getByTestId('locations-section')).toHaveAttribute(
-      'data-state',
-      'ready'
-    )
-
-    await log.step('Tab from the top of the document to the control')
-    // Story CC-7.9 D6: from 768 px the tab links sit in the top bar (`primary-nav`), ahead
-    // of main. Story CC-7.11 D1 made them five, so the desktop path reaches the toggle in
-    // nine presses via Skip, the five tab links and the two city controls. Check each stop
-    // to catch extra focus targets.
+    await log.step('Reach the control from the skip link with the keyboard')
     await page.keyboard.press('Tab')
     await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused()
-    const primaryNav = page.getByTestId('primary-nav')
-    // Each stop is a link with its tab name, Today first (Story CC-7.11 D1: Home reads Today,
-    // Wardrobe reads Closet, Looks is new), as the old named Home link lookup required (Codex
-    // replaced-assertions check).
-    for (const name of ['Today', 'Closet', 'Looks', 'Community', 'Profile']) {
-      await page.keyboard.press('Tab')
-      await expect(primaryNav.getByRole('link', { name, exact: true })).toBeFocused()
-    }
-    await expect(
-      primaryNav.getByRole('link', { name: 'Profile', exact: true })
-    ).toHaveAttribute('aria-current', 'page')
-    // Story CC-7.11 D7, D10: Profile's Style (and Notifications) rows sit between the tabs and
-    // the city search now. Tab through them; the Style row must be one of the stops.
-    const search = page.getByRole('combobox', { name: 'Search for a city' })
-    const stops: (string | null)[] = []
-    for (let index = 0; index < 6; index += 1) {
-      await page.keyboard.press('Tab')
-      if (await search.evaluate((node) => node === document.activeElement)) break
-      stops.push(
-        await page.evaluate(
-          () =>
-            document.activeElement
-              ?.closest('[data-testid]')
-              ?.getAttribute('data-testid') ?? null
-        )
-      )
-    }
-    expect(stops, 'Tab stops between the tabs and the city search').toContain(
-      'profile-style-row'
-    )
-    await expect(search).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('#main-content')).toBeFocused()
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('button', { name: 'Use my location' })).toBeFocused()
+    await expect(page.locator('main a[href="/privacy"]')).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(page.locator('main a[href="/terms"]')).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(optOutToggle(page)).toBeFocused()
 
@@ -360,7 +321,7 @@ anonymousTest.describe('Story 5.1 web settings signed out', () => {
         await route.fallback()
       })
 
-      await page.goto('/settings')
+      await page.goto('/settings/about')
       await waitForAccessibilityReady(page)
 
       await expect(

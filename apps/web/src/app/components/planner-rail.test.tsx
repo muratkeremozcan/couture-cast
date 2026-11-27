@@ -974,7 +974,7 @@ describe('7.12 PlannerRail free preview (D10)', () => {
     renderRail({ hideHeader: true })
 
     await screen.findByTestId('plan-free-preview')
-    expectFreePreview('/settings#premium')
+    expectFreePreview('/settings/premium')
     expect(screen.queryByTestId('planner-days')).toBeNull()
   })
 
@@ -1052,7 +1052,7 @@ describe('7.12 PlannerRail free preview (D10)', () => {
     const setCity = await screen.findByTestId('planner-set-city')
     expect(setCity).toHaveAttribute(
       'href',
-      '/settings?addLocation=1&returnTo=%2Flooks%3Fsegment%3Dplan#locations'
+      '/settings/places?addLocation=1&returnTo=%2Flooks%3Fsegment%3Dplan#locations'
     )
     expect(screen.queryByTestId('plan-free-preview')).toBeNull()
   })

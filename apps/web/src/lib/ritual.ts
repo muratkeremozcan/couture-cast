@@ -5,10 +5,10 @@ import {
 } from '@couture/api-client/contracts/http'
 import { createWebApiClient } from './api-client'
 
-export const SET_CITY_FROM_HOME = '/settings?addLocation=1&returnTo=%2F#locations'
+export const SET_CITY_FROM_HOME = '/settings/places?addLocation=1&returnTo=%2F#locations'
 // Story CC-7.12 D11: the planner is the Plan segment of Looks.
 export const SET_CITY_FROM_PLANNER =
-  '/settings?addLocation=1&returnTo=%2Flooks%3Fsegment%3Dplan#locations'
+  '/settings/places?addLocation=1&returnTo=%2Flooks%3Fsegment%3Dplan#locations'
 
 export async function getRitualFromWeb(
   token: string,

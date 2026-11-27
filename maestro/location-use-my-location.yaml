@@ -33,12 +33,12 @@ tags:
 - runFlow: subflows/open-settings.yaml
 - scrollUntilVisible:
     element:
-      id: 'locations-link'
+      id: 'profile-places-row'
     direction: DOWN
     centerElement: true
     timeout: 15000
 - tapOn:
-    id: 'locations-link'
+    id: 'profile-places-row'
 - extendedWaitUntil:
     visible:
       id: 'locations-use-my-location'
@@ -81,12 +81,12 @@ tags:
 - runFlow: subflows/open-settings.yaml
 - scrollUntilVisible:
     element:
-      id: 'locations-link'
+      id: 'profile-places-row'
     direction: DOWN
     centerElement: true
     timeout: 15000
 - tapOn:
-    id: 'locations-link'
+    id: 'profile-places-row'
 - extendedWaitUntil:
     visible:
       id: 'locations-use-my-location'

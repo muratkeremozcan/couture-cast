@@ -240,6 +240,7 @@ describe('readKey', () => {
       `${api}/community/spotlight?surface=home_teaser`,
       `${api}/community/spotlight?limit=6`,
       `${api}/community/feed`,
+      `${api}/community/notification-preferences`,
       `${api}/user/profile`,
       `${api}/wardrobe/onboarding`,
       `${api}/wardrobe/garments`,

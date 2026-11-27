@@ -1,0 +1,65 @@
+# Learning path Step 73: Calm Closet and Profile.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-73-calm-closet-and-profile
+# 7.16-ACC-002: Called once per appearance on the 320 dp, 2.0 font-scale device.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: open-wardrobe-tab.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'closet-category-all'
+    timeout: 20000
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'Schrank'
+- assertVisible:
+    id: 'garment-capture-open'
+- assertVisible:
+    id: 'closet-more-menu'
+- takeScreenshot:
+    path: maestro/artifacts/closet-profile-accessibility/${SCHEME}-closet-de-large
+
+- runFlow: open-settings.yaml
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'Profil'
+- takeScreenshot:
+    path: maestro/artifacts/closet-profile-accessibility/${SCHEME}-profile-de-large
+- scrollUntilVisible:
+    element:
+      id: 'profile-sign-out'
+    direction: DOWN
+    visibilityPercentage: 100
+    timeout: 15000
+# Maestro counts the button under the fixed tab bar as visible. Pin the scroll at the end.
+- scroll
+- waitForAnimationToEnd
+- assertVisible:
+    id: 'profile-about-row'
+- assertVisible:
+    id: 'profile-sign-out'
+    above:
+      id: 'tab-settings'
+- assertVisible: 'Abmelden'
+- takeScreenshot:
+    path: maestro/artifacts/closet-profile-accessibility/${SCHEME}-profile-end-de-large
+
+- runFlow:
+    file: open-profile-topic.yaml
+    env: { PROFILE_TOPIC: 'style' }
+- extendedWaitUntil:
+    visible:
+      id: 'settings-style-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'Stil'
+- assertVisible:
+    id: 'style-row-setup'
+- takeScreenshot:
+    path: maestro/artifacts/closet-profile-accessibility/${SCHEME}-style-de-large
+- tapOn:
+    id: 'app-top-bar-back'
+- extendedWaitUntil:
+    visible:
+      id: 'settings-screen'
+    timeout: 15000

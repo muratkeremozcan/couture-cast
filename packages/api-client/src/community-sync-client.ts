@@ -80,9 +80,12 @@ export function communitySyncClient(
           signal
         )
       ).data,
-    preferences: async () =>
+    preferences: async (signal?: AbortSignal) =>
       communityNotificationPreferencesResponseSchema.parse(
-        await request((options) => api.getCommunityNotificationPreferences(options))
+        await request(
+          (options) => api.getCommunityNotificationPreferences(options),
+          signal
+        )
       ).data,
     patchPreferences: async (input: PatchCommunityNotificationPreferences) =>
       communityNotificationPreferencesResponseSchema.parse(

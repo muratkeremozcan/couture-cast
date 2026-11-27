@@ -257,7 +257,14 @@ describe('Screen budget: native Closet', () => {
       expect(chromeBefore(anchor), 'banners, alerts or setup before the closet').toEqual(
         []
       )
-      expect(textBefore(anchor), 'text before the closet').toEqual([])
+      const labelsStart =
+        fixture === 'populated' ? screen.getByTestId('closet-category-filters') : anchor
+      expect(textBefore(labelsStart), 'text before the Closet controls').toEqual([])
+      if (fixture === 'populated') {
+        expect(labelsStart.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+          anchor.getBoundingClientRect().top + 1
+        )
+      }
 
       const bar = screen.getByTestId('app-top-bar')
       const add = screen.getByTestId(ADD)
@@ -282,19 +289,16 @@ describe('Screen budget: native Closet', () => {
 
       if (fixture === 'populated') {
         // P4, Codex 7.11 #2: all four first tiles sit wholly inside the band, each a tagged
-        // piece with its photo, label, status and Style this piece action, as a member sees it.
+        // piece with its photo and label. The card opens the garment detail.
         const band = foldBand()
         for (const index of [1, 2, 3, 4]) {
           const card = screen.getByTestId(`garment-card-budget-garment-${index}`)
           expect(card.querySelector('img'), `tile ${index} photo`).not.toBeNull()
-          expect(
-            within(card).getByTestId('garment-status-ready'),
-            `tile ${index} status`
-          ).toBeVisible()
-          const style = within(card).getByTestId('style-piece-open')
-          expect(style, `tile ${index} Style this piece`).toBeVisible()
-          // The compact tile keeps the 44 pt action.
-          expect(style.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)
+          expect(within(card).getByTestId('garment-card-label')).toBeVisible()
+          expect(within(card).queryByTestId(/^garment-status-/)).toBeNull()
+          const open = screen.getByTestId(`garment-open-budget-garment-${index}`)
+          expect(open).toBeVisible()
+          expect(open.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)
           const tile = card.getBoundingClientRect()
           expect(tile.top, `tile ${index} top`).toBeGreaterThanOrEqual(band.top - 1)
           expect(

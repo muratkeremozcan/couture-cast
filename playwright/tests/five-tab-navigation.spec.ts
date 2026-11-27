@@ -274,7 +274,12 @@ test.describe('CC-7.11 Closet opens on its grid @local-lane', () => {
     const empty = page.getByTestId('closet-empty-state')
     await expectInFold(page, empty.getByRole('button'), 'empty-state Add')
     await expect(page.getByTestId('wardrobe-actions')).toHaveCount(0)
-    await expect(page.locator('main a[href="/wardrobe/onboarding"]')).toHaveCount(0)
+    const progress = page.getByTestId('closet-setup-progress-link')
+    await expect(progress).toHaveAttribute('href', '/wardrobe/onboarding')
+    const emptyBox = (await empty.boundingBox())!
+    expect((await progress.boundingBox())!.y).toBeGreaterThanOrEqual(
+      emptyBox.y + emptyBox.height - 1
+    )
     await expect(page.getByRole('button', { name: /^Silhouette$/ })).toHaveCount(0)
   })
 })
@@ -310,7 +315,7 @@ test.describe('CC-7.11 More menu and Profile > Style @local-lane', () => {
 
       await more.click()
       await expect(menu).toBeVisible()
-      await page.mouse.click(195, 400)
+      await page.getByTestId('app-top-bar-title').click()
       await expect(menu).toBeHidden()
       // Codex 7.11 #14: an outside click on non-focusable chrome hands focus back to More.
       await expect(more).toBeFocused()
@@ -352,10 +357,10 @@ test.describe('CC-7.11 More menu and Profile > Style @local-lane', () => {
     await page.goto(SHELL_TABS.profile.path)
     await waitForShellSettled(page, router)
 
-    const account = await page.getByTestId('profile-account').boundingBox()
+    const account = await page.getByTestId('profile-account-row').boundingBox()
     const styleRow = page.getByTestId('profile-style-row')
     const row = await styleRow.boundingBox()
-    expect(row!.y, 'Style row below the account header').toBeGreaterThanOrEqual(
+    expect(row!.y, 'Style row below the Account row').toBeGreaterThanOrEqual(
       account!.y + account!.height - 1
     )
     await styleRow.click()

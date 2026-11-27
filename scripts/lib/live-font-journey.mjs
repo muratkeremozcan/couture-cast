@@ -70,7 +70,7 @@ export const SCREENS = {
     flow: 'open-settings',
     mount: 'settings',
     anchors: ['settings-language-title'],
-    controls: TABS,
+    controls: ['app-top-bar-back'],
     probes: [{ id: 'settings-language-title', sizeSp: 16 }],
   },
   composer: {

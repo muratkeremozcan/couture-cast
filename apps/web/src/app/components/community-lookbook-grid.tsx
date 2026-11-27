@@ -1919,7 +1919,7 @@ const NOTICE_CLASSES: Record<NoticeTone, string> = {
  * after the save: Home, or `/community` since that route renders the lookbook too.
  */
 export function communityAddLocationHref(returnPath: string): string {
-  return `/settings?addLocation=1&returnTo=${encodeURIComponent(returnPath)}#locations`
+  return `/settings/places?addLocation=1&returnTo=${encodeURIComponent(returnPath)}#locations`
 }
 
 interface CommunityNoticesProps {

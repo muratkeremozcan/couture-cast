@@ -29,20 +29,23 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
 } from 'react-native'
-import type { GarmentItemContract } from '@couture/api-client/contracts/http'
 import {
-  getGuestPreviewStrings,
-  getStylePieceStrings,
-  nextStylePiecePhotoExpiry,
-  scheduleStylePiecePhotoExpiry,
-  type StylePieceSelection,
-} from '@couture/utils'
+  garmentCategoryEnum,
+  wardrobeOnboardingStepEnum,
+  type GarmentCategory,
+  type GarmentItemContract,
+  type WardrobeOnboardingStep,
+} from '@couture/api-client/contracts/http'
+import { formatGarmentCategory, getGuestPreviewStrings } from '@couture/utils'
 
 import { underModalAccessibility } from '@/components/edge-to-edge-modal'
+import { NavRow } from '@/src/components/nav-row'
+import { ShellIcon, type ShellIconName } from '@/src/components/shell-icons'
 import { ScreenGate } from '@/src/components/screen-gate'
 import { useStatusBar } from '@/components/save-feedback'
 import { Text, View, useSchemeColors } from '@/components/themed'
@@ -71,11 +74,6 @@ import {
   garmentPhotoLabel,
   type ClosetGarment,
 } from './garment-detail-screen'
-import {
-  focusStylePieceControl,
-  StylePieceEntry,
-  StylePiecePanel,
-} from './style-piece-panel'
 
 export interface WardrobeHubScreenProps {
   addEntry?: boolean
@@ -174,11 +172,29 @@ function showFirstReadSpinner(
 }
 
 export function WardrobeHubScreen(props: WardrobeHubScreenProps = {}) {
-  const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
+  const epoch = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileIdentityEpoch,
+    mobileIdentityEpoch
+  )
   const sessionSeen = useSessionSeen(mobileApplicationUserId())
   return (
     <MemberWardrobeHub key={epoch} epoch={epoch} sessionSeen={sessionSeen} {...props} />
   )
+}
+
+function useClosetCategories(garments: readonly ClosetGarment[]) {
+  const [category, setCategory] = useState<GarmentCategory | 'all'>('all')
+  const categories = garmentCategoryEnum.options.filter((option) =>
+    garments.some((garment) => garment.category === option)
+  )
+  const activeCategory =
+    category !== 'all' && categories.includes(category) ? category : 'all'
+  const filteredGarments =
+    activeCategory === 'all'
+      ? garments
+      : garments.filter((garment) => garment.category === activeCategory)
+  return { categories, activeCategory, filteredGarments, setCategory }
 }
 
 function MemberWardrobeHub({
@@ -189,14 +205,12 @@ function MemberWardrobeHub({
   deletion = garmentDeletion,
 }: WardrobeHubScreenProps & { epoch: number; sessionSeen: SessionSeen }) {
   const { t, i18n } = useTranslation()
+  const { fontScale, width } = useWindowDimensions()
+  const wideCards = fontScale >= 1.5 && width <= 400
   const strings = getGuestPreviewStrings(i18n.language)
   const colors = useSchemeColors()
   const secondaryButton = [styles.secondaryButton, { borderColor: colors.lineStrong }]
   const secondaryButtonText = [styles.secondaryButtonText, { color: colors.ink }]
-  const notice = {
-    backgroundColor: colors.noticeSurface,
-    borderColor: colors.noticeLine,
-  }
   const navigation = useNavigation()
   const [garments, setGarments] = useState<ClosetGarment[]>([])
   const inventoryRevision = useRef(0)
@@ -220,26 +234,10 @@ function MemberWardrobeHub({
   )
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   // D5: the More sheet's setup row reads "Closet setup: done" once onboarding is completed.
-  const [setupDone, setSetupDone] = useState(false)
+  const [setupStep, setSetupStep] = useState<WardrobeOnboardingStep | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
   // Story CC-7.7 D3: the Closet gate waits for the first inventory read.
   const [inventorySettled, setInventorySettled] = useState(false)
-  const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
-  const owner = mobileApplicationUserId()
-  const [styleClosing, setStyleClosing] = useState(false)
-  const styleSelectionRef = useRef<StylePieceSelection | null>(null)
-  const taggingOpen = useRef(false)
-  const styleLabels = getStylePieceStrings(i18n.language)
-  const [, updatePhotoClock] = useState(0)
-  const photoExpiry = nextStylePiecePhotoExpiry(garments, Date.now())
-  useEffect(
-    () =>
-      scheduleStylePiecePhotoExpiry(photoExpiry, () =>
-        updatePhotoClock((clock) => clock + 1)
-      ),
-    [photoExpiry]
-  )
-  const styleButtons = useRef(new Map<string, ElementRef<typeof Pressable>>())
   const pollingAbortRef = useRef<AbortController | null>(null)
   const pendingTagging = useRef<{ id: string; invoker?: number | null } | null>(null)
   const isCaptureOpenRef = useRef(false)
@@ -257,50 +255,16 @@ function MemberWardrobeHub({
 
   const presentTagging = (id: string, invoker?: number | null) => {
     if (epoch !== mobileIdentityEpoch()) return
-    if (styleSelectionRef.current || isCaptureOpenRef.current) {
+    if (isCaptureOpenRef.current) {
       pendingTagging.current = { id, invoker }
       return
     }
-    taggingOpen.current = true
     setTaggingInvokerNodeHandle(invoker ?? safeFindNodeHandle(captureInvoker()))
     setTaggingGarmentId(id)
   }
 
   const closeTagging = () => {
-    taggingOpen.current = false
     setTaggingGarmentId(null)
-  }
-
-  const openStylePanel = (selection: StylePieceSelection) => {
-    if (taggingOpen.current || isCaptureOpenRef.current || styleSelectionRef.current)
-      return
-    styleSelectionRef.current = selection
-    setStyleSelection(selection)
-  }
-
-  const finishStyleDismissal = (selection: StylePieceSelection) => {
-    if (epoch !== mobileIdentityEpoch() || styleSelectionRef.current !== selection) return
-    const styleInvoker = () =>
-      styleButtons.current.get(selection.id) ?? addGarmentButtonRef.current
-    const invoker = styleInvoker()
-    styleSelectionRef.current = null
-    setStyleSelection(null)
-    setStyleClosing(false)
-    const pending = pendingTagging.current
-    pendingTagging.current = null
-    if (pending) {
-      presentTagging(pending.id, pending.invoker ?? safeFindNodeHandle(invoker))
-      return
-    }
-    requestAnimationFrame(() => {
-      if (
-        epoch === mobileIdentityEpoch() &&
-        !styleSelectionRef.current &&
-        !taggingOpen.current &&
-        !isCaptureOpenRef.current
-      )
-        focusStylePieceControl(styleInvoker())
-    })
   }
 
   // The hub's own change notices are for other screens; it already reloads itself.
@@ -363,6 +327,9 @@ function MemberWardrobeHub({
     pendingDeleteIds.size === 0
       ? garments
       : garments.filter((garment) => !pendingDeleteIds.has(garment.id))
+
+  const { categories, activeCategory, filteredGarments, setCategory } =
+    useClosetCategories(visibleGarments)
 
   const refreshGarmentList = useCallback(
     async (token: string, signal?: AbortSignal) => {
@@ -461,11 +428,11 @@ function MemberWardrobeHub({
       })
       .then((state) => {
         if (!state || controller.signal.aborted) return
-        setSetupDone(state.status === 'completed')
+        if (epoch === mobileIdentityEpoch()) setSetupStep(state.currentStep)
       })
       .catch(() => undefined)
     return () => controller.abort()
-  }, [loadAttempt])
+  }, [epoch, loadAttempt])
 
   useEffect(() => () => pollingAbortRef.current?.abort(), [])
 
@@ -586,7 +553,7 @@ function MemberWardrobeHub({
       <View
         style={styles.screen}
         testID="wardrobe-screen"
-        {...underModalAccessibility(Boolean(taggingGarmentId || styleSelection))}
+        {...underModalAccessibility(Boolean(taggingGarmentId))}
       >
         <ScrollView contentContainerStyle={styles.content}>
           <ScreenGate
@@ -644,11 +611,48 @@ function MemberWardrobeHub({
               buttonStyle={secondaryButton}
               textStyle={secondaryButtonText}
             />
+            {visibleGarments.length > 0 && (
+              <ScrollView
+                horizontal
+                accessibilityLabel={t('wardrobe.hub.categoryFilters')}
+                testID="closet-category-filters"
+                contentContainerStyle={styles.categoryFilters}
+                style={styles.categoryScroll}
+              >
+                {(['all', ...categories] as const).map((option) => (
+                  <Pressable
+                    key={option}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: option === activeCategory }}
+                    testID={`closet-category-${option}`}
+                    style={[
+                      styles.categoryChip,
+                      {
+                        backgroundColor:
+                          option === activeCategory ? colors.inverse : colors.page,
+                        borderColor: colors.lineStrong,
+                      },
+                    ]}
+                    onPress={() => setCategory(option)}
+                  >
+                    <Text
+                      style={{
+                        color: option === activeCategory ? colors.onInverse : colors.ink,
+                      }}
+                    >
+                      {option === 'all'
+                        ? t('wardrobe.hub.categoryAll')
+                        : formatGarmentCategory(i18n.language, option)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
             {/* Story CC-7.7 D5: only the first read shows the spinner; a refresh after a tag
               save, a delete or a Retry keeps the grid or the empty state in place. */}
             {showFirstReadSpinner(isLoading, inventorySettled, visibleGarments.length) ? (
               <ActivityIndicator accessibilityLabel={t('wardrobe.hub.loading')} />
-            ) : visibleGarments.length === 0 ? (
+            ) : filteredGarments.length === 0 ? (
               hasLoaded && !loadFailed ? (
                 // CC-7.10: marks the empty closet. The screen budget measures empty Closet chrome
                 // to the Add control (garment-capture-open) while this renders (review #11).
@@ -673,10 +677,10 @@ function MemberWardrobeHub({
               // CC-7.10 screen budget anchor (wardrobe-garment-list) around the P5 grid id.
               <View testID="wardrobe-garment-list">
                 <View style={styles.grid} testID="closet-garment-grid">
-                  {visibleGarments.map((garment) => (
+                  {filteredGarments.map((garment) => (
                     <View
                       key={garment.id}
-                      style={styles.garmentCard}
+                      style={[styles.garmentCard, wideCards && styles.wideGarmentCard]}
                       testID={`garment-card-${garment.id}`}
                     >
                       {garment.status === 'ready' ? (
@@ -697,23 +701,11 @@ function MemberWardrobeHub({
                       ) : (
                         <GarmentCardFace garment={garment} locale={i18n.language} />
                       )}
-                      <Text
-                        testID={`garment-status-${garment.status}`}
-                        style={styles.garmentStatus}
-                      >
-                        {/* The status set is open (the contract says so): a new state reads as
-                        in progress until the catalogs name it. */}
-                        {t(`wardrobe.hub.status.${garment.status}`, {
-                          defaultValue: t('wardrobe.hub.status.unknown'),
-                        })}
-                      </Text>
                       {garment.status === 'awaiting_tags' && (
                         <Pressable
                           accessibilityRole="button"
-                          accessibilityLabel={t('wardrobe.tagging.needs_tags', {
-                            defaultValue: 'Needs tags',
-                          })}
-                          style={[styles.needsTagsBtn, notice]}
+                          accessibilityLabel={t('wardrobe.hub.status.awaiting_tags')}
+                          style={styles.statusAction}
                           onPress={(event) => {
                             void openTaggingGarment(
                               garment.id,
@@ -721,19 +713,15 @@ function MemberWardrobeHub({
                             )
                           }}
                         >
-                          <Text
-                            style={[styles.needsTagsText, { color: colors.noticeInk }]}
-                          >
-                            {t('wardrobe.tagging.needs_tags', {
-                              defaultValue: 'Needs tags',
-                            })}
-                          </Text>
+                          <GarmentStatusBadge status="awaiting_tags" />
                         </Pressable>
                       )}
                       {garment.status === 'failed' && (
                         <Pressable
                           accessibilityRole="button"
-                          style={[styles.needsTagsBtn, notice]}
+                          accessibilityLabel={t('wardrobe.hub.status.failed')}
+                          accessibilityHint={strings.firstUse.replaceGarment}
+                          style={styles.statusAction}
                           onPress={(event) =>
                             openCapture(
                               event.currentTarget as unknown as ElementRef<
@@ -742,43 +730,36 @@ function MemberWardrobeHub({
                             )
                           }
                         >
-                          <Text
-                            style={[styles.needsTagsText, { color: colors.noticeInk }]}
-                          >
-                            {strings.firstUse.replaceGarment}
-                          </Text>
+                          <GarmentStatusBadge status="failed" />
                         </Pressable>
                       )}
                       {garment.status === 'processing' && (
                         <Pressable
                           accessibilityRole="button"
-                          style={[styles.needsTagsBtn, notice]}
+                          accessibilityLabel={t('wardrobe.hub.status.processing')}
+                          accessibilityHint={strings.firstUse.checkGarment}
+                          style={styles.statusAction}
                           onPress={() => pollCommittedGarment(garment.id, accessToken)}
                         >
-                          <Text
-                            style={[styles.needsTagsText, { color: colors.noticeInk }]}
-                          >
-                            {strings.firstUse.checkGarment}
-                          </Text>
+                          <GarmentStatusBadge status="processing" />
                         </Pressable>
                       )}
-                      <StylePieceEntry
-                        garment={garment}
-                        owner={owner}
-                        epoch={epoch}
-                        unavailable={loadFailed}
-                        loading={isLoading}
-                        labels={styleLabels}
-                        buttonRef={(button) => {
-                          if (button) styleButtons.current.set(garment.id, button)
-                          else styleButtons.current.delete(garment.id)
-                        }}
-                        onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
-                        onOpen={openStylePanel}
-                      />
                     </View>
                   ))}
                 </View>
+              </View>
+            )}
+            {hasLoaded && setupStep && setupStep !== 'complete' && (
+              <View testID="closet-setup-progress">
+                <NavRow
+                  label={t('wardrobe.menu.setup')}
+                  value={t('wardrobe.hub.setupProgress', {
+                    completed: wardrobeOnboardingStepEnum.options.indexOf(setupStep),
+                    total: wardrobeOnboardingStepEnum.options.length - 1,
+                  })}
+                  testID="closet-setup-progress-link"
+                  onPress={() => router.push('/wardrobe-onboarding')}
+                />
               </View>
             )}
           </ScreenGate>
@@ -813,24 +794,10 @@ function MemberWardrobeHub({
 
       <ClosetMoreSheet
         visible={moreOpen}
-        setupDone={setupDone}
+        setupDone={setupStep === 'complete'}
         onClose={() => setMoreOpen(false)}
         returnFocusRef={moreButtonRef}
       />
-
-      {owner && styleSelection && (
-        <StylePiecePanel
-          selection={styleSelection}
-          inWardrobe={garments.some(({ id }) => id === styleSelection.id)}
-          loadInventory={loadGarments}
-          visible={!styleClosing}
-          owner={owner}
-          epoch={epoch}
-          locale={i18n.language}
-          onClose={() => setStyleClosing(true)}
-          onDismiss={() => finishStyleDismissal(styleSelection)}
-        />
-      )}
     </>
   )
 }
@@ -855,31 +822,63 @@ function GarmentCardFace({
           style={styles.garmentImage}
         />
       ) : null}
-      <Text numberOfLines={1} style={styles.garmentLabel} testID="garment-card-label">
+      <Text style={styles.garmentLabel} testID="garment-card-label">
         {garmentCardLabel(locale, garment)}
       </Text>
     </>
   )
 }
 
+const statusIcon = {
+  awaiting_tags: 'tag',
+  failed: 'warning',
+  processing: 'clock',
+} as const satisfies Record<string, ShellIconName>
+
+function GarmentStatusBadge({ status }: { status: keyof typeof statusIcon }) {
+  const { t } = useTranslation()
+  const colors = useSchemeColors()
+  const tones = {
+    awaiting_tags: { backgroundColor: colors.noticeSurface, color: colors.noticeInk },
+    failed: { backgroundColor: colors.dangerSurface, color: colors.dangerInk },
+    processing: { backgroundColor: colors.cardMuted, color: colors.inkSoft },
+  }
+  const { backgroundColor, color } = tones[status]
+  return (
+    <View
+      testID={`garment-status-${status}`}
+      style={[styles.statusBadge, { backgroundColor, borderColor: color }]}
+    >
+      <ShellIcon name={statusIcon[status]} size={16} color={color} />
+      <Text style={[styles.garmentStatus, { color }]}>
+        {t(`wardrobe.hub.status.${status}`)}
+      </Text>
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  needsTagsBtn: {
-    minHeight: 44,
-    minWidth: 44,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignItems: 'center',
+  statusAction: {
+    alignSelf: 'flex-start',
     justifyContent: 'center',
-    marginTop: 4,
-    paddingHorizontal: 8,
-  },
-  needsTagsText: {
-    fontWeight: '700',
-    fontSize: 12,
+    minWidth: 44,
+    minHeight: 44,
+    maxWidth: '100%',
   },
   content: { paddingHorizontal: TAB_BODY_INSET, paddingVertical: 20, gap: 24 },
-  gatedBody: { gap: 24 },
+  gatedBody: { gap: 8 },
+  categoryScroll: { flexGrow: 0 },
+  categoryFilters: { gap: 8 },
+  categoryChip: {
+    justifyContent: 'center',
+    minHeight: 44,
+    maxWidth: 280,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderRadius: 9999,
+  },
   secondaryButton: {
     alignItems: 'center',
     borderRadius: 8,
@@ -897,9 +896,20 @@ const styles = StyleSheet.create({
   // piece) fit between the top bar and the tab bar at 360 x 640 dp, so the tile is compact: a
   // landscape photo, a tight label and status, and the 44 pt actions kept.
   garmentCard: { width: '47%', overflow: 'hidden', borderRadius: 12, padding: 8 },
+  wideGarmentCard: { width: '100%' },
   garmentImage: { width: '100%', aspectRatio: 4 / 3, borderRadius: 8 },
   garmentLabel: { marginTop: 4, fontSize: 14, lineHeight: 20, fontWeight: '600' },
-  garmentStatus: { fontSize: 12, lineHeight: 16 },
+  statusBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    padding: 4,
+    maxWidth: '100%',
+  },
+  garmentStatus: { flexShrink: 1, fontSize: 12, lineHeight: 16, fontWeight: '600' },
   errorBox: { borderRadius: 12, padding: 12, gap: 8 },
 })
 

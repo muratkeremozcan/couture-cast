@@ -1,3 +1,5 @@
+// Learning path Step 73: Calm Closet and Profile.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-73-calm-closet-and-profile
 // Learning path Step 67: Screen budget guard.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-67-screen-budget-guard
 // Story CC-7.10 test owner (TEA): 7.10-NAT-004, 008, 012 (the native Profile tab within the
@@ -116,8 +118,8 @@ async function profileSettled() {
     expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
   )
   expect(screen.queryByTestId('screen-placeholder')).toBeNull()
-  await waitFor(() => expect(screen.getByTestId('profile-account')).toBeVisible())
-  expect(screen.getByTestId('premium-settings-section')).toBeVisible()
+  await waitFor(() => expect(screen.getByTestId('profile-account-row')).toBeVisible())
+  expect(screen.getByTestId('profile-premium-row')).toBeVisible()
 }
 
 describe('Screen budget: native Profile', () => {
@@ -151,41 +153,44 @@ describe('Screen budget: native Profile', () => {
       await profileSettled()
 
       const measurement = await measureNativeScreen('profile')
+      expect(screen.getByTestId('profile-notifications-row')).toHaveAccessibleName(
+        fixture === 'populated' ? 'Notifications, On' : 'Notifications, Off'
+      )
       expectNativeMeasureFloors(measurement, 'profile')
       expectNativeWithinBudget('profile', fixture, measurement)
     }, 30_000)
   }
 
   for (const [id, fixture] of FOLD_CASES) {
-    it(`[P0] [${id}] native profile (${fixture}) opens on its account header inside the 360 x 640 fold`, async () => {
+    it(`[P0] [${id}] native profile (${fixture}) opens on its Account row inside the 360 x 640 fold`, async () => {
       await setFoldViewport()
       serveScreenBudgetFixture(fixture, MEMBER)
       renderProfile(true)
       await profileSettled()
 
-      const first = screen.getByTestId('profile-account')
+      const first = screen.getByTestId('profile-account-row')
       expectFirstContentInFold(first, 'Profile first content')
       expect(chromeBefore(first), 'banners, alerts or setup before Profile').toEqual([])
       expect(textBefore(first), 'text before Profile').toEqual([])
-      // D7: the Style row sits right below the account header, so it is in the fold too.
+      // The Style row is in the first group of topics.
       expectFirstContentInFold(screen.getByTestId('profile-style-row'), 'Style row')
     }, 30_000)
   }
 
-  it('[P1] [7.11-NAT-013] one Style row right below the account header opens the Style screen', async () => {
+  it('[P0] [7.16-PRO-002] [7.11-NAT-013] the single Style row opens the Style screen', async () => {
     serveScreenBudgetFixture('populated', MEMBER)
     renderProfile()
     await profileSettled()
 
-    const account = screen.getByTestId('profile-account')
+    const account = screen.getByTestId('profile-account-row')
     const rows = screen.getAllByTestId('profile-style-row')
     expect(rows, 'one Style row').toHaveLength(1)
     const row = rows[0]!
     expect(row).toHaveTextContent(i18n.t('settings.style.row'))
-    expect(row).toHaveAccessibleName(i18n.t('settings.style.row'))
+    expect(row).toHaveAccessibleName(/^Style\b/)
     expect(i18n.t('settings.style.row')).toBe('Style')
-    // Directly below the account header: its next sibling in the Profile body.
-    expect(account.nextElementSibling).toBe(row)
+    // Places and Style follow the Account row.
+    expect(screen.getByTestId('profile-places-row').nextElementSibling).toBe(row)
     expect(row.getBoundingClientRect().top).toBeGreaterThanOrEqual(
       account.getBoundingClientRect().bottom - 0.5
     )

@@ -159,12 +159,12 @@ tags:
 - runFlow: subflows/open-settings.yaml
 - scrollUntilVisible:
     element:
-      id: 'locations-link'
+      id: 'profile-places-row'
     direction: DOWN
     centerElement: true
     timeout: 15000
 - tapOn:
-    id: 'locations-link'
+    id: 'profile-places-row'
 - extendedWaitUntil:
     visible:
       id: 'location-primary-badge-0'

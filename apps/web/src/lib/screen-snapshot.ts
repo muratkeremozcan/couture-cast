@@ -14,10 +14,18 @@
 
 import { currentWebSessionScope } from './use-web-session'
 
-/** The five signed-in tabs (Story CC-7.11 D1 adds Looks); the snapshot never holds more. */
-export type ScreenName = 'home' | 'closet' | 'looks' | 'community' | 'profile'
+/** Signed-in tabs and settings destinations with owner-scoped section data. */
+export type ScreenName =
+  | 'home'
+  | 'closet'
+  | 'looks'
+  | 'community'
+  | 'profile'
+  | 'settings-about'
+  | 'settings-places'
+  | 'settings-premium'
 
-export const SCREEN_SNAPSHOT_CAP = 5
+export const SCREEN_SNAPSHOT_CAP = 8
 
 /** The Community grid's part, on Home and on Community. */
 export const COMMUNITY_GRID_SNAPSHOT_PART = 'community-grid'
@@ -94,7 +102,7 @@ export function createScreenSnapshotStore(
     if (!entry) {
       entry = { settled: false, scrollY: 0, parts: new Map() }
       entries.set(screen, entry)
-      // The cap: the oldest tab leaves first. Only four names exist, so this is a guard.
+      // The cap evicts the oldest entry when a new screen is added.
       while (entries.size > SCREEN_SNAPSHOT_CAP) {
         const oldest = entries.keys().next().value as ScreenName
         entries.delete(oldest)

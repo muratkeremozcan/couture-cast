@@ -319,14 +319,28 @@ describe('RootLayout startup', () => {
     // The translation double returns the key, so each title names its catalog entry.
     const title = (name: string) =>
       layout.screens.filter((screen) => screen.name === name).at(-1)?.options?.title
-    expect(title('settings-style')).toBe('settings.style.title')
+    expect(title('settings-account')).toBe('settings.profile.account')
+    expect(title('settings-premium')).toBe('settings.profile.premium')
+    expect(title('settings-language')).toBe('settings.profile.language')
+    expect(title('settings-about')).toBe('settings.profile.about')
+    expect(title('settings-style')).toBe('settings.profile.style')
     expect(title('guardian-dashboard')).toBe('guardian.dashboard.title')
     expect(title('teen-dashboard')).toBe('teen.dashboard.title')
     expect(title('wardrobe-capsules')).toBe('wardrobe.capsules.title')
     expect(title('notification-settings')).toBe('community.notifications.title')
-    expect(title('locations')).toBe('locations.title')
+    expect(title('locations')).toBe('settings.profile.places')
     // None of them hides its header or its back control.
-    for (const name of ['settings-style', 'guardian-dashboard', 'teen-dashboard']) {
+    for (const name of [
+      'settings-account',
+      'locations',
+      'settings-style',
+      'settings-premium',
+      'notification-settings',
+      'settings-language',
+      'settings-about',
+      'guardian-dashboard',
+      'teen-dashboard',
+    ]) {
       const options = layout.screens
         .filter((screen) => screen.name === name)
         .at(-1)?.options

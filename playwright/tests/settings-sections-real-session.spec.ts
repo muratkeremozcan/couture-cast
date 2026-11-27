@@ -12,8 +12,8 @@
 // bearer from the tab's session storage (lib/web-session.ts restoreVerifiedPrincipal), so its
 // sections read once while verification still runs; PS-1 pins the empty new tab, PS-2 the restored
 // reload. This spec signs in through the product
-// email-code UI against real GoTrue (scripts/e2e-real-session/run.mjs) and opens /settings the
-// ways a member does. The member has no Premium, so each section's signed-in state is the one a
+// email-code UI against real GoTrue (scripts/e2e-real-session/run.mjs) and opens the
+// About and privacy and Premium destinations the ways a member does. The member has no Premium, so each section's signed-in state is the one a
 // signed-in non-subscriber sees: the opt-out toggle, the subscribe controls, and the locked
 // palette gallery that points at those controls.
 import type { Page, Request } from '@playwright/test'
@@ -39,6 +39,22 @@ const READS = {
   theme: '/api/v1/commerce/premium/theme',
 } as const
 type ReadName = keyof typeof READS
+
+const DESTINATIONS = [
+  {
+    name: 'About and privacy',
+    path: '/settings/about',
+    reads: ['preferences'],
+    sections: ['commerce-preferences-section'],
+  },
+  {
+    name: 'Premium',
+    path: '/settings/premium',
+    reads: ['subscription', 'theme'],
+    sections: ['premium-subscription-section', 'premium-theme-section'],
+  },
+] as const
+type Destination = (typeof DESTINATIONS)[number]
 
 /** The signed-out wording of each section, as the owner saw it on production. */
 const SIGN_IN_HINTS = {
@@ -129,7 +145,7 @@ async function settledAfterSessionEvent(page: Page, reads: Request[]) {
 }
 
 /**
- * Opens /settings while holding the session's profile check, and expects all three sections to
+ * Opens one settings destination while holding the session profile check, and expects its sections to
  * reach the member's signed-in state. From first paint to the end no sign-in hint is ever on
  * the page, and each read goes out exactly once, counted from before navigation through the end
  * of verification and a same-owner `couture:session` event (a cancelled duplicate still counts).
@@ -149,8 +165,10 @@ async function settledAfterSessionEvent(page: Page, reads: Request[]) {
 async function expectSignedInSettings(
   page: Page,
   open: () => Promise<unknown>,
+  destination: Destination,
   { restored }: { restored: boolean }
 ) {
+  const expectedReads: readonly ReadName[] = destination.reads
   const reads: Record<ReadName, Request[]> = {
     preferences: [],
     subscription: [],
@@ -184,34 +202,18 @@ async function expectSignedInSettings(
       : null
     if (restored) expect(storedBearer).toBeTruthy()
     await open()
-    const commerce = page.getByTestId('commerce-preferences-section')
-    const premium = page.getByTestId('premium-subscription-section')
-    const palettes = page.getByTestId('premium-theme-section')
+    const sections = destination.sections.map((id) => page.getByTestId(id))
 
     await expect.poll(() => profileChecks.length).toBeGreaterThan(0)
     if (restored) {
-      await expect(commerce).toBeVisible()
-      await expect(premium).toBeVisible()
-      await expect(palettes).toBeVisible()
-    } else {
-      // Story CC-7.7 D1: a new tab has no member yet, so while verification runs the Profile body
-      // is the neutral placeholder; the sections are mounted behind it and paint nothing signed
-      // out. They used to be visible here, but no section can settle before verification answers.
-      await expect(page.getByTestId('screen-placeholder')).toBeVisible()
-      await expect(page.getByTestId('screen-placeholder')).toHaveAttribute(
-        'aria-busy',
-        'true'
-      )
-      await expect(commerce).toBeHidden()
-      await expect(premium).toBeHidden()
-      await expect(palettes).toBeHidden()
+      for (const section of sections) await expect(section).toBeVisible()
     }
     // Verification is pending: nobody is signed out yet.
     expect(await signInHintsSeen(page)).toEqual([])
     if (restored) {
       // The tab holds the member and the bearer already: every section reads once with it.
-      await expect.poll(() => all.length).toBe(3)
-      for (const name of Object.keys(READS) as ReadName[]) {
+      await expect.poll(() => all.length).toBe(expectedReads.length)
+      for (const name of expectedReads) {
         expect(reads[name], `${name} reads while verifying`).toHaveLength(1)
         expect(await reads[name][0]!.headerValue('authorization')).toBe(
           `Bearer ${storedBearer}`
@@ -223,58 +225,60 @@ async function expectSignedInSettings(
     }
 
     release()
-    if (!restored) {
-      await expect(commerce).toBeVisible()
-      await expect(premium).toBeVisible()
-      await expect(palettes).toBeVisible()
+    for (const section of sections) await expect(section).toBeVisible()
+    if (destination.path === '/settings/about') {
+      await expect(page.getByTestId('commerce-opt-out-toggle')).toBeVisible()
+    } else {
+      await expect(page.getByTestId('premium-subscribe-monthly')).toBeVisible()
+      await expect(page.getByTestId('premium-subscribe-annual')).toBeVisible()
+      await expect(page.getByTestId('premium-theme-locked')).toBeVisible()
     }
-    await expect(commerce.getByTestId('commerce-opt-out-toggle')).toBeVisible()
-    await expect(premium.getByTestId('premium-subscribe-monthly')).toBeVisible()
-    await expect(premium.getByTestId('premium-subscribe-annual')).toBeVisible()
-    await expect(palettes.getByTestId('premium-theme-locked')).toContainText(
-      'Subscribe to Premium with the controls above'
-    )
     await Promise.all(profileChecks.map((request) => request.response()))
 
     // The bridge announces the same member again (a token refresh does): no second read.
     await page.evaluate(() => window.dispatchEvent(new Event('couture:session')))
     await settledAfterSessionEvent(page, all)
-    for (const name of Object.keys(READS) as ReadName[]) {
+    for (const name of expectedReads) {
       expect(reads[name], `${name} reads`).toHaveLength(1)
       expect((await reads[name][0]!.response())?.status(), `${name} status`).toBe(200)
     }
     expect(await signInHintsSeen(page)).toEqual([])
-    await expect(commerce.getByTestId('commerce-signed-out-hint')).toHaveCount(0)
-    await expect(premium.getByTestId('premium-signed-out-hint')).toHaveCount(0)
+    expect(all, 'only reads owned by this destination').toHaveLength(expectedReads.length)
+    await expect(page.getByTestId('commerce-signed-out-hint')).toHaveCount(0)
+    await expect(page.getByTestId('premium-signed-out-hint')).toHaveCount(0)
   } finally {
     page.off('request', record)
     await page.unroute(PROFILE_CHECK)
   }
 }
 
-test('PS-1: a signed-in member who opens Settings in a new tab sees every section signed in, never Sign in', async ({
-  page,
-  apiRequest,
-}) => {
-  const account = await member(apiRequest)
-  await signIn(page, account)
+for (const destination of DESTINATIONS) {
+  test(`PS-1: a new tab opens ${destination.name} with the verified session and no sign-in flash`, async ({
+    page,
+    apiRequest,
+  }) => {
+    const account = await member(apiRequest)
+    await signIn(page, account)
 
-  // A new tab starts with empty session storage: the bearer exists only after verification.
-  const tab = await page.context().newPage()
-  await watchSignInHints(tab)
-  await expectSignedInSettings(tab, () => tab.goto('/settings'), { restored: false })
-})
+    const tab = await page.context().newPage()
+    await watchSignInHints(tab)
+    await expectSignedInSettings(tab, () => tab.goto(destination.path), destination, {
+      restored: false,
+    })
+  })
 
-test('PS-2: a signed-in member who reloads Settings sees every section signed in, never Sign in', async ({
-  page,
-  apiRequest,
-}) => {
-  const account = await member(apiRequest)
-  await signIn(page, account)
-  await watchSignInHints(page)
-  await page.goto('/settings')
-  await expect(page.getByTestId('commerce-preferences-section')).toBeVisible()
+  test(`PS-2: reloading ${destination.name} restores the known bearer without a sign-in flash`, async ({
+    page,
+    apiRequest,
+  }) => {
+    const account = await member(apiRequest)
+    await signIn(page, account)
+    await watchSignInHints(page)
+    await page.goto(destination.path)
+    await expect(page.getByTestId(destination.sections[0])).toBeVisible()
 
-  // The owner's path: reload Settings while signed in.
-  await expectSignedInSettings(page, () => page.reload(), { restored: true })
-})
+    await expectSignedInSettings(page, () => page.reload(), destination, {
+      restored: true,
+    })
+  })
+}

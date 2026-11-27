@@ -26,6 +26,9 @@ const REQUIRED_KEYS = [
   'refreshFailed',
   'silhouetteSaving',
   'detailTitle',
+  'categoryAll',
+  'categoryFilters',
+  'setupProgress',
 ] as const
 
 /**
@@ -66,14 +69,20 @@ describe('wardrobe.hub catalog (web)', () => {
     expect(Object.keys(hub!.status!).sort()).toEqual([...STATUS_KEYS].sort())
 
     const values = [
-      ...REQUIRED_KEYS.map((key) => hub![key]),
-      ...STATUS_KEYS.map((key) => hub!.status![key]),
+      ...REQUIRED_KEYS.map((key) => [key, hub![key]] as const),
+      ...STATUS_KEYS.map((key) => [key, hub!.status![key]] as const),
     ]
-    for (const value of values) {
+    for (const [key, value] of values) {
       expect(typeof value).toBe('string')
       expect((value as string).trim().length).toBeGreaterThan(0)
       expect(value).not.toContain('wardrobe.hub.')
-      expect(value).not.toMatch(/\{\{|\}\}/)
+      if (key === 'setupProgress') {
+        expect((value as string).match(/\{\{\w+\}\}/g)?.sort()).toEqual(
+          (baseline.setupProgress as string).match(/\{\{\w+\}\}/g)?.sort()
+        )
+      } else {
+        expect(value).not.toMatch(/\{\{|\}\}/)
+      }
     }
   })
 

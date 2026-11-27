@@ -20,7 +20,7 @@ export function firstContent(page: Page, screen: ShellScreen, mode: ShellMode): 
     closet: empty ? 'closet-empty-state' : 'closet-garment-grid',
     looks: 'looks-first-content',
     community: 'community-first-content',
-    profile: 'profile-account',
+    profile: 'profile-account-row',
   }
   return page.getByTestId(ids[screen])
 }
