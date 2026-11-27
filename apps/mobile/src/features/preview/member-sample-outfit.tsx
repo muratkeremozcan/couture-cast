@@ -1,5 +1,12 @@
 import { router } from 'expo-router'
-import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentRef,
+} from 'react'
 import { StyleSheet, Text, View, type Pressable } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { SavedLookContract } from '@couture/api-client/contracts/http'
@@ -244,9 +251,19 @@ function MemberSampleBody({
   const deletedIdsRef = useRef<Set<string>>(new Set())
   const mutationVersionRef = useRef(0)
   const lookUndoStackRef = useRef<SampleOutfitResult[]>([])
+  const outfitUndoNoticeRef = useRef<string | null>(null)
   const noticeSeqRef = useRef(0)
   const statusBarRef = useRef(statusBar)
   statusBarRef.current = statusBar
+  useLayoutEffect(() => {
+    return () => {
+      lookUndoStackRef.current = []
+      if (outfitUndoNoticeRef.current) {
+        statusBarRef.current.dismissNotice(outfitUndoNoticeRef.current)
+        outfitUndoNoticeRef.current = null
+      }
+    }
+  }, [selection])
   const updateResult = (
     updater: SampleOutfitResult | ((current: SampleOutfitResult) => SampleOutfitResult)
   ) => {
@@ -375,8 +392,9 @@ function MemberSampleBody({
     lookUndoStackRef.current = pushLookUndoSnapshot(lookUndoStackRef.current, result)
     updateResult(next)
     const seq = ++noticeSeqRef.current
+    outfitUndoNoticeRef.current = `sample-${kind}-${seq}`
     statusBar.showNotice({
-      id: `sample-${kind}-${seq}`,
+      id: outfitUndoNoticeRef.current,
       announcementId: createAnnouncementToken(`sample-${kind}`, seq),
       message,
       tone: 'neutral',
@@ -391,8 +409,9 @@ function MemberSampleBody({
             if (snapshot) {
               updateResult(snapshot)
               const undoSeq = ++noticeSeqRef.current
+              outfitUndoNoticeRef.current = `sample-${kind}-undo-${undoSeq}`
               statusBar.showNotice({
-                id: `sample-${kind}-undo-${undoSeq}`,
+                id: outfitUndoNoticeRef.current,
                 announcementId: createAnnouncementToken(`sample-${kind}-undo`, undoSeq),
                 message: t('feedback.undone'),
                 tone: 'neutral',

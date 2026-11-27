@@ -227,6 +227,8 @@ describe('MemberSampleOutfit (mobile)', () => {
       )
     )
 
+    fireEvent.click(tryAnother)
+    await screen.findByTestId('status-bar-action-undo')
     fireEvent.click(screen.getByTestId('style-day-open'))
     const cool = screen.getByTestId('style-day-temperature-cool')
     const chic = screen.getByTestId('style-day-mood-chic')
@@ -234,6 +236,7 @@ describe('MemberSampleOutfit (mobile)', () => {
     fireEvent.click(chic)
     expect(cool).toHaveAttribute('aria-pressed', 'true')
     expect(chic).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(screen.queryByTestId('status-bar-action-undo')).toBeNull())
     fireEvent.click(screen.getByTestId('style-day-reset'))
     expect(cool).toHaveAttribute('aria-pressed', 'false')
     expect(chic).toHaveAttribute('aria-pressed', 'false')

@@ -139,4 +139,29 @@ describe('CC-7.20 account style state', () => {
     expect(request).not.toHaveBeenCalled()
     unsubscribe()
   })
+
+  it('[7.20-ACCOUNT] notifies mounted screens when a scope change clears answers and overrides', async () => {
+    let scope = 'first'
+    const request = vi
+      .fn<Parameters<typeof createStyleProfileStore>[1]>()
+      .mockResolvedValue({ ...EMPTY, mood: 'cozy' })
+    const store = createStyleProfileStore(() => scope, request)
+    await store.load(scope)
+    store.updateDay(scope, { temperature: 'cool' })
+    const listener = vi.fn(store.read)
+    const unsubscribe = store.subscribe(listener)
+
+    scope = 'second'
+    store.refreshDay()
+
+    expect(listener).toHaveBeenCalledOnce()
+    expect(listener).toHaveReturnedWith({
+      profile: null,
+      status: 'idle',
+      saving: false,
+      day: null,
+    })
+    expect(vi.getTimerCount()).toBe(0)
+    unsubscribe()
+  })
 })

@@ -58,7 +58,8 @@ export function shouldShowStyleSample(
   outfits: readonly { garmentIds: readonly string[] }[] | undefined,
   { profile, day }: StyleSampleInputs
 ): boolean {
-  if (day || !outfits?.some(({ garmentIds }) => garmentIds.length > 0)) return true
+  if (activeStyleDay(day) || !outfits?.some(({ garmentIds }) => garmentIds.length > 0))
+    return true
   return (
     hasStyleProfileAnswers(profile ?? null) &&
     !outfits.some(({ garmentIds }) => garmentIds.some((id) => !id.startsWith('default-')))

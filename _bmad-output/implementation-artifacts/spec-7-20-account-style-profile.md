@@ -3,14 +3,14 @@ title: 'Story CC-7.20: Account style profile'
 type: feature
 ticket: '7-20-account-style-profile'
 created: '2026-11-27'
-status: in-review
+status: done
 baseline_revision: 'f6b06a60399480770da29e060bb41b7e843dcc2f'
 route: full
 route_source: auto
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
+lenses_ran: [independent-full-review, codex-security-diff]
 review_loop_iteration: 0
 context:
   - '_bmad-output/planning-artifacts/epics.md'
@@ -104,7 +104,7 @@ day)`, `styleLocalDay(now?)` and `activeStyleDay(record, now?)`. Export via the 
       TEA owns the plan, tests, route fixtures and CI repairs. Builder owns production code. Leave
       the shared index to the builder and keep test files under TEA ownership.
 - [x] Add Step 77 to the learning path with links to the finished test files.
-- [ ] Mark the sprint entry done before the final push.
+- [x] Mark the sprint entry done before the final push.
 
 Given a new member, the first look and its normal next action are available before any answer.
 When they finish a screen, change the day controls, or clear their profile, the visible selection
@@ -119,6 +119,26 @@ and account responses follow the table above. Verify on an adult and a guardian-
   memory across tab navigation for the current app session.
 
 ## Review triage log
+
+The combined review covered `f6b06a60399480770da29e060bb41b7e843dcc2f` through
+`8115924656d6f3102eb4184bee697e0827c16503`. Codex Security reviewed all 49 canonical source
+rows and found one low-severity client session issue. Static evidence established the stale
+scope. Browser exposure duration and older bearer acceptance were unmeasured.
+
+| Finding        | Verdict | Resolution                                                                                                                                                                  |
+| -------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1-1           | High    | Cover first-look sample eligibility and the shared utility coverage ratchet.                                                                                                |
+| P1-2           | High    | Give the day-override journey a populated closet so expiry proves return to the live outfit.                                                                                |
+| P1-3           | High    | Move day controls after Closet and Plan. Keep the first-look mood inline and move populated style controls below the main Today content. Verify snapshots on Linux CI.      |
+| P1-4           | Medium  | Use fixed token spacing for the four-picture row and constrain the art and labels at large text sizes.                                                                      |
+| P2-1 / WEB-001 | Low     | Fence style state and transport with the current shared auth principal. Recheck on storage and tab-return events. Assert immediate invalidation and same-principal refresh. |
+| P2-2           | Medium  | Ignore expired records in preview eligibility and notify mounted subscribers when a scope reset changes the snapshot.                                                       |
+| P2-3           | Medium  | Discard old undo history and notices when the sample selection inputs change.                                                                                               |
+| P2-4           | Medium  | Add inline load retry, clear stale errors on Tune open, and reuse the existing same-owner check for one rotated-bearer retry.                                               |
+| P2-5           | Medium  | Add component and transport coverage for web, bounded invalid answers and fallback selection.                                                                               |
+| P3-1           | Low     | Publish OpenAPI 1.13.0 with the standard 400 response body and regenerate the SDK.                                                                                          |
+| P3-2           | Low     | Let a selected temperature or mood toggle off independently.                                                                                                                |
+| P3-3           | Low     | Complete sprint status and cross-link the added evidence from Step 77.                                                                                                      |
 
 ## Verification
 

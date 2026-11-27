@@ -76,6 +76,7 @@ const session = vi.hoisted(() => ({ owner: null as string | null }))
 vi.mock('../../lib/web-session', async (importOriginal) => ({
   ...(await importOriginal<typeof WebSession>()),
   webSessionIdentity: () => session.owner,
+  webSessionVerifiedBearer: () => (session.owner ? `bearer-${session.owner}` : null),
 }))
 
 // Story CC-7.11 D11: the top bar back reads the router.

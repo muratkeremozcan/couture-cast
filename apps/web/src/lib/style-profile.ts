@@ -1,27 +1,37 @@
 'use client'
 
 import { useEffect, useSyncExternalStore } from 'react'
-import { requestStyleProfile } from '@couture/api-client'
+import { requestStyleProfile, ResponseError } from '@couture/api-client'
 import { createStyleProfileStore } from '@couture/utils'
 import { createWebApiClient } from './api-client'
 import {
   captureWebStyleBearer,
+  currentWebSessionOwner,
   currentWebStyleScope,
+  readAsMember,
   subscribeWebStyleScope,
   useWebStyleScope,
 } from './use-web-session'
 
 const store = createStyleProfileStore(currentWebStyleScope, async (scope, operation) => {
-  const accessToken = captureWebStyleBearer(scope)
-  if (!accessToken) throw new Error('Style session changed.')
-  const api = createWebApiClient({
-    accessToken,
-    fetchApi: (input, init) => {
-      if (currentWebStyleScope() !== scope) throw new Error('Style session changed.')
-      return fetch(input, init)
+  const owner = currentWebSessionOwner()
+  if (!owner) throw new Error('Style session changed.')
+  return readAsMember(
+    owner,
+    () => {
+      const accessToken = captureWebStyleBearer(scope)
+      if (!accessToken) throw new Error('Style session changed.')
+      const api = createWebApiClient({
+        accessToken,
+        fetchApi: (input, init) => {
+          if (currentWebStyleScope() !== scope) throw new Error('Style session changed.')
+          return fetch(input, init)
+        },
+      })
+      return requestStyleProfile(api, operation)
     },
-  })
-  return requestStyleProfile(api, operation)
+    (error) => error instanceof ResponseError && error.response.status === 401
+  )
 })
 
 // Clear the leaving member's state even when every style surface is unmounted.
@@ -38,14 +48,7 @@ export function useWebStyleProfile() {
   const scope = useWebStyleScope()
   const state = useSyncExternalStore(store.subscribe, store.read, () => serverSnapshot)
   useEffect(() => {
-    if (!scope) return
-    void store.load(scope)
-    window.addEventListener('focus', store.refreshDay)
-    document.addEventListener('visibilitychange', store.refreshDay)
-    return () => {
-      window.removeEventListener('focus', store.refreshDay)
-      document.removeEventListener('visibilitychange', store.refreshDay)
-    }
+    if (scope) void store.load(scope)
   }, [scope])
   return { ...state, scope, store }
 }

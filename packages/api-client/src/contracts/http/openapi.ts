@@ -180,7 +180,8 @@ export function generateHttpOpenApiDocument() {
       // Story CC-7.6 bumps the minor: one additive garment usage read, and the existing
       // garment DELETE (204) is now published. No existing operation narrows.
       // CC-7.19 adds independently negotiated garment subtypes and optional update fields.
-      version: '1.12.0',
+      // CC-7.20 adds the three owner-scoped style profile operations.
+      version: '1.13.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [

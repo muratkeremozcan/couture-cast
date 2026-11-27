@@ -113,4 +113,16 @@ describe('StyleProfileController', () => {
       .expect('cache-control', 'private, no-store')
     expect(deleteMany).toHaveBeenCalledWith({ where: { user_id: OWNER } })
   })
+
+  it('rejects signed-out and suspended members before reading or mutating answers', async () => {
+    const api = request(httpTestUrl(app))
+    await api.get(PATH).expect(401)
+    canTeenAccessNonUploadSurface.mockResolvedValue(false)
+    const headers = { authorization: 'Bearer suspended-teen-token' }
+    await api.patch(PATH).set(headers).send({ mood: 'cozy' }).expect(403)
+    await api.delete(PATH).set(headers).expect(403)
+    expect(findUnique).not.toHaveBeenCalled()
+    expect(upsert).not.toHaveBeenCalled()
+    expect(deleteMany).not.toHaveBeenCalled()
+  })
 })

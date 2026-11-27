@@ -66,7 +66,11 @@ export function registerStyleProfileContracts(
           content: json(response),
         },
         ...(method === 'patch' && {
-          400: { description: 'Invalid style preferences.', headers },
+          400: {
+            description: 'Invalid style preferences.',
+            headers,
+            content: json(common.badRequestHttpErrorSchema),
+          },
         }),
         401: {
           description: 'Missing or invalid authentication.',

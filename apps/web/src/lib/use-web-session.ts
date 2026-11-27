@@ -314,7 +314,11 @@ let styleSessionIdentity: string | null = null
 let styleSessionEpoch = 0
 
 export function currentWebStyleScope(): string | null {
-  const identity = currentWebSessionScope()
+  const owner = currentWebSessionOwner()
+  const identity =
+    owner === UNVERIFIED_BEARER_OWNER || webSessionVerifiedBearer()
+      ? currentWebSessionScope()
+      : null
   if (identity !== styleSessionIdentity) {
     styleSessionIdentity = identity
     styleSessionEpoch += 1
@@ -324,7 +328,18 @@ export function currentWebStyleScope(): string | null {
 
 if (typeof window !== 'undefined') subscribeWebSessionOwner(currentWebStyleScope)
 
-export const subscribeWebStyleScope = subscribeWebSessionOwner
+export function subscribeWebStyleScope(onChange: () => void): () => void {
+  const unsubscribe = subscribeWebSessionOwner(onChange)
+  window.addEventListener('focus', onChange)
+  window.addEventListener('pageshow', onChange)
+  document.addEventListener('visibilitychange', onChange)
+  return () => {
+    unsubscribe()
+    window.removeEventListener('focus', onChange)
+    window.removeEventListener('pageshow', onChange)
+    document.removeEventListener('visibilitychange', onChange)
+  }
+}
 
 export function useWebStyleScope(): string | null {
   return useSyncExternalStore(subscribeWebStyleScope, currentWebStyleScope, () => null)

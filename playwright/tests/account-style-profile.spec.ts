@@ -224,7 +224,7 @@ test.describe('CC-7.20 Account style profile @local-lane', () => {
   }) => {
     await page.clock.setFixedTime(new Date('2026-11-21T05:50:00Z'))
     const { router, setScreen } = await openFixtureShell(page, interceptNetworkCall, {
-      mode: 'empty-closet',
+      mode: 'populated',
       screen: 'home',
       memberId: MEMBER,
     })

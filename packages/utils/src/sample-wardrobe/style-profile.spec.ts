@@ -4,11 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { looksIdeas } from '../looks-feed'
 import { SAMPLE_CATALOG } from './catalog'
 import { createMemberSampleOutfit } from './member-outfit'
-import { garmentSuitsRange, sampleSwapCandidates } from './selector'
+import { garmentSuitsRange, sampleSwapCandidates, selectSampleOutfit } from './selector'
 import { getStyleProfileStrings } from './style-profile-strings'
 import { GUEST_PREVIEW_LOCALES } from './strings'
 import {
   activeStyleDay,
+  shouldShowStyleSample,
   STYLE_PALETTE_SWATCHES,
   styleChoiceGarment,
   styleForecastSampleWeather,
@@ -68,6 +69,58 @@ describe('CC-7.20 style answers and daily choices', () => {
     expect(swapIds).toContain('sample:g:midi-skirt')
     expect(swapIds).not.toContain('sample:g:mini-skirt')
     expect(swapIds).not.toContain('sample:g:leggings')
+  })
+
+  it('[7.20-RANK] keeps a complete eligible outfit when every catalog look contains an avoided piece', () => {
+    const profile: StyleProfileAnswers = { ...EMPTY_PROFILE, avoid: ['mini-skirt'] }
+    const catalog = {
+      ...SAMPLE_CATALOG,
+      looks: SAMPLE_CATALOG.looks.filter(({ id }) => id === 'sample:l:mini-and-tights'),
+    }
+    const base = createMemberSampleOutfit('mild-dry', { profile })
+    const result = selectSampleOutfit(base.input, catalog)
+    expect(result.look?.id).toBe('sample:l:mini-and-tights')
+    expect(result.garments.map(({ id }) => id)).toEqual([
+      'sample:g:ribbed-knit',
+      'sample:g:mini-skirt',
+      'sample:g:ankle-boots',
+      'sample:g:opaque-tights',
+    ])
+    for (const piece of result.garments) {
+      expect(garmentSuitsRange(piece, result.context.range)).toBe(true)
+    }
+  })
+
+  it('[7.20-FIRST] uses samples for empty or styled starter outfits and keeps an owned outfit live', () => {
+    const starter = [{ garmentIds: ['default-top', 'default-bottom'] }]
+    const ownsPieces = [...starter, { garmentIds: ['owned-shoes'] }]
+    for (const outfits of [undefined, [], [{ garmentIds: [] }]]) {
+      expect(shouldShowStyleSample(outfits, {})).toBe(true)
+    }
+    expect(shouldShowStyleSample(starter, { profile: null })).toBe(false)
+    expect(shouldShowStyleSample(starter, { profile: EMPTY_PROFILE })).toBe(false)
+    const choices: Partial<StyleProfileAnswers>[] = [
+      { mood: 'cozy' },
+      { palette: 'neutral' },
+      { texture: 'smooth' },
+      { fit: 'fitted' },
+      { avoid: ['crop-top'] },
+    ]
+    for (const choice of choices) {
+      const profile = { ...EMPTY_PROFILE, ...choice }
+      expect(shouldShowStyleSample(starter, { profile })).toBe(true)
+      expect(shouldShowStyleSample(ownsPieces, { profile })).toBe(false)
+    }
+    expect(
+      shouldShowStyleSample(ownsPieces, {
+        day: { date: '2026-11-21', temperature: 'warm' },
+      })
+    ).toBe(true)
+    expect(
+      shouldShowStyleSample(ownsPieces, {
+        day: { date: '2026-11-20', temperature: 'warm' },
+      })
+    ).toBe(false)
   })
 
   it('[7.20-DAY] changes sample temperature and mood for the active day and keeps real rain eligibility', () => {

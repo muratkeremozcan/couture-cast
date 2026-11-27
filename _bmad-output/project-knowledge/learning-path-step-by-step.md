@@ -22517,4 +22517,7 @@ Today's temperature and mood can change for the current day.
   [session and day state](../../packages/utils/src/sample-wardrobe/style-profile-store.spec.ts),
   [native style settings](../../apps/mobile/src/features/settings/style-settings-screen.test.tsx),
   and [native sample outfit](../../apps/mobile/src/features/preview/member-sample-outfit.test.tsx).
+- [Web Today](../../apps/web/src/app/components/home-ritual.test.tsx) and
+  [web session changes](../../apps/web/src/lib/web-session.resync.test.ts).
+- [Web style controls](../../apps/web/src/app/components/style-profile-controls.test.tsx).
 - [Step 71](#step-71-todays-outfit-as-a-picture) covers the outfit picture and its swap controls.

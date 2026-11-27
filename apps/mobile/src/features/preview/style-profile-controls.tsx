@@ -138,7 +138,11 @@ export function StyleDayControls({ style }: { style: StyleState }) {
                   palette={palette}
                   selected={day?.temperature === temperature}
                   primary={day?.temperature === temperature}
-                  onPress={() => store.updateDay(scope, { temperature })}
+                  onPress={() =>
+                    store.updateDay(scope, {
+                      temperature: day?.temperature === temperature ? null : temperature,
+                    })
+                  }
                 />
               ))}
             </View>
@@ -146,7 +150,9 @@ export function StyleDayControls({ style }: { style: StyleState }) {
           <StyleMoodRow
             day
             selected={day?.mood}
-            onSelect={(mood) => store.updateDay(scope, { mood })}
+            onSelect={(mood) =>
+              store.updateDay(scope, { mood: day?.mood === mood ? null : mood })
+            }
           />
           <PreviewButton
             label={copy.reset}
@@ -253,9 +259,11 @@ function TuneWizard({
 export function StyleMemberControls({
   style,
   showClear = false,
+  showMood = true,
 }: {
   style: StyleState
   showClear?: boolean
+  showMood?: boolean
 }) {
   const { t } = useTranslation()
   const copy = useStyleCopy()
@@ -266,16 +274,21 @@ export function StyleMemberControls({
   const opener = useRef<ComponentRef<typeof Pressable>>(null)
   if (!scope) return null
   const close = () => setOpen(false)
-  const mutate = async (work: Promise<boolean>) => setFailed(!(await work))
+  const mutate = async (work: Promise<boolean>) => {
+    setFailed(false)
+    setFailed(!(await work))
+  }
   return (
     <View style={styles.stack}>
-      <StyleMoodRow
-        selected={profile?.mood}
-        disabled={!profile || saving}
-        onSelect={(mood) =>
-          void mutate(store.save(scope, { mood: profile?.mood === mood ? null : mood }))
-        }
-      />
+      {showMood && (
+        <StyleMoodRow
+          selected={profile?.mood}
+          disabled={!profile || saving}
+          onSelect={(mood) =>
+            void mutate(store.save(scope, { mood: profile?.mood === mood ? null : mood }))
+          }
+        />
+      )}
       <View style={styles.actions}>
         <PreviewButton
           label={copy.tune}
@@ -283,6 +296,7 @@ export function StyleMemberControls({
           buttonRef={opener}
           palette={palette}
           onPress={() => {
+            setFailed(false)
             setOpen(true)
             if (status === 'failed') void store.load(scope)
           }}
@@ -297,6 +311,19 @@ export function StyleMemberControls({
           />
         )}
       </View>
+      {!open && status === 'failed' && !profile && (
+        <View style={styles.actions}>
+          <Text accessibilityRole="alert" style={{ color: palette.ink }}>
+            {copy.loadFailed}
+          </Text>
+          <PreviewButton
+            label={copy.retry}
+            testID="style-profile-retry"
+            palette={palette}
+            onPress={() => void store.load(scope)}
+          />
+        </View>
+      )}
       {failed && (
         <Text accessibilityRole="alert" style={{ color: palette.ink }}>
           {copy.saveFailed}

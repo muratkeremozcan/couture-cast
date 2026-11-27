@@ -773,12 +773,24 @@ export default function TabOneScreen() {
   const styleDayPreview = Boolean(liveLook && styleProfile.day)
   const showSample = shouldShowStyleSample(ritual?.data.outfits, styleProfile)
   const sampleWeather = styleForecastSampleWeather(weather?.current)
-  const liveStyleControls = liveLook && styleProfile.scope && (
-    <NativeView key={styleProfile.scope} style={styles.styleControls}>
-      <StyleMemberControls style={styleProfile} />
-      <StyleDayControls style={styleProfile} />
-    </NativeView>
+  const firstLook = !ritual?.data.outfits.some(({ garmentIds }) =>
+    garmentIds.some((id) => !id.startsWith('default-'))
   )
+  const renderFirstLookStyle = () =>
+    firstLook && (
+      <NativeView key={styleProfile.scope} style={styles.styleControls}>
+        <StyleMemberControls style={styleProfile} />
+      </NativeView>
+    )
+  const renderStyleControls = () =>
+    sessionState === 'member' &&
+    ritualSettled &&
+    styleProfile.scope && (
+      <NativeView key={styleProfile.scope} style={styles.styleControls}>
+        {!firstLook && <StyleMemberControls style={styleProfile} showMood={false} />}
+        <StyleDayControls style={styleProfile} />
+      </NativeView>
+    )
   const renderHero = () =>
     sessionState === 'signed-out' ? (
       <NativeView testID="today-first-content">
@@ -874,13 +886,13 @@ export default function TabOneScreen() {
                   weatherAvailable={Boolean(weather)}
                   sampleWeather={sampleWeather}
                   preview={styleDayPreview}
-                  showStyleControls={!liveLook}
+                  showStyleControls={false}
                 />
               )}
             </NativeView>
+            {renderFirstLookStyle()}
             <CachedWeatherNotice visible={isStale} />
             {weather && <WeatherAlertBanner alerts={weather.alerts} />}
-            {liveStyleControls}
           </>
         )}
         <HomeCloset pieces={homeWardrobe?.pieces} />
@@ -963,6 +975,7 @@ export default function TabOneScreen() {
             applicationUserId={applicationUserId}
             scrollViewRef={scrollViewRef}
           />
+          {renderStyleControls()}
         </ScreenGate>
       </ScrollView>
 

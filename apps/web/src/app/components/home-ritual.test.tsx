@@ -46,6 +46,7 @@ const session = vi.hoisted(() => ({
 vi.mock('../../lib/web-session', async (importOriginal) => ({
   ...(await importOriginal<typeof WebSession>()),
   webSessionIdentity: () => session.owner,
+  webSessionVerifiedBearer: () => (session.owner ? `bearer-${session.owner}` : null),
   hasStoredWebSession: () => session.stored,
   resolveWebSessionToken: session.verify,
 }))

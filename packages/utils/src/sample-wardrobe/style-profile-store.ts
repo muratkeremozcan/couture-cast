@@ -31,11 +31,15 @@ export function createStyleProfileStore(
   let expiry: ReturnType<typeof setTimeout> | undefined
   const listeners = new Set<() => void>()
 
+  function notify() {
+    for (const listener of listeners) listener()
+  }
+
   function publish(next: Snapshot) {
     if (next === snapshot) return
     snapshot = next
     expired = undefined
-    for (const listener of listeners) listener()
+    notify()
   }
 
   function read(): Snapshot {
@@ -55,8 +59,10 @@ export function createStyleProfileStore(
 
   function refreshDay() {
     clearTimeout(expiry)
+    const previous = snapshot
     const next = read()
     if (next !== snapshot) publish(next)
+    else if (next !== previous) notify()
     if (!next.day) return
     const now = new Date()
     const midnight = new Date(now)
@@ -101,11 +107,21 @@ export function createStyleProfileStore(
     save: (owner: string, input: StyleProfilePatch) =>
       perform(owner, { method: 'PATCH', input }),
     clear: (owner: string) => perform(owner, { method: 'DELETE' }),
-    updateDay(owner: string, change: Omit<StyleDay, 'date'> | null) {
+    updateDay(
+      owner: string,
+      change: { [Key in keyof Omit<StyleDay, 'date'>]?: StyleDay[Key] | null } | null
+    ) {
       const state = read()
       if (owner !== scope) return
-      clearTimeout(expiry)
-      const day = change ? { ...state.day, ...change, date: styleLocalDay() } : null
+      const next = { ...state.day, ...change }
+      const day =
+        change && (next.temperature || next.mood)
+          ? {
+              date: styleLocalDay(),
+              ...(next.temperature && { temperature: next.temperature }),
+              ...(next.mood && { mood: next.mood }),
+            }
+          : null
       publish({ ...state, day })
       refreshDay()
     },

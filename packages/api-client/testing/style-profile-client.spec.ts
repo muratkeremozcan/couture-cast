@@ -1,6 +1,7 @@
 // Learning path Step 77: Account style profile.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-77-account-style-profile
 import { describe, expect, it, vi } from 'vitest'
+import { updateStyleProfileInputSchema } from '../src/contracts/http/style-profile'
 import { Configuration, DefaultApi } from '../src/generated'
 import { requestStyleProfile } from '../src/style-profile-client'
 
@@ -76,5 +77,17 @@ describe('CC-7.20 style profile client', () => {
       JSON.stringify({ avoid: ['mini-skirt'] }),
       JSON.stringify({ avoid: [] }),
     ])
+  })
+
+  it('rejects repeated choices and limits the avoid field to three options', () => {
+    expect(
+      updateStyleProfileInputSchema.safeParse({ avoid: ['mini-skirt', 'mini-skirt'] })
+        .error?.issues
+    ).toEqual([expect.objectContaining({ code: 'custom', path: ['avoid'] })])
+    expect(
+      updateStyleProfileInputSchema.safeParse({
+        avoid: ['mini-skirt', 'leggings', 'crop-top', 'mini-skirt'],
+      }).error?.issues
+    ).toContainEqual(expect.objectContaining({ code: 'too_big', path: ['avoid'] }))
   })
 })

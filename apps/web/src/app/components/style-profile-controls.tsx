@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import {
   getStyleProfileStrings,
   SAMPLE_STYLE_OPTIONS,
+  space,
   STYLE_PALETTE_SWATCHES,
   STYLE_TEMPERATURE_OPTIONS,
   STYLE_TUNE_GROUPS,
@@ -53,11 +54,12 @@ function PictureChoice({
       aria-pressed={selected}
       disabled={disabled}
       onClick={onSelect}
-      className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center text-xs font-semibold leading-tight [overflow-wrap:anywhere] disabled:opacity-60 ${selected ? 'border-primary bg-card ring-1 ring-primary' : 'border-line bg-page'}`}
+      style={{ paddingInline: space[1] }}
+      className={`flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-lg border py-2 text-center text-xs font-semibold leading-tight [overflow-wrap:anywhere] disabled:opacity-60 ${selected ? 'border-primary bg-card ring-1 ring-primary' : 'border-line bg-page'}`}
     >
       {choice === 'neutral' || choice === 'colorful' ? (
         <span
-          className="my-2 flex h-8 overflow-hidden rounded-md border border-line"
+          className="my-2 flex h-8 max-w-full overflow-hidden rounded-md border border-line"
           aria-hidden="true"
         >
           {STYLE_PALETTE_SWATCHES[choice].map((color) => (
@@ -67,10 +69,10 @@ function PictureChoice({
       ) : (
         <SampleGarmentArt
           garment={styleChoiceGarment(choice)}
-          className="h-10 w-10 max-w-full"
+          className="h-8 w-8 max-w-full"
         />
       )}
-      <span>{label}</span>
+      <span className="min-w-0 max-w-full">{label}</span>
     </button>
   )
 }
@@ -90,7 +92,7 @@ export function StyleMoodRow({
   return (
     <fieldset className="min-w-0 space-y-2">
       <legend className="text-sm font-semibold">{copy.mood}</legend>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4" style={{ columnGap: space[1] }}>
         {SAMPLE_STYLE_OPTIONS.style.map((mood) => (
           <PictureChoice
             key={mood}
@@ -130,7 +132,11 @@ export function StyleDayControls({ style }: { style: StyleState }) {
                 className={`min-h-11 rounded-lg border px-2 text-sm font-semibold ${day?.temperature === temperature ? 'border-primary bg-card ring-1 ring-primary' : 'border-line bg-page'}`}
                 data-testid={`style-day-temperature-${temperature}`}
                 aria-pressed={day?.temperature === temperature}
-                onClick={() => store.updateDay(scope, { temperature })}
+                onClick={() =>
+                  store.updateDay(scope, {
+                    temperature: day?.temperature === temperature ? null : temperature,
+                  })
+                }
               >
                 {copy[temperature]}
               </button>
@@ -140,7 +146,9 @@ export function StyleDayControls({ style }: { style: StyleState }) {
         <StyleMoodRow
           day
           selected={day?.mood}
-          onSelect={(mood) => store.updateDay(scope, { mood })}
+          onSelect={(mood) =>
+            store.updateDay(scope, { mood: day?.mood === mood ? null : mood })
+          }
         />
         <button
           type="button"
@@ -243,9 +251,11 @@ function TuneWizard({
 export function StyleMemberControls({
   style,
   showClear = false,
+  showMood = true,
 }: {
   style: StyleState
   showClear?: boolean
+  showMood?: boolean
 }) {
   const copy = useStyleCopy()
   const { scope, profile, status, saving, store } = style
@@ -255,16 +265,21 @@ export function StyleMemberControls({
   const titleId = useId()
   if (!scope) return null
   const close = () => setOpen(false)
-  const mutate = async (work: Promise<boolean>) => setFailed(!(await work))
+  const mutate = async (work: Promise<boolean>) => {
+    setFailed(false)
+    setFailed(!(await work))
+  }
   return (
     <div className="space-y-2 text-ink">
-      <StyleMoodRow
-        selected={profile?.mood}
-        disabled={!profile || saving}
-        onSelect={(mood) =>
-          void mutate(store.save(scope, { mood: profile?.mood === mood ? null : mood }))
-        }
-      />
+      {showMood && (
+        <StyleMoodRow
+          selected={profile?.mood}
+          disabled={!profile || saving}
+          onSelect={(mood) =>
+            void mutate(store.save(scope, { mood: profile?.mood === mood ? null : mood }))
+          }
+        />
+      )}
       <div className="flex flex-wrap gap-x-2">
         <button
           type="button"
@@ -273,6 +288,7 @@ export function StyleMemberControls({
           ref={opener}
           className={secondary}
           onClick={() => {
+            setFailed(false)
             setOpen(true)
             if (status === 'failed') void store.load(scope)
           }}
@@ -291,6 +307,21 @@ export function StyleMemberControls({
           </button>
         )}
       </div>
+      {!open && status === 'failed' && !profile && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p role="alert" className="text-sm">
+            {copy.loadFailed}
+          </p>
+          <button
+            type="button"
+            data-testid="style-profile-retry"
+            className={secondary}
+            onClick={() => void store.load(scope)}
+          >
+            {copy.retry}
+          </button>
+        </div>
+      )}
       {failed && <p role="alert">{copy.saveFailed}</p>}
       <AccessibleModal
         isOpen={open}

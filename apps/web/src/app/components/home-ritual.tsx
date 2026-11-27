@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useReducer,
   useRef,
@@ -259,10 +260,26 @@ function SampleOutfitInner({
   const mutationVersionRef = useRef(0)
   const bookmarkOwnerMounted = useRef(true)
   const lookUndoStackRef = useRef<SampleOutfitResult[]>([])
+  const outfitUndoNoticeRef = useRef<string | null>(null)
   const ownedNoticeIdsRef = useRef<Set<string>>(new Set())
   const noticeSeqRef = useRef(0)
   const statusBarRef = useRef(statusBar)
   statusBarRef.current = statusBar
+
+  useLayoutEffect(() => {
+    const ownedNoticeIds = ownedNoticeIdsRef.current
+    if (retainedSample?.scope === scope && retainedSample.selection !== selection) {
+      retainedSample = undefined
+    }
+    return () => {
+      lookUndoStackRef.current = []
+      if (outfitUndoNoticeRef.current) {
+        statusBarRef.current.dismissNotice(outfitUndoNoticeRef.current)
+        ownedNoticeIds.delete(outfitUndoNoticeRef.current)
+        outfitUndoNoticeRef.current = null
+      }
+    }
+  }, [scope, selection])
 
   const readLiveOnline = () =>
     statusBarRef.current.isOnline &&
@@ -382,8 +399,9 @@ function SampleOutfitInner({
     lookUndoStackRef.current = pushLookUndoSnapshot(lookUndoStackRef.current, result)
     update(next)
     const seq = ++noticeSeqRef.current
+    outfitUndoNoticeRef.current = `sample-${owner}-${kind}-${seq}`
     showScopedNotice({
-      id: `sample-${owner}-${kind}-${seq}`,
+      id: outfitUndoNoticeRef.current,
       announcementId: createAnnouncementToken(`sample-${owner}-${kind}`, seq),
       message,
       tone: 'neutral',
@@ -399,8 +417,9 @@ function SampleOutfitInner({
             if (snapshot && isSampleCurrent()) {
               update(snapshot)
               const undoSeq = ++noticeSeqRef.current
+              outfitUndoNoticeRef.current = `sample-${owner}-${kind}-undo-${undoSeq}`
               showScopedNotice({
-                id: `sample-${owner}-${kind}-undo-${undoSeq}`,
+                id: outfitUndoNoticeRef.current,
                 announcementId: createAnnouncementToken(
                   `sample-${owner}-${kind}-undo`,
                   undoSeq
@@ -1065,6 +1084,9 @@ function MemberRitual({
     </button>
   )
   const liveOutfit = ritual?.outfits.some(usableOutfit) ? ritual : null
+  const firstLook = !liveOutfit?.outfits.some(({ garmentIds }) =>
+    garmentIds.some((id) => !id.startsWith('default-'))
+  )
   return (
     <>
       {settled && (
@@ -1084,6 +1106,7 @@ function MemberRitual({
             failure={failure}
             retry={retry}
           />
+          {firstLook && <StyleMemberControls key={style.scope} style={style} />}
         </>
       )}
       {liveOutfit && failure === 'failed' && (
@@ -1104,12 +1127,6 @@ function MemberRitual({
           <p className="mt-2 text-sm">{alert.description}</p>
         </details>
       ))}
-      {settled && (
-        <div className="space-y-3">
-          <StyleMemberControls key={style.scope} style={style} />
-          <StyleDayControls key={`day:${style.scope}`} style={style} />
-        </div>
-      )}
       <HomeCloset pieces={pieces} />
       <Link
         href="/looks?segment=plan"
@@ -1119,6 +1136,14 @@ function MemberRitual({
         {t('home.today.planWeek')}
         <span aria-hidden="true">›</span>
       </Link>
+      {settled && (
+        <div className="space-y-3">
+          {!firstLook && (
+            <StyleMemberControls key={style.scope} style={style} showMood={false} />
+          )}
+          <StyleDayControls key={`day:${style.scope}`} style={style} />
+        </div>
+      )}
     </>
   )
 }
@@ -1152,6 +1177,9 @@ function MemberRitualOutfit({
 }) {
   const preview = Boolean(liveOutfit && style.day)
   const showSample = shouldShowStyleSample(liveOutfit?.outfits, style)
+  useLayoutEffect(() => {
+    if (!showSample && retainedSample?.scope === style.scope) retainedSample = undefined
+  }, [showSample, style.scope])
   return (
     <>
       {liveOutfit && (
