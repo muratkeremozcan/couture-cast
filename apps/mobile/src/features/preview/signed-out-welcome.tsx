@@ -35,10 +35,7 @@ export function SignedOutWelcome() {
       style={[styles.card, { backgroundColor: palette.card, borderColor: palette.line }]}
     >
       <Text accessibilityRole="header" style={[styles.heading, { color: palette.ink }]}>
-        {strings.chrome.welcomeHeading}
-      </Text>
-      <Text style={[styles.body, { color: palette.inkMuted }]}>
-        {strings.chrome.sampleLabel}
+        {strings.firstRun.teaser}
       </Text>
       <View
         style={styles.art}
@@ -51,33 +48,34 @@ export function SignedOutWelcome() {
           </View>
         ))}
       </View>
-      {actions.map((action) => {
-        const primary = 'primary' in action
-        return (
-          <Pressable
-            key={action.testID}
-            testID={action.testID}
-            accessibilityRole="button"
-            onPress={() => router.push(action.href)}
-            style={[
-              styles.button,
-              // Story CC-7.9 D3: a filled button is ink; any other is the neutral outline.
-              primary
-                ? { backgroundColor: palette.inverse }
-                : { borderColor: palette.lineStrong, borderWidth: 1 },
-            ]}
-          >
-            <Text
-              style={[
-                styles.buttonText,
-                { color: primary ? palette.onInverse : palette.ink },
-              ]}
+      <View style={styles.actions}>
+        {actions.map((action) => {
+          const primary = 'primary' in action
+          return (
+            <Pressable
+              key={action.testID}
+              testID={action.testID}
+              accessibilityRole={primary ? 'button' : 'link'}
+              onPress={() => router.push(action.href)}
+              style={
+                primary
+                  ? [styles.button, { backgroundColor: palette.primary }]
+                  : styles.link
+              }
             >
-              {action.label}
-            </Text>
-          </Pressable>
-        )
-      })}
+              <Text
+                style={
+                  primary
+                    ? [styles.buttonText, { color: palette.onPrimary }]
+                    : [styles.linkText, { color: palette.ink }]
+                }
+              >
+                {action.label}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </View>
       <View
         style={styles.legal}
         role="navigation"
@@ -121,7 +119,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   heading: { fontSize: 24, fontWeight: '700', lineHeight: 30 },
-  body: { fontSize: 16, lineHeight: 24, marginBottom: 8 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12 },
+  link: { minHeight: 44, justifyContent: 'center' },
+  linkText: { fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
   button: {
     minHeight: 48,
     borderRadius: 9999,

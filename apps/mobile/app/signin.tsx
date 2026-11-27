@@ -186,7 +186,7 @@ export default function SignInScreen() {
         <Pressable
           testID="signin-back-to-preview"
           accessibilityRole="link"
-          onPress={() => router.replace('/preview')}
+          onPress={() => router.dismissTo('/preview')}
           style={styles.previewLink}
         >
           <Text style={styles.previewLinkText}>

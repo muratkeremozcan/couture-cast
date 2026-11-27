@@ -7,12 +7,22 @@ import { ScrollView, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
   applyComfortCarryover,
+  completeGuestLookSave,
   GUEST_PREVIEW_GARMENT_INTENT,
+  GUEST_PREVIEW_SAVE_INTENT,
   getGuestPreviewStrings,
+  guestLookStyleRows,
+  guestPreviewReviewProposal,
+  type GuestLookSaveIntent,
   type GuestPreviewStrings,
   type SampleComfort,
+  type StyleProfileAnswers,
 } from '@couture/utils'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { useStatusBar } from '@/components/save-feedback'
+import { savedLookRoute, savedLooksRoute } from '@/src/features/looks/looks-routes'
+import { verifiedGuestLookClient } from '@/src/lib/guest-look-review'
+import { notifyMobileSavedLooksChanged } from '@/src/lib/saved-looks'
 import {
   isConsentRejection,
   mobileGuestPreviewStore,
@@ -30,12 +40,39 @@ import { PreviewButton, previewStyles, type PreviewPalette } from './guest-previ
 type ReviewStatus =
   | { kind: 'loading' }
   | { kind: 'load-failed' }
-  | {
-      kind: 'ready' | 'saving' | 'failed'
-      account: SampleComfort
-      proposal: SampleComfort
-    }
+  | ActiveReview
   | { kind: 'saved' | 'kept' | 'rejected' }
+
+type ActiveReview = {
+  kind: 'ready' | 'saving' | 'failed'
+  account: SampleComfort
+  proposal: SampleComfort
+}
+
+type LookReview = {
+  intent: GuestLookSaveIntent
+  accountStyle: StyleProfileAnswers | null
+  client: Awaited<ReturnType<typeof verifiedGuestLookClient>>
+}
+
+async function loadAccountReview(
+  verified: MobileComfortClient,
+  intent: GuestLookSaveIntent | null
+) {
+  const client = intent ? await verifiedGuestLookClient(verified.memberId) : null
+  const [account, accountStyle] = await Promise.all([
+    verified.read(),
+    client?.readStyle() ?? null,
+  ])
+  return {
+    account,
+    lookReview: intent && client ? { intent, accountStyle, client } : null,
+  }
+}
+
+function isActiveReview(status: ReviewStatus): status is ActiveReview {
+  return status.kind === 'ready' || status.kind === 'saving' || status.kind === 'failed'
+}
 
 function ComfortColumn({
   heading,
@@ -43,12 +80,14 @@ function ComfortColumn({
   strings,
   palette,
   testID,
+  styleRows,
 }: {
   heading: string
   values: SampleComfort
   strings: GuestPreviewStrings
   palette: PreviewPalette
   testID: string
+  styleRows?: ReturnType<typeof guestLookStyleRows>
 }) {
   const v = strings.values
   const rows = [
@@ -68,7 +107,7 @@ function ComfortColumn({
       }}
     >
       <Text style={{ color: palette.ink, fontWeight: '700' }}>{heading}</Text>
-      {rows.map(([label, value]) => (
+      {[...rows, ...(styleRows ?? [])].map(([label, value]) => (
         <Text key={label} style={{ color: palette.ink }}>{`${label}: ${value}`}</Text>
       ))}
     </View>
@@ -91,8 +130,9 @@ async function settledIdentity(memberId: string): Promise<'same' | 'other' | 'un
 }
 
 export function GuestPreviewReviewScreen() {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language)
+  const { showNotice } = useStatusBar()
   const palette = useHeroPalette()
   const store = mobileGuestPreviewStore()
   const [status, setStatus] = useState<ReviewStatus>({ kind: 'loading' })
@@ -101,6 +141,8 @@ export function GuestPreviewReviewScreen() {
   const inFlight = useRef(false)
   const garmentIntent = useRef(false)
   const mounted = useRef(true)
+  const [lookReview, setLookReview] = useState<LookReview | null>(null)
+  const saveChoice = useRef<boolean | null>(null)
 
   useEffect(() => {
     mounted.current = true
@@ -112,10 +154,11 @@ export function GuestPreviewReviewScreen() {
     }
     void (async () => {
       const snapshot = await store.load()
+      if (!active) return
       const conversion = snapshot.state?.conversion
-      const proposal = conversion ? snapshot.state?.comfort : null
+      const draft = guestPreviewReviewProposal(snapshot.state)
       garmentIntent.current = conversion?.intent === GUEST_PREVIEW_GARMENT_INTENT
-      if (!proposal) {
+      if (!draft) {
         router.replace('/')
         return
       }
@@ -127,7 +170,10 @@ export function GuestPreviewReviewScreen() {
           return
         }
         client.current = verified
-        const account = await verified.read()
+        const { account, lookReview: loadedReview } = await loadAccountReview(
+          verified,
+          draft.intent
+        )
         if (!active) return
         // The member may have changed while the read was in flight.
         if (mobileApplicationUserId() !== verified.memberId) {
@@ -136,7 +182,9 @@ export function GuestPreviewReviewScreen() {
           if (identity === 'other') return discard()
           if (identity === 'unknown') return setStatus({ kind: 'load-failed' })
         }
-        setStatus({ kind: 'ready', account, proposal })
+        if (loadedReview && !loadedReview.client.isCurrent()) return discard()
+        setLookReview(loadedReview)
+        setStatus({ kind: 'ready', account, proposal: draft.comfort })
       } catch {
         if (active) setStatus({ kind: 'load-failed' })
       }
@@ -155,6 +203,76 @@ export function GuestPreviewReviewScreen() {
       unsubscribe()
     }
   }, [store, loadAttempt])
+
+  function cancelLookReview() {
+    if (inFlight.current) return
+    client.current = null
+    store.clear()
+    router.replace('/')
+  }
+
+  async function saveLook(
+    account: SampleComfort,
+    proposal: SampleComfort,
+    applySettings: boolean
+  ) {
+    const verified = client.current
+    if (!lookReview || !verified || inFlight.current) return
+    const { intent, client: lookClient } = lookReview
+    if (!lookClient.isCurrent()) return cancelLookReview()
+    if (saveChoice.current === null) {
+      const pending = store.snapshot().state?.conversion
+      if (pending?.intent !== GUEST_PREVIEW_SAVE_INTENT || pending.key !== intent.key) {
+        cancelLookReview()
+        return
+      }
+      saveChoice.current = applySettings
+      // Once confirmed, the retry belongs to this mounted review and verified account.
+      store.clear()
+    }
+    inFlight.current = true
+    setStatus({ kind: 'saving', account, proposal })
+    const isCurrent = () =>
+      mounted.current && client.current === verified && lookClient.isCurrent()
+    try {
+      const freshComfort = saveChoice.current ? await verifiedComfortClient() : verified
+      if (freshComfort?.memberId !== verified.memberId)
+        throw new Error('Guest review session changed')
+      const saved = await completeGuestLookSave({
+        intent,
+        applySettings: saveChoice.current,
+        lookClient,
+        comfortClient: freshComfort,
+        isCurrent,
+      })
+      if (saved && isCurrent()) {
+        notifyMobileSavedLooksChanged(verified.memberId)
+        showNotice({
+          id: `guest-look-saved:${saved.id}`,
+          message: t('feedback.savedToLooks'),
+          tone: 'success',
+          actions: [
+            {
+              id: 'view',
+              kind: 'view',
+              label: t('feedback.view'),
+              onPress: () => {
+                if (lookClient.isCurrent()) router.push(savedLookRoute(saved.id))
+              },
+            },
+          ],
+        })
+        router.replace(savedLooksRoute())
+        return
+      }
+    } catch {
+      // Keep the same idempotency key and confirmed settings for a retry.
+    } finally {
+      inFlight.current = false
+    }
+    if (mounted.current && client.current === verified)
+      setStatus({ kind: 'failed', account, proposal })
+  }
 
   async function applyProposal(account: SampleComfort, proposal: SampleComfort) {
     const verified = client.current
@@ -202,8 +320,6 @@ export function GuestPreviewReviewScreen() {
     }
   }
 
-  const review =
-    status.kind === 'ready' || status.kind === 'saving' || status.kind === 'failed'
   return (
     <ScrollView
       testID="guest-preview-review"
@@ -238,51 +354,28 @@ export function GuestPreviewReviewScreen() {
           />
         </>
       ) : null}
-      {review ? (
-        <>
-          <ComfortColumn
-            heading={strings.review.account}
-            values={status.account}
-            strings={strings}
-            palette={palette}
-            testID="guest-preview-review-account"
-          />
-          <ComfortColumn
-            heading={strings.review.proposed}
-            values={status.proposal}
-            strings={strings}
-            palette={palette}
-            testID="guest-preview-review-proposed"
-          />
-          {status.kind === 'failed' ? (
-            <Text
-              testID="guest-preview-review-failed"
-              accessibilityRole="alert"
-              style={{ color: palette.dangerInk }}
-            >
-              {strings.review.failed}
-            </Text>
-          ) : null}
-          <PreviewButton
-            label={status.kind === 'saving' ? strings.review.saving : strings.review.use}
-            onPress={() => void applyProposal(status.account, status.proposal)}
-            testID="guest-preview-review-use"
-            palette={palette}
-            disabled={status.kind === 'saving'}
-            primary
-          />
-          <PreviewButton
-            label={strings.review.keep}
-            onPress={() => {
+      {isActiveReview(status) && (
+        <ReviewChoices
+          status={status}
+          strings={strings}
+          locale={i18n.language}
+          palette={palette}
+          lookReview={lookReview}
+          saveChoice={saveChoice.current}
+          onUse={() => {
+            if (lookReview) void saveLook(status.account, status.proposal, true)
+            else void applyProposal(status.account, status.proposal)
+          }}
+          onKeep={() => {
+            if (lookReview) void saveLook(status.account, status.proposal, false)
+            else {
               store.clear()
               setStatus({ kind: 'kept' })
-            }}
-            testID="guest-preview-review-keep"
-            palette={palette}
-            disabled={status.kind === 'saving'}
-          />
-        </>
-      ) : null}
+            }
+          }}
+          onCancel={cancelLookReview}
+        />
+      )}
       {status.kind === 'saved' || status.kind === 'kept' || status.kind === 'rejected' ? (
         <>
           <Text
@@ -316,5 +409,97 @@ export function GuestPreviewReviewScreen() {
         </>
       ) : null}
     </ScrollView>
+  )
+}
+
+function ReviewChoices({
+  status,
+  strings,
+  locale,
+  lookReview,
+  saveChoice,
+  onUse,
+  onKeep,
+  onCancel,
+  palette,
+}: {
+  status: ActiveReview
+  strings: GuestPreviewStrings
+  locale: string
+  lookReview: LookReview | null
+  saveChoice: boolean | null
+  onUse: () => void
+  onKeep: () => void
+  onCancel: () => void
+  palette: PreviewPalette
+}) {
+  return (
+    <>
+      <ComfortColumn
+        heading={strings.review.account}
+        values={status.account}
+        strings={strings}
+        palette={palette}
+        testID="guest-preview-review-account"
+        styleRows={
+          lookReview ? guestLookStyleRows(lookReview.accountStyle, locale) : undefined
+        }
+      />
+      <ComfortColumn
+        heading={strings.review.proposed}
+        values={status.proposal}
+        strings={strings}
+        palette={palette}
+        testID="guest-preview-review-proposed"
+        styleRows={
+          lookReview ? guestLookStyleRows(lookReview.intent.style, locale) : undefined
+        }
+      />
+      {status.kind === 'failed' ? (
+        <Text
+          testID="guest-preview-review-failed"
+          accessibilityRole="alert"
+          style={{ color: palette.dangerInk }}
+        >
+          {lookReview ? strings.firstRun.reviewFailed : strings.review.failed}
+        </Text>
+      ) : null}
+      <PreviewButton
+        label={
+          status.kind === 'saving' && saveChoice !== false
+            ? strings.review.saving
+            : lookReview
+              ? strings.firstRun.saveWithSettings
+              : strings.review.use
+        }
+        onPress={onUse}
+        testID="guest-preview-review-use"
+        palette={palette}
+        disabled={status.kind === 'saving' || saveChoice === false}
+        primary
+      />
+      <PreviewButton
+        label={
+          status.kind === 'saving' && saveChoice === false
+            ? strings.review.saving
+            : lookReview
+              ? strings.firstRun.saveOnly
+              : strings.review.keep
+        }
+        onPress={onKeep}
+        testID="guest-preview-review-keep"
+        palette={palette}
+        disabled={status.kind === 'saving' || saveChoice === true}
+      />
+      {lookReview && (
+        <PreviewButton
+          label={strings.firstRun.cancelReview}
+          onPress={onCancel}
+          testID="guest-preview-review-cancel"
+          palette={palette}
+          disabled={status.kind === 'saving'}
+        />
+      )}
+    </>
   )
 }

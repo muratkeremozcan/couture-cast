@@ -5,7 +5,7 @@ import {
   type StyleProfileAnswers,
 } from './style-profile'
 
-type StyleProfilePatch = Partial<StyleProfileAnswers>
+export type StyleProfilePatch = Partial<StyleProfileAnswers>
 
 export type StyleProfileRequest =
   | { method: 'GET' | 'DELETE' }

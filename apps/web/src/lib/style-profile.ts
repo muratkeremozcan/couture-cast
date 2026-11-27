@@ -2,7 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from 'react'
 import { requestStyleProfile, ResponseError } from '@couture/api-client'
-import { createStyleProfileStore } from '@couture/utils'
+import { createStyleProfileStore, type StyleProfilePatch } from '@couture/utils'
 import { createWebApiClient } from './api-client'
 import {
   captureWebStyleBearer,
@@ -43,6 +43,20 @@ const serverSnapshot = {
   saving: false,
   day: null,
 } as const
+
+export async function saveWebStyleProfileForMember(
+  memberId: string,
+  input: StyleProfilePatch
+) {
+  const scope = currentWebStyleScope()
+  if (
+    !scope ||
+    currentWebSessionOwner() !== memberId ||
+    !(await store.save(scope, input))
+  ) {
+    throw new Error('Unable to save style profile for this session.')
+  }
+}
 
 export function useWebStyleProfile() {
   const scope = useWebStyleScope()

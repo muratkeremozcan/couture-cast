@@ -168,6 +168,7 @@ export default function SignInPage() {
             {fromPreview ? (
               <Link
                 href="/preview"
+                replace
                 data-testid="signin-back-to-preview"
                 className="inline-flex min-h-11 items-center text-ink underline underline-offset-4"
               >

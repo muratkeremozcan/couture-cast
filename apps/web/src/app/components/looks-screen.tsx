@@ -42,7 +42,11 @@ import {
   listSavedLooksPageFromWeb,
   subscribeSavedLooksChanged,
 } from '../../lib/saved-looks'
-import { listCapsulesFromWeb, resolveCurrentUserId } from '../../lib/wardrobe'
+import {
+  listCapsulesFromWeb,
+  resolveCurrentUserId,
+  WardrobeRequestError,
+} from '../../lib/wardrobe'
 import {
   currentWebSessionOwner,
   currentWebSessionScope,
@@ -198,12 +202,25 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
         })
         return { items: page.data, total: page.total }
       }
-      const page = await listCapsulesFromWeb(
-        await profileId(),
-        { sort: 'created_desc', limit: PAGE_SIZE, offset },
-        signal
-      )
-      return { items: page.items, total: page.total }
+      const ownerUserId = await profileId()
+      try {
+        const page = await listCapsulesFromWeb(
+          ownerUserId,
+          { sort: 'created_desc', limit: PAGE_SIZE, offset },
+          signal
+        )
+        return { items: page.items, total: page.total }
+      } catch (error) {
+        // Pending teens can open their saved catalog looks while capsules require approval.
+        if (
+          filter === 'all' &&
+          error instanceof WardrobeRequestError &&
+          error.status === 403
+        ) {
+          return { items: [], total: 0 }
+        }
+        throw error
+      }
     },
     [owner, filter, profileId]
   )

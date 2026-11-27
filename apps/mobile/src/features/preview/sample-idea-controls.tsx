@@ -161,7 +161,7 @@ export function SampleIdeaControls<Weather extends SampleWeatherKey>({
   )
 }
 
-function GuestStyleChoices({
+export function GuestStyleChoices({
   labels,
   palette,
   preferences,

@@ -22521,3 +22521,29 @@ Today's temperature and mood can change for the current day.
   [web session changes](../../apps/web/src/lib/web-session.resync.test.ts).
 - [Web style controls](../../apps/web/src/app/components/style-profile-controls.test.tsx).
 - [Step 71](#step-71-todays-outfit-as-a-picture) covers the outfit picture and its swap controls.
+
+## Step 78: First look and account save
+
+Open Today as a guest. See a sample outfit before you pick a style or create an account.
+
+### Sequence to follow
+
+1. Choose Show me looks and pass the age check. The complete look is ready to change.
+   Choose a mood, shuffle and swap a piece.
+2. Open Save this look. Cancel the account sheet, then check that the look and swaps are still
+   there. Open the sheet again and create an account. The signup form carries the age-check date
+   during the same app session.
+3. Review the mood, colors and comfort settings. Choose Save look and settings or Save look only.
+   Reopen the saved look and check that the exact catalog pieces match the preview.
+4. Repeat with an approved teen and a guardian-pending teen. Both can save and reopen the catalog
+   outfit. Check that the under-13 age gate keeps the preview locked.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-21-first-run-look-first-account-save.md) and
+  [acceptance plan](../test-artifacts/test-design-7-21-first-run-look-first-account-save.md).
+- [Guest preview and cancellation](../../playwright/tests/guest-preview.spec.ts) and
+  [real signup and account save](../../playwright/tests/guest-preview-real-session.spec.ts).
+- [Android guest preview](../../maestro/guest-preview.yaml) and
+  [Android account conversion](../../maestro/guest-preview-conversion.yaml).
+- [Pending guardian route scope](../../apps/api/src/modules/auth/guardian-lock-route-sweep.spec.ts).

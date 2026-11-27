@@ -7,14 +7,24 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   applyComfortCarryover,
+  completeGuestLookSave,
   GUEST_PREVIEW_GARMENT_INTENT,
+  GUEST_PREVIEW_SAVE_INTENT,
   getGuestPreviewStrings,
+  guestLookStyleRows,
+  guestPreviewReviewProposal,
+  type GuestLookSaveIntent,
   type GuestPreviewStrings,
   type SampleComfort,
+  type StyleProfileAnswers,
 } from '@couture/utils'
 import { getI18n } from '../../../i18n'
 import { AppPage, APP_MAIN_BASE_CLASS } from '../app-page'
 import { AppTopBar } from '../app-top-bar'
+import { savedLookHref, savedLooksHref } from '../looks/looks-address'
+import { useStatusBar } from '../save-feedback'
+import { verifiedGuestLookClient } from '../../../lib/guest-look-review'
+import { notifySavedLooksChanged } from '../../../lib/saved-looks'
 import {
   isConsentRejection,
   resolveWebNextStep,
@@ -27,23 +37,54 @@ import { resolveWebSessionToken, webSessionIdentity } from '../../../lib/web-ses
 type ReviewStatus =
   | { kind: 'loading' }
   | { kind: 'load-failed' }
-  | { kind: 'ready'; account: SampleComfort; proposal: SampleComfort }
-  | { kind: 'saving'; account: SampleComfort; proposal: SampleComfort }
-  | { kind: 'failed'; account: SampleComfort; proposal: SampleComfort }
+  | ActiveReview
   | { kind: 'saved' }
   | { kind: 'kept' }
   | { kind: 'rejected' }
+
+type ActiveReview = {
+  kind: 'ready' | 'saving' | 'failed'
+  account: SampleComfort
+  proposal: SampleComfort
+}
+
+type LookReview = {
+  intent: GuestLookSaveIntent
+  accountStyle: StyleProfileAnswers | null
+  client: Awaited<ReturnType<typeof verifiedGuestLookClient>>
+}
+
+async function loadAccountReview(
+  verified: WebComfortClient,
+  intent: GuestLookSaveIntent | null
+) {
+  const client = intent ? await verifiedGuestLookClient(verified.memberId) : null
+  const [account, accountStyle] = await Promise.all([
+    verified.read(),
+    client?.readStyle() ?? null,
+  ])
+  return {
+    account,
+    lookReview: intent && client ? { intent, accountStyle, client } : null,
+  }
+}
+
+function isActiveReview(status: ReviewStatus): status is ActiveReview {
+  return status.kind === 'ready' || status.kind === 'saving' || status.kind === 'failed'
+}
 
 function ComfortColumn({
   heading,
   values,
   strings,
   testId,
+  styleRows,
 }: {
   heading: string
   values: SampleComfort
   strings: GuestPreviewStrings
   testId: string
+  styleRows?: ReturnType<typeof guestLookStyleRows>
 }) {
   const v = strings.values
   return (
@@ -60,6 +101,12 @@ function ComfortColumn({
         <dd>{v.windTolerance[values.windTolerance]}</dd>
         <dt className="text-ink-muted">{strings.preferences.rain}</dt>
         <dd>{v.precipPreparedness[values.precipPreparedness]}</dd>
+        {styleRows?.map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-ink-muted">{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
       </dl>
     </div>
   )
@@ -82,8 +129,9 @@ async function settledIdentity(memberId: string): Promise<'same' | 'other' | 'un
 
 export function GuestPreviewReview() {
   const router = useRouter()
-  const { i18n } = useTranslation('translation', { i18n: getI18n() })
+  const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
   const strings = getGuestPreviewStrings(i18n.language)
+  const { showNotice } = useStatusBar()
   const store = webGuestPreviewStore()
   const [status, setStatus] = useState<ReviewStatus>({ kind: 'loading' })
   const [loadAttempt, setLoadAttempt] = useState(0)
@@ -91,6 +139,8 @@ export function GuestPreviewReview() {
   const inFlight = useRef(false)
   const garmentIntent = useRef(false)
   const mounted = useRef(true)
+  const [lookReview, setLookReview] = useState<LookReview | null>(null)
+  const saveChoice = useRef<boolean | null>(null)
 
   useEffect(() => {
     mounted.current = true
@@ -102,10 +152,11 @@ export function GuestPreviewReview() {
     }
     void (async () => {
       const snapshot = await store.load()
+      if (!active) return
       const conversion = snapshot.state?.conversion
-      const proposal = conversion ? snapshot.state?.comfort : null
+      const draft = guestPreviewReviewProposal(snapshot.state)
       garmentIntent.current = conversion?.intent === GUEST_PREVIEW_GARMENT_INTENT
-      if (!proposal) {
+      if (!draft) {
         router.replace('/')
         return
       }
@@ -117,7 +168,10 @@ export function GuestPreviewReview() {
           return
         }
         client.current = verified
-        const account = await verified.read()
+        const { account, lookReview: loadedReview } = await loadAccountReview(
+          verified,
+          draft.intent
+        )
         if (!active) return
         // W2: the member may have changed while the read was in flight.
         if (webSessionIdentity() !== verified.memberId) {
@@ -126,7 +180,9 @@ export function GuestPreviewReview() {
           if (identity === 'other') return discard()
           if (identity === 'unknown') return setStatus({ kind: 'load-failed' })
         }
-        setStatus({ kind: 'ready', account, proposal })
+        if (loadedReview && !loadedReview.client.isCurrent()) return discard()
+        setLookReview(loadedReview)
+        setStatus({ kind: 'ready', account, proposal: draft.comfort })
       } catch {
         if (active) setStatus({ kind: 'load-failed' })
       }
@@ -146,6 +202,76 @@ export function GuestPreviewReview() {
       window.removeEventListener('couture:session', onSession)
     }
   }, [router, store, loadAttempt])
+
+  function cancelLookReview() {
+    if (inFlight.current) return
+    client.current = null
+    store.clear()
+    router.replace('/')
+  }
+
+  async function saveLook(
+    account: SampleComfort,
+    proposal: SampleComfort,
+    applySettings: boolean
+  ) {
+    const verified = client.current
+    if (!lookReview || !verified || inFlight.current) return
+    const { intent, client: lookClient } = lookReview
+    if (!lookClient.isCurrent()) return cancelLookReview()
+    if (saveChoice.current === null) {
+      const pending = store.snapshot().state?.conversion
+      if (pending?.intent !== GUEST_PREVIEW_SAVE_INTENT || pending.key !== intent.key) {
+        cancelLookReview()
+        return
+      }
+      saveChoice.current = applySettings
+      // Once confirmed, the retry belongs to this mounted review and verified account.
+      store.clear()
+    }
+    inFlight.current = true
+    setStatus({ kind: 'saving', account, proposal })
+    const isCurrent = () =>
+      mounted.current && client.current === verified && lookClient.isCurrent()
+    try {
+      const freshComfort = saveChoice.current ? await verifiedComfortClient() : verified
+      if (freshComfort?.memberId !== verified.memberId)
+        throw new Error('Guest review session changed')
+      const saved = await completeGuestLookSave({
+        intent,
+        applySettings: saveChoice.current,
+        lookClient,
+        comfortClient: freshComfort,
+        isCurrent,
+      })
+      if (saved && isCurrent()) {
+        notifySavedLooksChanged(verified.memberId)
+        showNotice({
+          id: `guest-look-saved:${saved.id}`,
+          message: t('feedback.savedToLooks'),
+          tone: 'success',
+          actions: [
+            {
+              id: 'view',
+              kind: 'view',
+              label: t('feedback.view'),
+              onPress: () => {
+                if (lookClient.isCurrent()) router.push(savedLookHref(saved.id))
+              },
+            },
+          ],
+        })
+        router.replace(savedLooksHref())
+        return
+      }
+    } catch {
+      // Keep the same idempotency key and confirmed settings for a retry.
+    } finally {
+      inFlight.current = false
+    }
+    if (mounted.current && client.current === verified)
+      setStatus({ kind: 'failed', account, proposal })
+  }
 
   async function applyProposal(account: SampleComfort, proposal: SampleComfort) {
     const verified = client.current
@@ -219,7 +345,11 @@ export function GuestPreviewReview() {
     // Story CC-7.9 D6, D7: the shared top bar carries the review question as the screen's only
     // h1; back returns Home, where a declined review leaves the member.
     <AppPage>
-      <AppTopBar title={strings.review.heading} parentHref="/" />
+      <AppTopBar
+        title={strings.review.heading}
+        parentHref={lookReview ? undefined : '/'}
+        onBack={lookReview ? cancelLookReview : undefined}
+      />
       <main
         id="main-content"
         tabIndex={-1}
@@ -244,52 +374,24 @@ export function GuestPreviewReview() {
             </button>
           </div>
         ) : null}
-        {status.kind === 'ready' ||
-        status.kind === 'saving' ||
-        status.kind === 'failed' ? (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <ComfortColumn
-                heading={strings.review.account}
-                values={status.account}
-                strings={strings}
-                testId="guest-preview-review-account"
-              />
-              <ComfortColumn
-                heading={strings.review.proposed}
-                values={status.proposal}
-                strings={strings}
-                testId="guest-preview-review-proposed"
-              />
-            </div>
-            {status.kind === 'failed' ? (
-              <p role="alert" data-testid="guest-preview-review-failed">
-                {strings.review.failed}
-              </p>
-            ) : null}
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                disabled={status.kind === 'saving'}
-                aria-busy={status.kind === 'saving'}
-                onClick={() => void applyProposal(status.account, status.proposal)}
-                data-testid="guest-preview-review-use"
-                className="min-h-11 rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse disabled:opacity-60"
-              >
-                {status.kind === 'saving' ? strings.review.saving : strings.review.use}
-              </button>
-              <button
-                type="button"
-                disabled={status.kind === 'saving'}
-                onClick={keepAccount}
-                data-testid="guest-preview-review-keep"
-                className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink disabled:opacity-60"
-              >
-                {strings.review.keep}
-              </button>
-            </div>
-          </>
-        ) : null}
+        {isActiveReview(status) && (
+          <ReviewChoices
+            status={status}
+            strings={strings}
+            locale={i18n.language}
+            lookReview={lookReview}
+            saveChoice={saveChoice.current}
+            onUse={() => {
+              if (lookReview) void saveLook(status.account, status.proposal, true)
+              else void applyProposal(status.account, status.proposal)
+            }}
+            onKeep={() => {
+              if (lookReview) void saveLook(status.account, status.proposal, false)
+              else keepAccount()
+            }}
+            onCancel={cancelLookReview}
+          />
+        )}
         {status.kind === 'saved' ||
         status.kind === 'kept' ||
         status.kind === 'rejected' ? (
@@ -313,5 +415,95 @@ export function GuestPreviewReview() {
         ) : null}
       </main>
     </AppPage>
+  )
+}
+
+function ReviewChoices({
+  status,
+  strings,
+  locale,
+  lookReview,
+  saveChoice,
+  onUse,
+  onKeep,
+  onCancel,
+}: {
+  status: ActiveReview
+  strings: GuestPreviewStrings
+  locale: string
+  lookReview: LookReview | null
+  saveChoice: boolean | null
+  onUse: () => void
+  onKeep: () => void
+  onCancel: () => void
+}) {
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <ComfortColumn
+          heading={strings.review.account}
+          values={status.account}
+          strings={strings}
+          testId="guest-preview-review-account"
+          styleRows={
+            lookReview ? guestLookStyleRows(lookReview.accountStyle, locale) : undefined
+          }
+        />
+        <ComfortColumn
+          heading={strings.review.proposed}
+          values={status.proposal}
+          strings={strings}
+          testId="guest-preview-review-proposed"
+          styleRows={
+            lookReview ? guestLookStyleRows(lookReview.intent.style, locale) : undefined
+          }
+        />
+      </div>
+      {status.kind === 'failed' ? (
+        <p role="alert" data-testid="guest-preview-review-failed">
+          {lookReview ? strings.firstRun.reviewFailed : strings.review.failed}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          disabled={status.kind === 'saving' || saveChoice === false}
+          aria-busy={status.kind === 'saving'}
+          onClick={onUse}
+          data-testid="guest-preview-review-use"
+          className="min-h-11 rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse disabled:opacity-60"
+        >
+          {status.kind === 'saving' && saveChoice !== false
+            ? strings.review.saving
+            : lookReview
+              ? strings.firstRun.saveWithSettings
+              : strings.review.use}
+        </button>
+        <button
+          type="button"
+          disabled={status.kind === 'saving' || saveChoice === true}
+          onClick={onKeep}
+          data-testid="guest-preview-review-keep"
+          className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink disabled:opacity-60"
+        >
+          {status.kind === 'saving' && saveChoice === false
+            ? strings.review.saving
+            : lookReview
+              ? strings.firstRun.saveOnly
+              : strings.review.keep}
+        </button>
+        {lookReview && (
+          <button
+            type="button"
+            data-testid="guest-preview-review-cancel"
+            disabled={status.kind === 'saving'}
+            onClick={onCancel}
+            className="min-h-11 px-3 text-sm font-semibold underline"
+          >
+            {strings.firstRun.cancelReview}
+          </button>
+        )}
+      </div>
+    </>
   )
 }

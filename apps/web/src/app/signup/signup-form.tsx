@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   type GuardianInvitationInput,
@@ -18,6 +18,7 @@ import {
 } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { webGuestPreviewStore } from '../../lib/guest-preview'
+import { webGuestPreviewBirthdate } from '../../lib/guest-preview-birthdate'
 import { inviteGuardianFromWeb } from '../../lib/guardian'
 import { GoogleSignInButton, SignInDivider } from '../components/google-sign-in-button'
 import { SignupRefusedError, submitWebSignup } from '../../lib/signup'
@@ -45,7 +46,9 @@ export function SignupForm({
   googleOutcome = null,
 }: SignupFormProps) {
   const { i18n } = useTranslation('translation', { i18n: getI18n() })
-  const previewStrings = getGuestPreviewStrings(i18n.language).conversionDetail
+  const { conversionDetail: previewStrings, firstRun } = getGuestPreviewStrings(
+    i18n.language
+  )
   const strings = getFederatedSignInStrings(i18n.language)
   const googleMessage = googleOutcome ? strings[googleOutcome] : null
   const [accountCreated, setAccountCreated] = useState(false)
@@ -60,6 +63,12 @@ export function SignupForm({
   const [pendingTeenId, setPendingTeenId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isInviting, setIsInviting] = useState(false)
+
+  useEffect(() => {
+    if (!fromPreview) return
+    const date = webGuestPreviewBirthdate.read()
+    if (date) setBirthdate((draft) => draft || date)
+  }, [fromPreview])
 
   const birthdateEvaluation = evaluateBirthdateInput(birthdate)
   const inlineMessage = getBirthdateNotice(birthdateEvaluation, strings)
@@ -79,6 +88,8 @@ export function SignupForm({
 
     if (!gate.allowed) {
       setErrorMessage(strings.underage)
+      webGuestPreviewBirthdate.clear()
+      setBirthdate('')
       // Story 6.16 D2: an age refusal outranks the preview's self-reported gate.
       if (fromPreview) webGuestPreviewStore().clear()
       return
@@ -88,10 +99,14 @@ export function SignupForm({
 
     try {
       const response = await submitSignup({ email, birthdate })
+      webGuestPreviewBirthdate.clear()
+      setBirthdate('')
       if (response.guardianConsentRequired) {
         setAccountCreated(true)
         setPendingTeenId(response.userId)
-        setSuccessMessage(strings.createdGuardianPending)
+        setSuccessMessage(
+          fromPreview ? firstRun.guardianPending : strings.createdGuardianPending
+        )
         return
       }
 
@@ -101,8 +116,11 @@ export function SignupForm({
     } catch (error) {
       setErrorMessage(failureText(error, strings.createUnavailable))
       // D2: the server's refusal outranks the preview gate, as the client's does.
-      if (fromPreview && error instanceof SignupRefusedError)
-        webGuestPreviewStore().clear()
+      if (error instanceof SignupRefusedError) {
+        webGuestPreviewBirthdate.clear()
+        setBirthdate('')
+        if (fromPreview) webGuestPreviewStore().clear()
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -241,7 +259,9 @@ export function SignupForm({
             <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-ink-muted">
               {strings.guardianTitle}
             </h2>
-            <p className="text-sm text-ink-soft">{strings.guardianIntro}</p>
+            <p className="text-sm text-ink-soft">
+              {fromPreview ? firstRun.guardianInvite : strings.guardianIntro}
+            </p>
           </div>
 
           <div className="space-y-4">
@@ -310,6 +330,7 @@ export function SignupForm({
       {fromPreview ? (
         <Link
           href="/preview"
+          replace
           data-testid="signup-back-to-preview"
           className="inline-flex min-h-11 items-center text-sm text-ink underline underline-offset-4"
         >
@@ -351,6 +372,7 @@ function SignupNextStep({
     return (
       <Link
         href={fromPreview ? '/signin?from=preview' : '/signin'}
+        replace={fromPreview}
         data-testid="signup-sign-in-to-continue"
         data-gold="primary"
         className="inline-flex min-h-11 items-center rounded-full bg-primary px-5 text-sm font-semibold text-on-primary"

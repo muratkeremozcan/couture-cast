@@ -31,9 +31,11 @@ export default function SignupRoute() {
           router.replace(review ? '/preview-continue' : '/')
         )
       }}
-      onPreviewNavigate={(href) =>
-        href === '/preview' ? router.replace(href) : router.push(href)
-      }
+      onPreviewNavigate={(href) => {
+        if (href === '/preview') router.dismissTo(href)
+        else if (fromPreview) router.replace(href)
+        else router.push(href)
+      }}
     />
   )
 }

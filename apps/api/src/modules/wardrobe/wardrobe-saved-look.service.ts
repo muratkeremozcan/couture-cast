@@ -425,6 +425,7 @@ export class WardrobeSavedLookService {
           swaps: storedSwaps.success ? storedSwaps.data : {},
           collection: row.collection,
           comfort: parsedComfort,
+          composition: storedSlots,
         })
 
       const availabilityStatus: SavedLookAvailabilityStatus =

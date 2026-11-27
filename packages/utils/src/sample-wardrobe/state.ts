@@ -16,6 +16,12 @@ import {
   type SampleVote,
 } from './selector'
 import { keepSampleBookmarks, sampleBookmarksSchema } from './bookmarks'
+import {
+  GUEST_PREVIEW_SAVE_INTENT,
+  guestLookSaveIntentSchema,
+  guestPreviewComfortSchema,
+  isGuestLookAvailable,
+} from './first-run-save'
 
 export const GUEST_PREVIEW_SCHEMA_VERSION = 1
 export const GUEST_PREVIEW_RETENTION_MS = 24 * 60 * 60 * 1000
@@ -24,8 +30,6 @@ export const GUEST_PREVIEW_VIEWS = ['outfit', 'wardrobe', 'preferences'] as cons
 export type GuestPreviewView = (typeof GUEST_PREVIEW_VIEWS)[number]
 export const GUEST_PREVIEW_CONVERSION_INTENT = 'guest-preview-carryover'
 export const GUEST_PREVIEW_GARMENT_INTENT = 'guest-preview-first-garment'
-
-const tolerance = z.enum(['low', 'medium', 'high'])
 
 export const guestPreviewStateSchema = z
   .object({
@@ -41,23 +45,24 @@ export const guestPreviewStateSchema = z
     selectedLookId: z.string().max(64).optional(),
     preferences: sampleStylePreferencesSchema.optional(),
     bookmarks: sampleBookmarksSchema.optional(),
-    comfort: z
-      .object({
-        runsColdWarm: z.enum(['cold', 'neutral', 'warm']),
-        windTolerance: tolerance,
-        precipPreparedness: tolerance,
-      })
-      .strict(),
+    comfort: guestPreviewComfortSchema,
     votes: z.record(z.string().max(64), z.enum(['like', 'dislike'])),
     swaps: z.record(
       z.string().max(64),
       z.partialRecord(z.enum(SAMPLE_GARMENT_CATEGORIES), z.string().max(64))
     ),
     conversion: z
-      .object({
-        intent: z.enum([GUEST_PREVIEW_CONVERSION_INTENT, GUEST_PREVIEW_GARMENT_INTENT]),
-      })
-      .strict()
+      .union([
+        z
+          .object({
+            intent: z.enum([
+              GUEST_PREVIEW_CONVERSION_INTENT,
+              GUEST_PREVIEW_GARMENT_INTENT,
+            ]),
+          })
+          .strict(),
+        guestLookSaveIntentSchema,
+      ])
       .optional(),
   })
   .strict()
@@ -167,9 +172,14 @@ function keepCatalogIds(
     }
     if (Object.keys(kept).length > 0) swaps[lookId] = kept
   }
-  const { selectedLookId, ...rest } = state
+  const { selectedLookId, conversion, ...rest } = state
   return {
     ...rest,
+    ...(conversion &&
+    (conversion.intent !== GUEST_PREVIEW_SAVE_INTENT ||
+      isGuestLookAvailable(conversion, catalog))
+      ? { conversion }
+      : {}),
     ...(selectedLookId !== undefined && lookIds.has(selectedLookId)
       ? { selectedLookId }
       : {}),

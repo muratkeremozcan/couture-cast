@@ -38,11 +38,30 @@ export const ptPT: GuestPreviewStrings = {
     checkGarment: 'Vê a tua peça',
     backToWardrobe: 'Voltar ao roupeiro',
     outfitFailed: 'Não foi possível carregar o visual de hoje.',
-    sampleEntry: 'Experimenta conjuntos',
+    sampleEntry: 'Ver looks',
     outfitIdea: 'Ideia de visual',
   },
+  firstRun: {
+    sampleLabel: 'Looks e tempo de exemplo',
+    teaser: 'Look de exemplo',
+    shuffle: 'Baralhar',
+    save: 'Guardar look',
+    saveTitle: 'Guarda este look',
+    saveBody: 'Cria uma conta gratuita ou inicia sessão para guardar este look.',
+    cancel: 'Cancelar',
+    optionalComfort: 'Tempo e conforto (opcional)',
+    previewExpired:
+      'A tua pré-visualização expirou. Confirma a tua idade para recomeçar.',
+    saveWithSettings: 'Guardar look e definições',
+    saveOnly: 'Guardar só o look',
+    guardianPending:
+      'A tua conta está pronta. O teu encarregado de educação pode autorizar o acesso às fotos.',
+    guardianInvite: 'Convida o teu encarregado de educação a rever o acesso às fotos.',
+    cancelReview: 'Cancelar',
+    reviewFailed: 'Não foi possível guardar o teu look. Tenta novamente.',
+  },
   chrome: {
-    entry: 'Experimenta conjuntos',
+    entry: 'Looks de exemplo',
     exampleLabel: 'Exemplo',
     welcomeHeading: 'Conjuntos para o tempo de hoje',
     welcomeBody:
@@ -72,7 +91,7 @@ export const ptPT: GuestPreviewStrings = {
   },
   gate: {
     heading: 'Confirma a tua idade',
-    body: 'Indica a tua data de nascimento. Este dispositivo verifica-a. A app não a guarda nem a envia.',
+    body: 'Introduz a tua data de nascimento para verificar a tua idade. Se criares uma conta, vamos usá-la no registo.',
     field: 'Data de nascimento (YYYY-MM-DD)',
     submit: 'Continuar',
     selfReported: 'Usamos a idade que indicas. Não verificamos o teu documento.',

@@ -1,16 +1,18 @@
 'use client'
-// Story 6.16 D2: the self-reported age gate. The birthdate stays in this component's
-// state, is never sent or stored, and is cleared as soon as it is evaluated.
+// The age gate clears the draft after each check. Only an eligible date can reach signup.
 import Link from 'next/link'
 import { useId, useRef, useState, type FormEvent } from 'react'
 import { evaluateGuestPreviewGate, type GuestPreviewStrings } from '@couture/utils'
+import { webGuestPreviewBirthdate } from '../../../lib/guest-preview-birthdate'
 
 export function GuestPreviewGate({
   strings,
   onEligible,
+  expired,
 }: {
   strings: GuestPreviewStrings
-  onEligible: () => void
+  onEligible: (birthdate: string) => void
+  expired: boolean
 }) {
   const [birthdate, setBirthdate] = useState('')
   const [error, setError] = useState<'underage' | 'invalid' | null>(null)
@@ -24,9 +26,10 @@ export function GuestPreviewGate({
     setBirthdate('')
     if (result.eligible) {
       setError(null)
-      onEligible()
+      onEligible(birthdate)
       return
     }
+    webGuestPreviewBirthdate.clear()
     setError(result.reason === 'underage' ? 'underage' : 'invalid')
     inputRef.current?.focus()
   }
@@ -43,6 +46,7 @@ export function GuestPreviewGate({
         {strings.gate.heading}
       </h2>
       <p className="text-sm text-ink-soft">{strings.gate.body}</p>
+      {expired && !error && <p role="status">{strings.firstRun.previewExpired}</p>}
       <form className="space-y-4" onSubmit={submit} noValidate>
         <div className="space-y-2">
           <label htmlFor={inputId} className="block text-sm font-medium text-ink">
@@ -84,6 +88,7 @@ export function GuestPreviewGate({
       <p className="text-xs text-ink-muted">{strings.gate.selfReported}</p>
       <Link
         href="/"
+        onClick={webGuestPreviewBirthdate.clear}
         data-testid="guest-preview-gate-exit"
         className="inline-flex min-h-11 items-center text-sm font-medium text-ink underline underline-offset-4"
       >

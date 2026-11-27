@@ -1,5 +1,5 @@
 import { Controller, Get, Inject, UseGuards, Put, Body } from '@nestjs/common'
-import { AuthContext } from '../auth/security.decorators'
+import { AllowPendingGuardianTeen, AuthContext } from '../auth/security.decorators'
 import { RequestAuthGuard } from '../auth/security.guards'
 import type { RequestAuthContext } from '../auth/security.types'
 import { UserService } from './user.service'
@@ -19,6 +19,7 @@ export class UserController {
 
   @Get('profile')
   @UseGuards(RequestAuthGuard)
+  @AllowPendingGuardianTeen()
   getProfile(@AuthContext() auth: RequestAuthContext) {
     return this.userService.getProfile(auth)
   }

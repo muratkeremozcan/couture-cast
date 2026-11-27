@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { AppState } from 'react-native'
 import { requestStyleProfile } from '@couture/api-client'
-import { createStyleProfileStore } from '@couture/utils'
+import { createStyleProfileStore, type StyleProfilePatch } from '@couture/utils'
 import { createMobileApiClient } from './api-client'
 import {
   mobileApplicationUserId,
@@ -34,6 +34,20 @@ const store = createStyleProfileStore(
 
 // Clear the leaving member's state even when every style surface is unmounted.
 subscribeMobileApplicationUser(store.refreshDay)
+
+export async function saveMobileStyleProfileForMember(
+  memberId: string,
+  input: StyleProfilePatch
+) {
+  const scope = currentMobileStyleScope()
+  if (
+    !scope ||
+    mobileApplicationUserId() !== memberId ||
+    !(await store.save(scope, input))
+  ) {
+    throw new Error('Unable to save style profile for this session.')
+  }
+}
 
 export function useMobileStyleProfile() {
   const scope = useSyncExternalStore(
