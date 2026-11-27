@@ -1,4 +1,5 @@
 // Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6 owner: the mobile City Spotlight module through the real HTTP boundary.
 // Learning path Step 68: Five-tab navigation and back pattern.
@@ -999,7 +1000,7 @@ export function registerCommunitySpotlightCases() {
     ).toHaveTextContent('Updated spotlight title')
 
     // Open Spotlight detail and confirm it renders the updated title and Edited label.
-    press(within(spotCard).getByTestId('community-card-title-spot-edit'))
+    press(within(spotCard).getByTestId('community-card-open-spot-edit'))
     const detail = await screen.findByTestId('community-spotlight-detail')
     // Codex 7.11 #10 (D12): a titled look names the layer's top bar, the edited title included.
     expect(within(detail).getByTestId('app-top-bar-title').textContent).toBe(

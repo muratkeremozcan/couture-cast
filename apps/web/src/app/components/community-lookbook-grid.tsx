@@ -2211,7 +2211,7 @@ export interface CommunityLookbookGridProps {
   chipCategory?: ChipCategory
   highlightedCardId?: string
   showFilterNav?: boolean
-  /** Portal target in the app top bar. */
+  /** App top bar portal. Null waits for its target. Omit to render Post inline. */
   postActionSlot?: HTMLElement | null
   /** The route hosting this grid, where the add-location flow returns after the save. */
   returnPath?: string
@@ -2354,7 +2354,6 @@ function CommunitySettingsLink({
   label,
   signIn,
   guestOnly,
-  hideBell,
 }: {
   banned: boolean
   /** Null while the session is still being verified: neither the member's link nor the guest's. */
@@ -2364,8 +2363,6 @@ function CommunitySettingsLink({
   signIn: boolean
   /** Hidden by globals.css once the page knows a member is signed in. */
   guestOnly: boolean
-  /** Keep the existing focus target visible if a verification begins while it is focused. */
-  hideBell: boolean
 }) {
   if (banned || href === null) return null
   if (signIn) {
@@ -2390,7 +2387,7 @@ function CommunitySettingsLink({
       href={href}
       aria-label={label}
       title={label}
-      className={`flex h-11 w-11 items-center justify-center rounded-full border border-line-strong text-ink motion-safe:transition-colors hover:border-inverse ${hideBell ? 'invisible focus:visible' : ''}`}
+      className="flex h-11 w-11 items-center justify-center rounded-full border border-line-strong text-ink motion-safe:transition-colors hover:border-inverse"
     >
       <svg
         aria-hidden="true"
@@ -4592,6 +4589,13 @@ export function CommunityLookbookGrid({
       t={t}
     />
   )
+  // A warm ScreenGate restores scroll before the header ref update commits.
+  // Keep Post out of the feed until the portal is ready so that commit has the settled height.
+  const headerPostAction = postActionSlot
+    ? createPortal(postAction, postActionSlot)
+    : postActionSlot === undefined
+      ? postAction
+      : null
   const waitingForLooks =
     firstLoadShowing(isLoading || !feedSettled, restoring) ||
     (spotlightStatus === 'loading' && visibleRows.length === 0)
@@ -4613,20 +4617,28 @@ export function CommunityLookbookGrid({
       label={t(presentation.settingsLabel)}
       signIn={presentation.settingsSignIn}
       guestOnly={!hasSession}
-      hideBell={!available || waitingForLooks}
     />
   )
   const renderSettingsFooter = () => {
     if (banned || (refusedScope !== undefined && refusedScope === sessionScope))
       return null
     if (!memberSession && snapshotScope === null) return null
-    // Reserve the bell and its enclosing gap before scroll restoration reads the page height.
-    return <div className="min-h-11">{!presentation.settingsSignIn && settingsLink}</div>
+    const returning = restored && initialScope === snapshotScope
+    // Keep the whole footer out of view while the feed hides. A trusted return still needs the
+    // footer's height and gap to restore its offset. A focused bell stays reachable in a recheck.
+    const pending = returning
+      ? 'invisible focus-within:visible'
+      : 'hidden focus-within:block'
+    return (
+      <div className={`min-h-11 ${available && !waitingForLooks ? '' : pending}`}>
+        {!presentation.settingsSignIn && settingsLink}
+      </div>
+    )
   }
 
   const renderHeader = () => (
     <>
-      {postActionSlot ? createPortal(postAction, postActionSlot) : postAction}
+      {headerPostAction}
       {showFilterNav && !banned && (
         <CommunityClimateFilter
           activeTab={displayedMode}

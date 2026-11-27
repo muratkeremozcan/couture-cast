@@ -1,4 +1,5 @@
 // Learning path Step 46: Home spotlight teaser.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
 // Learning path Step 47: Sponsored community highlights.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
@@ -269,6 +270,9 @@ describe('6.7 mobile Home spotlight teaser', () => {
       const { reads, answer } = deferSpotlightReads()
       setMobileApplicationUserId('member-1')
       await renderHome()
+      await waitFor(() =>
+        expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+      )
       await screen.findByTestId('outfit-recommendation-card')
       // Reference: the same Home while the teaser read is still out.
       await waitFor(() => expect(reads).toHaveLength(1))

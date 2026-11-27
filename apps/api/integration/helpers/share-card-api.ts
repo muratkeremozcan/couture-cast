@@ -217,7 +217,8 @@ export function useShareCardApi() {
         },
       ],
     }).compile()
-    app = module.createNestApplication()
+    // The cancellation cases can leave a client socket open after their response settles.
+    app = module.createNestApplication({ forceCloseConnections: true })
     app.useLogger(false)
     url = await listenHttpApp(app)
   }, 60000)

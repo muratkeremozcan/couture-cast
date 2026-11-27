@@ -3,7 +3,7 @@ title: 'Story CC-7.15: Calm Community with an empty state'
 type: feature
 ticket: '7-15-calm-community-empty-state'
 created: '2026-11-27'
-status: built
+status: done
 baseline_revision: '53adbe2fa05067b2da2294b40611b19684371d6b'
 route: full
 route_source: auto
@@ -79,7 +79,7 @@ resolution. Keep all new member-visible strings in the supported locales.
 - [x] Integrate TEA's [test plan](../test-artifacts/test-design-7-15-calm-community-empty-state.md).
       Keep `community-climate-filter`, `community-climate-sheet`,
       `community-challenge-dismiss` and `community-card-actions` on both clients.
-- [ ] Link the tests in learning path Step 72 and set sprint status to done before final push.
+- [x] Link the tests in learning path Step 72 and set sprint status to done before final push.
 
 ## Implementation Notes
 
@@ -92,6 +92,16 @@ appear when the composer is set to join the challenge. Both header layouts let t
 Post grow when text is enlarged.
 
 ## Plan Change Log
+
+The first CI run measured a 57 px web header at default text size and a 60 px scroll jump
+on tab return. The header keeps its 56 px minimum including the border and can grow when the title wraps. The Post action waits for its header slot before rendering. The notification footer reserves space on a trusted tab return and stays hidden during a cold feed read.
+
+Spotlight paging treats an ordinary look that gains a ranked placement as newly ranked.
+Only visible ranked rows count in the announcement and can receive focus. Closing web Share
+returns focus to the active post detail if the Share opener disappears.
+
+The small-phone German capture exposed a one-letter wrap in the sheet title. Both clients use
+`Klimafilter` in German.
 
 ## Review Triage Log
 

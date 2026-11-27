@@ -28,7 +28,7 @@ export function httpTestUrl(app: INestApplication): string {
 /**
  * Serves a plain request handler, such as an Express app, on one 127.0.0.1 listener for
  * the same reason as `listenHttpApp`: supertest given the handler itself would bind the
- * wildcard. Returns the base URL and a close function the caller must await.
+ * wildcard. Returns the base URL and an awaited teardown that closes any remaining connections.
  */
 export async function listenHttpHandler(
   handler: RequestListener
@@ -47,8 +47,9 @@ export async function listenHttpHandler(
   return {
     url: `http://127.0.0.1:${address.port}`,
     close: () =>
-      new Promise<void>((resolve, reject) =>
+      new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()))
-      ),
+        server.closeAllConnections()
+      }),
   }
 }

@@ -1,4 +1,5 @@
 // Learning path Step 41: Curated reactions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
 import { selectCommunityClimate } from './interactions'
 import {
@@ -236,7 +237,7 @@ export function registerCommunityReactionsCases() {
           items: [
             {
               ...item(),
-              caption: index ? 'Remounted native feed completed.' : item().caption,
+              title: index ? 'Remounted native feed completed.' : item().title,
               reactions: raceZero,
             },
           ],
@@ -308,7 +309,7 @@ export function registerCommunityReactionsCases() {
           items: [
             {
               ...item(),
-              caption: index ? 'Older native feed completed.' : item().caption,
+              title: index ? 'Older native feed completed.' : item().title,
               reactions: raceZero,
             },
           ],

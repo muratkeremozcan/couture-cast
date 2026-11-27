@@ -1,4 +1,5 @@
 // Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
@@ -289,22 +290,24 @@ export function registerCommunityFeedCases() {
       )
     )
     await render(<CommunityScreen />)
-    const highlight = await screen.findByTestId('highlighted-community-card-post-a')
-    const invoker = within(highlight).getByTestId('community-card-title-post-a')
+    await screen.findByTestId('highlighted-community-card-post-a')
     // The deep-link focus lands on the card itself first, under its own handle.
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
     )
     await openCommunityPostComments('post-a')
-    press(await screen.findByRole('button', { name: 'Close comments' }))
-    await waitFor(() => expect(findNodeHandle).toHaveBeenLastCalledWith(invoker))
-    const invokerHandle = handleOf(invoker)
+    const close = await screen.findByRole('button', { name: 'Close comments' })
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    press(close)
+    await waitFor(() => expect(close).not.toBeInTheDocument())
+    const highlight = await screen.findByTestId('highlighted-community-card-post-a')
+    const liveInvoker = within(highlight).getByTestId('community-card-title-post-a')
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
-        invokerHandle
+        handleOf(liveInvoker)
       )
     )
-    expect(invoker).toBeVisible()
+    expect(liveInvoker).toBeVisible()
   })
 
   it('restores close focus to the ordinary card title while a highlighted card is drawn', async () => {
@@ -327,14 +330,17 @@ export function registerCommunityFeedCases() {
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
     )
     await openCommunityPostComments('post-b')
-    press(await screen.findByRole('button', { name: 'Close comments' }))
-    await waitFor(() => expect(findNodeHandle).toHaveBeenLastCalledWith(feedInvoker))
+    const close = await screen.findByRole('button', { name: 'Close comments' })
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    press(close)
+    await waitFor(() => expect(close).not.toBeInTheDocument())
+    const liveInvoker = screen.getByTestId('community-card-title-post-b')
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
-        handleOf(feedInvoker)
+        handleOf(liveInvoker)
       )
     )
-    expect(feedInvoker).not.toBe(highlightInvoker)
+    expect(liveInvoker).not.toBe(highlightInvoker)
   })
 
   it('restores close focus to the same card after a held link resolves while comments are open', async () => {

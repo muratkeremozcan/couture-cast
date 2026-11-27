@@ -36,7 +36,7 @@ Added Steps 40 to 72:
 - Step 69: Story 7.12, Looks tab for saved looks, ideas and plans, `0d3b82a3` (PR #296), merged on 2026-11-26.
 - Step 70: Story 7.13, Calm Today with one primary job, `a519243d` (PR #297), merged on 2026-11-26.
 - Step 71: Story 7.14, Today's outfit as a picture, `53adbe2f` (PR #298), merged on 2026-11-27.
-- Step 72: Story 7.15, Calm Community with an empty state.
+- Step 72: Story 7.15, Calm Community with an empty state (PR #299).
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.

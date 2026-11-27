@@ -1,4 +1,5 @@
 // Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Story CC-7.11 D12 (TEA): the post detail's title and back are its app top bar's; the old detail
 // title and Back ids are gone, so presence and absence read the detail layer itself.
@@ -417,7 +418,7 @@ export function registerCommunitySponsoredCases() {
       )
       // The newer reads: a pull to refresh started after the older read went
       // out; the link ended in between, so they carry no block. Each read has
-      // its own caption, so the screen shows which one it rendered.
+      // its own title, so the screen shows which one it rendered.
       serveFeed((_url, index) =>
         feedJson({
           items: [
@@ -457,7 +458,13 @@ export function registerCommunitySponsoredCases() {
       await openCommunityPostComments('post-a')
       act(() => refreshEvents.onRefresh!())
       // The refresh's feed read and its re-read of the highlighted post both
-      // landed: the highlighted card shows their caption.
+      // landed: the highlighted card shows their title.
+      await waitFor(() => expect(postReads).toBe(2))
+      await act(async () => {
+        const refresh: unknown = vi.mocked(getCommunityPostFromMobile).mock.results[1]!
+          .value
+        await expect(refresh).resolves.toMatchObject({ title: 'Newer read' })
+      })
       const highlighted = await screen.findByTestId('highlighted-community-card-post-a')
       await within(highlighted).findByText('Newer read')
 
@@ -472,8 +479,10 @@ export function registerCommunitySponsoredCases() {
         screen.getByTestId('highlighted-community-card-post-a')
       ).getByTestId('community-post-card-post-a')
       expect(within(card).getByText('Newer read')).toBeInTheDocument()
-      expect(screen.queryByTestId('community-card-shop-post-a')).toBeNull()
-      expect(screen.queryByTestId('community-card-partnered-post-a')).toBeNull()
+      await waitFor(() =>
+        expect(within(card).queryByTestId('community-card-shop-post-a')).toBeNull()
+      )
+      expect(within(card).queryByTestId('community-card-partnered-post-a')).toBeNull()
     }
   )
 
