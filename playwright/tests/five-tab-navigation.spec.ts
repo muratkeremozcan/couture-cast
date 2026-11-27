@@ -315,7 +315,7 @@ test.describe('CC-7.11 More menu and Profile > Style @local-lane', () => {
 
       await more.click()
       await expect(menu).toBeVisible()
-      await page.mouse.click(195, 400)
+      await page.getByTestId('app-top-bar-title').click()
       await expect(menu).toBeHidden()
       // Codex 7.11 #14: an outside click on non-focusable chrome hands focus back to More.
       await expect(more).toBeFocused()

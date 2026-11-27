@@ -396,6 +396,7 @@ test('every flow the runner calls exists and only targets testIDs the app define
   const appSource = [
     'apps/mobile/app/(tabs)/settings.tsx',
     'apps/mobile/app/(tabs)/_layout.tsx',
+    'apps/mobile/src/features/settings/settings-destination-screens.tsx',
   ]
     .map((file) => fs.readFileSync(file, 'utf8'))
     .join('\n')

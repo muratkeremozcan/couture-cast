@@ -116,7 +116,7 @@ export function AppTopBar({
           {heading}
         </h1>
         <div
-          className={`flex shrink-0 items-center gap-2 ${wrapTitle ? 'min-w-0 max-w-[55%] md:max-w-none' : ''}`}
+          className={`flex shrink-0 items-center gap-2 ${wrapTitle ? 'min-w-0 max-w-[65%] md:max-w-none' : ''}`}
         >
           {trailing}
           <nav

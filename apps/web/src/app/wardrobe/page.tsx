@@ -357,7 +357,7 @@ function WardrobeEmptyState({
  * "+ Add" so the title keeps its room in long locales; its accessible name stays the full label.
  */
 const ADD_GARMENT_CLASS =
-  'flex min-h-touch items-center justify-center rounded-lg bg-primary px-2 py-1 text-sm font-semibold text-on-primary [overflow-wrap:anywhere]'
+  'flex min-h-touch min-w-touch items-center justify-center rounded-lg bg-primary px-2 py-1 text-sm font-semibold text-on-primary [overflow-wrap:anywhere]'
 
 /**
  * The Closet's one primary action. Adding a garment is a member action, so for a visitor who
@@ -1084,7 +1084,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
             titleKey="nav.closet"
             wrapTitle
             trailing={
-              <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+              <div className="flex min-w-0 items-center justify-end gap-2">
                 <AddGarmentAction
                   visitor={visitor}
                   buttonRef={addGarmentButtonRef}
@@ -1167,7 +1167,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                         type="button"
                         aria-pressed={activeCategory === option}
                         data-testid={`closet-category-${option}`}
-                        className={`min-h-touch max-w-full shrink-0 rounded-full border border-line-strong px-3 py-1 text-sm font-medium [overflow-wrap:anywhere] ${activeCategory === option ? 'bg-inverse text-on-inverse' : 'bg-page text-ink'}`}
+                        className={`min-h-touch min-w-touch max-w-full shrink-0 rounded-full border border-line-strong px-2 py-1 text-sm font-medium [overflow-wrap:anywhere] ${activeCategory === option ? 'bg-inverse text-on-inverse' : 'bg-page text-ink'}`}
                         onClick={() => setCategory(option)}
                       >
                         {option === 'all'

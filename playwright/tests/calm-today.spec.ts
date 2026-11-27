@@ -166,7 +166,7 @@ test.describe('CC-7.13 Calm Today @local-lane', () => {
           setScreen('profile')
           await setCity(page).click()
           await expect(page).toHaveURL(
-            /\/settings\?addLocation=1&returnTo=%2F#locations$/i
+            /\/settings\/places\?addLocation=1&returnTo=%2F#locations$/i
           )
         }
       }

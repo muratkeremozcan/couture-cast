@@ -119,8 +119,14 @@ test.describe('CC-7.9 premium palette follows the system scheme (7.9-E2E-008) @l
         })
 
         await page.goto(SHELL_TABS.profile.path)
+        await page.getByTestId('profile-premium-row').click()
+        await expect(page).toHaveURL('/settings/premium')
         expect((await themeRead).status).toBe(200)
         await waitForShellSettled(page, router)
+        await expect(page.getByTestId(`premium-theme-option-${palette}`)).toHaveAttribute(
+          'aria-pressed',
+          'true'
+        )
         const html = page.locator('html')
         await expect(html).toHaveAttribute('data-theme', palette)
         expect(

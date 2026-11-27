@@ -77,7 +77,7 @@ export function ClosetMoreMenu({ setupDone }: { setupDone: boolean }) {
   }
 
   return (
-    <div className="relative min-w-0 max-w-full">
+    <div className="relative min-w-touch max-w-full">
       <button
         ref={buttonRef}
         type="button"
