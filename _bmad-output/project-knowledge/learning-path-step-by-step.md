@@ -22485,6 +22485,7 @@ Use subtype tags to find a specific piece in Closet and choose which piece goes 
   and [shared Today selection](../../packages/utils/src/sample-wardrobe/today-outfit.spec.ts).
 - [Preserving sample selections](../../packages/utils/src/sample-wardrobe/member-outfit.spec.ts).
 - [Wardrobe controller](../../apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts).
+- [Native sample closet](../../apps/mobile/src/features/preview/guest-preview-screen.test.tsx).
 - [Android smart tagging](../../maestro/garment-smart-tagging-flow.yaml)
   and [guest conversion](../../maestro/guest-preview/guest-preview-conversion-verify.yaml).
 - [Step 75](#step-75-find-mini-skirts-tights-and-socks) covers the sample closet.

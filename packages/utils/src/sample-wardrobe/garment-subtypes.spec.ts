@@ -6,6 +6,7 @@ import {
   filterCloset,
   garmentSubtypesForCategory,
   garmentSubtypeStrings,
+  resetUnavailableClosetSubtype,
 } from '../index'
 import { SAMPLE_CATALOG } from './catalog'
 import {
@@ -136,6 +137,18 @@ describe('[7.19-CLOSET] subtype filters', () => {
       expect.objectContaining({ id: 'closet-subtype-all', selected: true })
     )
     expect(result.filteredGarments).toEqual([legacy, midi])
+  })
+
+  it('resets a removed subtype and shows all category items when that subtype returns', () => {
+    const filter = { category: 'bottom', subtype: 'midi-skirt' } as const
+    expect(resetUnavailableClosetSubtype(filter, [legacy, midi])).toBe(filter)
+
+    const afterRemoval = resetUnavailableClosetSubtype(filter, [legacy])
+    expect(afterRemoval).toEqual({ category: 'bottom', subtype: 'all' })
+    expect(resetUnavailableClosetSubtype(afterRemoval, [legacy, midi])).toBe(afterRemoval)
+    expect(
+      filterCloset([legacy, midi], afterRemoval, 'en-US', 'All').filteredGarments
+    ).toEqual([legacy, midi])
   })
 })
 
