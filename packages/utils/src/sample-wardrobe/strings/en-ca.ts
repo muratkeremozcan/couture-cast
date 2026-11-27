@@ -206,6 +206,9 @@ export const enCA: GuestPreviewStrings = {
       accessory: 'accessory',
     },
     garmentType: {
+      tank: 'Sleeveless tops',
+      'crop-top': 'Crop tops',
+      leggings: 'Leggings',
       tee: 'T-shirts',
       shirt: 'Shirts',
       sweater: 'Sweaters',
@@ -299,6 +302,30 @@ export const enCA: GuestPreviewStrings = {
     'no-eligible': 'No look in {collection} suits these settings.',
   },
   garments: {
+    'lined-blazer': {
+      name: 'Lined blazer',
+      description: 'A slate-blue blazer in tightly woven wool.',
+    },
+    camisole: { name: 'Silk camisole', description: 'Rose silk with thin straps.' },
+    tank: { name: 'Ribbed tank top', description: 'A sage tank top in ribbed cotton.' },
+    'crop-top': { name: 'Cotton crop top', description: 'A short lilac tee.' },
+    'maxi-skirt': {
+      name: 'Linen maxi skirt',
+      description: 'A long blue skirt in linen.',
+    },
+    leggings: {
+      name: 'Stretch leggings',
+      description: 'Charcoal leggings with a wide waistband.',
+    },
+    'moto-jacket': {
+      name: 'Leather moto jacket',
+      description: 'Black leather with a diagonal zip.',
+    },
+    'moto-boots': {
+      name: 'Moto boots',
+      description: 'Dark leather boots with a buckle.',
+    },
+    'knee-boots': { name: 'Knee-high boots', description: 'Tall brown leather boots.' },
     'ribbed-knit': {
       name: 'Ribbed knit',
       description: 'A cream cotton sweater with a ribbed finish.',
@@ -423,6 +450,26 @@ export const enCA: GuestPreviewStrings = {
     sunglasses: { name: 'Sunglasses', description: 'Black sunglasses with gold arms.' },
   },
   looks: {
+    'weekend-layers': {
+      name: 'Weekend layers',
+      description: 'A ribbed knit, leggings, moto boots and socks.',
+    },
+    'skirt-and-boots': {
+      name: 'Skirt and tall boots',
+      description: 'A sweater, mini skirt, tights and knee-high boots.',
+    },
+    'summer-skirt': {
+      name: 'Summer skirt',
+      description: 'A silk camisole, long skirt and sandals.',
+    },
+    'sunny-weekend': {
+      name: 'Sunny weekend',
+      description: 'A tank top, linen trousers and sandals.',
+    },
+    'midi-and-sneakers': {
+      name: 'Midi and sneakers',
+      description: 'A crop top, midi skirt and white sneakers.',
+    },
     'mini-and-tights': {
       name: 'Mini skirt and tights',
       description: 'Ribbed knit, plum mini skirt, opaque tights and ankle boots.',

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import {
   formatPreviewString,
+  garmentSubtypeStrings,
   sampleGarmentText,
   todayCatalogSlot,
   todaySlotCatalogItem,
@@ -17,11 +18,17 @@ import {
   type SampleSwapOptionFocus,
 } from './guest-preview/sample-swap-rows'
 
-function slotName(slot: TodaySlot, strings: GuestPreviewStrings) {
+function slotName(
+  slot: TodaySlot,
+  strings: GuestPreviewStrings,
+  locale: string | undefined
+) {
   const item = todaySlotCatalogItem(slot)
   return item
     ? sampleGarmentText(item, strings).name
-    : strings.values.category[slot.category]
+    : slot.subtype
+      ? garmentSubtypeStrings(locale).values[slot.subtype]
+      : strings.values.category[slot.category]
 }
 
 function SlotArt({ slot, index }: { slot: TodaySlot; index?: number }) {
@@ -76,12 +83,14 @@ function SlotArt({ slot, index }: { slot: TodaySlot; index?: number }) {
 export function TodayOutfitPicture({
   slots,
   strings,
+  locale,
   getOptions,
   getSampleOptions,
   onChoose,
 }: {
   slots: readonly TodaySlot[]
   strings: GuestPreviewStrings
+  locale?: string
   getOptions?: (index: number) => readonly TodaySlot[]
   getSampleOptions?: (index: number) => SampleSwapOptions | undefined
   onChoose: (index: number, slot: TodaySlot) => void
@@ -101,7 +110,7 @@ export function TodayOutfitPicture({
     slot: TodaySlot,
     index: number,
     selected: boolean,
-    name = slotName(slot, strings),
+    name = slotName(slot, strings, locale),
     focus?: SampleSwapOptionFocus
   ) => (
     <button
@@ -109,6 +118,7 @@ export function TodayOutfitPicture({
       key={slot.itemId}
       ref={index === 0 ? firstOption : undefined}
       data-testid={`today-outfit-swap-option-${index}`}
+      data-garment-id={slot.itemId}
       role="radio"
       aria-checked={selected}
       {...focus}
@@ -139,7 +149,7 @@ export function TodayOutfitPicture({
             type="button"
             key={index}
             data-testid={`today-outfit-slot-${index}`}
-            aria-label={`${formatPreviewString(strings.outfit.swap, { category: strings.values.category[slot.category] })}: ${slotName(slot, strings)}`}
+            aria-label={`${formatPreviewString(strings.outfit.swap, { category: strings.values.category[slot.category] })}: ${slotName(slot, strings, locale)}`}
             aria-haspopup="dialog"
             className="relative min-h-touch min-w-touch overflow-hidden rounded-md border border-line bg-card-muted hover:border-ink"
             onClick={(event) => {

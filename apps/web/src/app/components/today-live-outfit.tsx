@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type {
-  GarmentWithColor,
+  GarmentWithTags,
   RitualResponse,
   SavedLookContract,
   ScenarioName,
@@ -57,7 +57,7 @@ export function TodayLiveOutfit({
   initialScenario?: ScenarioName
   owner: string
   scope: string | null
-  wardrobe: readonly GarmentWithColor[]
+  wardrobe: readonly GarmentWithTags[]
 }) {
   const { t, i18n } = useTranslation(undefined, { i18n: getI18n() })
   const router = useRouter()
@@ -122,6 +122,7 @@ export function TodayLiveOutfit({
         key={recommendationKey}
         slots={slots}
         strings={strings}
+        locale={i18n.language}
         getOptions={(index) => todaySwapOptions(slots, index, closet, weather)}
         onChoose={(index, slot) => {
           if (!live()) return

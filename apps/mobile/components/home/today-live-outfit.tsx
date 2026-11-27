@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type {
-  GarmentWithColor,
+  GarmentWithTags,
   RitualResponse,
   SavedLookContract,
   ScenarioOutfit,
@@ -74,7 +74,7 @@ export function TodayLiveOutfit({
   owner: string | null
   epoch: number
   locale: string
-  wardrobe: readonly GarmentWithColor[]
+  wardrobe: readonly GarmentWithTags[]
   isCacheServed: boolean
   stale: boolean
   periodPicker: ReactNode
@@ -163,6 +163,7 @@ export function TodayLiveOutfit({
         key={recommendationKey}
         slots={slots}
         strings={strings}
+        locale={locale}
         getOptions={(index) => todaySwapOptions(slots, index, closet, weather)}
         onChoose={(index, slot) => {
           if (!live()) return

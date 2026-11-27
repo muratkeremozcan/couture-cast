@@ -20,6 +20,12 @@ import type {
   SuggestGarmentTagsSuggestedData,
 } from '@couture/api-client/contracts/http'
 import {
+  garmentSubtypeMatchesCategory,
+  garmentSubtypesForCategory,
+  garmentSubtypeStrings,
+  type GarmentSubtype,
+} from '@couture/utils'
+import {
   suggestGarmentTagsFromMobile,
   updateGarmentTagsFromMobile,
 } from '../../src/lib/wardrobe'
@@ -50,6 +56,7 @@ export interface MobileGarmentTaggingModalProps {
     garmentId: string,
     tags: {
       category: GarmentCategory
+      subtype?: GarmentSubtype
       material?: GarmentMaterial | null
       comfortRange: GarmentComfortRange
     },
@@ -122,13 +129,14 @@ export function MobileGarmentTaggingModal({
   invokingNodeHandle,
 }: MobileGarmentTaggingModalProps) {
   const modalAnimation = useModalAnimation('slide')
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const insets = useModalInsets()
   const styles = useStyles()
   const colors = useSchemeColors()
   const { scrim } = useTokens()
   const { announce } = useAccessibilityAnnouncer()
   const [selectedCategory, setSelectedCategory] = useState<GarmentCategory | null>(null)
+  const [selectedSubtype, setSelectedSubtype] = useState<GarmentSubtype | null>(null)
   const [selectedMaterial, setSelectedMaterial] = useState<GarmentMaterial | null>(null)
   const [selectedComfort, setSelectedComfort] = useState<GarmentComfortRange | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(false)
@@ -193,6 +201,7 @@ export function MobileGarmentTaggingModal({
   useEffect(() => {
     if (!visible || !garmentId) {
       setSelectedCategory(null)
+      setSelectedSubtype(null)
       setSelectedMaterial(null)
       setSelectedComfort(null)
       setSuggestions(null)
@@ -206,6 +215,7 @@ export function MobileGarmentTaggingModal({
     const controller = new AbortController()
     let isMounted = true
     setSelectedCategory(null)
+    setSelectedSubtype(null)
     setSelectedMaterial(null)
     setSelectedComfort(null)
     setSuggestions(null)
@@ -284,6 +294,7 @@ export function MobileGarmentTaggingModal({
         garmentId,
         {
           category: selectedCategory,
+          ...(selectedSubtype && { subtype: selectedSubtype }),
           material: selectedMaterial,
           comfortRange: selectedComfort,
         },
@@ -319,6 +330,8 @@ export function MobileGarmentTaggingModal({
       ? t('wardrobe.tagging.manual_desc')
       : t('wardrobe.tagging.pending_desc')
 
+  const subtypes = garmentSubtypesForCategory(selectedCategory)
+  const subtypeStrings = garmentSubtypeStrings(i18n.language)
   const isSaveDisabled =
     !selectedCategory || !selectedComfort || isSaving || isAnalysisPending
 
@@ -426,6 +439,9 @@ export function MobileGarmentTaggingModal({
                       disabled={isSaving}
                       onPress={() => {
                         setSelectedCategory(opt)
+                        setSelectedSubtype((subtype) =>
+                          garmentSubtypeMatchesCategory(opt, subtype) ? subtype : null
+                        )
                         announce('feedback', label)
                       }}
                       style={[styles.chip, isSelected && styles.chipSelected]}
@@ -439,6 +455,46 @@ export function MobileGarmentTaggingModal({
                   )
                 })}
               </View>
+
+              {subtypes.length > 0 && (
+                <View testID="garment-tagging-subtype-picker">
+                  <Text style={styles.sectionTitle}>{subtypeStrings.label}</Text>
+                  <View
+                    accessibilityRole="radiogroup"
+                    accessibilityLabel={subtypeStrings.label}
+                    style={styles.chipGrid}
+                  >
+                    {([null, ...subtypes] as const).map((value) => {
+                      const selected = selectedSubtype === value
+                      const label = value
+                        ? subtypeStrings.values[value]
+                        : subtypeStrings.none
+                      return (
+                        <TouchableOpacity
+                          key={value ?? 'none'}
+                          testID={`garment-tagging-subtype-${value ?? 'none'}`}
+                          accessibilityRole="radio"
+                          aria-checked={selected}
+                          aria-disabled={isSaving}
+                          accessibilityLabel={label}
+                          disabled={isSaving}
+                          onPress={() => {
+                            setSelectedSubtype(value)
+                            announce('feedback', label)
+                          }}
+                          style={[styles.chip, selected && styles.chipSelected]}
+                        >
+                          <Text
+                            style={[styles.chipText, selected && styles.chipTextSelected]}
+                          >
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </View>
+                </View>
+              )}
 
               {/* Material */}
               <Text style={styles.sectionTitle}>

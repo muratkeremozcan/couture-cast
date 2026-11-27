@@ -8246,6 +8246,12 @@ export interface GarmentListResponseDataInner {
    * @memberof GarmentListResponseDataInner
    */
   colorFamily?: GarmentListResponseDataInnerColorFamilyEnum | null
+  /**
+   * Garment subtype, or null when unset. Present only when the request sends x-couture-garment-subtype: 1.
+   * @type {GarmentListResponseDataInnerSubtypeEnum}
+   * @memberof GarmentListResponseDataInner
+   */
+  subtype?: GarmentListResponseDataInnerSubtypeEnum | null
 }
 
 /**
@@ -8346,6 +8352,28 @@ export const GarmentListResponseDataInnerColorFamilyEnum = {
 } as const
 export type GarmentListResponseDataInnerColorFamilyEnum =
   (typeof GarmentListResponseDataInnerColorFamilyEnum)[keyof typeof GarmentListResponseDataInnerColorFamilyEnum]
+
+/**
+ * @export
+ */
+export const GarmentListResponseDataInnerSubtypeEnum = {
+  camisole: 'camisole',
+  tank: 'tank',
+  crop_top: 'crop-top',
+  mini_skirt: 'mini-skirt',
+  midi_skirt: 'midi-skirt',
+  maxi_skirt: 'maxi-skirt',
+  leggings: 'leggings',
+  blazer: 'blazer',
+  moto_jacket: 'moto-jacket',
+  moto_boots: 'moto-boots',
+  ankle_boots: 'ankle-boots',
+  knee_boots: 'knee-boots',
+  tights: 'tights',
+  socks: 'socks',
+} as const
+export type GarmentListResponseDataInnerSubtypeEnum =
+  (typeof GarmentListResponseDataInnerSubtypeEnum)[keyof typeof GarmentListResponseDataInnerSubtypeEnum]
 
 /**
  *
@@ -20993,6 +21021,12 @@ export interface UpdateGarmentTagsInput {
    */
   category: UpdateGarmentTagsInputCategoryEnum | null
   /**
+   * Optional subtype for the selected category. null clears the subtype. Omission keeps a compatible subtype.
+   * @type {UpdateGarmentTagsInputSubtypeEnum}
+   * @memberof UpdateGarmentTagsInput
+   */
+  subtype?: UpdateGarmentTagsInputSubtypeEnum | null
+  /**
    *
    * @type {UpdateGarmentTagsInputMaterialEnum}
    * @memberof UpdateGarmentTagsInput
@@ -21025,6 +21059,28 @@ export const UpdateGarmentTagsInputCategoryEnum = {
 } as const
 export type UpdateGarmentTagsInputCategoryEnum =
   (typeof UpdateGarmentTagsInputCategoryEnum)[keyof typeof UpdateGarmentTagsInputCategoryEnum]
+
+/**
+ * @export
+ */
+export const UpdateGarmentTagsInputSubtypeEnum = {
+  camisole: 'camisole',
+  tank: 'tank',
+  crop_top: 'crop-top',
+  mini_skirt: 'mini-skirt',
+  midi_skirt: 'midi-skirt',
+  maxi_skirt: 'maxi-skirt',
+  leggings: 'leggings',
+  blazer: 'blazer',
+  moto_jacket: 'moto-jacket',
+  moto_boots: 'moto-boots',
+  ankle_boots: 'ankle-boots',
+  knee_boots: 'knee-boots',
+  tights: 'tights',
+  socks: 'socks',
+} as const
+export type UpdateGarmentTagsInputSubtypeEnum =
+  (typeof UpdateGarmentTagsInputSubtypeEnum)[keyof typeof UpdateGarmentTagsInputSubtypeEnum]
 
 /**
  * @export
@@ -21070,6 +21126,12 @@ export interface UpdateGarmentTagsInputExpected {
   category?: UpdateGarmentTagsInputExpectedCategoryEnum | null
   /**
    *
+   * @type {UpdateGarmentTagsInputExpectedSubtypeEnum}
+   * @memberof UpdateGarmentTagsInputExpected
+   */
+  subtype?: UpdateGarmentTagsInputExpectedSubtypeEnum | null
+  /**
+   *
    * @type {UpdateGarmentTagsInputExpectedMaterialEnum}
    * @memberof UpdateGarmentTagsInputExpected
    */
@@ -21095,6 +21157,28 @@ export const UpdateGarmentTagsInputExpectedCategoryEnum = {
 } as const
 export type UpdateGarmentTagsInputExpectedCategoryEnum =
   (typeof UpdateGarmentTagsInputExpectedCategoryEnum)[keyof typeof UpdateGarmentTagsInputExpectedCategoryEnum]
+
+/**
+ * @export
+ */
+export const UpdateGarmentTagsInputExpectedSubtypeEnum = {
+  camisole: 'camisole',
+  tank: 'tank',
+  crop_top: 'crop-top',
+  mini_skirt: 'mini-skirt',
+  midi_skirt: 'midi-skirt',
+  maxi_skirt: 'maxi-skirt',
+  leggings: 'leggings',
+  blazer: 'blazer',
+  moto_jacket: 'moto-jacket',
+  moto_boots: 'moto-boots',
+  ankle_boots: 'ankle-boots',
+  knee_boots: 'knee-boots',
+  tights: 'tights',
+  socks: 'socks',
+} as const
+export type UpdateGarmentTagsInputExpectedSubtypeEnum =
+  (typeof UpdateGarmentTagsInputExpectedSubtypeEnum)[keyof typeof UpdateGarmentTagsInputExpectedSubtypeEnum]
 
 /**
  * @export

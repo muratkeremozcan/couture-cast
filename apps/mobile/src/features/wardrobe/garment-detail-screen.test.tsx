@@ -12,6 +12,8 @@
 // Story CC-7.11 test owner (TEA): [Codex 7.11 #3], 7.11-NAT-032: the Style this piece editor
 // header is the layer's swipe handle, through the same close as its X.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import React from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -429,6 +431,27 @@ describe('GarmentDetailScreen', () => {
     expect(tag('garment-detail-category').textContent).toBe('Top')
     expect(topBarTitle()).toHaveTextContent('Blue top')
     expect(changes).toBe(2)
+  })
+
+  it('[P0] [7.19-CLOSET] clears a stored subtype through the tag editor', async () => {
+    closet = [{ ...blueTop, subtype: 'tank' }]
+    renderDetail()
+    expect((await screen.findByTestId('garment-detail-subtype')).textContent).toBe(
+      'Tank top'
+    )
+    await browserUser.click(await editTagsButton())
+    const subtypes = within(screen.getByRole('radiogroup', { name: 'Subtype' }))
+    expect(subtypes.queryByRole('radio', { name: 'Midi skirt' })).toBeNull()
+    await browserUser.click(subtypes.getByRole('radio', { name: 'None' }))
+    await browserUser.click(tag('garment-tag-done'))
+
+    expect(await screen.findByTestId('status-feedback-bar')).toHaveTextContent('Saved')
+    expect(patches).toHaveLength(1)
+    expect(patches[0]?.body).toMatchObject({
+      subtype: null,
+      expected: { subtype: 'tank' },
+    })
+    expect(tag('garment-detail-subtype').textContent).toBe('None')
   })
 
   it('[P0] [7.5-NAT-004] Done without a change says "No changes" and sends nothing', async () => {

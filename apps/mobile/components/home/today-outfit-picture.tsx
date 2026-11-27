@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import {
   formatPreviewString,
+  garmentSubtypeStrings,
   sampleGarmentText,
   todayCatalogSlot,
   todaySlotCatalogItem,
@@ -35,11 +36,17 @@ import { useTokens } from '@/src/theme/tokens'
 type Button = ComponentRef<typeof Pressable>
 const pictureHeight = 176
 
-function slotName(slot: TodaySlot, strings: GuestPreviewStrings) {
+function slotName(
+  slot: TodaySlot,
+  strings: GuestPreviewStrings,
+  locale: string | undefined
+) {
   const item = todaySlotCatalogItem(slot)
   return item
     ? sampleGarmentText(item, strings).name
-    : strings.values.category[slot.category]
+    : slot.subtype
+      ? garmentSubtypeStrings(locale).values[slot.subtype]
+      : strings.values.category[slot.category]
 }
 
 function usePiecePhoto(slot: TodaySlot) {
@@ -145,12 +152,14 @@ function OptionArt({ slot }: { slot: TodaySlot }) {
 export function TodayOutfitPicture({
   slots,
   strings,
+  locale,
   getOptions,
   getSampleOptions,
   onChoose,
 }: {
   slots: readonly TodaySlot[]
   strings: GuestPreviewStrings
+  locale?: string
   getOptions?: (index: number) => readonly TodaySlot[]
   getSampleOptions?: (index: number) => SampleSwapOptions | undefined
   onChoose: (index: number, slot: TodaySlot) => void
@@ -175,7 +184,7 @@ export function TodayOutfitPicture({
     slot: TodaySlot,
     index: number,
     selected: boolean,
-    name = slotName(slot, strings),
+    name = slotName(slot, strings, locale),
     ref?: React.Ref<Button>
   ) => (
     <Pressable
@@ -220,7 +229,7 @@ export function TodayOutfitPicture({
               if (node) buttons.current.set(index, node)
               else buttons.current.delete(index)
             }}
-            label={`${formatPreviewString(strings.outfit.swap, { category: strings.values.category[slot.category] })}: ${slotName(slot, strings)}`}
+            label={`${formatPreviewString(strings.outfit.swap, { category: strings.values.category[slot.category] })}: ${slotName(slot, strings, locale)}`}
             onPress={() => {
               invoker.current = buttons.current.get(index) ?? null
               setSwappingIndex(index)

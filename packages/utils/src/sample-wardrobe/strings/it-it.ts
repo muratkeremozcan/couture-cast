@@ -209,6 +209,9 @@ export const itIT: GuestPreviewStrings = {
       accessory: 'accessorio',
     },
     garmentType: {
+      tank: 'Top senza maniche',
+      'crop-top': 'Top corti',
+      leggings: 'Leggings',
       tee: 'Magliette',
       shirt: 'Camicie',
       sweater: 'Maglioni',
@@ -305,6 +308,39 @@ export const itIT: GuestPreviewStrings = {
       'Nessun look adatto a queste impostazioni nella collezione: {collection}.',
   },
   garments: {
+    'lined-blazer': {
+      name: 'Blazer foderato',
+      description: 'Un blazer blu ardesia in lana a trama fitta.',
+    },
+    camisole: { name: 'Top di seta', description: 'Seta rosa con spalline sottili.' },
+    tank: {
+      name: 'Canotta a coste',
+      description: 'Una canotta verde salvia in cotone a coste.',
+    },
+    'crop-top': {
+      name: 'Top corto di cotone',
+      description: 'Una maglietta corta lilla.',
+    },
+    'maxi-skirt': {
+      name: 'Gonna lunga di lino',
+      description: 'Una gonna lunga blu di lino.',
+    },
+    leggings: {
+      name: 'Leggings elasticizzati',
+      description: 'Leggings antracite a vita larga.',
+    },
+    'moto-jacket': {
+      name: 'Giacca da moto di pelle',
+      description: 'Pelle nera con cerniera diagonale.',
+    },
+    'moto-boots': {
+      name: 'Stivali da moto',
+      description: 'Stivali di pelle scura con fibbia.',
+    },
+    'knee-boots': {
+      name: 'Stivali al ginocchio',
+      description: 'Stivali alti di pelle marrone.',
+    },
     'ribbed-knit': {
       name: 'Maglia a coste',
       description: 'Maglia di cotone color crema lavorata a coste.',
@@ -444,6 +480,26 @@ export const itIT: GuestPreviewStrings = {
     },
   },
   looks: {
+    'weekend-layers': {
+      name: 'A strati nel weekend',
+      description: 'Maglia a coste, leggings, stivali da moto e calzini.',
+    },
+    'skirt-and-boots': {
+      name: 'Gonna e stivali alti',
+      description: 'Maglione, minigonna, collant e stivali al ginocchio.',
+    },
+    'summer-skirt': {
+      name: 'Gonna estiva',
+      description: 'Top di seta, gonna lunga e sandali.',
+    },
+    'sunny-weekend': {
+      name: 'Weekend al sole',
+      description: 'Canotta, pantaloni di lino e sandali.',
+    },
+    'midi-and-sneakers': {
+      name: 'Gonna midi e sneakers',
+      description: 'Top corto, gonna midi e sneakers bianche.',
+    },
     'mini-and-tights': {
       name: 'Minigonna e collant',
       description:

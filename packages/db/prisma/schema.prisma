@@ -556,6 +556,7 @@ model GarmentItem {
   object_path                     String?                @unique
   image_url                       String?
   category                        GarmentCategory?
+  subtype                         String?
   material                        GarmentMaterial?
   comfort_range                   GarmentComfortRange?
   color_palette                   Json?

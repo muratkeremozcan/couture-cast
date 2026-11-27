@@ -35,13 +35,15 @@ import {
   type ViewStyle,
 } from 'react-native'
 import {
-  garmentCategoryEnum,
   wardrobeOnboardingStepEnum,
-  type GarmentCategory,
   type GarmentItemContract,
   type WardrobeOnboardingStep,
 } from '@couture/api-client/contracts/http'
-import { formatGarmentCategory, getGuestPreviewStrings } from '@couture/utils'
+import {
+  getGuestPreviewStrings,
+  filterCloset,
+  type ClosetGarmentFilter,
+} from '@couture/utils'
 
 import { underModalAccessibility } from '@/components/edge-to-edge-modal'
 import { NavRow } from '@/src/components/nav-row'
@@ -183,20 +185,6 @@ export function WardrobeHubScreen(props: WardrobeHubScreenProps = {}) {
   )
 }
 
-function useClosetCategories(garments: readonly ClosetGarment[]) {
-  const [category, setCategory] = useState<GarmentCategory | 'all'>('all')
-  const categories = garmentCategoryEnum.options.filter((option) =>
-    garments.some((garment) => garment.category === option)
-  )
-  const activeCategory =
-    category !== 'all' && categories.includes(category) ? category : 'all'
-  const filteredGarments =
-    activeCategory === 'all'
-      ? garments
-      : garments.filter((garment) => garment.category === activeCategory)
-  return { categories, activeCategory, filteredGarments, setCategory }
-}
-
 function MemberWardrobeHub({
   pollOffsetsMs,
   addEntry,
@@ -328,8 +316,16 @@ function MemberWardrobeHub({
       ? garments
       : garments.filter((garment) => !pendingDeleteIds.has(garment.id))
 
-  const { categories, activeCategory, filteredGarments, setCategory } =
-    useClosetCategories(visibleGarments)
+  const [closetFilter, setClosetFilter] = useState<ClosetGarmentFilter>({
+    category: 'all',
+    subtype: 'all',
+  })
+  const { filterChips, filteredGarments } = filterCloset(
+    visibleGarments,
+    closetFilter,
+    i18n.language,
+    t('wardrobe.hub.categoryAll')
+  )
 
   const refreshGarmentList = useCallback(
     async (token: string, signal?: AbortSignal) => {
@@ -619,30 +615,27 @@ function MemberWardrobeHub({
                 contentContainerStyle={styles.categoryFilters}
                 style={styles.categoryScroll}
               >
-                {(['all', ...categories] as const).map((option) => (
+                {filterChips.map(({ id, selected, label, filter }) => (
                   <Pressable
-                    key={option}
+                    key={id}
                     accessibilityRole="button"
-                    accessibilityState={{ selected: option === activeCategory }}
-                    testID={`closet-category-${option}`}
+                    accessibilityState={{ selected: selected }}
+                    testID={id}
                     style={[
                       styles.categoryChip,
                       {
-                        backgroundColor:
-                          option === activeCategory ? colors.inverse : colors.page,
+                        backgroundColor: selected ? colors.inverse : colors.page,
                         borderColor: colors.lineStrong,
                       },
                     ]}
-                    onPress={() => setCategory(option)}
+                    onPress={() => setClosetFilter(filter)}
                   >
                     <Text
                       style={{
-                        color: option === activeCategory ? colors.onInverse : colors.ink,
+                        color: selected ? colors.onInverse : colors.ink,
                       }}
                     >
-                      {option === 'all'
-                        ? t('wardrobe.hub.categoryAll')
-                        : formatGarmentCategory(i18n.language, option)}
+                      {label}
                     </Text>
                   </Pressable>
                 ))}

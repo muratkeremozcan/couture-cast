@@ -12,7 +12,7 @@ import type {
   GarmentComfortRange,
   GarmentMaterial,
   GarmentUsageResponse,
-  GarmentWithColor,
+  GarmentWithTags,
 } from '@couture/api-client/contracts/http'
 import {
   classifyGarmentTagSaveError,
@@ -23,12 +23,16 @@ import {
   formatGarmentAlt,
   formatGarmentCategory,
   formatGarmentTagLabels,
+  garmentSubtypeMatchesCategory,
+  garmentSubtypesForCategory,
+  garmentSubtypeStrings,
   garmentTagDraft,
   garmentTagsEqual,
   getGuestPreviewStrings,
   getStylePieceStrings,
   SAMPLE_GARMENT_CATEGORIES,
   SAMPLE_GARMENT_MATERIALS,
+  type GarmentSubtype,
   type GarmentTagDraft,
   type GarmentTagSaveFailure,
   type StylePieceSelection,
@@ -41,8 +45,8 @@ import { StylePieceEntry } from './style-piece-panel'
 import type { GarmentDeleteMode } from './garment-deletion'
 
 /** A Closet garment: list reads carry `colorFamily`; a just-committed upload may not yet. */
-export type ClosetGarment = Omit<GarmentWithColor, 'colorFamily'> &
-  Partial<Pick<GarmentWithColor, 'colorFamily'>>
+export type ClosetGarment = Omit<GarmentWithTags, 'colorFamily'> &
+  Partial<Pick<GarmentWithTags, 'colorFamily'>>
 
 /** D6: the alt text of a member garment photo ("Blue top"), shared by the grid and the detail. */
 export function garmentPhotoAlt(locale: string, garment: ClosetGarment): string {
@@ -64,7 +68,7 @@ export type GarmentDetailProps = {
    * `onTagsSaved`, so the page can tell whether a newer closet read landed meanwhile.
    */
   onTagSaveStart?: () => number
-  onTagsSaved: (garment: GarmentWithColor, startToken?: number) => void
+  onTagsSaved: (garment: GarmentWithTags, startToken?: number) => void
   onRefresh: () => void
   onStylePiece: (selection: StylePieceSelection, button: HTMLButtonElement) => void
   /**
@@ -149,7 +153,7 @@ function useGarmentTagEditor({
   garment: ClosetGarment
   owner: string | null
   onTagSaveStart?: () => number
-  onTagsSaved: (garment: GarmentWithColor, startToken?: number) => void
+  onTagsSaved: (garment: GarmentWithTags, startToken?: number) => void
   onRefresh: () => void
 }) {
   const { t } = useTranslation('translation', { i18n: getI18n() })
@@ -294,7 +298,7 @@ function useGarmentTagEditor({
     target: GarmentTagDraft,
     expected: GarmentTagDraft,
     applies: () => boolean
-  ): Promise<GarmentWithColor> => {
+  ): Promise<GarmentWithTags> => {
     const startToken = onTagSaveStart?.()
     return updateGarmentTagsFromWeb(garment.id, { ...target, expected }).then(
       (updated) => {
@@ -331,7 +335,9 @@ function useGarmentTagEditor({
       const doneCommits = doneCommitsRef.current
       await saveTags(
         actionOwner,
-        previous,
+        savedTags.subtype === undefined
+          ? previous
+          : { ...previous, subtype: previous.subtype ?? null },
         savedTags,
         () => doneCommitsRef.current === doneCommits
       )
@@ -440,7 +446,7 @@ function useGarmentTagEditor({
       setSaveState('still-saving')
       announce('still-saving', runId)
     }, SAVE_FEEDBACK_TIMINGS.stillSavingAfterMs)
-    let updated: GarmentWithColor
+    let updated: GarmentWithTags
     try {
       updated = await saveTags(actionOwner, target, previous, () => {
         doneCommitsRef.current++
@@ -777,6 +783,46 @@ function GarmentDetailPhoto({
 /** A signed photo URL this close to expiry is renewed before it is shown. */
 const PHOTO_REFRESH_LEAD_MS = 60_000
 
+function GarmentTagSummary({ garment }: { garment: ClosetGarment }) {
+  const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
+  const labels = formatGarmentTagLabels(i18n.language, garment)
+  const subtypeStrings = garmentSubtypeStrings(i18n.language)
+  const tagRow = (testId: string, label: string, value: string) => (
+    <div className="flex items-baseline justify-between gap-4 border-b border-line py-2 last:border-b-0">
+      <dt className="text-sm text-ink-muted">{label}</dt>
+      <dd data-testid={testId} className="text-sm font-semibold text-ink">
+        {value}
+      </dd>
+    </div>
+  )
+
+  return (
+    <dl>
+      {tagRow(
+        'garment-detail-category',
+        t('wardrobe.detail.category'),
+        labels.category ?? ''
+      )}
+      {garmentSubtypesForCategory(garment.category).length > 0 &&
+        tagRow(
+          'garment-detail-subtype',
+          subtypeStrings.label,
+          garment.subtype ? subtypeStrings.values[garment.subtype] : subtypeStrings.none
+        )}
+      {tagRow(
+        'garment-detail-material',
+        t('wardrobe.detail.material'),
+        labels.material ?? t('wardrobe.detail.noMaterial')
+      )}
+      {tagRow(
+        'garment-detail-comfort',
+        t('wardrobe.detail.comfort'),
+        labels.comfort ?? ''
+      )}
+    </dl>
+  )
+}
+
 function GarmentDetailInner({
   garment,
   owner,
@@ -812,16 +858,20 @@ function GarmentDetailInner({
   }, [garmentId])
 
   const alt = garmentPhotoAlt(locale, garment)
-  const labels = formatGarmentTagLabels(locale, garment)
+  const subtypeStrings = garmentSubtypeStrings(locale)
+  const subtypeOptions = garmentSubtypesForCategory(draft?.category)
 
   const field = <V extends string>(
-    name: 'category' | 'material' | 'comfort',
+    name: 'category' | 'subtype' | 'material' | 'comfort',
     legend: string,
     options: readonly { value: V; label: string }[],
     selected: V,
     onSelect: (value: V) => void
   ) => (
-    <fieldset className="mt-4">
+    <fieldset
+      className="mt-4"
+      data-testid={name === 'subtype' ? 'garment-detail-subtype-picker' : undefined}
+    >
       <legend className="text-sm font-semibold text-ink">{legend}</legend>
       <div className="mt-2 flex flex-wrap gap-2">
         {options.map((option) => {
@@ -831,7 +881,11 @@ function GarmentDetailInner({
               key={option.value}
               type="button"
               aria-pressed={pressed}
-              data-testid={`garment-tag-option-${name}-${option.value}`}
+              data-testid={
+                name === 'subtype'
+                  ? `garment-detail-subtype-${option.value}`
+                  : `garment-tag-option-${name}-${option.value}`
+              }
               disabled={busy}
               onClick={() => onSelect(option.value)}
               className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition-colors duration-150 motion-reduce:transition-none disabled:opacity-60 ${
@@ -849,14 +903,6 @@ function GarmentDetailInner({
   )
 
   const { values } = samples
-  const tagRow = (testId: string, label: string, value: string) => (
-    <div className="flex items-baseline justify-between gap-4 border-b border-line py-2 last:border-b-0">
-      <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd data-testid={testId} className="text-sm font-semibold text-ink">
-        {value}
-      </dd>
-    </div>
-  )
 
   return (
     <section
@@ -870,23 +916,7 @@ function GarmentDetailInner({
         <GarmentDetailPhoto garment={garment} alt={alt} onRefresh={onRefresh} />
 
         <div>
-          <dl>
-            {tagRow(
-              'garment-detail-category',
-              t('wardrobe.detail.category'),
-              labels.category ?? ''
-            )}
-            {tagRow(
-              'garment-detail-material',
-              t('wardrobe.detail.material'),
-              labels.material ?? t('wardrobe.detail.noMaterial')
-            )}
-            {tagRow(
-              'garment-detail-comfort',
-              t('wardrobe.detail.comfort'),
-              labels.comfort ?? ''
-            )}
-          </dl>
+          <GarmentTagSummary garment={garment} />
 
           {draft ? (
             <div data-testid="garment-tag-editor" ref={editor.editorRef} className="mt-2">
@@ -898,8 +928,31 @@ function GarmentDetailInner({
                   label: formatGarmentCategory(locale, value),
                 })),
                 draft.category,
-                (category) => setDraft({ ...draft, category })
+                (category) =>
+                  setDraft({
+                    ...draft,
+                    category,
+                    ...(draft.subtype &&
+                    !garmentSubtypeMatchesCategory(category, draft.subtype)
+                      ? { subtype: null }
+                      : {}),
+                  })
               )}
+              {subtypeOptions.length > 0 &&
+                field<GarmentSubtype | 'none'>(
+                  'subtype',
+                  subtypeStrings.label,
+                  [
+                    { value: 'none', label: subtypeStrings.none },
+                    ...subtypeOptions.map((value) => ({
+                      value,
+                      label: subtypeStrings.values[value],
+                    })),
+                  ],
+                  draft.subtype ?? 'none',
+                  (subtype) =>
+                    setDraft({ ...draft, subtype: subtype === 'none' ? null : subtype })
+                )}
               {field<GarmentMaterial | 'none'>(
                 'material',
                 t('wardrobe.detail.material'),

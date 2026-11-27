@@ -23,6 +23,7 @@ import type { GarmentItem } from '@prisma/client'
 import type { CapsuleOccasion } from '@couture/api-client'
 import {
   adjustFeelsLike,
+  buildSampleContext,
   CLOSE_COMFORT_MATCHES,
   getRainProbThreshold,
   getWindThreshold,
@@ -30,8 +31,13 @@ import {
   rainAmountExceeds,
   rainProbabilityExceeds,
   resolveComfortRangeFromTemperature,
+  SAMPLE_CATALOG,
+  selectSampleOutfit,
   windExceeds,
   type ComfortRange,
+  type GarmentSubtype,
+  type SampleGarmentCategory,
+  type SampleSelectionInput,
 } from '@couture/utils'
 import {
   evaluateCapsuleForScenario,
@@ -918,18 +924,67 @@ export interface RitualGenerationResult {
 
 function pickBestGarment(
   candidates: readonly GarmentItem[],
-  targetComfortRange: ComfortRange
+  targetComfortRange: ComfortRange,
+  preferences: readonly GarmentSubtype[]
 ): GarmentItem | undefined {
-  const exact = candidates.find((g) => g.comfort_range === targetComfortRange)
-  if (exact) return exact
-
-  const preferences = CLOSE_COMFORT_MATCHES[targetComfortRange]
-  for (const pref of preferences) {
-    const match = candidates.find((g) => g.comfort_range === pref)
-    if (match) return match
+  for (const range of [
+    targetComfortRange,
+    ...CLOSE_COMFORT_MATCHES[targetComfortRange],
+  ]) {
+    const tier = candidates.filter((garment) => garment.comfort_range === range)
+    for (const subtype of preferences) {
+      const match = tier.find((garment) => garment.subtype === subtype)
+      if (match) return match
+    }
+    if (tier.length > 0) return tier[0]
   }
 
   return candidates[0]
+}
+
+type SubtypePreferences = Partial<
+  Record<SampleGarmentCategory, readonly GarmentSubtype[]>
+>
+
+const coolSubtypePreferences = {
+  outerwear: ['moto-jacket', 'blazer'],
+  shoes: ['knee-boots', 'moto-boots', 'ankle-boots'],
+  bottom: ['leggings'],
+} as const satisfies SubtypePreferences
+
+const warmSubtypePreferences = {
+  top: ['camisole', 'tank', 'crop-top'],
+  bottom: ['maxi-skirt', 'midi-skirt'],
+} as const satisfies SubtypePreferences
+
+function scenarioSubtypePreferences(
+  weather: ScenarioWeatherInput,
+  comfort: ComfortPreferencesInput
+): SubtypePreferences {
+  const input: SampleSelectionInput = {
+    weather: 'mild-dry',
+    collection: 'all',
+    comfort,
+    votes: {},
+    swaps: {},
+  }
+  const context = buildSampleContext(input, weather)
+  const { range } = context
+  const preferences: SubtypePreferences =
+    range === 'cold' || range === 'cool'
+      ? { ...coolSubtypePreferences }
+      : range === 'warm' || range === 'hot'
+        ? { ...warmSubtypePreferences }
+        : {}
+  const sample = selectSampleOutfit(input, SAMPLE_CATALOG, undefined, context)
+  for (const { category, subtype } of sample.garments) {
+    if (!subtype) continue
+    preferences[category] = [
+      subtype,
+      ...(preferences[category] ?? []).filter((candidate) => candidate !== subtype),
+    ]
+  }
+  return preferences
 }
 
 /**
@@ -942,10 +997,11 @@ function pickBestGarment(
  * garments at all, exclusions aside.
  */
 function selectGenericGarments(
-  requiredCategories: readonly string[],
+  requiredCategories: readonly SampleGarmentCategory[],
   eligibleGarments: readonly GarmentItem[],
   targetComfortRange: ComfortRange,
-  excludedGarmentIds: ReadonlySet<string> = new Set()
+  excludedGarmentIds: ReadonlySet<string> = new Set(),
+  subtypePreferences: SubtypePreferences = {}
 ): { garmentIds: string[]; usedPlaceholder: boolean } {
   let usedPlaceholder = false
 
@@ -957,9 +1013,10 @@ function selectGenericGarments(
     }
 
     const preferredCandidates = allCandidates.filter((g) => !excludedGarmentIds.has(g.id))
+    const preferences = subtypePreferences[category] ?? []
     const chosen =
-      pickBestGarment(preferredCandidates, targetComfortRange) ??
-      pickBestGarment(allCandidates, targetComfortRange)
+      pickBestGarment(preferredCandidates, targetComfortRange, preferences) ??
+      pickBestGarment(allCandidates, targetComfortRange, preferences)
     return chosen!.id
   })
 
@@ -1045,7 +1102,7 @@ function generateAvailableScenario(
   })
   const recommendedCapsule = capsuleEval?.capsule
 
-  let requiredCategories: string[]
+  let requiredCategories: SampleGarmentCategory[]
   if (needsOuterwear(adjustedFeelsLike)) {
     requiredCategories = ['outerwear', 'top', 'bottom', 'shoes']
   } else {
@@ -1061,7 +1118,8 @@ function generateAvailableScenario(
     requiredCategories,
     input.eligibleGarments,
     targetComfortRange,
-    excludedGarmentIds
+    excludedGarmentIds,
+    scenarioSubtypePreferences(weather, comfortPreferences)
   )
 
   const garmentIds = capsuleEval ? capsuleEval.garmentIds : genericGarmentIds
@@ -1230,7 +1288,9 @@ function generateUnavailableScenario(
         ? 'warm'
         : 'mild'
   const hasDress = eligibleGarments.some((g) => g.category === 'dress')
-  const requiredCategories = hasDress ? ['dress', 'shoes'] : ['top', 'bottom', 'shoes']
+  const requiredCategories: SampleGarmentCategory[] = hasDress
+    ? ['dress', 'shoes']
+    : ['top', 'bottom', 'shoes']
   const { garmentIds, usedPlaceholder } = selectGenericGarments(
     requiredCategories,
     eligibleGarments,

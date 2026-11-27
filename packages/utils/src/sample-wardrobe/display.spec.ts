@@ -42,6 +42,7 @@ it('[7.18-PICK-001] exposes type filters and respects the selected collection', 
   expect(sampleWardrobeItems('skirts', 'all').map(({ id }) => id)).toEqual([
     'sample:g:midi-skirt',
     'sample:g:pleated-skirt',
+    'sample:g:maxi-skirt',
     'sample:g:mini-skirt',
   ])
   expect(sampleWardrobeItems('tights', 'all')).toEqual([garment('opaque-tights')])

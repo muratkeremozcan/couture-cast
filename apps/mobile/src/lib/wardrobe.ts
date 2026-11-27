@@ -1,13 +1,10 @@
 import { ResponseError, withRequestDeadline } from '@couture/api-client'
 import {
   type GarmentItemContract,
-  type GarmentWithColor,
+  type GarmentWithTags,
   type GarmentUsageResponse,
   type UpdateGarmentTagsInput,
   type SuggestGarmentTagsData,
-  type GarmentCategory,
-  type GarmentMaterial,
-  type GarmentComfortRange,
   type CreateOutfitCapsuleInput,
   type UpdateOutfitCapsuleInput,
   type ListOutfitCapsulesQuery,
@@ -20,8 +17,8 @@ import {
   type CreateSilhouetteUploadUrlResponse,
   type CommitSilhouettePhotoInput,
   userProfileResponseSchema,
-  parseGarmentListWithColorResponse,
-  parseUpdateGarmentTagsWithColorResponse,
+  garmentListClientResponseSchema,
+  updateGarmentTagsClientResponseSchema,
   garmentUsageResponseSchema,
   suggestGarmentTagsResponseSchema,
   outfitCapsuleResponseSchema,
@@ -117,7 +114,7 @@ export async function listGarmentsFromMobile(
   accessToken: string,
   signal?: AbortSignal,
   { today = false }: { today?: boolean } = {}
-): Promise<GarmentWithColor[]> {
+): Promise<GarmentWithTags[]> {
   try {
     const response = await withRequestTimeout(signal, (requestSignal) =>
       createMobileApiClient({
@@ -125,12 +122,13 @@ export async function listGarmentsFromMobile(
       }).apiV1WardrobeGarmentsGet(
         {
           xCoutureGarmentColor: '1',
+          xCoutureGarmentSubtype: '1',
           ...(today ? { xCoutureTodayWardrobe: '1' as const } : {}),
         },
         { signal: requestSignal }
       )
     )
-    return parseGarmentListWithColorResponse(response).data
+    return garmentListClientResponseSchema.parse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to load your wardrobe.')
   }
@@ -204,25 +202,24 @@ export async function suggestGarmentTagsFromMobile(
 export async function updateGarmentTagsFromMobile(
   accessToken: string,
   garmentId: string,
-  tags: {
-    category: GarmentCategory
-    material?: GarmentMaterial | null
-    comfortRange: GarmentComfortRange
-    /** The tags the editor saw; a newer edit then answers 409 GARMENT_TAGS_CHANGED. */
-    expected?: UpdateGarmentTagsInput['expected']
-  },
+  tags: UpdateGarmentTagsInput,
   signal?: AbortSignal
-): Promise<GarmentWithColor> {
+): Promise<GarmentWithTags> {
   try {
     const response = await withRequestTimeout(signal, (requestSignal) =>
       createMobileApiClient({
         accessToken,
       }).apiV1WardrobeGarmentsGarmentIdTagsPatch(
-        { garmentId, updateGarmentTagsInput: tags, xCoutureGarmentColor: '1' },
+        {
+          garmentId,
+          updateGarmentTagsInput: tags,
+          xCoutureGarmentColor: '1',
+          xCoutureGarmentSubtype: '1',
+        },
         { signal: requestSignal }
       )
     )
-    return parseUpdateGarmentTagsWithColorResponse(response).data
+    return updateGarmentTagsClientResponseSchema.parse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to save garment tags.')
   }

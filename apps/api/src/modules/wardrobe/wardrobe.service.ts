@@ -31,7 +31,9 @@ import {
   buildGarmentObjectPath,
   buildWardrobeStagingObjectPath,
   colorFamilyFromHex,
+  garmentSubtypeMatchesCategory,
   isWardrobePathSegment,
+  type GarmentSubtype,
 } from '@couture/utils'
 
 import { createBaseLogger } from '../../logger/pino.config'
@@ -265,14 +267,29 @@ function resolveTargetMaterial(
     : input.material
 }
 
+function resolveTargetSubtype(
+  storedSubtype: string | null,
+  { category, subtype }: UpdateGarmentTagsInput
+): GarmentSubtype | null {
+  if (subtype === undefined) {
+    return garmentSubtypeMatchesCategory(category, storedSubtype) ? storedSubtype : null
+  }
+  if (subtype !== null && !garmentSubtypeMatchesCategory(category, subtype)) {
+    throw new BadRequestException('Subtype must match the garment category')
+  }
+  return subtype
+}
+
 function isUnchangedTagConfirmation(
   garment: GarmentItem,
   input: UpdateGarmentTagsInput,
-  targetMaterial: GarmentMaterial | null
+  targetMaterial: GarmentMaterial | null,
+  targetSubtype: GarmentSubtype | null
 ): boolean {
   return (
     garment.upload_status === 'ready' &&
     garment.category === input.category &&
+    (garment.subtype ?? null) === targetSubtype &&
     garment.material === targetMaterial &&
     garment.comfort_range === input.comfortRange
   )
@@ -434,29 +451,27 @@ function garmentData(
 
 /** Each tag the editor sent in `expected` equals the stored tag; an omitted one is not compared. */
 function storedTagsMatch(
-  garment: Pick<GarmentItem, 'category' | 'material' | 'comfort_range'>,
+  garment: Pick<GarmentItem, 'category' | 'material' | 'comfort_range' | 'subtype'>,
   expected: NonNullable<UpdateGarmentTagsInput['expected']>
 ): boolean {
   return (
     (expected.category === undefined || expected.category === garment.category) &&
+    (expected.subtype === undefined || expected.subtype === (garment.subtype ?? null)) &&
     (expected.material === undefined || expected.material === garment.material) &&
     (expected.comfortRange === undefined ||
       expected.comfortRange === garment.comfort_range)
   )
 }
 
-/**
- * Story CC-7.5 D1: a request opts in to `colorFamily` with `x-couture-garment-color: 1`.
- * Without it the garment keeps the strict legacy shape, key for key.
- */
 export interface GarmentReadOptions {
   today?: boolean
   includeColor?: boolean
+  includeSubtype?: boolean
 }
 
-/** A garment as the API returns it, with `colorFamily` when the request opted in. */
 export type GarmentResponseData = GarmentItemResponse['data'] & {
   colorFamily?: GarmentColorFamilyContract | null
+  subtype?: GarmentSubtype | null
 }
 
 /** The family of the dominant hex the color processor stored; null when there is none. */
@@ -469,14 +484,19 @@ export function garmentColorFamily(
   return colorFamilyFromHex(typeof dominant === 'string' ? dominant : null)
 }
 
-function withGarmentColor(
+function withGarmentMetadata(
   garment: GarmentItem,
   data: GarmentItemResponse['data'],
   options: GarmentReadOptions
 ): GarmentResponseData {
-  return options.includeColor
-    ? { ...data, colorFamily: garmentColorFamily(garment) }
-    : data
+  const subtype = garmentSubtypeMatchesCategory(garment.category, garment.subtype)
+    ? garment.subtype
+    : null
+  return {
+    ...data,
+    ...(options.includeColor && { colorFamily: garmentColorFamily(garment) }),
+    ...(options.includeSubtype && { subtype }),
+  }
 }
 
 @Injectable()
@@ -676,7 +696,7 @@ export class WardrobeService {
     return {
       data: await Promise.all(
         garments.map(async (garment) =>
-          withGarmentColor(garment, await this.toListedGarment(garment), options)
+          withGarmentMetadata(garment, await this.toListedGarment(garment), options)
         )
       ),
     }
@@ -811,7 +831,7 @@ export class WardrobeService {
     // The tags are committed: a photo that cannot be signed right now leaves the answer without
     // one, as the list does, instead of reporting a failed save for a committed edit.
     const data = await this.toListedGarment(result.updated)
-    return { data: withGarmentColor(result.updated, data, options) }
+    return { data: withGarmentMetadata(result.updated, data, options) }
   }
 
   private async confirmTagsTransaction(
@@ -859,7 +879,8 @@ export class WardrobeService {
     }
 
     const targetMaterial = resolveTargetMaterial(garment, input)
-    if (isUnchangedTagConfirmation(garment, input, targetMaterial)) {
+    const targetSubtype = resolveTargetSubtype(garment.subtype, input)
+    if (isUnchangedTagConfirmation(garment, input, targetMaterial, targetSubtype)) {
       return {
         updated: garment,
         telemetryProperties: null,
@@ -881,6 +902,7 @@ export class WardrobeService {
       },
       data: {
         category: input.category,
+        subtype: targetSubtype,
         material: targetMaterial,
         comfort_range: input.comfortRange,
         upload_status: 'ready',

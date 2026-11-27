@@ -212,6 +212,9 @@ export const deDE: GuestPreviewStrings = {
       accessory: 'Accessoire',
     },
     garmentType: {
+      tank: 'Ärmellose Tops',
+      'crop-top': 'Kurze Tops',
+      leggings: 'Leggings',
       tee: 'T-Shirts',
       shirt: 'Hemden',
       sweater: 'Pullover',
@@ -307,6 +310,42 @@ export const deDE: GuestPreviewStrings = {
     'no-eligible': 'Kollektion {collection}: Kein Look passt zu diesen Einstellungen.',
   },
   garments: {
+    'lined-blazer': {
+      name: 'Gefütterter Blazer',
+      description: 'Schieferblauer Blazer aus dichter Wolle.',
+    },
+    camisole: {
+      name: 'Top aus Seide',
+      description: 'Rosafarbene Seide mit schmalen Trägern.',
+    },
+    tank: {
+      name: 'Geripptes Tanktop',
+      description: 'Salbeigrünes Top aus gerippter Baumwolle.',
+    },
+    'crop-top': {
+      name: 'Kurzes Baumwolltop',
+      description: 'Ein kurzes fliederfarbenes T-Shirt.',
+    },
+    'maxi-skirt': {
+      name: 'Maxirock aus Leinen',
+      description: 'Ein langer blauer Rock aus Leinen.',
+    },
+    leggings: {
+      name: 'Stretchleggings',
+      description: 'Dunkelgraue Leggings mit breitem Bund.',
+    },
+    'moto-jacket': {
+      name: 'Bikerjacke aus Leder',
+      description: 'Schwarzes Leder mit schrägem Reißverschluss.',
+    },
+    'moto-boots': {
+      name: 'Bikerstiefel',
+      description: 'Dunkle Lederstiefel mit Schnalle.',
+    },
+    'knee-boots': {
+      name: 'Kniehohe Stiefel',
+      description: 'Hohe Stiefel aus braunem Leder.',
+    },
     'ribbed-knit': {
       name: 'Rippenpullover',
       description: 'Cremefarbener Baumwollpullover in Rippenstrick.',
@@ -453,6 +492,26 @@ export const deDE: GuestPreviewStrings = {
     },
   },
   looks: {
+    'weekend-layers': {
+      name: 'Schichten fürs Wochenende',
+      description: 'Rippstrick, Leggings, Bikerstiefel und Socken.',
+    },
+    'skirt-and-boots': {
+      name: 'Rock und hohe Stiefel',
+      description: 'Pullover, Minirock, Strumpfhose und kniehohe Stiefel.',
+    },
+    'summer-skirt': {
+      name: 'Sommerrock',
+      description: 'Seidentop, langer Rock und Sandalen.',
+    },
+    'sunny-weekend': {
+      name: 'Sonniges Wochenende',
+      description: 'Tanktop, Leinenhose und Sandalen.',
+    },
+    'midi-and-sneakers': {
+      name: 'Midirock und Sneaker',
+      description: 'Kurzes Top, Midirock und weiße Sneaker.',
+    },
     'mini-and-tights': {
       name: 'Minirock und Strumpfhose',
       description:

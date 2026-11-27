@@ -110,7 +110,7 @@ export function StylePieceEntry({
   onRefresh,
   onOpen,
 }: {
-  garment: GarmentItemContract
+  garment: GarmentItemContract & Pick<StylePieceAnchor, 'subtype'>
   owner: string | null
   epoch: number
   unavailable: boolean
@@ -141,6 +141,7 @@ export function StylePieceEntry({
           onOpen({
             id: garment.id,
             category: garment.category,
+            ...(garment.subtype && { subtype: garment.subtype }),
             comfortRange: garment.comfortRange,
           })
       }}
@@ -221,7 +222,11 @@ export function StylePiecePanel({
         setInventoryView((view) => ({
           anchor: next,
           piece: next
-            ? { category: next.category, comfortRange: next.comfortRange }
+            ? {
+                category: next.category,
+                comfortRange: next.comfortRange,
+                subtype: next.subtype,
+              }
             : view.piece,
           // A background pause explicitly puts the panel back into the checking state.
           restoreWeatherFocus:
@@ -418,7 +423,7 @@ function StylePieceIdeas({
 }) {
   const { t } = useTranslation()
   const statusBar = useStatusBar()
-  const { category, comfortRange } = piece
+  const { category, comfortRange, subtype } = piece
   const photo = anchor?.photo
   const initialRecipe = initialSavedLook
     ? savedLookToStylePieceRecipe(initialSavedLook)
@@ -509,7 +514,9 @@ function StylePieceIdeas({
 
   const currentPiece = (inventory: InventoryRefresh | null) => {
     const fresh = inventory?.currentAnchor()
-    return fresh?.category === category && fresh.comfortRange === comfortRange
+    return fresh?.category === category &&
+      fresh.comfortRange === comfortRange &&
+      (fresh.subtype ?? null) === (subtype ?? null)
       ? fresh
       : null
   }

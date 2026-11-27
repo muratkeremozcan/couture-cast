@@ -38,7 +38,7 @@ import {
  */
 const translate = vi.hoisted(() => (key: string) => key)
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: translate }),
+  useTranslation: () => ({ t: translate, i18n: { language: 'en-US' } }),
 }))
 
 /** Held on a plain object so assertions never reference an unbound method. */

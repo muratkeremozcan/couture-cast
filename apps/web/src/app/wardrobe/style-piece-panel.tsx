@@ -82,7 +82,7 @@ export function StylePieceEntry({
   onRefresh,
   onOpen,
 }: {
-  garment: GarmentItemContract
+  garment: GarmentItemContract & Pick<StylePieceAnchor, 'subtype'>
   owner: string | null
   unavailable: boolean
   loading: boolean
@@ -105,8 +105,11 @@ export function StylePieceEntry({
         if (currentWebSessionOwner() !== owner) return
         if (unavailable || !stylePieceAnchor(garment)) onRefresh()
         else {
-          const { id, category, comfortRange } = garment
-          onOpen({ id, category, comfortRange }, event.currentTarget)
+          const { id, category, comfortRange, subtype } = garment
+          onOpen(
+            { id, category, comfortRange, ...(subtype && { subtype }) },
+            event.currentTarget
+          )
         }
       }}
     >
@@ -182,7 +185,11 @@ export function StylePiecePanel({
         setInventoryView((view) => ({
           anchor: next,
           piece: next
-            ? { category: next.category, comfortRange: next.comfortRange }
+            ? {
+                category: next.category,
+                comfortRange: next.comfortRange,
+                subtype: next.subtype,
+              }
             : view.piece,
         }))
       },
@@ -344,7 +351,7 @@ function StylePieceIdeas({
   const { t } = useTranslation('translation', { i18n: getI18n() })
   const router = useRouter()
   const statusBar = useStatusBar()
-  const { category, comfortRange } = piece
+  const { category, comfortRange, subtype } = piece
   const photo = anchor?.photo
   const initialRecipe = initialSavedLook
     ? savedLookToStylePieceRecipe(initialSavedLook)
@@ -433,7 +440,9 @@ function StylePieceIdeas({
 
   const currentPiece = (inventory: InventoryRefresh | null) => {
     const fresh = inventory?.currentAnchor()
-    return fresh?.category === category && fresh.comfortRange === comfortRange
+    return fresh?.category === category &&
+      fresh.comfortRange === comfortRange &&
+      (fresh.subtype ?? null) === (subtype ?? null)
       ? fresh
       : null
   }

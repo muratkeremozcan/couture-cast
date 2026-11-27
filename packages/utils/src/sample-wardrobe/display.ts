@@ -13,7 +13,16 @@ import {
 export type SampleGarmentType =
   | Exclude<
       SampleArtKey,
-      'mini-skirt' | 'pleated-skirt' | 'knit-dress' | 'wrap-dress' | 'sundress'
+      | 'camisole'
+      | 'mini-skirt'
+      | 'maxi-skirt'
+      | 'pleated-skirt'
+      | 'knit-dress'
+      | 'wrap-dress'
+      | 'sundress'
+      | 'moto-jacket'
+      | 'moto-boots'
+      | 'knee-boots'
     >
   | 'dress'
 
@@ -21,8 +30,16 @@ export type SampleGarmentType =
 export function sampleGarmentType(garment: SampleGarment): SampleGarmentType {
   switch (garment.art.key) {
     case 'mini-skirt':
+    case 'maxi-skirt':
     case 'pleated-skirt':
       return 'skirt'
+    case 'camisole':
+      return 'tank'
+    case 'moto-jacket':
+      return 'jacket'
+    case 'moto-boots':
+    case 'knee-boots':
+      return 'boots'
     case 'knit-dress':
     case 'wrap-dress':
     case 'sundress':

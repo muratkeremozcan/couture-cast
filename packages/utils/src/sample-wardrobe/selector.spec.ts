@@ -416,14 +416,12 @@ describe('sample swaps (U-SWAP)', () => {
   })
 
   it('ranks exact range before close matches', () => {
-    const state = input({
-      weather: 'warm-rainy',
-      comfort: comfort({ runsColdWarm: 'cold' }),
-    })
+    const state = input({ weather: 'warm-rainy' })
     const options = sampleSwapCandidates(SAMPLE_CATALOG, 'outerwear', state)
     expect(options.map((option) => option.id)).toEqual([
-      'sample:g:trench-coat',
       'sample:g:rain-shell',
+      'sample:g:trench-coat',
+      'sample:g:moto-jacket',
     ])
   })
 })

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { ComfortRange } from '../comfort-rules'
 import { MAX_SAMPLE_BOOKMARK_BYTES } from './bookmarks'
 import { SAMPLE_CATALOG } from './catalog'
+import type { GarmentSubtype } from './garment-subtypes'
 import {
   buildSampleContext,
   DEFAULT_SAMPLE_COMFORT,
@@ -22,6 +23,7 @@ import {
 export type StylePieceAnchor = {
   category: SampleGarmentCategory
   comfortRange: ComfortRange
+  subtype?: GarmentSubtype | null
 }
 
 type WardrobePhoto = { url: string; expiresAt: string }
@@ -31,6 +33,7 @@ type StylePieceItem = {
   status: string
   category: SampleGarmentCategory | null
   comfortRange: ComfortRange | null
+  subtype?: GarmentSubtype | null
 }
 
 export function isStylePieceTagged(
@@ -46,9 +49,9 @@ export function isStylePieceTagged(
 
 export function stylePieceAnchor(item: StylePieceItem, now = Date.now()) {
   if (!isStylePieceTagged(item)) return null
-  const { category, comfortRange, imageAccess: photo } = item
+  const { category, comfortRange, subtype, imageAccess: photo } = item
   return photo && Date.parse(photo.expiresAt) > now
-    ? { category, comfortRange, photo }
+    ? { category, comfortRange, ...(subtype && { subtype }), photo }
     : null
 }
 
@@ -358,7 +361,30 @@ export function stylePieceLooks(
 
   const projected = projectCatalog(catalog, anchor.category)
   const ranked = selectSampleOutfit(input, projected)
-  const looks: StylePieceLook[] = ranked.eligibleLookIds.map((lookId) => {
+  const matchingItems = new Set(
+    catalog.garments
+      .filter(
+        (garment) =>
+          garment.category === anchor.category && garment.subtype === anchor.subtype
+      )
+      .map(({ id }) => id)
+  )
+  const matchingLooks = new Set(
+    anchor.subtype
+      ? catalog.looks
+          .filter(
+            ({ core, layer }) =>
+              core.some((id) => matchingItems.has(id)) ||
+              (layer && matchingItems.has(layer))
+          )
+          .map(({ id }) => id)
+      : []
+  )
+  const eligibleLookIds = [
+    ...ranked.eligibleLookIds.filter((id) => matchingLooks.has(id)),
+    ...ranked.eligibleLookIds.filter((id) => !matchingLooks.has(id)),
+  ]
+  const looks: StylePieceLook[] = eligibleLookIds.map((lookId) => {
     const selected = selectSampleOutfit({ ...input, selectedLookId: lookId }, projected)
     const companions = selected.garments.filter(
       (item) => item.category !== anchor.category

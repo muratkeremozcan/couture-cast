@@ -21,13 +21,16 @@ import {
   createGarmentItemInputSchema,
   createGarmentUploadUrlInputSchema,
   garmentIdPathParamsSchema,
+  garmentListWireResponseSchema,
   garmentListWithColorResponseSchema,
   suggestGarmentTagsWireResponseSchema,
   updateGarmentTagsInputSchema,
   updateGarmentTagsResponseSchema,
+  updateGarmentTagsWireResponseSchema,
   updateGarmentTagsWithColorResponseSchema,
   TODAY_WARDROBE_HEADER,
   WARDROBE_GARMENT_COLOR_HEADER,
+  WARDROBE_GARMENT_SUBTYPE_HEADER,
 } from '@couture/api-client/contracts/http'
 import { AuthContext } from '../auth/security.decorators'
 import { RequestAuthGuard } from '../auth/security.guards'
@@ -41,14 +44,6 @@ function validationMessage(prefix: string, error: z.ZodError): string {
     .map((issue) => `${issue.path.join('.') || 'request'}: ${issue.message}`)
     .join('; ')
   return `${prefix}: ${details}`
-}
-
-/**
- * Story CC-7.5 D1: only the exact value `1` opts in to `colorFamily`. Anything else, `0`,
- * `true` and an empty value included, keeps the strict legacy shape installed builds parse.
- */
-function wantsGarmentColor(header: string | string[] | undefined): boolean {
-  return header === '1'
 }
 
 @Controller('/api/v1/wardrobe')
@@ -65,7 +60,8 @@ export class WardrobeController {
   async listGarments(
     @AuthContext() auth: RequestAuthContext,
     @Headers(WARDROBE_GARMENT_COLOR_HEADER) colorHeader?: string | string[],
-    @Headers(TODAY_WARDROBE_HEADER) todayHeader?: string | string[]
+    @Headers(TODAY_WARDROBE_HEADER) todayHeader?: string | string[],
+    @Headers(WARDROBE_GARMENT_SUBTYPE_HEADER) subtypeHeader?: string | string[]
   ) {
     const today = todayHeader === '1'
     if (
@@ -75,7 +71,16 @@ export class WardrobeController {
     ) {
       return { data: [] }
     }
-    if (!wantsGarmentColor(colorHeader)) {
+    if (subtypeHeader === '1') {
+      return garmentListWireResponseSchema.parse(
+        await this.wardrobeService.listGarments(auth.userId, {
+          includeSubtype: true,
+          ...(colorHeader === '1' && { includeColor: true }),
+          ...(today && { today }),
+        })
+      )
+    }
+    if (colorHeader !== '1') {
       return await this.wardrobeService.listGarments(
         auth.userId,
         today ? { today } : undefined
@@ -184,7 +189,8 @@ export class WardrobeController {
     @AuthContext() auth: RequestAuthContext,
     @Param('garmentId') garmentId: string,
     @Body() payload: unknown,
-    @Headers(WARDROBE_GARMENT_COLOR_HEADER) colorHeader?: string | string[]
+    @Headers(WARDROBE_GARMENT_COLOR_HEADER) colorHeader?: string | string[],
+    @Headers(WARDROBE_GARMENT_SUBTYPE_HEADER) subtypeHeader?: string | string[]
   ) {
     const parsedPath = garmentIdPathParamsSchema.safeParse({ garmentId })
     if (!parsedPath.success) {
@@ -200,7 +206,21 @@ export class WardrobeController {
       )
     }
 
-    if (!wantsGarmentColor(colorHeader)) {
+    if (subtypeHeader === '1') {
+      return updateGarmentTagsWireResponseSchema.parse(
+        await this.wardrobeService.updateGarmentTags(
+          auth.userId,
+          auth.role,
+          parsedPath.data.garmentId,
+          parsedBody.data,
+          {
+            includeSubtype: true,
+            ...(colorHeader === '1' && { includeColor: true }),
+          }
+        )
+      )
+    }
+    if (colorHeader !== '1') {
       return updateGarmentTagsResponseSchema.parse(
         await this.wardrobeService.updateGarmentTags(
           auth.userId,

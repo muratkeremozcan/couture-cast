@@ -1,3 +1,5 @@
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import { describe, expect, it } from 'vitest'
 import type { GarmentItem } from '@prisma/client'
 import type { CapsuleWithJoins } from './capsule-recommendation.engine.js'
@@ -376,6 +378,42 @@ describe('generateRitualScenarios: unavailable weather', () => {
     })
     expect(warmResult.scenarios[0].garmentIds).toContain('top-warm')
   })
+})
+
+describe('[7.19-GENERATE] generation uses subtype within the weather fit', () => {
+  it.each([
+    { bootRange: 'cold', expectedShoe: 'ankle-boots' },
+    { bootRange: 'hot', expectedShoe: 'legacy-shoe' },
+  ] as const)(
+    'chooses $expectedShoe when the boot fits $bootRange weather',
+    ({ bootRange, expectedShoe }) => {
+      const result = generateRitualScenarios({
+        ...baseInput,
+        weather: availableWeather({ feelsLike: 5 }),
+        eligibleGarments: [
+          buildGarment({ id: 'shirt', category: 'top', comfort_range: 'cold' }),
+          buildGarment({ id: 'trousers', category: 'bottom', comfort_range: 'cold' }),
+          buildGarment({ id: 'coat', category: 'outerwear', comfort_range: 'cold' }),
+          buildGarment({
+            id: 'legacy-shoe',
+            category: 'shoes',
+            comfort_range: 'cold',
+            subtype: null,
+          }),
+          buildGarment({
+            id: 'ankle-boots',
+            category: 'shoes',
+            comfort_range: bootRange,
+            subtype: 'ankle-boots',
+          }),
+        ],
+      })
+
+      for (const scenario of result.scenarios) {
+        expect(scenario.garmentIds).toEqual(['coat', 'shirt', 'trousers', expectedShoe])
+      }
+    }
+  )
 })
 
 describe('generateRitualScenarios: exclusions', () => {

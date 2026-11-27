@@ -11,6 +11,12 @@ import type {
   SuggestGarmentTagsData,
   SuggestGarmentTagsSuggestedData,
 } from '@couture/api-client/contracts/http'
+import {
+  garmentSubtypeMatchesCategory,
+  garmentSubtypesForCategory,
+  garmentSubtypeStrings,
+  type GarmentSubtype,
+} from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
 import {
@@ -33,6 +39,7 @@ export interface GarmentTaggingModalProps {
     garmentId: string,
     tags: {
       category: GarmentCategory
+      subtype?: GarmentSubtype
       material?: GarmentMaterial | null
       comfortRange: GarmentComfortRange
     },
@@ -125,6 +132,7 @@ export function GarmentTaggingModal({
   // keeps it on the same language without requiring either.
   const { t, i18n } = useTranslation(undefined, { i18n: getI18n() })
   const [selectedCategory, setSelectedCategory] = useState<GarmentCategory | null>(null)
+  const [selectedSubtype, setSelectedSubtype] = useState<GarmentSubtype | null>(null)
   const [selectedMaterial, setSelectedMaterial] = useState<GarmentMaterial | null>(null)
   const [selectedComfort, setSelectedComfort] = useState<GarmentComfortRange | null>(null)
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState<boolean>(false)
@@ -140,6 +148,7 @@ export function GarmentTaggingModal({
   const [loadAttempt, setLoadAttempt] = useState(0)
   const categoryGroupRef = useRef<HTMLDivElement | null>(null)
   const categoryOptionRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const subtypeOptionRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const materialOptionRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const comfortOptionRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const saveAbortRef = useRef<AbortController | null>(null)
@@ -157,6 +166,7 @@ export function GarmentTaggingModal({
       comfort: false,
     }
     setSelectedCategory(null)
+    setSelectedSubtype(null)
     setSelectedMaterial(null)
     setSelectedComfort(null)
     setSuggestions(null)
@@ -267,6 +277,9 @@ export function GarmentTaggingModal({
   const selectCategory = (value: GarmentCategory) => {
     touchedFieldsRef.current.category = true
     setSelectedCategory(value)
+    setSelectedSubtype((subtype) =>
+      garmentSubtypeMatchesCategory(value, subtype) ? subtype : null
+    )
   }
 
   const selectMaterial = (value: GarmentMaterial | null) => {
@@ -300,6 +313,7 @@ export function GarmentTaggingModal({
         garmentId,
         {
           category: selectedCategory,
+          ...(selectedSubtype && { subtype: selectedSubtype }),
           material: selectedMaterial,
           comfortRange: selectedComfort,
         },
@@ -320,6 +334,11 @@ export function GarmentTaggingModal({
     }
   }
 
+  const subtypes = garmentSubtypesForCategory(selectedCategory)
+  const subtypeOptions = ['none', ...subtypes] as const
+  const subtypeStrings = garmentSubtypeStrings(i18n.language)
+  const selectSubtype = (value: (typeof subtypeOptions)[number]) =>
+    setSelectedSubtype(value === 'none' ? null : value)
   const isSaveDisabled =
     !selectedCategory || !selectedComfort || isSaving || isAnalysisPending
 
@@ -431,6 +450,58 @@ export function GarmentTaggingModal({
                 })}
               </div>
             </fieldset>
+
+            {subtypes.length > 0 && (
+              <fieldset
+                data-testid="garment-tagging-subtype-picker"
+                className="m-0 border-0 p-0"
+              >
+                <legend
+                  id="garment-subtype-legend"
+                  className="text-sm font-semibold text-ink"
+                >
+                  {subtypeStrings.label}
+                </legend>
+                <div
+                  role="radiogroup"
+                  aria-labelledby="garment-subtype-legend"
+                  className="mt-2 flex flex-wrap gap-2"
+                >
+                  {subtypeOptions.map((value) => {
+                    const selected = (selectedSubtype ?? 'none') === value
+                    return (
+                      <button
+                        key={value}
+                        ref={(element) => {
+                          subtypeOptionRefs.current[value] = element
+                        }}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        tabIndex={selected ? 0 : -1}
+                        data-testid={`garment-tagging-subtype-${value}`}
+                        disabled={isSaving}
+                        onClick={() => selectSubtype(value)}
+                        onKeyDown={(event) =>
+                          moveSelection(
+                            event,
+                            subtypeOptions,
+                            selectedSubtype ?? 'none',
+                            subtypeOptionRefs,
+                            selectSubtype
+                          )
+                        }
+                        className={`min-h-11 min-w-11 rounded-lg border px-3 text-sm font-semibold disabled:opacity-60 ${selected ? 'border-inverse bg-inverse text-on-inverse' : 'border-line-strong bg-page text-ink'}`}
+                      >
+                        {value === 'none'
+                          ? subtypeStrings.none
+                          : subtypeStrings.values[value]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </fieldset>
+            )}
 
             {/* Material Group */}
             <fieldset className="flex flex-col gap-2 border-0 p-0 m-0">

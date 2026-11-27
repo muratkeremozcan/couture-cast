@@ -211,6 +211,9 @@ export const frCA: GuestPreviewStrings = {
       accessory: "l'accessoire",
     },
     garmentType: {
+      tank: 'Hauts sans manches',
+      'crop-top': 'Hauts courts',
+      leggings: 'Leggings',
       tee: 'T-shirts',
       shirt: 'Chemises',
       sweater: 'Chandails',
@@ -307,6 +310,33 @@ export const frCA: GuestPreviewStrings = {
     'no-eligible': 'Aucune tenue de « {collection} » ne convient à ces réglages.',
   },
   garments: {
+    'lined-blazer': {
+      name: 'Veston doublé',
+      description: 'Un veston bleu ardoise en laine tissée serrée.',
+    },
+    camisole: { name: 'Camisole en soie', description: 'Soie rose à bretelles fines.' },
+    tank: {
+      name: 'Chandail sans manches côtelé',
+      description: 'Coton côtelé vert sauge.',
+    },
+    'crop-top': { name: 'Haut court en coton', description: 'Un t-shirt court lilas.' },
+    'maxi-skirt': {
+      name: 'Jupe longue en lin',
+      description: 'Une jupe longue bleue en lin.',
+    },
+    leggings: {
+      name: 'Leggings extensibles',
+      description: 'Leggings anthracite à taille large.',
+    },
+    'moto-jacket': {
+      name: 'Veste de moto en cuir',
+      description: 'Cuir noir à fermeture diagonale.',
+    },
+    'moto-boots': {
+      name: 'Bottes de moto',
+      description: 'Bottes en cuir foncé à boucle.',
+    },
+    'knee-boots': { name: 'Bottes au genou', description: 'Bottes hautes en cuir brun.' },
     'ribbed-knit': {
       name: 'Tricot côtelé',
       description: 'Chandail de coton crème en maille côtelée.',
@@ -441,6 +471,26 @@ export const frCA: GuestPreviewStrings = {
     },
   },
   looks: {
+    'weekend-layers': {
+      name: 'En couches la fin de semaine',
+      description: 'Tricot côtelé, leggings, bottes de moto et bas.',
+    },
+    'skirt-and-boots': {
+      name: 'Jupe et bottes hautes',
+      description: 'Chandail, minijupe, collants et bottes au genou.',
+    },
+    'summer-skirt': {
+      name: 'Jupe estivale',
+      description: 'Camisole en soie, jupe longue et sandales.',
+    },
+    'sunny-weekend': {
+      name: 'Fin de semaine au soleil',
+      description: 'Chandail sans manches, pantalon en lin et sandales.',
+    },
+    'midi-and-sneakers': {
+      name: 'Jupe midi et espadrilles',
+      description: 'Haut court, jupe midi et espadrilles blanches.',
+    },
     'mini-and-tights': {
       name: 'Minijupe et collants',
       description: 'Tricot côtelé, minijupe prune, collants opaques et bottillons.',

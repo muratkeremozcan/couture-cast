@@ -829,9 +829,9 @@ describe('7.5 opt-in garment colorFamily', () => {
     ).toThrow(/retentionStatus/)
   })
 
-  it('[P1] [7.5-UNIT-012] documents the header on the list and the tag update, at version 1.11.0', () => {
+  it('[P1] [7.5-UNIT-012] documents the header on the list and the tag update, at version 1.12.0', () => {
     const spec = generateHttpOpenApiDocument()
-    expect(spec.info.version).toBe('1.11.0')
+    expect(spec.info.version).toBe('1.12.0')
     type Operation = {
       parameters?: {
         in?: string

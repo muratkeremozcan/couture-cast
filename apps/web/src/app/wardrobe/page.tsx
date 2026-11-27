@@ -20,11 +20,9 @@ import React, {
 import { useSearchParams } from 'next/navigation'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import {
-  garmentCategoryEnum,
   wardrobeOnboardingStepEnum,
-  type GarmentCategory,
   type GarmentItemContract,
-  type GarmentWithColor,
+  type GarmentWithTags,
   type WardrobeOnboardingStep,
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
@@ -53,9 +51,10 @@ import {
 } from '../../lib/use-web-session'
 import {
   formatGarmentAlt,
-  formatGarmentCategory,
   formatGarmentTagLabels,
   getGuestPreviewStrings,
+  filterCloset,
+  type ClosetGarmentFilter,
   nextStylePiecePhotoExpiry,
   scheduleStylePiecePhotoExpiry,
   type StylePieceSelection,
@@ -636,20 +635,6 @@ function ClosetAccountNotices({
   )
 }
 
-function useClosetCategories(garments: readonly ClosetGarment[]) {
-  const [category, setCategory] = useState<GarmentCategory | 'all'>('all')
-  const categories = garmentCategoryEnum.options.filter((option) =>
-    garments.some((garment) => garment.category === option)
-  )
-  const activeCategory =
-    category !== 'all' && categories.includes(category) ? category : 'all'
-  const filteredGarments =
-    activeCategory === 'all'
-      ? garments
-      : garments.filter((garment) => garment.category === activeCategory)
-  return { categories, activeCategory, filteredGarments, setCategory }
-}
-
 function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: boolean }) {
   const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language)
@@ -732,7 +717,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
   const { detailGarmentId, openGarmentDetail, closeGarmentDetail, paramSync } =
     useGarmentDetailRoute(garmentOpenRefs)
 
-  const handleDetailTagsSaved = (updated: GarmentWithColor, startedVersion?: number) => {
+  const handleDetailTagsSaved = (updated: GarmentWithTags, startedVersion?: number) => {
     // A closet read that landed while the save was in flight is newer than this answer for
     // every other field, so keep it and read again instead of applying a stale row.
     if (startedVersion !== undefined && startedVersion !== inventoryVersion.current) {
@@ -762,8 +747,16 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
   })
   // A piece inside its Undo window, or being sent, is hidden from the grid and the detail.
   const visibleGarments = withoutPendingDeletes(garments, pendingDeleteIds)
-  const { categories, activeCategory, filteredGarments, setCategory } =
-    useClosetCategories(visibleGarments)
+  const [closetFilter, setClosetFilter] = useState<ClosetGarmentFilter>({
+    category: 'all',
+    subtype: 'all',
+  })
+  const { filterChips, filteredGarments } = filterCloset(
+    visibleGarments,
+    closetFilter,
+    i18n.language,
+    t('wardrobe.hub.categoryAll')
+  )
 
   /**
    * D7: the detail closes to the grid at its saved scroll position, and focus moves to the next
@@ -1162,18 +1155,16 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                     data-testid="closet-category-filters"
                     className="mb-2 flex w-full gap-2 overflow-x-auto py-1"
                   >
-                    {(['all', ...categories] as const).map((option) => (
+                    {filterChips.map(({ id, selected, label, filter }) => (
                       <button
-                        key={option}
+                        key={id}
                         type="button"
-                        aria-pressed={activeCategory === option}
-                        data-testid={`closet-category-${option}`}
-                        className={`min-h-touch min-w-touch max-w-full shrink-0 rounded-full border border-line-strong px-2 py-1 text-sm font-medium [overflow-wrap:anywhere] ${activeCategory === option ? 'bg-inverse text-on-inverse' : 'bg-page text-ink'}`}
-                        onClick={() => setCategory(option)}
+                        aria-pressed={selected}
+                        data-testid={id}
+                        className={`min-h-touch min-w-touch max-w-full shrink-0 rounded-full border border-line-strong px-2 py-1 text-sm font-medium [overflow-wrap:anywhere] ${selected ? 'bg-inverse text-on-inverse' : 'bg-page text-ink'}`}
+                        onClick={() => setClosetFilter(filter)}
                       >
-                        {option === 'all'
-                          ? t('wardrobe.hub.categoryAll')
-                          : formatGarmentCategory(i18n.language, option)}
+                        {label}
                       </button>
                     ))}
                   </div>

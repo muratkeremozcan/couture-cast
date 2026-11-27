@@ -62,6 +62,27 @@ export const SAMPLE_ART: Readonly<Record<SampleArtKey, readonly SampleArtPath[]>
       tone: 'secondary',
     },
   ],
+  camisole: [
+    {
+      d: 'M21 7 L24 7 L26 24 Q32 29 38 24 L40 7 L43 7 L43 25 L48 55 L16 55 L21 25 Z',
+      tone: 'primary',
+    },
+    { d: 'M24 25 Q32 32 40 25', tone: 'secondary', stroke: true },
+  ],
+  tank: [
+    {
+      d: 'M18 8 L25 8 Q25 21 32 21 Q39 21 39 8 L46 8 Q43 25 47 32 L47 56 L17 56 L17 32 Q21 25 18 8 Z',
+      tone: 'primary',
+    },
+    { d: 'M25 8 Q25 21 32 21 Q39 21 39 8', tone: 'secondary', stroke: true },
+  ],
+  'crop-top': [
+    {
+      d: 'M21 14 L27 12 Q32 18 37 12 L43 14 L55 25 L49 32 L45 29 L45 47 L19 47 L19 29 L15 32 L9 25 Z',
+      tone: 'primary',
+    },
+    { d: 'M19 44 L45 44 L45 47 L19 47 Z', tone: 'secondary' },
+  ],
   trousers: [
     { d: TROUSER_BODY, tone: 'primary' },
     { d: 'M18 8 L46 8 L46 13 L18 13 Z', tone: 'secondary' },
@@ -92,6 +113,18 @@ export const SAMPLE_ART: Readonly<Record<SampleArtKey, readonly SampleArtPath[]>
       d: 'M19 16 L45 16 L46 21 L18 21 Z M35 21 L37 44 L34 44 L32 21 Z',
       tone: 'secondary',
     },
+  ],
+  'maxi-skirt': [
+    { d: 'M23 5 L41 5 L53 60 L11 60 Z', tone: 'primary' },
+    {
+      d: 'M23 5 L41 5 L42 10 L22 10 Z M29 10 L23 60 M35 10 L41 60',
+      tone: 'secondary',
+      stroke: true,
+    },
+  ],
+  leggings: [
+    { d: 'M19 7 L45 7 L43 58 L35 58 L32 25 L29 58 L21 58 Z', tone: 'primary' },
+    { d: 'M19 7 L45 7 L45 13 L19 13 Z', tone: 'secondary' },
   ],
   'knit-dress': [
     {
@@ -152,6 +185,14 @@ export const SAMPLE_ART: Readonly<Record<SampleArtKey, readonly SampleArtPath[]>
     { d: SHORT_JACKET_BODY, tone: 'primary' },
     { d: 'M27 6 L32 13 L37 6 L36 18 L32 26 L28 18 Z', tone: 'secondary' },
   ],
+  'moto-jacket': [
+    { d: SHORT_JACKET_BODY, tone: 'primary' },
+    {
+      d: 'M27 6 L32 13 L37 6 M36 10 L23 47 M37 34 L44 31 M20 43 L46 43',
+      tone: 'secondary',
+      stroke: true,
+    },
+  ],
   fleece: [
     { d: SHORT_JACKET_BODY, tone: 'primary' },
     { d: 'M32 6 L32 48 M27 6 L37 6 L37 10 L27 10 Z', tone: 'secondary', stroke: true },
@@ -159,6 +200,20 @@ export const SAMPLE_ART: Readonly<Record<SampleArtKey, readonly SampleArtPath[]>
   boots: [
     { d: 'M18 10 L32 10 L32 40 L52 44 Q57 46 57 52 L57 56 L18 56 Z', tone: 'primary' },
     { d: 'M18 52 L57 52 L57 56 L18 56 Z', tone: 'secondary' },
+  ],
+  'moto-boots': [
+    { d: 'M15 18 L36 18 L37 37 L52 43 Q58 46 58 54 L58 57 L15 57 Z', tone: 'primary' },
+    {
+      d: 'M15 30 L37 30 L37 35 L15 35 Z M15 51 L58 51 L58 57 L15 57 Z',
+      tone: 'secondary',
+    },
+  ],
+  'knee-boots': [
+    {
+      d: 'M19 4 L37 4 Q37 24 34 41 L49 45 Q55 47 55 53 L55 57 L18 57 Z',
+      tone: 'primary',
+    },
+    { d: 'M19 4 L37 4 L37 9 L19 9 Z M18 52 L55 52 L55 57 L18 57 Z', tone: 'secondary' },
   ],
   sneakers: [
     { d: 'M7 27 L25 20 L35 27 L54 31 Q58 33 58 39 L58 43 L7 43 Z', tone: 'primary' },

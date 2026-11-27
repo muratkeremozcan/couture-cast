@@ -1,6 +1,8 @@
 // Learning path Step 56: Guest wardrobe and outfit preview.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 U-CATALOG-COMPLETE, U-CATALOG-FIXTURE-REACH and the art fallback.
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import { describe, expect, it } from 'vitest'
 import {
   resolveSampleArt,
@@ -66,6 +68,17 @@ describe('sample catalog (6.16 U-CATALOG-COMPLETE)', () => {
           expect(garments.get(id)?.collections, `${look.id} ${id}`).toContain(collection)
         }
       }
+    }
+  })
+
+  it('[7.19-CATALOG] points every preferred layer to outerwear in the look collections', () => {
+    for (const look of SAMPLE_CATALOG.looks) {
+      if (!look.layer) continue
+      const layer = garments.get(look.layer)
+      expect(layer?.category, look.id).toBe('outerwear')
+      expect(layer?.collections, look.id).toEqual(
+        expect.arrayContaining(look.collections)
+      )
     }
   })
 

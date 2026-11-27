@@ -2,6 +2,7 @@
 // like a persisted GarmentItem, RitualResponse, capsule or community post.
 import { z } from 'zod'
 import { COMFORT_RANGES } from '../comfort-rules'
+import { GARMENT_SUBTYPES, garmentSubtypeMatchesCategory } from './garment-subtypes'
 
 /** Mirrors `garmentCategoryEnum` in `@couture/api-client` contracts/http/wardrobe.ts. */
 export const SAMPLE_GARMENT_CATEGORIES = [
@@ -56,12 +57,17 @@ export const SAMPLE_ART_KEYS = [
   'sweater',
   'blouse',
   'polo',
+  'camisole',
+  'tank',
+  'crop-top',
   'trousers',
   'jeans',
   'shorts',
   'skirt',
   'pleated-skirt',
   'mini-skirt',
+  'maxi-skirt',
+  'leggings',
   'knit-dress',
   'wrap-dress',
   'sundress',
@@ -71,8 +77,11 @@ export const SAMPLE_ART_KEYS = [
   'puffer',
   'shell',
   'blazer',
+  'moto-jacket',
   'fleece',
   'boots',
+  'moto-boots',
+  'knee-boots',
   'sneakers',
   'loafers',
   'sandals',
@@ -102,6 +111,7 @@ export const sampleGarmentSchema = z
   .object({
     id: z.string().regex(SAMPLE_GARMENT_ID_PATTERN),
     category: z.enum(SAMPLE_GARMENT_CATEGORIES),
+    subtype: z.enum(GARMENT_SUBTYPES).optional(),
     material: z.enum(SAMPLE_GARMENT_MATERIALS).optional(),
     comfortRanges: z.array(z.enum(COMFORT_RANGES)).min(1),
     windResistant: z.boolean(),
@@ -115,6 +125,11 @@ export const sampleGarmentSchema = z
     provenance: sampleProvenanceSchema,
   })
   .strict()
+  .refine(
+    ({ category, subtype }) =>
+      subtype === undefined || garmentSubtypeMatchesCategory(category, subtype),
+    { path: ['subtype'], message: 'Subtype must match the garment category' }
+  )
 export type SampleGarment = z.infer<typeof sampleGarmentSchema>
 
 export const sampleLookSchema = z
@@ -122,6 +137,7 @@ export const sampleLookSchema = z
     id: z.string().regex(SAMPLE_LOOK_ID_PATTERN),
     collections: z.array(z.enum(SAMPLE_COLLECTIONS)).min(1),
     core: z.array(z.string().regex(SAMPLE_GARMENT_ID_PATTERN)).min(2),
+    layer: z.string().regex(SAMPLE_GARMENT_ID_PATTERN).optional(),
     feedbackCard: z.boolean(),
     preferences: sampleStylePreferencesSchema.optional(),
   })

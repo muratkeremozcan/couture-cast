@@ -5,21 +5,20 @@ import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 // Story 4.1 Task 4 step 1 owner: define Zod request and response envelope schemas and uploadGarmentBytes helper
 // Story 4.2 Task 4 step 1 owner: define suggestGarmentTags and updateGarmentTags HTTP contracts and Zod schemas in packages/api-client/src/contracts/http/wardrobe.ts
 import { z } from 'zod'
-import { GARMENT_COLOR_FAMILIES } from '@couture/utils'
+import {
+  GARMENT_COLOR_FAMILIES,
+  GARMENT_SUBTYPES,
+  SAMPLE_GARMENT_CATEGORIES,
+} from '@couture/utils'
 import {
   isoTimestampSchema,
   nonEmptyStringSchema,
   type RegisteredCommonHttpSchemas,
 } from './common'
 
-export const garmentCategoryEnum = z.enum([
-  'top',
-  'bottom',
-  'outerwear',
-  'dress',
-  'shoes',
-  'accessory',
-])
+export const garmentCategoryEnum = z.enum(SAMPLE_GARMENT_CATEGORIES)
+
+export const garmentSubtypeEnum = z.enum(GARMENT_SUBTYPES)
 
 export const garmentMaterialEnum = z.enum([
   'cotton',
@@ -296,10 +295,11 @@ export const suggestGarmentTagsResponseSchema = z
 export const GARMENT_TAGS_CHANGED_MESSAGE = 'GARMENT_TAGS_CHANGED' as const
 
 // Each field is optional so the published request stays additive (Optic refuses a new required
-// request property). A field that is left out is not compared; web and native send all three.
+// request property). The API compares only the fields the editor sends.
 export const garmentExpectedTagsSchema = z
   .object({
     category: garmentCategoryEnum.nullable().optional(),
+    subtype: garmentSubtypeEnum.nullable().optional(),
     material: garmentMaterialEnum.nullable().optional(),
     comfortRange: garmentComfortRangeEnum.nullable().optional(),
   })
@@ -309,6 +309,10 @@ export const updateGarmentTagsInputSchema = z
   .object({
     category: garmentCategoryEnum.openapi({
       enum: [...garmentCategoryEnum.options, null],
+    }),
+    subtype: garmentSubtypeEnum.nullable().optional().openapi({
+      description:
+        'Optional subtype for the selected category. Null clears the subtype. Omission keeps a compatible subtype.',
     }),
     material: garmentMaterialEnum.nullable().optional(),
     comfortRange: garmentComfortRangeEnum.openapi({
@@ -335,6 +339,7 @@ export const updateGarmentTagsResponseSchema = z
  * included, also keeps the legacy shape.
  */
 export const WARDROBE_GARMENT_COLOR_HEADER = 'x-couture-garment-color'
+export const WARDROBE_GARMENT_SUBTYPE_HEADER = 'x-couture-garment-subtype'
 export const TODAY_WARDROBE_HEADER = 'x-couture-today-wardrobe'
 
 /** The color families `classifyRgbColorFamily` in `@couture/utils` names. */
@@ -351,16 +356,18 @@ export const garmentItemWithColorSchema = garmentItemSchema
   .strict()
 
 /**
- * The one published (OpenAPI) shape of a garment read or tag update: `colorFamily` optional,
- * because it is present only for a request that sends the header. Generated SDK types follow
- * this shape. Runtime parsing stays strict: the API and the clients use the legacy and
- * WithColor schemas above and below.
+ * The published shape of garment list and tag responses. Each optional field has its own
+ * request header so installed clients can continue parsing the garment shape they requested.
  */
 export const garmentItemWireSchema = garmentItemSchema
   .extend({
     colorFamily: garmentColorFamilyEnum.nullable().optional().openapi({
       description:
         'Color family of the stored dominant garment color, null when none was computed. Present only when the request sends x-couture-garment-color: 1.',
+    }),
+    subtype: garmentSubtypeEnum.nullable().optional().openapi({
+      description:
+        'Garment subtype, or null when unset. Present only when the request sends x-couture-garment-subtype: 1.',
     }),
   })
   .strict()
@@ -412,15 +419,30 @@ export function parseUpdateGarmentTagsWithColorResponse(
   return { data: { ...legacy.data.data, colorFamily: null } }
 }
 
+// Current clients request both extensions. An older server can omit either field.
+const garmentClientSchema = garmentItemWireSchema.extend({
+  colorFamily: garmentColorFamilyEnum.nullable().default(null),
+})
+
+export const garmentListClientResponseSchema = garmentListWireResponseSchema.extend({
+  data: z.array(garmentClientSchema),
+})
+
+export const updateGarmentTagsClientResponseSchema =
+  updateGarmentTagsWireResponseSchema.extend({ data: garmentClientSchema })
+
 /** The request header schema both garment reads and the tag update publish. */
-const garmentColorHeaderSchema = z.object({
+const garmentMetadataHeaderSchema = z.object({
   [WARDROBE_GARMENT_COLOR_HEADER]: z.enum(['1']).optional().openapi({
     description:
       'Opt in to colorFamily on each garment. Omission, or any other value, preserves the strict legacy response.',
   }),
+  [WARDROBE_GARMENT_SUBTYPE_HEADER]: z.enum(['1']).optional().openapi({
+    description: 'Opt in to subtype on each garment independently of colorFamily.',
+  }),
 })
 
-const garmentListHeaderSchema = garmentColorHeaderSchema.extend({
+const garmentListHeaderSchema = garmentMetadataHeaderSchema.extend({
   [TODAY_WARDROBE_HEADER]: z
     .enum(['1'])
     .optional()
@@ -839,6 +861,7 @@ export type UpdateGarmentTagsResponse = z.infer<typeof updateGarmentTagsResponse
 export type GarmentUsageResponse = z.infer<typeof garmentUsageResponseSchema>
 export type GarmentColorFamilyContract = z.infer<typeof garmentColorFamilyEnum>
 export type GarmentWithColor = z.infer<typeof garmentItemWithColorSchema>
+export type GarmentWithTags = z.infer<typeof garmentClientSchema>
 export type GarmentListWithColorResponse = z.infer<
   typeof garmentListWithColorResponseSchema
 >
@@ -1393,7 +1416,7 @@ export function registerWardrobeContracts(
     responses: {
       200: {
         description:
-          'Persisted wardrobe garments. Each garment carries colorFamily only when the request sends x-couture-garment-color: 1.',
+          'Persisted wardrobe garments. Each garment carries colorFamily and subtype only when the corresponding header is set to 1.',
         content: {
           'application/json': {
             schema: registeredGarmentListResponse,
@@ -1588,11 +1611,11 @@ export function registerWardrobeContracts(
     method: 'patch',
     path: '/api/v1/wardrobe/garments/{garmentId}/tags',
     tags: ['wardrobe'],
-    summary: 'Confirm or edit garment category, material, and comfort tags',
+    summary: 'Confirm or edit garment category, subtype, material, and comfort tags',
     security: [{ bearerAuth: [] }],
     request: {
       params: garmentIdPathParamsSchema,
-      headers: garmentColorHeaderSchema,
+      headers: garmentMetadataHeaderSchema,
       body: {
         required: true,
         content: {
@@ -1605,7 +1628,7 @@ export function registerWardrobeContracts(
     responses: {
       200: {
         description:
-          'Garment tags updated successfully. The garment carries colorFamily only when the request sends x-couture-garment-color: 1.',
+          'Garment tags updated successfully. The garment carries colorFamily and subtype only when the corresponding header is set to 1.',
         content: {
           'application/json': {
             schema: registeredUpdateGarmentTagsResponse,

@@ -210,6 +210,9 @@ export const frFR: GuestPreviewStrings = {
       accessory: "l'accessoire",
     },
     garmentType: {
+      tank: 'Hauts sans manches',
+      'crop-top': 'Hauts courts',
+      leggings: 'Leggings',
       tee: 'T-shirts',
       shirt: 'Chemises',
       sweater: 'Pulls',
@@ -305,6 +308,36 @@ export const frFR: GuestPreviewStrings = {
     'no-eligible': 'Collection : {collection}. Aucun look ne convient à ces réglages.',
   },
   garments: {
+    'lined-blazer': {
+      name: 'Blazer doublé',
+      description: 'Un blazer bleu ardoise en laine à tissage serré.',
+    },
+    camisole: { name: 'Caraco en soie', description: 'Soie rose à fines bretelles.' },
+    tank: {
+      name: 'Débardeur côtelé',
+      description: 'Un débardeur vert sauge en coton côtelé.',
+    },
+    'crop-top': { name: 'Haut court en coton', description: 'Un t-shirt court lilas.' },
+    'maxi-skirt': {
+      name: 'Jupe longue en lin',
+      description: 'Une jupe longue bleue en lin.',
+    },
+    leggings: {
+      name: 'Legging extensible',
+      description: 'Legging anthracite à taille large.',
+    },
+    'moto-jacket': {
+      name: 'Blouson de moto en cuir',
+      description: 'Cuir noir à fermeture oblique.',
+    },
+    'moto-boots': {
+      name: 'Bottes de moto',
+      description: 'Bottes en cuir foncé à boucle.',
+    },
+    'knee-boots': {
+      name: 'Bottes au genou',
+      description: 'Bottes hautes en cuir marron.',
+    },
     'ribbed-knit': {
       name: 'Pull côtelé',
       description: 'Pull en coton crème à maille côtelée.',
@@ -438,6 +471,26 @@ export const frFR: GuestPreviewStrings = {
     },
   },
   looks: {
+    'weekend-layers': {
+      name: 'Week-end en couches',
+      description: 'Maille côtelée, legging, bottes de moto et chaussettes.',
+    },
+    'skirt-and-boots': {
+      name: 'Jupe et bottes hautes',
+      description: 'Pull, minijupe, collants et bottes au genou.',
+    },
+    'summer-skirt': {
+      name: 'Jupe estivale',
+      description: 'Caraco en soie, jupe longue et sandales.',
+    },
+    'sunny-weekend': {
+      name: 'Week-end au soleil',
+      description: 'Débardeur, pantalon en lin et sandales.',
+    },
+    'midi-and-sneakers': {
+      name: 'Jupe midi et baskets',
+      description: 'Haut court, jupe midi et baskets blanches.',
+    },
     'mini-and-tights': {
       name: 'Minijupe et collants',
       description: 'Pull côtelé, minijupe prune, collants opaques et bottines.',

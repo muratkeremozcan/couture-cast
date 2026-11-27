@@ -1,6 +1,8 @@
 // Story 4.2 Task 9 step 1 owner: E2E Playwright test for smart tagging modal accessibility and flow in playwright/tests/wardrobe-smart-tagging.spec.ts
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import path from 'node:path'
 import {
   createSavedLocationResponseSchema,
@@ -197,6 +199,11 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
         await bottomChip.press('Space')
         await expect(bottomChip).toHaveAttribute('aria-checked', 'true')
 
+        const subtypes = page.getByTestId('garment-tagging-subtype-picker')
+        await expect(subtypes).toBeVisible()
+        await expect(subtypes.getByTestId('garment-tagging-subtype-tank')).toHaveCount(0)
+        await subtypes.getByTestId('garment-tagging-subtype-mini-skirt').click()
+
         await page.getByRole('button', { name: 'Save tags' }).click()
         await expect(
           page.getByRole('dialog', { name: 'Organize Garment Tags' })
@@ -208,14 +215,20 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
         ).toBeEnabled()
       })
 
-      await test.step('Verify persistence after a browser reload', async () => {
+      await test.step('[7.19-CLOSET] Find the tagged subtype in Closet after a reload', async () => {
+        const closetRead = interceptNetworkCall({
+          method: 'GET',
+          url: '**/api/v1/wardrobe/garments*',
+        })
         await page.reload()
-        await expect(
-          page
-            .getByTestId(`garment-card-${awaitingGarment.id}`)
-            .getByTestId(`garment-open-${awaitingGarment.id}`)
-        ).toBeEnabled()
+        expect((await closetRead).status).toBe(200)
+        const openGarment = page.getByTestId(`garment-open-${awaitingGarment.id}`)
+        await expect(openGarment).toBeEnabled()
         await expect(page.getByRole('button', { name: 'Needs tags' })).toHaveCount(0)
+        await page.getByTestId('closet-category-bottom').click()
+        await page.getByTestId('closet-subtype-mini-skirt').click()
+        await openGarment.click()
+        await expect(page.getByTestId('garment-detail-subtype')).toHaveText(/mini skirt/i)
       })
 
       await test.step('Verify the confirmed garment is eligible for Ritual', async () => {
