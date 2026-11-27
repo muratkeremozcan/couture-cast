@@ -1,5 +1,7 @@
 # Learning path Step 56: Guest wardrobe and outfit preview.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
+# Learning path Step 76: Garment subtypes.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 # Story 6.16 owner: E-CONV-REAL-STACK on mobile, step 2 of 2. Not a standalone flow: the
 # signed-out runner runs it right after maestro/guest-preview-conversion.yaml, on the
 # sign-in screen that flow leaves open.
@@ -105,6 +107,11 @@ env:
           timeout: 30000
       - tapOn:
           id: 'garment-tag-category-bottom'
+      - scrollUntilVisible:
+          element:
+            id: 'garment-tag-comfort-mild'
+          direction: DOWN
+          centerElement: true
       - tapOn:
           id: 'garment-tag-comfort-mild'
       - tapOn:

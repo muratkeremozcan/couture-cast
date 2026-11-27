@@ -20,7 +20,10 @@ import {
   Text as RNText,
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
-import type { GarmentItemContract } from '@couture/api-client/contracts/http'
+import type {
+  GarmentItemContract,
+  GarmentWithTags,
+} from '@couture/api-client/contracts/http'
 
 import { Text, View, createSchemeStyles, useSchemeColors } from '@/components/themed'
 import { MobileGarmentCaptureModal } from '@/components/wardrobe/garment-capture-modal'
@@ -66,7 +69,7 @@ export function WardrobeOnboardingScreen() {
   const [permissionDenied, setPermissionDenied] = useState(false)
 
   const [accessToken, setAccessToken] = useState('')
-  const [garments, setGarments] = useState<GarmentItemContract[]>([])
+  const [garments, setGarments] = useState<Omit<GarmentWithTags, 'colorFamily'>[]>([])
   const [isCaptureOpen, setIsCaptureOpen] = useState(false)
   const [taggingGarmentId, setTaggingGarmentId] = useState<string | null>(null)
 
@@ -451,6 +454,7 @@ export function WardrobeOnboardingScreen() {
         visible={Boolean(taggingGarmentId)}
         onClose={() => setTaggingGarmentId(null)}
         garmentId={taggingGarmentId}
+        initialGarment={garments.find((garment) => garment.id === taggingGarmentId)}
         accessToken={accessToken}
         onTagsConfirmed={(updatedGarment) => {
           setGarments((current) =>

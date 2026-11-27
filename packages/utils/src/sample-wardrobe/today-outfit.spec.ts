@@ -209,6 +209,21 @@ describe('Today outfit slots and saved composition', () => {
     })
   })
 
+  it('[7.19-SWAP] omits an owned subtype that conflicts with the recommendation category', () => {
+    const owned = { ...closet, category: 'bottom', subtype: 'mini-skirt' } as const
+    const slots = buildTodaySlots(
+      {
+        id: 'stale-recommendation',
+        garmentIds: [owned.id],
+        displayGarments: [{ id: owned.id, category: 'top' }],
+      },
+      mild,
+      [owned]
+    )
+    expect(slots[0]).toMatchObject({ itemId: owned.id, category: 'top' })
+    expect(slots[0]?.subtype).toBeUndefined()
+  })
+
   it('writes the selected condition, date and ordered slots without photo access', () => {
     const slots = buildTodaySlots(
       {

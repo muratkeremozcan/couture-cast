@@ -8,8 +8,10 @@ import type {
   GarmentMaterial,
   GarmentComfortRange,
   GarmentItemContract,
+  GarmentWithTags,
   SuggestGarmentTagsData,
   SuggestGarmentTagsSuggestedData,
+  UpdateGarmentTagsInput,
 } from '@couture/api-client/contracts/http'
 import {
   garmentSubtypeMatchesCategory,
@@ -29,6 +31,7 @@ export interface GarmentTaggingModalProps {
   isOpen: boolean
   onClose: () => void
   garmentId: string | null
+  initialGarment?: Pick<GarmentWithTags, 'id' | 'category' | 'subtype'>
   onTagsConfirmed?: (garment: GarmentItemContract) => void
   invokingElementRef?: React.RefObject<HTMLElement | null>
   suggestTagsFn?: (
@@ -37,12 +40,7 @@ export interface GarmentTaggingModalProps {
   ) => Promise<SuggestGarmentTagsData>
   updateTagsFn?: (
     garmentId: string,
-    tags: {
-      category: GarmentCategory
-      subtype?: GarmentSubtype
-      material?: GarmentMaterial | null
-      comfortRange: GarmentComfortRange
-    },
+    tags: UpdateGarmentTagsInput,
     signal?: AbortSignal
   ) => Promise<GarmentItemContract>
 }
@@ -123,6 +121,7 @@ export function GarmentTaggingModal({
   isOpen,
   onClose,
   garmentId,
+  initialGarment,
   onTagsConfirmed,
   invokingElementRef,
   suggestTagsFn = suggestGarmentTagsFromWeb,
@@ -131,8 +130,9 @@ export function GarmentTaggingModal({
   // The modal mounts under the wardrobe page's provider and under onboarding; the shared instance
   // keeps it on the same language without requiring either.
   const { t, i18n } = useTranslation(undefined, { i18n: getI18n() })
-  const [selectedCategory, setSelectedCategory] = useState<GarmentCategory | null>(null)
-  const [selectedSubtype, setSelectedSubtype] = useState<GarmentSubtype | null>(null)
+  const [chosenCategory, setChosenCategory] = useState<GarmentCategory | null>(null)
+  // Undefined leaves the stored subtype alone. A member's explicit None is null.
+  const [chosenSubtype, setChosenSubtype] = useState<GarmentSubtype | null>()
   const [selectedMaterial, setSelectedMaterial] = useState<GarmentMaterial | null>(null)
   const [selectedComfort, setSelectedComfort] = useState<GarmentComfortRange | null>(null)
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState<boolean>(false)
@@ -154,19 +154,17 @@ export function GarmentTaggingModal({
   const saveAbortRef = useRef<AbortController | null>(null)
   const saveRequestIdRef = useRef(0)
   const touchedFieldsRef = useRef({
-    category: false,
     material: false,
     comfort: false,
   })
 
   useEffect(() => {
     touchedFieldsRef.current = {
-      category: false,
       material: false,
       comfort: false,
     }
-    setSelectedCategory(null)
-    setSelectedSubtype(null)
+    setChosenCategory(null)
+    setChosenSubtype(undefined)
     setSelectedMaterial(null)
     setSelectedComfort(null)
     setSuggestions(null)
@@ -194,9 +192,6 @@ export function GarmentTaggingModal({
           return
         }
         setSuggestions(data)
-        if (data.suggestions.category.isConfident && !touchedFieldsRef.current.category) {
-          setSelectedCategory(data.suggestions.category.value)
-        }
         if (data.suggestions.material.isConfident && !touchedFieldsRef.current.material) {
           setSelectedMaterial(data.suggestions.material.value)
         }
@@ -275,10 +270,11 @@ export function GarmentTaggingModal({
   }
 
   const selectCategory = (value: GarmentCategory) => {
-    touchedFieldsRef.current.category = true
-    setSelectedCategory(value)
-    setSelectedSubtype((subtype) =>
-      garmentSubtypeMatchesCategory(value, subtype) ? subtype : null
+    setChosenCategory(value)
+    setChosenSubtype((subtype) =>
+      subtype == null || garmentSubtypeMatchesCategory(value, subtype)
+        ? subtype
+        : undefined
     )
   }
 
@@ -291,6 +287,20 @@ export function GarmentTaggingModal({
     touchedFieldsRef.current.comfort = true
     setSelectedComfort(value)
   }
+
+  const storedGarment = initialGarment?.id === garmentId ? initialGarment : undefined
+  const storedCategory = storedGarment?.category ?? null
+  const storedSubtype = storedGarment?.subtype
+  const hasStoredSubtype = garmentSubtypeMatchesCategory(storedCategory, storedSubtype)
+  const suggestedCategory = suggestions?.suggestions.category
+  const selectedCategory =
+    chosenCategory ??
+    (hasStoredSubtype ? storedCategory : null) ??
+    (suggestedCategory?.isConfident ? suggestedCategory.value : null)
+  const selectedSubtype =
+    chosenSubtype === undefined && hasStoredSubtype && selectedCategory === storedCategory
+      ? storedSubtype
+      : (chosenSubtype ?? null)
 
   const handleSave = async () => {
     if (!garmentId || !selectedCategory || !selectedComfort) {
@@ -313,7 +323,7 @@ export function GarmentTaggingModal({
         garmentId,
         {
           category: selectedCategory,
-          ...(selectedSubtype && { subtype: selectedSubtype }),
+          ...(chosenSubtype !== undefined && { subtype: chosenSubtype }),
           material: selectedMaterial,
           comfortRange: selectedComfort,
         },
@@ -337,8 +347,10 @@ export function GarmentTaggingModal({
   const subtypes = garmentSubtypesForCategory(selectedCategory)
   const subtypeOptions = ['none', ...subtypes] as const
   const subtypeStrings = garmentSubtypeStrings(i18n.language)
-  const selectSubtype = (value: (typeof subtypeOptions)[number]) =>
-    setSelectedSubtype(value === 'none' ? null : value)
+  const selectSubtype = (value: (typeof subtypeOptions)[number]) => {
+    setChosenCategory(selectedCategory)
+    setChosenSubtype(value === 'none' ? null : value)
+  }
   const isSaveDisabled =
     !selectedCategory || !selectedComfort || isSaving || isAnalysisPending
 

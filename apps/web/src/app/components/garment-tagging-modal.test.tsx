@@ -675,6 +675,49 @@ describe('GarmentTaggingModal manual mode', () => {
     expect(onTagsConfirmed).toHaveBeenCalledWith(mockUpdatedGarment)
   })
 
+  it.each([
+    {
+      behavior: 'omits a stored subtype that the member left untouched',
+      clear: false,
+      expectedSubtype: {},
+    },
+    {
+      behavior: 'sends null when the member chooses None',
+      clear: true,
+      expectedSubtype: { subtype: null },
+    },
+  ])('[7.19-CLOSET] $behavior', async ({ clear, expectedSubtype }) => {
+    const user = userEvent.setup()
+    const updateTagsFn = vi.fn().mockResolvedValue(mockUpdatedGarment)
+    render(
+      <GarmentTaggingModal
+        isOpen
+        onClose={vi.fn()}
+        garmentId="garment-1"
+        initialGarment={{ id: 'garment-1', category: 'top', subtype: 'camisole' }}
+        onTagsConfirmed={vi.fn()}
+        suggestTagsFn={vi
+          .fn()
+          .mockResolvedValue(createManualSuggestGarmentTagsDataFixture())}
+        updateTagsFn={updateTagsFn}
+      />
+    )
+    await screen.findByText(MANUAL_COPY)
+    const subtypes = within(screen.getByRole('radiogroup', { name: 'Subtype' }))
+    expect(subtypes.getByRole('radio', { name: 'Camisole' })).toBeChecked()
+    if (clear) await user.click(subtypes.getByRole('radio', { name: 'None' }))
+    await user.click(screen.getByRole('radio', { name: /Cool/ }))
+    await user.click(screen.getByRole('button', { name: 'Save tags' }))
+
+    await waitFor(() =>
+      expect(updateTagsFn).toHaveBeenCalledExactlyOnceWith(
+        'garment-1',
+        { category: 'top', material: null, comfortRange: 'cool', ...expectedSubtype },
+        expect.any(AbortSignal)
+      )
+    )
+  })
+
   it('returns to the suggestion copy when the next garment is not manual', async () => {
     const suggestTagsFn = vi
       .fn()

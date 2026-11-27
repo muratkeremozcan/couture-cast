@@ -330,6 +330,9 @@ export const updateGarmentTagsInputSchema = z
       subtype == null || garmentSubtypeMatchesCategory(category, subtype),
     { path: ['subtype'], message: 'Subtype must match the garment category' }
   )
+  .openapi({
+    description: 'A garment subtype must belong to the selected category when set.',
+  })
 
 export const updateGarmentTagsResponseSchema = z
   .object({

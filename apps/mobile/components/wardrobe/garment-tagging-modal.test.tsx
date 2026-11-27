@@ -631,11 +631,12 @@ describe('MobileGarmentTaggingModal manual mode', () => {
     vi.restoreAllMocks()
   })
 
-  type UpdateTagsFn = React.ComponentProps<
-    typeof MobileGarmentTaggingModal
-  >['updateTagsFn']
-
-  function renderManual(overrides: { updateTagsFn?: UpdateTagsFn } = {}) {
+  function renderManual(
+    overrides: Pick<
+      React.ComponentProps<typeof MobileGarmentTaggingModal>,
+      'initialGarment' | 'updateTagsFn'
+    > = {}
+  ) {
     const suggestTagsFn = vi
       .fn()
       .mockResolvedValue(
@@ -646,6 +647,7 @@ describe('MobileGarmentTaggingModal manual mode', () => {
         visible={true}
         onClose={vi.fn()}
         garmentId="g_123"
+        initialGarment={overrides.initialGarment}
         accessToken="test_token"
         suggestTagsFn={suggestTagsFn}
         updateTagsFn={
@@ -711,6 +713,44 @@ describe('MobileGarmentTaggingModal manual mode', () => {
         expect.any(AbortSignal)
       )
     })
+  })
+
+  it.each([
+    {
+      behavior: 'omits a stored subtype that the member left untouched',
+      clear: false,
+      expectedSubtype: {},
+    },
+    {
+      behavior: 'sends null when the member chooses None',
+      clear: true,
+      expectedSubtype: { subtype: null },
+    },
+  ])('[7.19-CLOSET] $behavior', async ({ clear, expectedSubtype }) => {
+    const updateTagsFn = vi
+      .fn()
+      .mockResolvedValue(createReadyGarmentFixture({ id: 'g_123' }))
+    renderManual({
+      updateTagsFn,
+      initialGarment: { id: 'g_123', category: 'top', subtype: 'camisole' },
+    })
+    await screen.findByTestId('garment-tagging-manual-notice')
+    expect(screen.getByTestId('garment-tagging-subtype-camisole')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    if (clear) fireEvent.click(screen.getByTestId('garment-tagging-subtype-none'))
+    fireEvent.click(screen.getByTestId('garment-tag-comfort-cool'))
+    fireEvent.click(screen.getByTestId('garment-tagging-save'))
+
+    await waitFor(() =>
+      expect(updateTagsFn).toHaveBeenCalledExactlyOnceWith(
+        'test_token',
+        'g_123',
+        { category: 'top', material: null, comfortRange: 'cool', ...expectedSubtype },
+        expect.any(AbortSignal)
+      )
+    )
   })
 })
 

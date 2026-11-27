@@ -1307,6 +1307,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
         isOpen={Boolean(taggingGarmentId)}
         onClose={() => setTaggingGarmentId(null)}
         garmentId={taggingGarmentId}
+        initialGarment={garments.find((garment) => garment.id === taggingGarmentId)}
         onTagsConfirmed={handleTagsConfirmed}
         invokingElementRef={taggingInvokerRef}
       />

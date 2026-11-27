@@ -118,7 +118,7 @@ export function buildTodaySlots(
     return {
       itemId,
       category,
-      ...(owned?.subtype && { subtype: owned.subtype }),
+      ...(owned?.subtype && owned.category === category && { subtype: owned.subtype }),
       imageAccess: piece?.imageAccess,
       kind: 'garment',
       art: neutralArt,

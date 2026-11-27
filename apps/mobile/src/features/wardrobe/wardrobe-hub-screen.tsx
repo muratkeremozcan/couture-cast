@@ -782,6 +782,7 @@ function MemberWardrobeHub({
         visible={Boolean(taggingGarmentId)}
         onClose={closeTagging}
         garmentId={taggingGarmentId}
+        initialGarment={garments.find((garment) => garment.id === taggingGarmentId)}
         accessToken={accessToken}
         invokingNodeHandle={taggingInvokerNodeHandle}
         onTagsConfirmed={(updatedGarment) => {

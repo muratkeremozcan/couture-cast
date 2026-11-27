@@ -21009,7 +21009,7 @@ export type UpdateCommunityChallengeInputClimateBandEnum =
   (typeof UpdateCommunityChallengeInputClimateBandEnum)[keyof typeof UpdateCommunityChallengeInputClimateBandEnum]
 
 /**
- *
+ * A garment subtype must belong to the selected category when set.
  * @export
  * @interface UpdateGarmentTagsInput
  */

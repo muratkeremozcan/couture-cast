@@ -5302,7 +5302,8 @@
           "category",
           "comfortRange"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "A garment subtype must belong to the selected category when set."
       },
       "UpdateGarmentTagsResponse": {
         "type": "object",

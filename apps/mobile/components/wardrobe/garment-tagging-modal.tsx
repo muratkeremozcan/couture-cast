@@ -16,8 +16,10 @@ import type {
   GarmentMaterial,
   GarmentComfortRange,
   GarmentItemContract,
+  GarmentWithTags,
   SuggestGarmentTagsData,
   SuggestGarmentTagsSuggestedData,
+  UpdateGarmentTagsInput,
 } from '@couture/api-client/contracts/http'
 import {
   garmentSubtypeMatchesCategory,
@@ -44,6 +46,7 @@ export interface MobileGarmentTaggingModalProps {
   visible: boolean
   onClose: () => void
   garmentId: string | null
+  initialGarment?: Pick<GarmentWithTags, 'id' | 'category' | 'subtype'>
   accessToken: string
   onTagsConfirmed?: (garment: GarmentItemContract) => void
   suggestTagsFn?: (
@@ -54,12 +57,7 @@ export interface MobileGarmentTaggingModalProps {
   updateTagsFn?: (
     accessToken: string,
     garmentId: string,
-    tags: {
-      category: GarmentCategory
-      subtype?: GarmentSubtype
-      material?: GarmentMaterial | null
-      comfortRange: GarmentComfortRange
-    },
+    tags: UpdateGarmentTagsInput,
     signal?: AbortSignal
   ) => Promise<GarmentItemContract>
   invokingNodeHandle?: number | null
@@ -122,6 +120,7 @@ export function MobileGarmentTaggingModal({
   visible,
   onClose,
   garmentId,
+  initialGarment,
   accessToken,
   onTagsConfirmed,
   suggestTagsFn = suggestGarmentTagsFromMobile,
@@ -135,8 +134,9 @@ export function MobileGarmentTaggingModal({
   const colors = useSchemeColors()
   const { scrim } = useTokens()
   const { announce } = useAccessibilityAnnouncer()
-  const [selectedCategory, setSelectedCategory] = useState<GarmentCategory | null>(null)
-  const [selectedSubtype, setSelectedSubtype] = useState<GarmentSubtype | null>(null)
+  const [chosenCategory, setChosenCategory] = useState<GarmentCategory | null>(null)
+  // Undefined leaves the stored subtype alone. A member's explicit None is null.
+  const [chosenSubtype, setChosenSubtype] = useState<GarmentSubtype | null>()
   const [selectedMaterial, setSelectedMaterial] = useState<GarmentMaterial | null>(null)
   const [selectedComfort, setSelectedComfort] = useState<GarmentComfortRange | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(false)
@@ -200,8 +200,8 @@ export function MobileGarmentTaggingModal({
 
   useEffect(() => {
     if (!visible || !garmentId) {
-      setSelectedCategory(null)
-      setSelectedSubtype(null)
+      setChosenCategory(null)
+      setChosenSubtype(undefined)
       setSelectedMaterial(null)
       setSelectedComfort(null)
       setSuggestions(null)
@@ -214,8 +214,8 @@ export function MobileGarmentTaggingModal({
 
     const controller = new AbortController()
     let isMounted = true
-    setSelectedCategory(null)
-    setSelectedSubtype(null)
+    setChosenCategory(null)
+    setChosenSubtype(undefined)
     setSelectedMaterial(null)
     setSelectedComfort(null)
     setSuggestions(null)
@@ -234,9 +234,6 @@ export function MobileGarmentTaggingModal({
           return
         }
         setSuggestions(data)
-        if (data.suggestions.category.isConfident) {
-          setSelectedCategory(data.suggestions.category.value)
-        }
         if (data.suggestions.material.isConfident) {
           setSelectedMaterial(data.suggestions.material.value)
         }
@@ -274,6 +271,20 @@ export function MobileGarmentTaggingModal({
     }
   }, [accessToken, announce, garmentId, loadAttempt, suggestTagsFn, t, visible])
 
+  const storedGarment = initialGarment?.id === garmentId ? initialGarment : undefined
+  const storedCategory = storedGarment?.category ?? null
+  const storedSubtype = storedGarment?.subtype
+  const hasStoredSubtype = garmentSubtypeMatchesCategory(storedCategory, storedSubtype)
+  const suggestedCategory = suggestions?.suggestions.category
+  const selectedCategory =
+    chosenCategory ??
+    (hasStoredSubtype ? storedCategory : null) ??
+    (suggestedCategory?.isConfident ? suggestedCategory.value : null)
+  const selectedSubtype =
+    chosenSubtype === undefined && hasStoredSubtype && selectedCategory === storedCategory
+      ? storedSubtype
+      : (chosenSubtype ?? null)
+
   const handleSave = async () => {
     if (!garmentId || !selectedCategory || !selectedComfort) {
       const message = t('wardrobe.tagging.selection_required')
@@ -294,7 +305,7 @@ export function MobileGarmentTaggingModal({
         garmentId,
         {
           category: selectedCategory,
-          ...(selectedSubtype && { subtype: selectedSubtype }),
+          ...(chosenSubtype !== undefined && { subtype: chosenSubtype }),
           material: selectedMaterial,
           comfortRange: selectedComfort,
         },
@@ -438,9 +449,11 @@ export function MobileGarmentTaggingModal({
                       accessibilityLabel={label}
                       disabled={isSaving}
                       onPress={() => {
-                        setSelectedCategory(opt)
-                        setSelectedSubtype((subtype) =>
-                          garmentSubtypeMatchesCategory(opt, subtype) ? subtype : null
+                        setChosenCategory(opt)
+                        setChosenSubtype((subtype) =>
+                          subtype == null || garmentSubtypeMatchesCategory(opt, subtype)
+                            ? subtype
+                            : undefined
                         )
                         announce('feedback', label)
                       }}
@@ -479,7 +492,8 @@ export function MobileGarmentTaggingModal({
                           accessibilityLabel={label}
                           disabled={isSaving}
                           onPress={() => {
-                            setSelectedSubtype(value)
+                            setChosenCategory(selectedCategory)
+                            setChosenSubtype(value)
                             announce('feedback', label)
                           }}
                           style={[styles.chip, selected && styles.chipSelected]}

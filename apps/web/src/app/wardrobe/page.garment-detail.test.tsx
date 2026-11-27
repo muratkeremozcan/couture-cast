@@ -378,8 +378,8 @@ describe('Closet garment detail', () => {
     await user.click(await screen.findByTestId('garment-edit-tags'))
     await user.click(screen.getByRole('button', { name: 'Tank top' }))
     await user.click(screen.getByTestId('garment-tag-done'))
-    expect(await screen.findByTestId('garment-detail-subtype')).toHaveTextContent(
-      /^Tank top$/
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-detail-subtype')).toHaveTextContent(/^Tank top$/)
     )
 
     await user.click(await screen.findByTestId('status-bar-action-undo'))

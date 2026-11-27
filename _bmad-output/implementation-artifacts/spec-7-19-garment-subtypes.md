@@ -114,6 +114,15 @@ It accounted for 23 documentation and version-comment exclusions.
 | P3-2    | Confirmed | Distinguish subtype filters and clear a filter when the member removes its last matching garment.                                              |
 | P3-3    | Confirmed | Link Step 76 to the acceptance tests and close the spec and sprint entry before publishing.                                                    |
 
+CodeRabbit ran one automatic review on `30d483ec153f2816f88b83300fa24ca5833a2f44`.
+Two findings were in threads and one was in the review body.
+
+| Finding                  | Action                                                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Saved subtype assertion  | Wait for the updated subtype text after save.                                                               |
+| Stale Today category     | Copy an owned subtype only when the inventory category matches the slot.                                    |
+| Initial tag confirmation | Show a compatible stored subtype. Keep the value when untouched and send null when the member chooses None. |
+
 ## Verification
 
 - Run the touched workspace type checks, formatter, and lint. Use GitHub Actions for the unit,

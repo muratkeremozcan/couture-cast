@@ -22467,7 +22467,8 @@ Use subtype tags to find a specific piece in Closet and choose which piece goes 
   [wardrobe HTTP tests](../../apps/api/integration/wardrobe-garment-color-http.integration.spec.ts),
   and [generator tests](../../apps/api/src/modules/personalization/ritual-generation.engine.spec.ts).
 - [Web tagging](../../playwright/tests/wardrobe-smart-tagging.spec.ts),
-  [live Today swap](../../playwright/tests/today-outfit-picture.spec.ts), and
+  [live Today swap](../../playwright/tests/today-outfit-picture.spec.ts),
+  [persistent tag editing](../../playwright/tests/wardrobe-garment-detail.spec.ts), and
   [web garment detail](../../apps/web/src/app/wardrobe/page.garment-detail.test.tsx).
 - [Native tag edit](../../apps/mobile/src/features/wardrobe/garment-detail-screen.test.tsx)
   and [native Closet filters](../../apps/mobile/src/features/wardrobe/wardrobe-hub-screen.test.tsx).
@@ -22483,4 +22484,7 @@ Use subtype tags to find a specific piece in Closet and choose which piece goes 
   [native swap picture](../../apps/mobile/components/home/today-outfit-picture.test.tsx),
   and [shared Today selection](../../packages/utils/src/sample-wardrobe/today-outfit.spec.ts).
 - [Preserving sample selections](../../packages/utils/src/sample-wardrobe/member-outfit.spec.ts).
+- [Wardrobe controller](../../apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts).
+- [Android smart tagging](../../maestro/garment-smart-tagging-flow.yaml)
+  and [guest conversion](../../maestro/guest-preview/guest-preview-conversion-verify.yaml).
 - [Step 75](#step-75-find-mini-skirts-tights-and-socks) covers the sample closet.
