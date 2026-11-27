@@ -1090,7 +1090,7 @@ function MemberRitual({
   return (
     <>
       {settled && (
-        <>
+        <div className={firstLook ? 'flex min-h-dvh flex-col gap-4' : 'contents'}>
           <TodayWeather ritual={ritual} city={city} locale={locale} />
           <MemberRitualOutfit
             ritual={ritual}
@@ -1107,26 +1107,26 @@ function MemberRitual({
             retry={retry}
           />
           {firstLook && <StyleMemberControls key={style.scope} style={style} />}
-        </>
-      )}
-      {liveOutfit && failure === 'failed' && (
-        <div
-          data-testid="home-outfit-refresh-failed"
-          className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-page px-3 text-sm"
-        >
-          <p role="status">{t('commerce.premium.planner.freshness.stale')}</p>
-          {retry}
+          {liveOutfit && failure === 'failed' && (
+            <div
+              data-testid="home-outfit-refresh-failed"
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-page px-3 text-sm"
+            >
+              <p role="status">{t('commerce.premium.planner.freshness.stale')}</p>
+              {retry}
+            </div>
+          )}
+          {ritual?.weather.alerts.map((alert) => (
+            <details
+              key={alert.start + alert.event}
+              className="rounded-lg border border-notice-line bg-notice-surface p-2 text-notice-ink"
+            >
+              <summary className="cursor-pointer font-semibold">{alert.event}</summary>
+              <p className="mt-2 text-sm">{alert.description}</p>
+            </details>
+          ))}
         </div>
       )}
-      {ritual?.weather.alerts.map((alert) => (
-        <details
-          key={alert.start + alert.event}
-          className="rounded-lg border border-notice-line bg-notice-surface p-2 text-notice-ink"
-        >
-          <summary className="cursor-pointer font-semibold">{alert.event}</summary>
-          <p className="mt-2 text-sm">{alert.description}</p>
-        </details>
-      ))}
       <HomeCloset pieces={pieces} />
       <Link
         href="/looks?segment=plan"
@@ -1137,12 +1137,7 @@ function MemberRitual({
         <span aria-hidden="true">›</span>
       </Link>
       {settled && (
-        <div className="space-y-3">
-          {!firstLook && (
-            <StyleMemberControls key={style.scope} style={style} showMood={false} />
-          )}
-          <StyleDayControls key={`day:${style.scope}`} style={style} />
-        </div>
+        <StyleDayControls key={style.scope} style={style} showTune={!firstLook} />
       )}
     </>
   )

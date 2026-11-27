@@ -108,7 +108,13 @@ export function StyleMoodRow({
   )
 }
 
-export function StyleDayControls({ style }: { style: StyleState }) {
+export function StyleDayControls({
+  style,
+  showTune = false,
+}: {
+  style: StyleState
+  showTune?: boolean
+}) {
   const copy = useStyleCopy()
   const palette = useHeroPalette()
   const [open, setOpen] = useState(false)
@@ -161,6 +167,7 @@ export function StyleDayControls({ style }: { style: StyleState }) {
             disabled={!day}
             onPress={() => store.updateDay(scope, null)}
           />
+          {showTune && <StyleMemberControls style={style} showMood={false} />}
         </View>
       )}
     </View>

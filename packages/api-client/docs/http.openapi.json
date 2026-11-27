@@ -4552,7 +4552,8 @@
               ]
             },
             "maxItems": 3,
-            "description": "The pieces the member prefers to avoid. Each choice may appear once."
+            "description": "The pieces the member prefers to avoid. Each choice may appear once.",
+            "uniqueItems": true
           }
         },
         "additionalProperties": false,
@@ -4621,7 +4622,8 @@
                   ]
                 },
                 "maxItems": 3,
-                "description": "The pieces the member prefers to avoid. Each choice may appear once."
+                "description": "The pieces the member prefers to avoid. Each choice may appear once.",
+                "uniqueItems": true
               }
             },
             "required": [
@@ -24529,6 +24531,27 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Account verification is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
           }
         }
       },
@@ -24636,6 +24659,27 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Account verification is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
           }
         }
       },
@@ -24709,6 +24753,27 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Account verification is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
                 }
               }
             }

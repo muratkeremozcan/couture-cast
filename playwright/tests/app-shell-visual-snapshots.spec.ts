@@ -82,7 +82,7 @@ test.describe('CC-7.9 tab snapshots @local-lane', () => {
         if (screen === 'home') {
           await expect(page.getByTestId('today-outfit-photo-0')).toBeVisible()
           await expect(page.getByTestId('today-outfit-catalog-1')).toBeVisible()
-          await expect(page.getByTestId('style-mood-active')).toBeEnabled()
+          await expect(page.getByTestId('style-day-open')).toBeVisible()
         }
 
         await expect(page).toHaveScreenshot(`${name}.png`, {
@@ -128,7 +128,11 @@ test.describe('CC-7.9 tab snapshots @local-lane', () => {
       await expect(page.getByTestId('today-outfit-catalog-1')).toBeVisible()
       await expect(page.getByTestId('today-outfit-catalog-2')).toBeVisible()
       await expect(page.getByTestId('today-outfit-photo-0')).toBeHidden()
-      await expect(page.getByTestId('style-mood-active')).toBeEnabled()
+      if (mode === 'empty-closet') {
+        await expect(page.getByTestId('style-mood-active')).toBeEnabled()
+      } else {
+        await expect(page.getByTestId('style-day-open')).toBeVisible()
+      }
       if (fail) {
         await photo?.requested
         await expect(page.getByTestId('home-closet-strip')).toBeVisible()

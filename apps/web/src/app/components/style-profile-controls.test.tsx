@@ -35,21 +35,21 @@ const EMPTY: StyleProfile = {
   avoid: [],
 }
 
-function Controls() {
+function Controls({ groupTune = false }: { groupTune?: boolean }) {
   const style = useWebStyleProfile()
   return (
     <I18nextProvider i18n={getI18n()}>
-      <StyleMemberControls style={style} showClear />
-      <StyleDayControls style={style} />
+      {!groupTune && <StyleMemberControls style={style} showClear />}
+      <StyleDayControls style={style} showTune={groupTune} />
     </I18nextProvider>
   )
 }
 
 const control = (name: string) => screen.getByTestId(`style-${name}`)
 
-function serveProfile(options: { failLoad?: boolean; failPatch?: boolean } = {}) {
+function serveProfile(options: { failedReads?: number; failPatch?: boolean } = {}) {
   let profile = EMPTY
-  let shouldFailLoad = options.failLoad
+  let failedReads = options.failedReads ?? 0
   let shouldFailPatch = options.failPatch
   const writes: (UpdateStyleProfileInput | 'clear')[] = []
   const reply = () => HttpResponse.json({ data: profile })
@@ -60,8 +60,8 @@ function serveProfile(options: { failLoad?: boolean; failPatch?: boolean } = {})
   registerMswHandlers(
     http.get(PATH, ({ request }) => {
       if (!isMember(request)) return unauthorized()
-      if (shouldFailLoad) {
-        shouldFailLoad = false
+      if (failedReads > 0) {
+        failedReads -= 1
         return failure()
       }
       return reply()
@@ -90,7 +90,7 @@ function serveProfile(options: { failLoad?: boolean; failPatch?: boolean } = {})
 describe('CC-7.20 web style profile controls', () => {
   it('recovers a failed initial read inline, then saves and clears a mood', async () => {
     session.scope = 'style-load-and-clear'
-    const writes = serveProfile({ failLoad: true })
+    const writes = serveProfile({ failedReads: 1 })
     const user = userEvent.setup()
     render(<Controls />)
 
@@ -109,6 +109,46 @@ describe('CC-7.20 web style profile controls', () => {
       expect(control('mood-classic')).toHaveAttribute('aria-pressed', 'false')
     )
     expect(writes).toEqual([{ mood: 'classic' }, 'clear'])
+  })
+
+  it('retries a read from inside Tune and returns focus to its trigger on close', async () => {
+    session.scope = 'style-modal-read-retry'
+    const writes = serveProfile({ failedReads: 2 })
+    const user = userEvent.setup()
+    render(<Controls />)
+
+    await screen.findByTestId('style-profile-retry')
+    const open = control('tune-open')
+    await user.click(open)
+    const dialog = screen.getByRole('dialog', { name: 'Tune my style' })
+    expect(await within(dialog).findByRole('alert')).toBeVisible()
+    await user.click(within(dialog).getByRole('button', { name: 'Try again' }))
+    expect(await within(dialog).findByTestId('style-palette-neutral')).toBeVisible()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await waitFor(() => expect(open).toHaveFocus())
+    expect(writes).toEqual([])
+  })
+
+  it('clears an inline save error when Tune opens and accepts a subsequent save', async () => {
+    session.scope = 'style-mood-write-recovery'
+    const writes = serveProfile({ failPatch: true })
+    const user = userEvent.setup()
+    render(<Controls />)
+    await waitFor(() => expect(control('mood-active')).toBeEnabled())
+
+    await user.click(control('mood-active'))
+    expect(await screen.findByRole('alert')).toBeVisible()
+    await user.click(control('tune-open'))
+    const dialog = screen.getByRole('dialog', { name: 'Tune my style' })
+    expect(screen.queryByRole('alert')).toBeNull()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(dialog).not.toBeInTheDocument())
+    await user.click(control('mood-active'))
+    await waitFor(() =>
+      expect(control('mood-active')).toHaveAttribute('aria-pressed', 'true')
+    )
+    expect(writes).toEqual([{ mood: 'active' }, { mood: 'active' }])
   })
 
   it('preserves a Tune draft on failure, supports Skip, and finishes with a piece toggle', async () => {
@@ -164,5 +204,16 @@ describe('CC-7.20 web style profile controls', () => {
     expect(cozy).toHaveAttribute('aria-pressed', 'false')
     expect(reset).toBeDisabled()
     expect(writes).toEqual([])
+  })
+
+  it('opens Tune from the populated Today disclosure', async () => {
+    session.scope = 'style-grouped-actions'
+    const user = userEvent.setup()
+    render(<Controls groupTune />)
+    expect(control('tune-open')).not.toBeVisible()
+    await user.click(control('day-open'))
+    await user.click(control('tune-open'))
+    expect(await screen.findByTestId('style-palette-neutral')).toBeVisible()
+    expect(screen.queryByTestId('style-mood-active')).toBeNull()
   })
 })

@@ -11,6 +11,7 @@
 // shared couturecast.auth-session entry the way the real SDK would. The return-to-tab cases
 // leave its storage event undelivered.
 import type { Session } from '@supabase/supabase-js'
+import { renderHook, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMswHandlers } from '../test-utils/msw/runtime'
@@ -201,6 +202,34 @@ describe('CC-7.20 style scope across tabs', () => {
     await expect(auth.resolveWebSessionToken()).resolves.toBe('token-a-refreshed')
     expect(currentWebStyleScope()).toBe(scope)
     expect(captureWebStyleBearer(scope!)).toBe('token-a-refreshed')
+    expect(profileReads).toEqual(['token-a', 'token-a-refreshed'])
+  })
+
+  it('[7.20-ACCOUNT] retries a denied profile read with the rotated bearer for the same member', async () => {
+    await liveMember()
+    const readTokens: (string | null)[] = []
+    const style = { mood: 'classic', palette: null, texture: null, fit: null, avoid: [] }
+    useMswHandlers(
+      http.get('*/api/v1/personalization/style-profile', ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        readTokens.push(bearer)
+        if (bearer === 'Bearer token-a') {
+          storeAuthSession(session('auth-a', 'token-a-refreshed'))
+          return new HttpResponse(null, { status: 401 })
+        }
+        return bearer === 'Bearer token-a-refreshed'
+          ? HttpResponse.json({ data: style })
+          : new HttpResponse(null, { status: 403 })
+      })
+    )
+    const { useWebStyleProfile } = await import('./style-profile')
+    const { result } = renderHook(useWebStyleProfile)
+    const initialScope = result.current.scope
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.profile).toEqual(style)
+    expect(result.current.scope).toBe(initialScope)
+    expect(readTokens).toEqual(['Bearer token-a', 'Bearer token-a-refreshed'])
     expect(profileReads).toEqual(['token-a', 'token-a-refreshed'])
   })
 })

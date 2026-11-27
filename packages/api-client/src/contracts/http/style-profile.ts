@@ -18,7 +18,10 @@ const styleProfileSchema = z.strictObject({
     .array(styleAvoidEnum)
     .max(3)
     .refine((values) => new Set(values).size === values.length, 'Pieces must be unique')
-    .describe('The pieces the member prefers to avoid. Each choice may appear once.'),
+    .meta({
+      description: 'The pieces the member prefers to avoid. Each choice may appear once.',
+      uniqueItems: true,
+    }),
 })
 
 export const updateStyleProfileInputSchema = styleProfileSchema
@@ -81,6 +84,11 @@ export function registerStyleProfileContracts(
           description: 'Account access restricted.',
           headers,
           content: json(common.forbiddenHttpErrorSchema),
+        },
+        503: {
+          description: 'Account verification is temporarily unavailable.',
+          headers,
+          content: json(common.serviceUnavailableHttpErrorSchema),
         },
       },
     })

@@ -1,6 +1,7 @@
 // Learning path Step 77: Account style profile.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-77-account-style-profile
 import { describe, expect, it, vi } from 'vitest'
+import { generateHttpOpenApiDocument } from '../src/contracts/http/openapi'
 import { updateStyleProfileInputSchema } from '../src/contracts/http/style-profile'
 import { Configuration, DefaultApi } from '../src/generated'
 import { requestStyleProfile } from '../src/style-profile-client'
@@ -89,5 +90,26 @@ describe('CC-7.20 style profile client', () => {
         avoid: ['mini-skirt', 'leggings', 'crop-top', 'mini-skirt'],
       }).error?.issues
     ).toContainEqual(expect.objectContaining({ code: 'too_big', path: ['avoid'] }))
+  })
+
+  it('publishes unique avoid choices and an account verification failure for all operations', () => {
+    const document = generateHttpOpenApiDocument()
+    const path = document.paths?.['/api/v1/personalization/style-profile']
+    const avoid = { type: 'array', maxItems: 3, uniqueItems: true }
+    expect(document.components?.schemas?.UpdateStyleProfileInput).toMatchObject({
+      properties: { avoid },
+    })
+    expect(document.components?.schemas?.StyleProfileResponse).toMatchObject({
+      properties: { data: { properties: { avoid } } },
+    })
+    for (const method of ['get', 'patch', 'delete'] as const) {
+      expect(path?.[method]?.responses?.['503']).toMatchObject({
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ServiceUnavailableHttpError' },
+          },
+        },
+      })
+    }
   })
 })

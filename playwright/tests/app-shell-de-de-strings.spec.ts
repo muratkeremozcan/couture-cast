@@ -7,6 +7,7 @@
 // manager at /looks/capsules join the no-English check.
 import enUS from '../../apps/web/src/i18n/locales/en-US.json'
 import deDE from '../../apps/web/src/i18n/locales/de-DE.json'
+import { getStyleProfileStrings } from '@couture/utils'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { openFixtureShell } from '../support/helpers/app-shell'
 import { SHELL_SAVED_LOOK_ID } from '../support/helpers/shell-fixtures'
@@ -118,6 +119,9 @@ test.describe('CC-7.9 Wardrobe strings from the catalogs @local-lane', () => {
         for (let node = walker.nextNode(); node; node = walker.nextNode()) {
           const parent = node.parentElement
           if (!parent || parent.closest('script, style, [aria-hidden="true"]')) continue
+          const closed = parent.closest('details:not([open])')
+          if (closed && !closed.querySelector(':scope > summary')?.contains(parent))
+            continue
           const rect = parent.getBoundingClientRect()
           if (rect.width === 0 || rect.height === 0) continue
           const text = (node.textContent ?? '').replace(/\s+/g, ' ').trim()
@@ -146,6 +150,16 @@ test.describe('CC-7.9 Wardrobe strings from the catalogs @local-lane', () => {
         texts.filter((text) => untranslated.has(text)),
         'en-US catalog text where de-DE has its own'
       ).toEqual([])
+
+      if (screen.name === 'Looks Ideas') {
+        await page.getByTestId('style-day-open').click()
+        const copy = getStyleProfileStrings('de-DE')
+        for (const temperature of ['cool', 'mild', 'warm'] as const) {
+          await expect(
+            page.getByTestId(`style-day-temperature-${temperature}`)
+          ).toHaveText(copy[temperature])
+        }
+      }
     })
   }
 

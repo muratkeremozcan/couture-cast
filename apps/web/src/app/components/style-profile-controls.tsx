@@ -38,6 +38,7 @@ function PictureChoice({
   choice,
   selected,
   disabled,
+  compact = false,
   onSelect,
 }: {
   id: string
@@ -45,6 +46,7 @@ function PictureChoice({
   choice: StyleIllustratedChoice | keyof typeof STYLE_PALETTE_SWATCHES
   selected: boolean
   disabled?: boolean
+  compact?: boolean
   onSelect: () => void
 }) {
   return (
@@ -54,7 +56,7 @@ function PictureChoice({
       aria-pressed={selected}
       disabled={disabled}
       onClick={onSelect}
-      style={{ paddingInline: space[1] }}
+      style={{ paddingInline: compact ? 0 : space[1] }}
       className={`flex w-full min-w-0 flex-col items-center justify-center gap-1 rounded-lg border py-2 text-center text-xs font-semibold leading-tight [overflow-wrap:anywhere] disabled:opacity-60 ${selected ? 'border-primary bg-card ring-1 ring-primary' : 'border-line bg-page'}`}
     >
       {choice === 'neutral' || choice === 'colorful' ? (
@@ -101,6 +103,7 @@ export function StyleMoodRow({
             choice={mood}
             selected={selected === mood}
             disabled={disabled}
+            compact
             onSelect={() => onSelect(mood)}
           />
         ))}
@@ -109,7 +112,13 @@ export function StyleMoodRow({
   )
 }
 
-export function StyleDayControls({ style }: { style: StyleState }) {
+export function StyleDayControls({
+  style,
+  showTune = false,
+}: {
+  style: StyleState
+  showTune?: boolean
+}) {
   const copy = useStyleCopy()
   const { scope, day, store } = style
   if (!scope) return null
@@ -159,6 +168,7 @@ export function StyleDayControls({ style }: { style: StyleState }) {
         >
           {copy.reset}
         </button>
+        {showTune && <StyleMemberControls style={style} showMood={false} />}
       </div>
     </details>
   )

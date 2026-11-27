@@ -12,6 +12,7 @@ import {
   type WeatherAlertDeepLinkTarget,
 } from '@couture/api-client'
 import {
+  type ReactNode,
   type RefObject,
   useCallback,
   useEffect,
@@ -27,6 +28,7 @@ import {
   StyleSheet,
   ScrollView,
   Platform,
+  useWindowDimensions,
   View as NativeView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -218,6 +220,18 @@ function ritualIdentity(ritual: RitualResponse, readAt: number): string {
   return locationKey + '|' + todayRitualAnchorDate(timezone, readAt)
 }
 
+function FirstLookRegion({
+  firstLook,
+  minHeight,
+  children,
+}: {
+  firstLook: boolean
+  minHeight: number
+  children: ReactNode
+}) {
+  return firstLook ? <NativeView style={{ minHeight }}>{children}</NativeView> : children
+}
+
 export default function TabOneScreen() {
   const openAndroidShareCard = useShareCardPresentationOpener()
   const shareCardInvoker = useRef<{
@@ -255,6 +269,8 @@ export default function TabOneScreen() {
   const applicationUserId = mobileApplicationUserId()
   // Story 6.16 D1: the ritual is a member request. A signed-out launch shows the
   // welcome card and sends nothing; an unverifiable session keeps its retry state.
+  const { height } = useWindowDimensions()
+  const [viewportHeight, setViewportHeight] = useState(height)
   const [sessionState, retrySession] = useMemberSessionState()
   const styleProfile = useMobileStyleProfile()
   const homeWardrobe = useHomeWardrobe(applicationUserId, sessionState === 'member')
@@ -787,8 +803,7 @@ export default function TabOneScreen() {
     ritualSettled &&
     styleProfile.scope && (
       <NativeView key={styleProfile.scope} style={styles.styleControls}>
-        {!firstLook && <StyleMemberControls style={styleProfile} showMood={false} />}
-        <StyleDayControls style={styleProfile} />
+        <StyleDayControls style={styleProfile} showTune={!firstLook} />
       </NativeView>
     )
   const renderHero = () =>
@@ -821,7 +836,7 @@ export default function TabOneScreen() {
     ) : sessionState === 'member' ? (
       <>
         {ritualSettled && (ritual || !isLoading) && (
-          <>
+          <FirstLookRegion firstLook={firstLook} minHeight={viewportHeight}>
             <WeatherHeader
               current={weather?.current}
               unavailable={!weather}
@@ -893,7 +908,7 @@ export default function TabOneScreen() {
             {renderFirstLookStyle()}
             <CachedWeatherNotice visible={isStale} />
             {weather && <WeatherAlertBanner alerts={weather.alerts} />}
-          </>
+          </FirstLookRegion>
         )}
         <HomeCloset pieces={homeWardrobe?.pieces} />
         <HomePlannerLink />
@@ -914,6 +929,7 @@ export default function TabOneScreen() {
         innerViewRef={scrollContentRef as RefObject<NativeView>}
         style={[styles.container, { backgroundColor: palette.page }]}
         contentContainerStyle={styles.contentContainer}
+        onLayout={({ nativeEvent }) => setViewportHeight(nativeEvent.layout.height)}
         testID="hero-experience-scrollview"
         // Focusable from code on web without becoming a tab stop, so focus can
         // land here when the teaser leaves.

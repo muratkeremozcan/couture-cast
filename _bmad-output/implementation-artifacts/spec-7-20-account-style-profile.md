@@ -112,8 +112,8 @@ and account responses follow the table above. Verify on an adult and a guardian-
 
 ## Implementation notes
 
-- The generated SDK sends JSON request bodies directly. Describe the unique avoid values in the
-  OpenAPI field and enforce them through Zod and the database so the generated DTO uses a JSON array.
+- The generated SDK sends JSON request bodies directly. Map unique OpenAPI arrays to TypeScript
+  arrays in the SDK generator. Zod and the database enforce uniqueness on writes.
 - Today preserves the weather forecast and switches to the labeled sample for an active override,
   or when a member without usable closet pieces has saved style answers. Overrides are held in
   memory across tab navigation for the current app session.
@@ -139,6 +139,16 @@ scope. Browser exposure duration and older bearer acceptance were unmeasured.
 | P3-1           | Low     | Publish OpenAPI 1.13.0 with the standard 400 response body and regenerate the SDK.                                                                                          |
 | P3-2           | Low     | Let a selected temperature or mood toggle off independently.                                                                                                                |
 | P3-3           | Low     | Complete sprint status and cross-link the added evidence from Step 77.                                                                                                      |
+
+### CodeRabbit and CI fixes
+
+- CodeRabbit completed one review on `e3d380eb`. Published `uniqueItems` for avoid choices with
+  SDK array mapping, and declared the standard 503 response for all three account style methods.
+  Paused further reviews before publishing fixes.
+- A starter outfit and its four mood pictures share the first viewport. Closet and Plan follow.
+  Populated Today exposes Tune inside the day disclosure so it adds one closed control.
+- WebKit at 320 px needs the full width of each mood tile for German labels. Mood tiles use the
+  available width and allow wrapping for accessibility text sizes.
 
 ## Verification
 

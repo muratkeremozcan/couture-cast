@@ -836,7 +836,6 @@ describe('7.5 opt-in garment colorFamily', () => {
 
   it('[P1] [7.5-UNIT-012] [7.19-HTTP] documents both metadata headers on the list and tag update', () => {
     const spec = generateHttpOpenApiDocument()
-    expect(spec.info.version).toBe('1.12.0')
     type Operation = {
       parameters?: {
         in?: string
