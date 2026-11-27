@@ -76,6 +76,7 @@ const session = vi.hoisted(() => ({ owner: null as string | null }))
 vi.mock('../../lib/web-session', async (importOriginal) => ({
   ...(await importOriginal<typeof WebSession>()),
   webSessionIdentity: () => session.owner,
+  webSessionVerifiedBearer: () => (session.owner ? `bearer-${session.owner}` : null),
 }))
 
 // Story CC-7.11 D11: the top bar back reads the router.
@@ -880,8 +881,10 @@ describe('Wardrobe styling', () => {
     const view = render(home)
     await user.click(await screen.findByTestId('home-edit-sample'))
     const saveExample = await screen.findByRole('button', { name: 'Save example look' })
-    const homeWeather = () => screen.getByRole('combobox', { name: 'Sample weather' })
-    await user.selectOptions(homeWeather(), 'warm-rainy')
+    await user.click(screen.getByTestId('style-day-open'))
+    await user.click(screen.getByTestId('style-day-temperature-warm'))
+    const homeWeather = () => screen.getByTestId('guest-preview-weather-chip')
+    expect(homeWeather()).toHaveTextContent('Warm and dry')
     await user.click(saveExample)
     const homeSaves = () => screen.findByRole('region', { name: 'Saved on this device' })
     expect(await homeSaves()).toBeVisible()
@@ -900,10 +903,12 @@ describe('Wardrobe styling', () => {
     view.rerender(home)
     await user.click(await screen.findByTestId('home-edit-sample'))
     const savedOnHome = within(await homeSaves())
-    await user.selectOptions(homeWeather(), 'mild-dry')
+    await user.click(screen.getByTestId('style-day-open'))
+    await user.click(screen.getByTestId('style-day-reset'))
+    expect(homeWeather()).toHaveTextContent('Mild and dry')
     const reopen = savedOnHome.getByRole('button', { name: /^(?!Remove )/ })
     await user.click(reopen)
-    expect(homeWeather()).toHaveValue('warm-rainy')
+    expect(homeWeather()).toHaveTextContent('Warm and dry')
     await user.click(savedOnHome.getByRole('button', { name: /^Remove / }))
     expect(screen.queryByRole('region', { name: 'Saved on this device' })).toBeNull()
     expect(readRecipes()).toEqual([defaultRecipe])

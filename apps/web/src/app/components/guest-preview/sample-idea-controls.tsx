@@ -12,22 +12,22 @@ import {
 } from '@couture/utils'
 import { SaveActionButton } from '../save-feedback'
 
-type SampleBookmarkItem = SampleBookmark & {
+type SampleBookmarkItem<Weather extends SampleWeatherKey> = SampleBookmark<Weather> & {
   savedLookId?: string
   needsReview?: boolean
 }
 
-type Props = {
+type Props<Weather extends SampleWeatherKey> = {
   strings: GuestPreviewStrings
   preferences?: SampleStylePreferences
-  onPreferences: (preferences: SampleStylePreferences) => void
-  bookmarks: SampleBookmarkItem[]
+  onPreferences?: (preferences: SampleStylePreferences) => void
+  bookmarks: SampleBookmarkItem<Weather>[]
   needsReviewLabel?: string
   lookId?: string
   onSave: () => unknown
   onUndoSave?: () => unknown
   onViewSaved?: () => void
-  onOpen: (bookmark: SampleBookmarkItem) => void
+  onOpen: (bookmark: SampleBookmarkItem<Weather>) => void
   onRemove: (id: string) => void
   weather?: SampleWeatherKey
   onWeather?: (weather: SampleWeatherKey) => void
@@ -46,7 +46,7 @@ type Props = {
 const buttonClass =
   'min-h-11 rounded-lg border border-line-strong bg-page px-3 text-sm font-semibold text-ink'
 
-export function SampleIdeaControls({
+export function SampleIdeaControls<Weather extends SampleWeatherKey>({
   strings,
   preferences,
   onPreferences,
@@ -66,9 +66,9 @@ export function SampleIdeaControls({
   useSharedFeedback = false,
   requiresNetwork = false,
   nested = false,
-}: Props) {
+}: Props<Weather>) {
   const labels = strings.styleIdeas
-  const dimensions = Object.keys(SAMPLE_STYLE_OPTIONS) as (keyof SampleStylePreferences)[]
+  const dimensions = ['palette', 'texture'] as const
   const isBookmarked = Boolean(
     lookId && bookmarks.some((bookmark) => bookmark.lookId === lookId)
   )
@@ -172,33 +172,37 @@ export function SampleIdeaControls({
           </select>
         </label>
       )}
-      <details>
-        <summary className="cursor-pointer py-2 font-semibold">{labels.heading}</summary>
-        <div className="mt-2 grid gap-3 sm:grid-cols-3">
-          {dimensions.map((dimension) => (
-            <label key={dimension} className="flex flex-col gap-1 font-medium">
-              {labels[dimension]}
-              <select
-                className="min-h-11 rounded-lg border border-line-strong bg-page px-2 text-ink"
-                value={preferences?.[dimension] ?? ''}
-                onChange={(event) =>
-                  onPreferences({
-                    ...preferences,
-                    [dimension]: event.currentTarget.value || undefined,
-                  })
-                }
-              >
-                <option value="">{labels.any}</option>
-                {SAMPLE_STYLE_OPTIONS[dimension].map((option) => (
-                  <option key={option} value={option}>
-                    {labels[option]}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-        </div>
-      </details>
+      {onPreferences && (
+        <details>
+          <summary className="cursor-pointer py-2 font-semibold">
+            {labels.heading}
+          </summary>
+          <div className="mt-2 grid gap-3 sm:grid-cols-3">
+            {dimensions.map((dimension) => (
+              <label key={dimension} className="flex flex-col gap-1 font-medium">
+                {labels[dimension]}
+                <select
+                  className="min-h-11 rounded-lg border border-line-strong bg-page px-2 text-ink"
+                  value={preferences?.[dimension] ?? ''}
+                  onChange={(event) =>
+                    onPreferences({
+                      ...preferences,
+                      [dimension]: event.currentTarget.value || undefined,
+                    })
+                  }
+                >
+                  <option value="">{labels.any}</option>
+                  {SAMPLE_STYLE_OPTIONS[dimension].map((option) => (
+                    <option key={option} value={option}>
+                      {labels[option]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   )
 }

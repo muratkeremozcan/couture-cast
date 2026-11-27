@@ -12,10 +12,12 @@ import {
 } from './bookmarks'
 import { SAMPLE_CATALOG } from './catalog'
 import {
+  COMMUNITY_SAMPLE_WEATHER_KEYS,
   SAMPLE_WEATHER_KEYS,
   selectSampleOutfit,
   type GuestSampleWeatherKey,
   type SampleOutfitResult,
+  type SampleWeatherKey,
 } from './selector'
 import {
   MAX_STYLE_PIECE_STORAGE_BYTES,
@@ -98,7 +100,10 @@ export type LegacySavedLookImportEntry<TRaw> = {
 }
 
 const STYLE_PIECE_WEATHER_SET = new Set<string>(STYLE_PIECE_WEATHER_KEYS)
-const SAMPLE_WEATHER_SET = new Set<string>(SAMPLE_WEATHER_KEYS)
+const SAMPLE_WEATHER_SET = new Set<string>([
+  ...SAMPLE_WEATHER_KEYS,
+  ...COMMUNITY_SAMPLE_WEATHER_KEYS,
+])
 const SAMPLE_COLLECTION_SET = new Set<string>(SAMPLE_COLLECTION_FILTERS)
 const GARMENT_CATEGORY_SET = new Set<string>(SAMPLE_GARMENT_CATEGORIES)
 
@@ -941,7 +946,7 @@ export function savedLookToStylePieceRecipe(
 /** Extracts a `SampleBookmark` for reopening a Home sample saved look. */
 export function savedLookToSampleBookmark(
   savedLook: SavedLookLike
-): SampleBookmark | null {
+): SampleBookmark<SampleWeatherKey> | null {
   if (savedLook.source !== 'home_sample' || savedLook.wornOn) return null
   if (!SAMPLE_WEATHER_SET.has(savedLook.weather)) return null
   if (!savedLook.collection || !SAMPLE_COLLECTION_SET.has(savedLook.collection)) {
@@ -950,7 +955,7 @@ export function savedLookToSampleBookmark(
   if (!savedLook.comfort) return null
   return {
     lookId: savedLook.lookId,
-    weather: savedLook.weather as GuestSampleWeatherKey,
+    weather: savedLook.weather as SampleWeatherKey,
     collection: savedLook.collection as SampleCollectionFilter,
     comfort: {
       runsColdWarm: savedLook.comfort.runsColdWarm,

@@ -20151,6 +20151,110 @@ export const SkinUndertone = {
 export type SkinUndertone = (typeof SkinUndertone)[keyof typeof SkinUndertone]
 
 /**
+ * The authenticated account’s style preferences.
+ * @export
+ * @interface StyleProfileResponse
+ */
+export interface StyleProfileResponse {
+  /**
+   *
+   * @type {StyleProfileResponseData}
+   * @memberof StyleProfileResponse
+   */
+  data: StyleProfileResponseData
+}
+/**
+ *
+ * @export
+ * @interface StyleProfileResponseData
+ */
+export interface StyleProfileResponseData {
+  /**
+   *
+   * @type {StyleProfileResponseDataMoodEnum}
+   * @memberof StyleProfileResponseData
+   */
+  mood: StyleProfileResponseDataMoodEnum | null
+  /**
+   *
+   * @type {StyleProfileResponseDataPaletteEnum}
+   * @memberof StyleProfileResponseData
+   */
+  palette: StyleProfileResponseDataPaletteEnum | null
+  /**
+   *
+   * @type {StyleProfileResponseDataTextureEnum}
+   * @memberof StyleProfileResponseData
+   */
+  texture: StyleProfileResponseDataTextureEnum | null
+  /**
+   *
+   * @type {StyleProfileResponseDataFitEnum}
+   * @memberof StyleProfileResponseData
+   */
+  fit: StyleProfileResponseDataFitEnum | null
+  /**
+   * The pieces the member prefers to avoid. Each choice may appear once.
+   * @type {Array<StyleProfileResponseDataAvoidEnum>}
+   * @memberof StyleProfileResponseData
+   */
+  avoid: Array<StyleProfileResponseDataAvoidEnum>
+}
+
+/**
+ * @export
+ */
+export const StyleProfileResponseDataMoodEnum = {
+  active: 'active',
+  chic: 'chic',
+  cozy: 'cozy',
+  classic: 'classic',
+} as const
+export type StyleProfileResponseDataMoodEnum =
+  (typeof StyleProfileResponseDataMoodEnum)[keyof typeof StyleProfileResponseDataMoodEnum]
+
+/**
+ * @export
+ */
+export const StyleProfileResponseDataPaletteEnum = {
+  neutral: 'neutral',
+  colorful: 'colorful',
+} as const
+export type StyleProfileResponseDataPaletteEnum =
+  (typeof StyleProfileResponseDataPaletteEnum)[keyof typeof StyleProfileResponseDataPaletteEnum]
+
+/**
+ * @export
+ */
+export const StyleProfileResponseDataTextureEnum = {
+  smooth: 'smooth',
+  textured: 'textured',
+} as const
+export type StyleProfileResponseDataTextureEnum =
+  (typeof StyleProfileResponseDataTextureEnum)[keyof typeof StyleProfileResponseDataTextureEnum]
+
+/**
+ * @export
+ */
+export const StyleProfileResponseDataFitEnum = {
+  fitted: 'fitted',
+  relaxed: 'relaxed',
+} as const
+export type StyleProfileResponseDataFitEnum =
+  (typeof StyleProfileResponseDataFitEnum)[keyof typeof StyleProfileResponseDataFitEnum]
+
+/**
+ * @export
+ */
+export const StyleProfileResponseDataAvoidEnum = {
+  crop_top: 'crop-top',
+  mini_skirt: 'mini-skirt',
+  leggings: 'leggings',
+} as const
+export type StyleProfileResponseDataAvoidEnum =
+  (typeof StyleProfileResponseDataAvoidEnum)[keyof typeof StyleProfileResponseDataAvoidEnum]
+
+/**
  * @type Subscription
  * One variant per subscription presence. The correlations between status and the entitlement fields are expressed by the variants themselves: a `none` response carries null entitlement fields with the keys still serialized, and an entitled response always carries all of them.
  * @export
@@ -21471,6 +21575,97 @@ export interface UpdateSilhouetteSlidersInput {
    */
   buildSlider: number
 }
+/**
+ * Only supplied style preference fields are updated.
+ * @export
+ * @interface UpdateStyleProfileInput
+ */
+export interface UpdateStyleProfileInput {
+  /**
+   *
+   * @type {UpdateStyleProfileInputMoodEnum}
+   * @memberof UpdateStyleProfileInput
+   */
+  mood?: UpdateStyleProfileInputMoodEnum | null
+  /**
+   *
+   * @type {UpdateStyleProfileInputPaletteEnum}
+   * @memberof UpdateStyleProfileInput
+   */
+  palette?: UpdateStyleProfileInputPaletteEnum | null
+  /**
+   *
+   * @type {UpdateStyleProfileInputTextureEnum}
+   * @memberof UpdateStyleProfileInput
+   */
+  texture?: UpdateStyleProfileInputTextureEnum | null
+  /**
+   *
+   * @type {UpdateStyleProfileInputFitEnum}
+   * @memberof UpdateStyleProfileInput
+   */
+  fit?: UpdateStyleProfileInputFitEnum | null
+  /**
+   * The pieces the member prefers to avoid. Each choice may appear once.
+   * @type {Array<UpdateStyleProfileInputAvoidEnum>}
+   * @memberof UpdateStyleProfileInput
+   */
+  avoid?: Array<UpdateStyleProfileInputAvoidEnum>
+}
+
+/**
+ * @export
+ */
+export const UpdateStyleProfileInputMoodEnum = {
+  active: 'active',
+  chic: 'chic',
+  cozy: 'cozy',
+  classic: 'classic',
+} as const
+export type UpdateStyleProfileInputMoodEnum =
+  (typeof UpdateStyleProfileInputMoodEnum)[keyof typeof UpdateStyleProfileInputMoodEnum]
+
+/**
+ * @export
+ */
+export const UpdateStyleProfileInputPaletteEnum = {
+  neutral: 'neutral',
+  colorful: 'colorful',
+} as const
+export type UpdateStyleProfileInputPaletteEnum =
+  (typeof UpdateStyleProfileInputPaletteEnum)[keyof typeof UpdateStyleProfileInputPaletteEnum]
+
+/**
+ * @export
+ */
+export const UpdateStyleProfileInputTextureEnum = {
+  smooth: 'smooth',
+  textured: 'textured',
+} as const
+export type UpdateStyleProfileInputTextureEnum =
+  (typeof UpdateStyleProfileInputTextureEnum)[keyof typeof UpdateStyleProfileInputTextureEnum]
+
+/**
+ * @export
+ */
+export const UpdateStyleProfileInputFitEnum = {
+  fitted: 'fitted',
+  relaxed: 'relaxed',
+} as const
+export type UpdateStyleProfileInputFitEnum =
+  (typeof UpdateStyleProfileInputFitEnum)[keyof typeof UpdateStyleProfileInputFitEnum]
+
+/**
+ * @export
+ */
+export const UpdateStyleProfileInputAvoidEnum = {
+  crop_top: 'crop-top',
+  mini_skirt: 'mini-skirt',
+  leggings: 'leggings',
+} as const
+export type UpdateStyleProfileInputAvoidEnum =
+  (typeof UpdateStyleProfileInputAvoidEnum)[keyof typeof UpdateStyleProfileInputAvoidEnum]
+
 /**
  *
  * @export

@@ -33,6 +33,7 @@ import {
   isWebSessionDenial,
   resolveWebSessionToken,
   webSessionIdentity,
+  webSessionVerifiedBearer,
 } from './web-session'
 
 export type WebSessionState =
@@ -305,6 +306,49 @@ export function useWebSessionScope(): string | null {
     currentWebSessionScope,
     () => null
   )
+}
+
+// The style cache and temporary day controls also fence sign-out followed by signing back in
+// as the same verified owner. Token refresh preserves this epoch.
+let styleSessionIdentity: string | null = null
+let styleSessionEpoch = 0
+
+export function currentWebStyleScope(): string | null {
+  const owner = currentWebSessionOwner()
+  const identity =
+    owner === UNVERIFIED_BEARER_OWNER || webSessionVerifiedBearer()
+      ? currentWebSessionScope()
+      : null
+  if (identity !== styleSessionIdentity) {
+    styleSessionIdentity = identity
+    styleSessionEpoch += 1
+  }
+  return identity === null ? null : `${styleSessionEpoch}:${identity}`
+}
+
+if (typeof window !== 'undefined') subscribeWebSessionOwner(currentWebStyleScope)
+
+export function subscribeWebStyleScope(onChange: () => void): () => void {
+  const unsubscribe = subscribeWebSessionOwner(onChange)
+  window.addEventListener('focus', onChange)
+  window.addEventListener('pageshow', onChange)
+  document.addEventListener('visibilitychange', onChange)
+  return () => {
+    unsubscribe()
+    window.removeEventListener('focus', onChange)
+    window.removeEventListener('pageshow', onChange)
+    document.removeEventListener('visibilitychange', onChange)
+  }
+}
+
+export function useWebStyleScope(): string | null {
+  return useSyncExternalStore(subscribeWebStyleScope, currentWebStyleScope, () => null)
+}
+
+export function captureWebStyleBearer(scope: string): string | null {
+  if (scope !== currentWebStyleScope()) return null
+  const owner = currentWebSessionOwner()
+  return owner === UNVERIFIED_BEARER_OWNER ? fixtureBearer() : webSessionVerifiedBearer()
 }
 
 /**

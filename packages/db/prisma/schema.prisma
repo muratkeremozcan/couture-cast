@@ -305,6 +305,7 @@ model User {
   updated_at                          DateTime                          @updatedAt
   profile                             UserProfile?
   comfort_profile                     ComfortPreferences?
+  style_profile                       StyleProfile?
   garments                            GarmentItem[]
   palette_insights                    PaletteInsights[]
   outfits                             OutfitRecommendation[]
@@ -2408,4 +2409,37 @@ model SavedLook {
   @@index([user_id, created_at(sort: Desc), id(sort: Asc)])
   @@index([user_id, source, anchor_garment_id])
   @@map("SavedLook")
+}
+
+/// CC-7.20: private, bounded sample style answers. One row per owner.
+model StyleProfile {
+  user_id String        @id
+  user    User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  mood    StyleMood?
+  palette StylePalette?
+  texture StyleTexture?
+  fit     StyleFit?
+  avoid   String[]      @default([])
+}
+
+enum StyleMood {
+  active
+  chic
+  cozy
+  classic
+}
+
+enum StylePalette {
+  neutral
+  colorful
+}
+
+enum StyleTexture {
+  smooth
+  textured
+}
+
+enum StyleFit {
+  fitted
+  relaxed
 }

@@ -28,6 +28,7 @@ import {
 } from '@couture/utils'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { guestPreviewAnalytics, mobileGuestPreviewStore } from '@/src/lib/guest-preview'
+import { StyleMoodRow } from './style-profile-controls'
 import { SampleIdeaControls } from './sample-idea-controls'
 import { useMemberSessionState } from '@/src/lib/member-session'
 import {
@@ -360,6 +361,19 @@ export function GuestPreviewScreen() {
               update((current) => ({ ...current, votes: {} }))
               guestPreviewAnalytics.interacted('votes_reset')
             }}
+          />
+          <StyleMoodRow
+            selected={state.preferences?.style}
+            onSelect={(style) =>
+              update((current) => ({
+                ...current,
+                preferences: {
+                  ...current.preferences,
+                  style: current.preferences?.style === style ? undefined : style,
+                },
+                selectedLookId: undefined,
+              }))
+            }
           />
           <SampleIdeaControls
             strings={strings}

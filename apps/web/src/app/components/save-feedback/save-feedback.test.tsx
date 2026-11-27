@@ -45,6 +45,7 @@ const sessionMock = vi.hoisted(() => ({ owner: null as string | null }))
 vi.mock('../../../lib/web-session', async (importOriginal) => ({
   ...(await importOriginal<typeof WebSession>()),
   webSessionIdentity: () => sessionMock.owner,
+  webSessionVerifiedBearer: () => sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY),
 }))
 
 function NoticeHarness({

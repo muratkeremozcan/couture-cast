@@ -1,14 +1,17 @@
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Learning path Step 77: Account style profile.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-77-account-style-profile
 // Story CC-7.11 test owner (TEA): 7.11-UNIT-030..034, the return-to-tab resync in
 // startWebSession (b78ecca9). WebKit can deliver another tab's storage event late or drop it, so
 // focus, pageshow and visibilitychange to visible compare the stored auth session's user with
 // the one in memory and settle a difference through auth.getSession() and accept().
 // Only the external Supabase SDK is controlled; web-session, browser storage and the profile
 // HTTP call (MSW) run unchanged. The mocked SDK does not write storage, so each test writes the
-// shared couturecast.auth-session entry the way the real SDK would, and no test dispatches a
-// storage event: that is the lost delivery under test.
+// shared couturecast.auth-session entry the way the real SDK would. The return-to-tab cases
+// leave its storage event undelivered.
 import type { Session } from '@supabase/supabase-js'
+import { renderHook, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMswHandlers } from '../test-utils/msw/runtime'
@@ -35,7 +38,11 @@ vi.mock('@supabase/supabase-js', () => ({
 const bearerKey = 'couturecast.access-token'
 const authKey = 'couturecast.auth-session'
 const cleanups: (() => void)[] = []
-const members: Record<string, string> = { 'token-a': 'app-a', 'token-b': 'app-b' }
+const members: Record<string, string> = {
+  'token-a': 'app-a',
+  'token-a-refreshed': 'app-a',
+  'token-b': 'app-b',
+}
 const session = (id: string, token: string): Session => ({
   access_token: token,
   refresh_token: 'synthetic-refresh',
@@ -76,6 +83,17 @@ const returns = {
   },
   focus: () => window.dispatchEvent(new Event('focus')),
   pageshow: () => window.dispatchEvent(new Event('pageshow')),
+}
+const styleScopeEvents = {
+  ...returns,
+  storage: () =>
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: authKey,
+        newValue: localStorage.getItem(authKey),
+        storageArea: localStorage,
+      })
+    ),
 }
 const settle = async () => {
   for (let turn = 0; turn < 3; turn++)
@@ -123,6 +141,97 @@ beforeEach(() => {
         : HttpResponse.json({}, { status: 401 })
     })
   )
+})
+
+describe('CC-7.20 style scope across tabs', () => {
+  it.each(Object.keys(styleScopeEvents) as (keyof typeof styleScopeEvents)[])(
+    '[7.20-ACCOUNT] %s clears the previous style scope before a changed principal is verified',
+    async (trigger) => {
+      await liveMember()
+      const { currentWebStyleScope, captureWebStyleBearer, subscribeWebStyleScope } =
+        await import('./use-web-session')
+      const first = currentWebStyleScope()
+      expect(first).toEqual(expect.any(String))
+      expect(captureWebStyleBearer(first!)).toBe('token-a')
+      const subscriber = vi.fn(currentWebStyleScope)
+      cleanups.push(subscribeWebStyleScope(subscriber))
+
+      let finishVerification!: () => void
+      const pendingVerification = new Promise<{
+        data: { session: Session | null }
+        error: null
+      }>((resolve) => {
+        finishVerification = () =>
+          resolve({ data: { session: sdk.current }, error: null })
+      })
+      sdk.getSession.mockReturnValue(pendingVerification)
+      storeAuthSession(session('auth-b', 'token-b'))
+      try {
+        styleScopeEvents[trigger]()
+        expect(subscriber).toHaveReturnedWith(null)
+        expect(currentWebStyleScope()).toBeNull()
+        expect(captureWebStyleBearer(first!)).toBeNull()
+        expect(profileReads).toEqual(['token-a'])
+        if (trigger === 'storage') returns.focus()
+      } finally {
+        finishVerification()
+      }
+
+      await vi.waitFor(() => {
+        const next = currentWebStyleScope()
+        expect(next).toEqual(expect.any(String))
+        expect(next).not.toBe(first)
+        expect(captureWebStyleBearer(next!)).toBe('token-b')
+      })
+      expect(profileReads).toEqual(['token-a', 'token-b'])
+    }
+  )
+
+  it('[7.20-ACCOUNT] keeps the style scope across a verified same-principal token refresh', async () => {
+    const { auth } = await liveMember()
+    const { currentWebStyleScope, captureWebStyleBearer } = await import(
+      './use-web-session'
+    )
+    const scope = currentWebStyleScope()
+    expect(scope).toEqual(expect.any(String))
+    storeAuthSession(session('auth-a', 'token-a-refreshed'))
+    styleScopeEvents.storage()
+    expect(currentWebStyleScope()).toBe(scope)
+    expect(captureWebStyleBearer(scope!)).toBe('token-a')
+
+    await expect(auth.resolveWebSessionToken()).resolves.toBe('token-a-refreshed')
+    expect(currentWebStyleScope()).toBe(scope)
+    expect(captureWebStyleBearer(scope!)).toBe('token-a-refreshed')
+    expect(profileReads).toEqual(['token-a', 'token-a-refreshed'])
+  })
+
+  it('[7.20-ACCOUNT] retries a denied profile read with the rotated bearer for the same member', async () => {
+    await liveMember()
+    const readTokens: (string | null)[] = []
+    const style = { mood: 'classic', palette: null, texture: null, fit: null, avoid: [] }
+    useMswHandlers(
+      http.get('*/api/v1/personalization/style-profile', ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        readTokens.push(bearer)
+        if (bearer === 'Bearer token-a') {
+          storeAuthSession(session('auth-a', 'token-a-refreshed'))
+          return new HttpResponse(null, { status: 401 })
+        }
+        return bearer === 'Bearer token-a-refreshed'
+          ? HttpResponse.json({ data: style })
+          : new HttpResponse(null, { status: 403 })
+      })
+    )
+    const { useWebStyleProfile } = await import('./style-profile')
+    const { result } = renderHook(useWebStyleProfile)
+    const initialScope = result.current.scope
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.profile).toEqual(style)
+    expect(result.current.scope).toBe(initialScope)
+    expect(readTokens).toEqual(['Bearer token-a', 'Bearer token-a-refreshed'])
+    expect(profileReads).toEqual(['token-a', 'token-a-refreshed'])
+  })
 })
 afterEach(() => {
   cleanups.splice(0).forEach((stop) => stop())

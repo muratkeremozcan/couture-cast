@@ -164,10 +164,12 @@ test.describe('Jade first use on a phone', () => {
     await nextLook.click()
     await expect(outfit.getByRole('heading', { name: 'Silk midi' })).toBeVisible()
 
+    await page.getByTestId('style-mood-cozy').click()
+    await expect(page.getByTestId('style-mood-cozy')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
     await page.getByText('Pick your style (optional)', { exact: true }).click()
-    await page
-      .getByRole('combobox', { name: 'Style', exact: true })
-      .selectOption({ label: 'Cozy' })
     await page
       .getByRole('combobox', { name: 'Colors', exact: true })
       .selectOption({ value: 'colorful' })

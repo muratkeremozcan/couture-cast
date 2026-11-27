@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Learning path Step 77: Account style profile.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-77-account-style-profile
 // Story CC-7.12 test owner (TEA): D7, View on the Home sample save confirmation opens the saved
 // look's detail, for a new save and for a save that confirmed an existing look (Codex 7.12 #1).
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
@@ -44,6 +46,7 @@ const session = vi.hoisted(() => ({
 vi.mock('../../lib/web-session', async (importOriginal) => ({
   ...(await importOriginal<typeof WebSession>()),
   webSessionIdentity: () => session.owner,
+  webSessionVerifiedBearer: () => (session.owner ? `bearer-${session.owner}` : null),
   hasStoredWebSession: () => session.stored,
   resolveWebSessionToken: session.verify,
 }))
@@ -313,17 +316,25 @@ it('saves and reopens Home sample looks even when browser localStorage is blocke
     const saved = await screen.findByRole('region', { name: 'Saved on this device' })
     expect(store.items).toHaveLength(1)
 
-    const weather = screen.getByRole('combobox', { name: 'Sample weather' })
-    await user.selectOptions(weather, 'cool-windy')
-    await user.click(screen.getByText('Pick your style (optional)'))
-    await user.selectOptions(screen.getByRole('combobox', { name: /^Style$/ }), 'cozy')
+    await user.click(screen.getByTestId('style-day-open'))
+    await user.click(screen.getByTestId('style-day-temperature-cool'))
+    await user.click(screen.getByTestId('style-day-mood-cozy'))
+    expect(screen.getByTestId('guest-preview-weather-chip')).toHaveTextContent(
+      'Cool and windy'
+    )
     await user.click(screen.getByRole('button', { name: 'Try another look' }))
     await user.click(screen.getByRole('button', { name: 'Save example look' }))
     await waitFor(() => expect(within(saved).getAllByRole('button')).toHaveLength(4))
 
     await user.click(within(saved).getByRole('button', { name: 'School day' }))
     expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent('School day')
-    expect(weather).toHaveValue('mild-dry')
+    expect(screen.getByTestId('guest-preview-weather-chip')).toHaveTextContent(
+      'Mild and dry'
+    )
+    expect(screen.getByTestId('style-day-temperature-cool')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
     await user.click(within(saved).getByRole('button', { name: 'Remove School day' }))
     await waitFor(() => expect(within(saved).getAllByRole('button')).toHaveLength(2))
   } finally {
@@ -633,6 +644,44 @@ it('shows the city and garment entry links beside an editable sample when the me
   publishMember('other-sample-member')
   await waitFor(() => expect(sampleTitle()).toHaveTextContent(initial ?? ''))
   expect(sampleTitle()).not.toHaveTextContent(rotated ?? '')
+})
+
+it('honors account avoid choices when picking a piece for the Today sample', async () => {
+  const user = userEvent.setup()
+  useMswHandlers(
+    http.get('/api/v1/ritual', missingCity),
+    http.get('*/api/v1/personalization/style-profile', () =>
+      HttpResponse.json({
+        data: {
+          mood: null,
+          palette: null,
+          texture: null,
+          fit: null,
+          avoid: ['mini-skirt'],
+        },
+      })
+    )
+  )
+  publishMember('style-picker-member')
+  renderHome()
+  await waitFor(() => expect(screen.getByTestId('style-mood-cozy')).toBeEnabled())
+  await openSampleEditor()
+
+  const browse = screen.getByTestId('guest-preview-browse-wardrobe')
+  await user.click(browse)
+  await user.click(screen.getByTestId('guest-preview-collection-womenswear'))
+  const picker = within(screen.getByTestId('guest-preview-wardrobe'))
+  await user.click(picker.getByRole('button', { name: /^Mini skirt/ }))
+  const avoided = within(await screen.findByRole('dialog', { name: 'Mini skirt' }))
+  expect(avoided.queryByTestId('guest-preview-use-item')).toBeNull()
+  await user.keyboard('{Escape}')
+  await user.click(picker.getByRole('button', { name: /^Midi skirt/ }))
+  const allowed = within(await screen.findByRole('dialog', { name: 'Midi skirt' }))
+  await user.click(allowed.getByTestId('guest-preview-use-item'))
+  expect(screen.queryByTestId('guest-preview-wardrobe')).toBeNull()
+  expect(
+    within(screen.getByTestId('guest-preview-outfit')).getByText('Midi skirt')
+  ).toBeVisible()
 })
 
 it('retries a failed recommendation, shows the verified city, and keeps the chosen live outfit during a failed refresh', async () => {

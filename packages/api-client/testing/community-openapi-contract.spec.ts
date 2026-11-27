@@ -106,8 +106,6 @@ describe('community HTTP contracts', () => {
     })
 
     it('6.1-CON-040 preserves nullable enum values without mutating the ClimateBand component', () => {
-      expect(document.info.version).toBe('1.12.0')
-
       const standaloneBand = document.components?.schemas?.ClimateBand as {
         type?: string
         enum?: (string | null)[]

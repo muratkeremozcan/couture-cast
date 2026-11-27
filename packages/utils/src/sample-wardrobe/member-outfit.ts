@@ -15,10 +15,21 @@ import {
   type SampleGarment,
   type SampleGarmentCategory,
 } from './types'
+import {
+  activeStyleDay,
+  styleProfileSelection,
+  styleSampleWeather,
+  type StyleSampleInputs,
+} from './style-profile'
 
-export function createMemberSampleOutfit(weather: SampleWeatherKey = 'mild-dry') {
+export function createMemberSampleOutfit(
+  weather: SampleWeatherKey = 'mild-dry',
+  inputs?: StyleSampleInputs
+) {
+  const day = activeStyleDay(inputs?.day)
   const input: SampleSelectionInput = {
-    weather,
+    weather: styleSampleWeather(weather, day?.temperature),
+    ...styleProfileSelection(inputs?.profile, day),
     collection: 'all',
     comfort: DEFAULT_SAMPLE_COMFORT,
     votes: {},
@@ -62,7 +73,7 @@ export function updateMemberSampleOutfit(
 
 export function reopenMemberSampleOutfit(
   result: ReturnType<typeof createMemberSampleOutfit>,
-  bookmark: SampleBookmark
+  bookmark: SampleBookmark<SampleWeatherKey>
 ) {
   return selectSampleOutfit(
     { ...result.input, ...openSampleBookmark(bookmark, result.input) },

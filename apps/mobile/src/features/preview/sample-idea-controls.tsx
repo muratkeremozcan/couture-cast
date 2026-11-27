@@ -13,12 +13,12 @@ import {
 import { PreviewButton, type PreviewPalette } from './guest-preview-parts'
 import { SaveActionButton } from '@/components/save-feedback'
 
-type SampleBookmarkItem = SampleBookmark & {
+type SampleBookmarkItem<Weather extends SampleWeatherKey> = SampleBookmark<Weather> & {
   savedLookId?: string
   needsReview?: boolean
 }
 
-export function SampleIdeaControls({
+export function SampleIdeaControls<Weather extends SampleWeatherKey>({
   strings,
   palette,
   preferences,
@@ -43,14 +43,14 @@ export function SampleIdeaControls({
   strings: GuestPreviewStrings
   palette: PreviewPalette
   preferences?: SampleStylePreferences
-  onPreferences: (preferences: SampleStylePreferences) => void
-  bookmarks: SampleBookmarkItem[]
+  onPreferences?: (preferences: SampleStylePreferences) => void
+  bookmarks: SampleBookmarkItem<Weather>[]
   needsReviewLabel?: string
   lookId?: string
   onSave: () => unknown
   onUndoSave?: () => unknown
   onViewSaved?: () => void
-  onOpen: (bookmark: SampleBookmarkItem) => void
+  onOpen: (bookmark: SampleBookmarkItem<Weather>) => void
   onRemove: (id: string) => void
   weather?: SampleWeatherKey
   onWeather?: (weather: SampleWeatherKey) => void
@@ -61,9 +61,7 @@ export function SampleIdeaControls({
   useSharedFeedback?: boolean
   requiresNetwork?: boolean
 }) {
-  const [expanded, setExpanded] = useState(false)
   const labels = strings.styleIdeas
-  const dimensions = Object.keys(SAMPLE_STYLE_OPTIONS) as (keyof SampleStylePreferences)[]
   const isBookmarked = Boolean(
     lookId && bookmarks.some((bookmark) => bookmark.lookId === lookId)
   )
@@ -151,6 +149,33 @@ export function SampleIdeaControls({
           })}
         </View>
       )}
+      {onPreferences && (
+        <GuestStyleChoices
+          labels={labels}
+          palette={palette}
+          preferences={preferences}
+          onPreferences={onPreferences}
+        />
+      )}
+    </View>
+  )
+}
+
+function GuestStyleChoices({
+  labels,
+  palette,
+  preferences,
+  onPreferences,
+}: {
+  labels: GuestPreviewStrings['styleIdeas']
+  palette: PreviewPalette
+  preferences?: SampleStylePreferences
+  onPreferences: (preferences: SampleStylePreferences) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const dimensions = ['palette', 'texture'] as const
+  return (
+    <>
       <PreviewButton
         testID="sample-style-preferences"
         label={labels.heading}
@@ -177,7 +202,7 @@ export function SampleIdeaControls({
             </View>
           </View>
         ))}
-    </View>
+    </>
   )
 }
 

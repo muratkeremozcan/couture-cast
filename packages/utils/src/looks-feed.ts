@@ -5,6 +5,9 @@
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 import { SAMPLE_CATALOG } from './sample-wardrobe/catalog'
+import { createMemberSampleOutfit } from './sample-wardrobe/member-outfit'
+import { selectSampleOutfit } from './sample-wardrobe/selector'
+import { activeStyleDay, type StyleSampleInputs } from './sample-wardrobe/style-profile'
 import type { SampleGarment, SampleLook } from './sample-wardrobe/types'
 
 /** The fields the merge reads from a saved look or a capsule. */
@@ -147,9 +150,25 @@ function resolveIdea(look: SampleLook): LooksIdea {
   }
 }
 
-/** Every sample look, in catalog order, until CC-7.22 ships the lookbook. */
-export function looksIdeas(): readonly LooksIdea[] {
-  return SAMPLE_CATALOG.looks.map(resolveIdea)
+/** The unchanged catalog order also supplies historical looks and the sample week. */
+export function looksIdeas(inputs?: StyleSampleInputs): readonly LooksIdea[] {
+  if (!inputs) return SAMPLE_CATALOG.looks.map(resolveIdea)
+  const result = createMemberSampleOutfit(undefined, inputs)
+  const { avoid, preferences, weather } = result.input
+  if (
+    !avoid &&
+    !preferences &&
+    weather === 'mild-dry' &&
+    !activeStyleDay(inputs.day)?.temperature
+  )
+    return SAMPLE_CATALOG.looks.map(resolveIdea)
+  return result.eligibleLookIds.flatMap((selectedLookId) => {
+    const { look, garments } = selectSampleOutfit(
+      { ...result.input, selectedLookId },
+      SAMPLE_CATALOG
+    )
+    return look ? [{ look, garments }] : []
+  })
 }
 
 /** Story CC-7.12 D10: one row of the free Plan preview's sample week. */

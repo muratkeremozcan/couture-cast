@@ -7,6 +7,8 @@
 // locked states show the free preview. `looks-first-content` marks the open segment's first block.
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+import { useMobileStyleProfile } from '@/src/lib/style-profile'
+import { StyleDayControls } from '@/src/features/preview/style-profile-controls'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import {
   useCallback,
@@ -547,7 +549,9 @@ function SavedPanel({
 function IdeasPanel({ showEmptyLine }: { showEmptyLine: boolean }) {
   const { t } = useTranslation()
   const { colors, space, type } = useTokens()
-  const ideas = useMemo(() => looksIdeas(), [])
+  const style = useMobileStyleProfile()
+  const { profile, day } = style
+  const ideas = useMemo(() => looksIdeas({ profile, day }), [profile, day])
   return (
     <View testID="looks-first-content" style={{ gap: space[3] }}>
       {showEmptyLine ? (
@@ -558,6 +562,7 @@ function IdeasPanel({ showEmptyLine }: { showEmptyLine: boolean }) {
           {t('looks.empty')}
         </Text>
       ) : null}
+      <StyleDayControls key={style.scope} style={style} />
       <LooksTileGrid testID="looks-ideas-grid">
         {ideas.map((idea) => (
           <IdeaTile key={idea.look.id} idea={idea} />

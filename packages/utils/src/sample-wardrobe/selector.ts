@@ -25,6 +25,7 @@ import {
   type SampleLook,
   type SampleStylePreferences,
 } from './types'
+import type { StyleAvoid } from './style-profile'
 
 export const SAMPLE_POLICY_VERSION = 2
 
@@ -106,6 +107,7 @@ export type SampleSelectionInput = {
   comfort: SampleComfort
   selectedLookId?: string
   preferences?: SampleStylePreferences
+  avoid?: readonly StyleAvoid[]
   votes: Readonly<Record<string, SampleVote>>
   swaps: Readonly<
     Record<string, Readonly<Partial<Record<SampleGarmentCategory, string>>>>
@@ -285,16 +287,27 @@ function rankByRange(
 export function sampleSwapCandidates(
   catalog: SampleCatalog,
   category: SampleGarmentCategory,
-  input: Pick<SampleSelectionInput, 'collection' | 'weather' | 'comfort'>,
+  input: Pick<SampleSelectionInput, 'collection' | 'weather' | 'comfort' | 'avoid'>,
   context: SampleContext = buildSampleContext(input)
 ): SampleGarment[] {
   const candidates = catalog.garments.filter(
     (garment) =>
       garment.category === category &&
+      !avoidsGarment(input.avoid, garment) &&
       inCollection(garment.collections, input.collection) &&
       meetsProtection(garment, context)
   )
   return rankByRange(candidates, context.range)
+}
+
+function avoidsGarment(
+  avoid: readonly StyleAvoid[] | undefined,
+  garment?: SampleGarment
+) {
+  return (
+    avoid?.some((piece) => piece === garment?.subtype || piece === garment?.art.key) ??
+    false
+  )
 }
 
 type SwapCheck =
@@ -450,13 +463,19 @@ export function selectSampleOutfit(
     .map((lookItem, index) => ({
       lookItem,
       index,
+      avoided: lookItem.core.filter((id) => avoidsGarment(input.avoid, garments.get(id)))
+        .length,
       liked: input.votes[lookItem.id] === 'like' ? 1 : 0,
       style: styleMatch(lookItem, input.preferences),
       fit: exactRangeShare(lookItem, garments, context.range),
     }))
     .sort(
       (a, b) =>
-        b.liked - a.liked || b.style - a.style || b.fit - a.fit || a.index - b.index
+        a.avoided - b.avoided ||
+        b.liked - a.liked ||
+        b.style - a.style ||
+        b.fit - a.fit ||
+        a.index - b.index
     )
     .map((entry) => entry.lookItem)
   const eligibleLookIds = ordered.map((lookItem) => lookItem.id)

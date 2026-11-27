@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 // Learning path Step 75: Find mini skirts, tights and socks.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-75-find-mini-skirts-tights-and-socks
+// Learning path Step 77: Account style profile.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-77-account-style-profile
 // Story CC-7.12 test owner (TEA): 7.12-NAT-023 (D7: the Home sample save confirmation gains View,
 // which opens the saved look's own screen) and 7.12-NAT-031 (D11: Plan your week opens the Looks
 // tab on Plan in one press).
@@ -66,11 +68,11 @@ describe('MemberSampleOutfit (mobile)', () => {
   })
 
   it.each([
-    { weather: 'cool-windy', weatherLabel: 'Cool and windy' },
-    { weather: 'mild-dry', weatherLabel: 'Mild and dry' },
+    { temperature: 'cool', weather: 'cool-windy', weatherLabel: 'Cool and windy' },
+    { temperature: 'mild', weather: 'mild-dry', weatherLabel: 'Mild and dry' },
   ])(
     '[7.18-PICK-001/SAVE-001/SWAP-001] previews and saves a mini skirt with socks in $weatherLabel weather',
-    async ({ weather, weatherLabel }) => {
+    async ({ temperature, weather, weatherLabel }) => {
       const { store, handlers } = createSavedLooksMswHandlers()
       server.use(...handlers)
       const view = await render(
@@ -84,8 +86,11 @@ describe('MemberSampleOutfit (mobile)', () => {
         </SaveFeedbackProvider>
       )
 
+      await userEvent.click(screen.getByTestId('style-day-open'))
+      const dayTemperature = screen.getByTestId(`style-day-temperature-${temperature}`)
+      await userEvent.click(dayTemperature)
+      expect(dayTemperature).toHaveAttribute('aria-pressed', 'true')
       await userEvent.click(screen.getByTestId('home-edit-sample'))
-      await userEvent.click(screen.getByTestId(`sample-weather-${weather}`))
       expect(screen.getByTestId('guest-preview-weather-chip')).toHaveTextContent(
         weatherLabel
       )
@@ -190,7 +195,7 @@ describe('MemberSampleOutfit (mobile)', () => {
     }
   )
 
-  it('covers shuffle/swap Undo, preferences/weather/reset, Save/Undo, remote-delete revalidation, 409 tombstone, and Remove/Retry/Undo', async () => {
+  it('covers shuffle/swap Undo, daily style, Save/Undo, remote-delete revalidation, 409 tombstone, and Remove/Retry/Undo', async () => {
     const { store, handlers } = createSavedLooksMswHandlers()
     server.use(...handlers)
     const onRetry = vi.fn()
@@ -222,17 +227,19 @@ describe('MemberSampleOutfit (mobile)', () => {
       )
     )
 
-    // Weather and style preferences controls update the sample look.
-    fireEvent.click(screen.getByTestId('sample-weather-cool-windy'))
-    fireEvent.click(screen.getByTestId('sample-style-preferences'))
-    const prefButtons = screen
-      .getAllByRole('button')
-      .filter((btn) => btn.getAttribute('data-testid')?.startsWith('sample-'))
-    for (const btn of prefButtons.slice(0, 4)) {
-      if (btn.getAttribute('data-testid') !== 'sample-save-look') {
-        fireEvent.click(btn)
-      }
-    }
+    fireEvent.click(tryAnother)
+    await screen.findByTestId('status-bar-action-undo')
+    fireEvent.click(screen.getByTestId('style-day-open'))
+    const cool = screen.getByTestId('style-day-temperature-cool')
+    const chic = screen.getByTestId('style-day-mood-chic')
+    fireEvent.click(cool)
+    fireEvent.click(chic)
+    expect(cool).toHaveAttribute('aria-pressed', 'true')
+    expect(chic).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(screen.queryByTestId('status-bar-action-undo')).toBeNull())
+    fireEvent.click(screen.getByTestId('style-day-reset'))
+    expect(cool).toHaveAttribute('aria-pressed', 'false')
+    expect(chic).toHaveAttribute('aria-pressed', 'false')
 
     // Swap from the picture and verify that Undo restores the original piece.
     const piece = screen.getByTestId('today-outfit-slot-0')

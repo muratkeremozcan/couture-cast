@@ -110,3 +110,4 @@ export type {
 } from './contracts/http/share-cards'
 export * from './share-cards-client'
 export * from './share-card-png'
+export { requestStyleProfile } from './style-profile-client'

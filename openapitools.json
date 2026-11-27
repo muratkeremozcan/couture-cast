@@ -8,6 +8,9 @@
         "generatorName": "typescript-fetch",
         "inputSpec": "packages/api-client/docs/http.openapi.json",
         "output": "packages/api-client/src/generated",
+        "typeMappings": {
+          "set": "Array"
+        },
         "additionalProperties": {
           "enumPropertyNaming": "original",
           "supportsES6": true,

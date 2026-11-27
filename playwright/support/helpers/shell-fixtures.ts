@@ -16,7 +16,9 @@ import {
   savedLookListResponseSchema,
   savedLookResponseSchema,
   silhouetteProfileResponseSchema,
+  styleProfileResponseSchema,
   trackedResponseSchema,
+  updateStyleProfileInputSchema,
   userProfileResponseSchema,
   wardrobeOnboardingStateResponseSchema,
   type CommunityFeedMode,
@@ -26,6 +28,7 @@ import {
   type GarmentListResponse,
   type ResolveCommunityTargetsInput,
   type ShopThisLook,
+  type StyleProfile,
   type WardrobeOnboardingStateResponse,
 } from '@couture/api-client/contracts/http'
 
@@ -86,6 +89,13 @@ export const SYNC_DELAY_MS = 1000
 export const ownerMarker = (memberId: string) => `comfort note for ${memberId}`
 export const POPULATED_GARMENTS = 24
 export const SHELL_PROFILE_NAME = 'Alex Morgenstern-Falkenberg'
+const EMPTY_STYLE_PROFILE: StyleProfile = {
+  mood: null,
+  palette: null,
+  texture: null,
+  fit: null,
+  avoid: [],
+}
 /** Story CC-7.12: the populated member's one saved look and one capsule (Looks > Saved tiles). */
 export const SHELL_SAVED_LOOK_ID = 'shell-saved-look-1'
 export const SHELL_CAPSULE_ID = 'shell-capsule-1'
@@ -639,7 +649,7 @@ export function bodies(
     return checked(resolveCommunityTargetsResponseSchema, body)
   }
 
-  return { json, resolve }
+  return { json, resolve, styleProfile: EMPTY_STYLE_PROFILE }
 }
 
 /** The `sub` of a local fixture bearer (local-e2e-token.ts), or null for any other header. */
@@ -729,8 +739,21 @@ export function createShellRouter(options: {
     return held
   }
 
+  const styleAnswer = (request: Request): Parameters<Route['fulfill']>[0] => {
+    const fixture = bodiesFor(request)
+    const method = request.method()
+    if (method === 'PATCH') {
+      const patch = updateStyleProfileInputSchema.safeParse(request.postDataJSON())
+      if (!patch.success)
+        return { status: 400, json: { message: 'Invalid style preferences' } }
+      fixture.styleProfile = { ...fixture.styleProfile, ...patch.data }
+    } else if (method === 'DELETE') fixture.styleProfile = EMPTY_STYLE_PROFILE
+    return { json: styleProfileResponseSchema.parse({ data: fixture.styleProfile }) }
+  }
+
   /** The fixture answer for one known read. */
   const answerFor = (key: string, request: Request): Parameters<Route['fulfill']>[0] => {
+    if (key === 'style-profile') return styleAnswer(request)
     const { json, resolve } = bodiesFor(request)
     if (key === 'community-resolve') return { json: resolve(request) }
     if (key === 'ritual' && !populated) return { status: 400, json: NO_CITY }
@@ -756,7 +779,9 @@ export function createShellRouter(options: {
   }
 
   const handler = async (route: Route, request: Request) => {
-    const key = readKey(request.url(), request.method())
+    const key = /\/api\/v1\/personalization\/style-profile(?:\?|$)/.test(request.url())
+      ? 'style-profile'
+      : readKey(request.url(), request.method())
     if (key === null) {
       unknown.add(`${request.method()} ${new URL(request.url()).pathname}`)
       await route.fallback()

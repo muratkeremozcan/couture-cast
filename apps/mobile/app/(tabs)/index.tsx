@@ -12,6 +12,7 @@ import {
   type WeatherAlertDeepLinkTarget,
 } from '@couture/api-client'
 import {
+  type ReactNode,
   type RefObject,
   useCallback,
   useEffect,
@@ -27,6 +28,7 @@ import {
   StyleSheet,
   ScrollView,
   Platform,
+  useWindowDimensions,
   View as NativeView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -76,6 +78,11 @@ import { HomeCloset, useHomeWardrobe } from '@/components/home/home-closet'
 import { HomeSpotlightTeaserSlot } from '@/components/home/home-spotlight-teaser'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { useMemberSessionState } from '@/src/lib/member-session'
+import { useMobileStyleProfile } from '@/src/lib/style-profile'
+import {
+  StyleDayControls,
+  StyleMemberControls,
+} from '@/src/features/preview/style-profile-controls'
 import { useStatusBar } from '@/components/save-feedback'
 import { SignedOutWelcome } from '@/src/features/preview/signed-out-welcome'
 import {
@@ -84,6 +91,8 @@ import {
 } from '@/src/features/preview/member-sample-outfit'
 import {
   getGuestPreviewStrings,
+  shouldShowStyleSample,
+  styleForecastSampleWeather,
   todayForecastPeriods,
   todayRitualAnchorDate,
 } from '@couture/utils'
@@ -211,6 +220,18 @@ function ritualIdentity(ritual: RitualResponse, readAt: number): string {
   return locationKey + '|' + todayRitualAnchorDate(timezone, readAt)
 }
 
+function FirstLookRegion({
+  firstLook,
+  minHeight,
+  children,
+}: {
+  firstLook: boolean
+  minHeight: number
+  children: ReactNode
+}) {
+  return firstLook ? <NativeView style={{ minHeight }}>{children}</NativeView> : children
+}
+
 export default function TabOneScreen() {
   const openAndroidShareCard = useShareCardPresentationOpener()
   const shareCardInvoker = useRef<{
@@ -248,7 +269,10 @@ export default function TabOneScreen() {
   const applicationUserId = mobileApplicationUserId()
   // Story 6.16 D1: the ritual is a member request. A signed-out launch shows the
   // welcome card and sends nothing; an unverifiable session keeps its retry state.
+  const { height } = useWindowDimensions()
+  const [viewportHeight, setViewportHeight] = useState(height)
   const [sessionState, retrySession] = useMemberSessionState()
+  const styleProfile = useMobileStyleProfile()
   const homeWardrobe = useHomeWardrobe(applicationUserId, sessionState === 'member')
   // Story 6.17 D3: a Google identity that left the finish step returns to it. On focus only,
   // so a screen pushed above Home is never hijacked (6.16 stacked-screen rule).
@@ -762,6 +786,26 @@ export default function TabOneScreen() {
 
   // The hero for the session on screen, in its own function to keep the screen's branching
   // readable. Story CC-7.7 D2: a member's slot stays empty until the ritual read settles.
+  const styleDayPreview = Boolean(liveLook && styleProfile.day)
+  const showSample = shouldShowStyleSample(ritual?.data.outfits, styleProfile)
+  const sampleWeather = styleForecastSampleWeather(weather?.current)
+  const firstLook = !ritual?.data.outfits.some(({ garmentIds }) =>
+    garmentIds.some((id) => !id.startsWith('default-'))
+  )
+  const renderFirstLookStyle = () =>
+    firstLook && (
+      <NativeView key={styleProfile.scope} style={styles.styleControls}>
+        <StyleMemberControls style={styleProfile} />
+      </NativeView>
+    )
+  const renderStyleControls = () =>
+    sessionState === 'member' &&
+    ritualSettled &&
+    styleProfile.scope && (
+      <NativeView key={styleProfile.scope} style={styles.styleControls}>
+        <StyleDayControls style={styleProfile} showTune={!firstLook} />
+      </NativeView>
+    )
   const renderHero = () =>
     sessionState === 'signed-out' ? (
       <NativeView testID="today-first-content">
@@ -792,7 +836,7 @@ export default function TabOneScreen() {
     ) : sessionState === 'member' ? (
       <>
         {ritualSettled && (ritual || !isLoading) && (
-          <>
+          <FirstLookRegion firstLook={firstLook} minHeight={viewportHeight}>
             <WeatherHeader
               current={weather?.current}
               unavailable={!weather}
@@ -807,57 +851,64 @@ export default function TabOneScreen() {
               />
             )}
             <NativeView testID="today-first-content">
-              {liveLook ? (
-                <TodayLiveOutfit
-                  key={identityEpoch}
-                  {...liveLook}
-                  owner={applicationUserId}
-                  epoch={identityEpoch}
-                  locale={activeLocale}
-                  wardrobe={homeWardrobe?.wardrobe ?? []}
-                  isCacheServed={isCacheServed}
-                  stale={isStale}
-                  periodPicker={
-                    showPeriods ? (
-                      <ScenarioToggles
-                        activeScenario={activeScenario}
-                        availableScenarios={availableScenarios}
-                        onScenarioChange={handleScenarioChange}
-                      />
-                    ) : null
-                  }
-                  onExport={(recommendationId, opener) => {
-                    if (
-                      openAndroidShareCard(
-                        { kind: 'outfit', recommendationId },
-                        'outfit',
-                        opener
-                      )
-                    )
-                      return
-                    shareCardInvoker.current = {
-                      node: opener,
-                      member: mobileApplicationUserId(),
+              {liveLook && (
+                <NativeView style={showSample ? styles.hidden : undefined}>
+                  <TodayLiveOutfit
+                    key={identityEpoch}
+                    {...liveLook}
+                    owner={applicationUserId}
+                    epoch={identityEpoch}
+                    locale={activeLocale}
+                    wardrobe={homeWardrobe?.wardrobe ?? []}
+                    isCacheServed={isCacheServed}
+                    stale={isStale}
+                    periodPicker={
+                      showPeriods ? (
+                        <ScenarioToggles
+                          activeScenario={activeScenario}
+                          availableScenarios={availableScenarios}
+                          onScenarioChange={handleScenarioChange}
+                        />
+                      ) : null
                     }
-                    setShareCardSource({ kind: 'outfit', recommendationId })
-                    setShareCardOpen(true)
-                    traceShareCardOpener('state-open')
-                  }}
-                />
-              ) : (
+                    onExport={(recommendationId, opener) => {
+                      if (
+                        openAndroidShareCard(
+                          { kind: 'outfit', recommendationId },
+                          'outfit',
+                          opener
+                        )
+                      )
+                        return
+                      shareCardInvoker.current = {
+                        node: opener,
+                        member: mobileApplicationUserId(),
+                      }
+                      setShareCardSource({ kind: 'outfit', recommendationId })
+                      setShareCardOpen(true)
+                      traceShareCardOpener('state-open')
+                    }}
+                  />
+                </NativeView>
+              )}
+              {showSample && (
                 <MemberSampleOutfit
-                  key={applicationUserId}
+                  key={identityEpoch}
                   owner={applicationUserId}
                   error={error}
                   busy={isLoading}
                   onRetry={handleRetry}
                   weatherAvailable={Boolean(weather)}
+                  sampleWeather={sampleWeather}
+                  preview={styleDayPreview}
+                  showStyleControls={false}
                 />
               )}
             </NativeView>
+            {renderFirstLookStyle()}
             <CachedWeatherNotice visible={isStale} />
             {weather && <WeatherAlertBanner alerts={weather.alerts} />}
-          </>
+          </FirstLookRegion>
         )}
         <HomeCloset pieces={homeWardrobe?.pieces} />
         <HomePlannerLink />
@@ -878,6 +929,7 @@ export default function TabOneScreen() {
         innerViewRef={scrollContentRef as RefObject<NativeView>}
         style={[styles.container, { backgroundColor: palette.page }]}
         contentContainerStyle={styles.contentContainer}
+        onLayout={({ nativeEvent }) => setViewportHeight(nativeEvent.layout.height)}
         testID="hero-experience-scrollview"
         // Focusable from code on web without becoming a tab stop, so focus can
         // land here when the teaser leaves.
@@ -939,6 +991,7 @@ export default function TabOneScreen() {
             applicationUserId={applicationUserId}
             scrollViewRef={scrollViewRef}
           />
+          {renderStyleControls()}
         </ScreenGate>
       </ScrollView>
 
@@ -965,6 +1018,8 @@ export default function TabOneScreen() {
 }
 
 const styles = StyleSheet.create({
+  hidden: { display: 'none' },
+  styleControls: { marginHorizontal: TAB_BODY_INSET, gap: 12 },
   // Colors follow the OS scheme at render time; this sheet keeps layout only.
   safeContainer: {
     flex: 1,

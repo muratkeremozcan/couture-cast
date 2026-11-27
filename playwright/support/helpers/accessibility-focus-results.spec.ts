@@ -144,8 +144,12 @@ case "$*" in
   *"settings get secure touch_exploration_enabled"*) cat "$state" 2>/dev/null || echo 0 ;;
   *"am start -W -a android.settings.SETTINGS"*)
     [ -f "$FAKE_RESULTS/no-app-window" ] || touch "$FAKE_RESULTS/backdrop" ;;
+  *"am force-stop com.google.android.apps.nexuslauncher"*)
+    [ -f "$FAKE_RESULTS/launcher-anr-stuck" ] || rm -f "$FAKE_RESULTS/launcher-anr" ;;
   *"dumpsys accessibility"*)
-    if [ -f "$FAKE_RESULTS/backdrop" ]; then
+    if [ -f "$FAKE_RESULTS/launcher-anr" ]; then
+      echo "A11yWindow[AccessibilityWindowInfo[title=Pixel Launcher isn't responding, id=0, type=TYPE_SYSTEM, focused=true, active=true]]"
+    elif [ -f "$FAKE_RESULTS/backdrop" ]; then
       echo 'A11yWindow[AccessibilityWindowInfo[title=Settings, id=12, type=TYPE_APPLICATION, focused=true, active=true]]'
     else
       echo 'A11yWindow[AccessibilityWindowInfo[title=null, id=8, type=TYPE_SYSTEM, focused=false, active=false]]'
@@ -168,7 +172,7 @@ exit 0
     if (outcomes) fs.writeFileSync(path.join(work, 'fake', `${run}.xml`), junit(outcomes))
   }
 
-  const runLane = () =>
+  const runLane = (windowWait = '1') =>
     spawnSync(
       'bash',
       [path.join(repo, 'scripts/ci/accessibility-focus-device-tests.sh')],
@@ -178,7 +182,7 @@ exit 0
           ...process.env,
           ADB: path.join(work, 'adb'),
           FAKE_RESULTS: path.join(work, 'fake'),
-          ACCESSIBILITY_FOCUS_WINDOW_WAIT: '1',
+          ACCESSIBILITY_FOCUS_WINDOW_WAIT: windowWait,
         },
         encoding: 'utf8',
       }
@@ -220,6 +224,43 @@ exit 0
       '::error::accessibility tracks no active app window under the Settings backdrop'
     )
     expect(lane.status).toBe(1)
+    expect(calls().some((line) => line.includes('connectedDebugAndroidTest'))).toBe(false)
+    expect(lane.stdout).toContain('TalkBack off.')
+  })
+
+  it('recovers once from an active Pixel Launcher ANR before running both assertions', () => {
+    fs.writeFileSync(path.join(work, 'fake', 'launcher-anr'), '')
+    scenario('positive', 0, allPass())
+    scenario('suppressed', 1, controlFails())
+
+    const lane = runLane('3')
+
+    expect(lane.status).toBe(0)
+    const backdrop = 'adb shell am start -W -a android.settings.SETTINGS'
+    expect(
+      calls().filter((line) =>
+        /am start -W|am force-stop|connectedDebugAndroidTest/.test(line)
+      )
+    ).toEqual([
+      backdrop,
+      'adb shell am force-stop com.google.android.apps.nexuslauncher',
+      backdrop,
+      expect.stringContaining('connectedDebugAndroidTest'),
+      expect.stringContaining('suppressFocus=true'),
+    ])
+    expect(lane.stdout).toContain('Suppressed-focus control: the 4 tests')
+  })
+
+  it('fails before instrumentation when the Pixel Launcher ANR persists', () => {
+    for (const marker of ['launcher-anr', 'launcher-anr-stuck']) {
+      fs.writeFileSync(path.join(work, 'fake', marker), '')
+    }
+
+    const lane = runLane('2')
+
+    expect(lane.status).toBe(1)
+    expect(lane.stderr).toContain('accessibility tracks no active app window')
+    expect(calls().filter((line) => line.includes('am force-stop'))).toHaveLength(1)
     expect(calls().some((line) => line.includes('connectedDebugAndroidTest'))).toBe(false)
     expect(lane.stdout).toContain('TalkBack off.')
   })

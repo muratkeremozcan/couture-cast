@@ -37,9 +37,10 @@ export const SAMPLE_COLLECTION_FILTERS = ['all', ...SAMPLE_COLLECTIONS] as const
 export type SampleCollectionFilter = (typeof SAMPLE_COLLECTION_FILTERS)[number]
 
 export const SAMPLE_STYLE_OPTIONS = {
-  style: ['active', 'chic', 'cozy'],
+  style: ['active', 'chic', 'cozy', 'classic'],
   palette: ['neutral', 'colorful'],
   texture: ['smooth', 'textured'],
+  fit: ['fitted', 'relaxed'],
 } as const
 
 export const sampleStylePreferencesSchema = z
@@ -47,6 +48,7 @@ export const sampleStylePreferencesSchema = z
     style: z.enum(SAMPLE_STYLE_OPTIONS.style).optional(),
     palette: z.enum(SAMPLE_STYLE_OPTIONS.palette).optional(),
     texture: z.enum(SAMPLE_STYLE_OPTIONS.texture).optional(),
+    fit: z.enum(SAMPLE_STYLE_OPTIONS.fit).optional(),
   })
   .strict()
 export type SampleStylePreferences = z.infer<typeof sampleStylePreferencesSchema>
