@@ -99,10 +99,7 @@ const ALLOWED = {
   'src/components/nav-row.tsx': ['NavRow'],
   'src/features/looks/looks-screen.tsx': ['SegmentControl'],
   'src/features/premium/planner-screen.tsx': ['FreePlanPreview'],
-  'src/features/preview/style-profile-controls.tsx': [
-    'StyleMoodRow',
-    'StyleMemberControls',
-  ],
+  'src/features/preview/style-profile-controls.tsx': ['StyleMoodRow', 'TuneModalHeader'],
   'src/features/wardrobe/wardrobe-hub-screen.tsx': ['MemberWardrobeHub'],
   'src/lib/font-scale-text.tsx': ['remeasureCap', 'createFontScaleText.FontScaleText'],
 }
@@ -190,7 +187,7 @@ const FONT_SCALE_FORMS = {
   'src/features/premium/planner-screen.tsx': { FreePlanPreview: compactLayoutScaleRead },
   'src/features/preview/style-profile-controls.tsx': {
     StyleMoodRow: moodRowScaleRead,
-    StyleMemberControls: compactLayoutScaleRead,
+    TuneModalHeader: compactLayoutScaleRead,
   },
   'src/features/wardrobe/wardrobe-hub-screen.tsx': {
     MemberWardrobeHub: compactLayoutScaleRead,
@@ -554,7 +551,7 @@ describe('font-scale reads in app code', () => {
   test('the Tune style modal can stack its header without directly scaling text', () => {
     const file = 'src/features/preview/style-profile-controls.tsx'
     const source = [
-      'export function StyleMemberControls() {',
+      'function TuneModalHeader() {',
       '  const { fontScale, width } = useWindowDimensions()',
       '  const stackHeader = fontScale >= 1.5 && width <= 400',
       '  return <Text style={{ fontSize: 20 * fontScale }} />',
