@@ -1139,7 +1139,8 @@ describe('Wardrobe styling', () => {
     const checkGrid = (records: MutationRecord[]) => {
       if (!shownGrid) {
         const grid = gridNow()
-        if (tileCount(grid) === 2) shownGrid = grid
+        // The first grid on screen with at least both tiles is the one that must stay.
+        if (grid && tileCount(grid) >= 2) shownGrid = grid
         return
       }
       const grid = shownGrid
@@ -1219,10 +1220,13 @@ describe('Wardrobe styling', () => {
       ).toEqual(originalTiles)
       expect(grid.getAllByRole('link', { name: /, Needs review$/ })).toHaveLength(1)
     })
-    expect(screen.getByTestId('looks-saved-grid')).toBe(shownGrid)
+    // The trace and hide records go first, so a failure names its cause before the identity
+    // check reports only that the node changed.
     checkGrid(observer.takeRecords())
     expect(hides, hides.join('\n')).toEqual([])
     expect(gaps, gaps.join('\n')).toEqual([])
+    expect(replaced, replaced.join('\n')).toEqual([])
+    expect(screen.getByTestId('looks-saved-grid')).toBe(shownGrid)
     // A focused tile keeps focus across a refresh: another save for this member is a third look
     // in the account, and its notice reads Looks again with the tile still focused.
     const focused = within(screen.getByTestId('looks-saved-grid')).getAllByRole(
