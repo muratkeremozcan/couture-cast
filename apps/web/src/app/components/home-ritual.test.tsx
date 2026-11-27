@@ -646,6 +646,44 @@ it('shows the city and garment entry links beside an editable sample when the me
   expect(sampleTitle()).not.toHaveTextContent(rotated ?? '')
 })
 
+it('honors account avoid choices when picking a piece for the Today sample', async () => {
+  const user = userEvent.setup()
+  useMswHandlers(
+    http.get('/api/v1/ritual', missingCity),
+    http.get('*/api/v1/personalization/style-profile', () =>
+      HttpResponse.json({
+        data: {
+          mood: null,
+          palette: null,
+          texture: null,
+          fit: null,
+          avoid: ['mini-skirt'],
+        },
+      })
+    )
+  )
+  publishMember('style-picker-member')
+  renderHome()
+  await waitFor(() => expect(screen.getByTestId('style-mood-cozy')).toBeEnabled())
+  await openSampleEditor()
+
+  const browse = screen.getByTestId('guest-preview-browse-wardrobe')
+  await user.click(browse)
+  await user.click(screen.getByTestId('guest-preview-collection-womenswear'))
+  const picker = within(screen.getByTestId('guest-preview-wardrobe'))
+  await user.click(picker.getByRole('button', { name: /^Mini skirt\b/ }))
+  const avoided = within(await screen.findByRole('dialog', { name: 'Mini skirt' }))
+  expect(avoided.queryByTestId('guest-preview-use-item')).toBeNull()
+  await user.keyboard('{Escape}')
+  await user.click(picker.getByRole('button', { name: /^Midi skirt\b/ }))
+  const allowed = within(await screen.findByRole('dialog', { name: 'Midi skirt' }))
+  await user.click(allowed.getByTestId('guest-preview-use-item'))
+  expect(screen.queryByTestId('guest-preview-wardrobe')).toBeNull()
+  expect(
+    within(screen.getByTestId('guest-preview-outfit')).getByText('Midi skirt')
+  ).toBeVisible()
+})
+
 it('retries a failed recommendation, shows the verified city, and keeps the chosen live outfit during a failed refresh', async () => {
   const user = userEvent.setup()
   let available = false

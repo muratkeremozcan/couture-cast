@@ -277,8 +277,8 @@ jobs:
             build-tools;37.0.0
             platform-tools
             platforms;android-34
-            system-images;android-${{ env.ANDROID_API_LEVEL }};${{ env.ANDROID_TARGET }};${{ env.ANDROID_ARCH }}
             emulator
+            system-images;android-${{ env.ANDROID_API_LEVEL }};${{ env.ANDROID_TARGET }};${{ env.ANDROID_ARCH }}
         run: bash scripts/ci/android-sdk-install.sh
 
       - name: Enable KVM

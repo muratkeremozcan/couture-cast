@@ -36,9 +36,8 @@ test('the emulator SDK step installs its list through the shared script', () => 
   assert.match(step.env.SDK_PACKAGES, /^build-tools;\S+ platform-tools /)
   assert.match(
     step.env.SDK_PACKAGES,
-    / system-images;android-\$\{\{ env\.ANDROID_API_LEVEL \}\};/
+    / emulator system-images;android-\$\{\{ env\.ANDROID_API_LEVEL \}\};/
   )
-  assert.match(step.env.SDK_PACKAGES, / emulator$/)
 })
 
 const shareCardWorkflow = parse(
@@ -72,11 +71,12 @@ function runStep(t, sdkmanager, env = {}, args = [], { node, gradleProperties } 
   t.after(() => rmSync(work, { recursive: true, force: true }))
   const bin = path.join(work, 'bin')
   const sdk = path.join(work, 'sdk')
+  const limits = path.join(work, 'attempt-limits')
   mkdirSync(bin)
   mkdirSync(sdk)
   writeFileSync(
     path.join(bin, 'timeout'),
-    '#!/bin/bash\nwhile [[ "$1" == --* ]]; do shift; done\nshift\nexec "$@"\n',
+    `#!/bin/bash\nwhile [[ "$1" == --* ]]; do shift; done\nprintf '%s\\n' "$1" >> "${limits}"\nshift\nexec "$@"\n`,
     { mode: 0o755 }
   )
   writeFileSync(
@@ -105,12 +105,30 @@ function runStep(t, sdkmanager, env = {}, args = [], { node, gradleProperties } 
   return {
     ...result,
     sdk,
+    attemptLimits: existsSync(limits)
+      ? readFileSync(limits, 'utf8').trim().split('\n').map(Number)
+      : [],
     gradleProperties: existsSync(properties) ? readFileSync(properties, 'utf8') : null,
   }
 }
 
 const unpack =
   'mkdir -p "$ANDROID_HOME/${package//;//}" && touch "$ANDROID_HOME/${package//;//}/package.xml"'
+
+test('the system image has a longer attempt limit within the shared deadline', (t) => {
+  const image = 'system-images;android-34;google_apis;x86_64'
+  const normal = runStep(t, unpack, { SDK_PACKAGES: `emulator ${image}` })
+  assert.equal(normal.status, 0, normal.stdout + normal.stderr)
+  assert.deepEqual(normal.attemptLimits, [180, 300])
+
+  const nearDeadline = runStep(t, unpack, {
+    SDK_PACKAGES: image,
+    SDK_INSTALL_BUDGET_SECONDS: '200',
+  })
+  assert.equal(nearDeadline.status, 0, nearDeadline.stdout + nearDeadline.stderr)
+  assert.ok(nearDeadline.attemptLimits[0] <= 200)
+  assert.equal(nearDeadline.attemptLimits.length, 1)
+})
 
 test('a package that fails five times installs on the sixth attempt', (t) => {
   const result = runStep(

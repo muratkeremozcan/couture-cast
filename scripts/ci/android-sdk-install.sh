@@ -48,17 +48,22 @@ log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
 for package in "${packages[@]}"; do
   dir="$ANDROID_HOME/${package//;//}"
+  attempt_limit=180
+  # Run 46059613976 reached system.img extraction before its watchdog fired.
+  # Give large system images more time within the same whole-install budget.
+  case "$package" in
+    system-images\;*) attempt_limit=300 ;;
+  esac
   for attempt in 1 2 3 4 5 6; do
     remaining=$(( budget - SECONDS ))
     if [ "$remaining" -lt 20 ]; then
       echo "::error::Could not install $package: the ${budget} s install budget ran out after $(( attempt - 1 )) attempts."
       exit 1
     fi
-    # An attempt that has not finished in 180 s has stalled (a whole install takes under a
-    # minute; one sdkmanager call ran 33.5 minutes in run 43083368586); the next one starts
-    # clean. Not cached: the repo's Actions cache is at its 10 GB limit, and a 1.5 GB SDK entry
-    # would evict the Supabase image and AVD caches every job reads.
-    limit=$(( remaining < 180 ? remaining : 180 ))
+    # Bound each attempt as well as the whole step. A stalled sdkmanager ran for 33.5
+    # minutes in run 43083368586. Caching the 1.5 GB SDK entry would evict the Supabase
+    # image and AVD caches that every job reads.
+    limit=$(( remaining < attempt_limit ? remaining : attempt_limit ))
     timeout --kill-after=10 "$limit" sdkmanager --install "$package" --channel=0 > "$log" 2>&1 || true
     # A truncated archive never unpacks, so package.xml is the check.
     if [ -f "$dir/package.xml" ]; then
