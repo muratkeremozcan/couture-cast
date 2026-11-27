@@ -2354,6 +2354,7 @@ function CommunitySettingsLink({
   label,
   signIn,
   guestOnly,
+  hideBell,
 }: {
   banned: boolean
   /** Null while the session is still being verified: neither the member's link nor the guest's. */
@@ -2363,6 +2364,8 @@ function CommunitySettingsLink({
   signIn: boolean
   /** Hidden by globals.css once the page knows a member is signed in. */
   guestOnly: boolean
+  /** Keep the existing focus target visible if a verification begins while it is focused. */
+  hideBell: boolean
 }) {
   if (banned || href === null) return null
   if (signIn) {
@@ -2380,14 +2383,14 @@ function CommunitySettingsLink({
       </Link>
     )
   }
-  // A member's link is a bell in the heading row; its name stays the full label for assistive
+  // A member's link is a bell in the footer; its name stays the full label for assistive
   // technology, and the tooltip shows it to a pointer.
   return (
     <Link
       href={href}
       aria-label={label}
       title={label}
-      className="flex h-11 w-11 items-center justify-center rounded-full border border-line-strong text-ink motion-safe:transition-colors hover:border-inverse"
+      className={`flex h-11 w-11 items-center justify-center rounded-full border border-line-strong text-ink motion-safe:transition-colors hover:border-inverse ${hideBell ? 'invisible focus:visible' : ''}`}
     >
       <svg
         aria-hidden="true"
@@ -4580,15 +4583,6 @@ export function CommunityLookbookGrid({
     presentation.canAct
   )
 
-  const settingsLink = (
-    <CommunitySettingsLink
-      banned={banned}
-      href={presentation.settingsHref}
-      label={t(presentation.settingsLabel)}
-      signIn={presentation.settingsSignIn}
-      guestOnly={!hasSession}
-    />
-  )
   const postAction = (
     <CommunityHeaderActions
       showShare={shareSlotShown(memberSession, banned)}
@@ -4611,6 +4605,24 @@ export function CommunityLookbookGrid({
     handleModeChange
   )
   const climateEmpty = Boolean(handleShowAllClimates)
+
+  const settingsLink = (
+    <CommunitySettingsLink
+      banned={banned}
+      href={presentation.settingsHref}
+      label={t(presentation.settingsLabel)}
+      signIn={presentation.settingsSignIn}
+      guestOnly={!hasSession}
+      hideBell={!available || waitingForLooks}
+    />
+  )
+  const renderSettingsFooter = () => {
+    if (banned || (refusedScope !== undefined && refusedScope === sessionScope))
+      return null
+    if (!memberSession && snapshotScope === null) return null
+    // Reserve the bell and its enclosing gap before scroll restoration reads the page height.
+    return <div className="min-h-11">{!presentation.settingsSignIn && settingsLink}</div>
+  }
 
   const renderHeader = () => (
     <>
@@ -4786,7 +4798,7 @@ export function CommunityLookbookGrid({
         t={t}
       />
 
-      {!presentation.settingsSignIn && settingsLink}
+      {renderSettingsFooter()}
     </>
   )
 
