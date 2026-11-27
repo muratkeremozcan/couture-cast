@@ -312,7 +312,9 @@ export function ScreenGate({
   placeholderClassName = 'min-h-[60vh] w-full rounded-xl bg-card-muted',
   children,
 }: ScreenGateProps) {
-  const { t } = useTranslation(undefined, { i18n: getI18n() })
+  // Story CC-7.12 (TEA IMPORT-001): the gate never suspends. Looks renders it under the Suspense
+  // that `useSearchParams` needs, and a suspending gate swapped the whole body for the fallback.
+  const { t } = useTranslation(undefined, { i18n: getI18n(), useSuspense: false })
   const hydrating = useHydrating()
   const session = useWebSession()
   const scope = useWebSessionScope()

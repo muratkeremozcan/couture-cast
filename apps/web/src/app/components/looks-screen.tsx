@@ -618,7 +618,12 @@ function LooksBody({ owner }: { owner: string | null }) {
     if (!defaultSegment && !addressSegment && decided) setDefaultSegment(decided)
   }, [defaultSegment, addressSegment, decided])
 
-  const segment = addressSegment ?? defaultSegment
+  // TEA IMPORT-001 trace: when the address loses its segment mid-session, the decided default
+  // applies in the same render, so the body never drops to an empty frame.
+  // An address that loses its segment keeps the segment on screen (TEA IMPORT-001).
+  const shownSegmentRef = useRef<LooksSegment | null>(null)
+  const segment = addressSegment ?? shownSegmentRef.current ?? defaultSegment ?? decided
+  shownSegmentRef.current = segment
   // TEA M2: Saved and Ideas both wait for the first reads, so Ideas' first-save line never
   // lands above a grid already on screen (a CC-7.7 shift).
   const ready = segment !== null && (segment === 'plan' || feed.settled)
