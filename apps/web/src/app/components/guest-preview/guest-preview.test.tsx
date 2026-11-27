@@ -295,8 +295,9 @@ describe('guest preview surfaces', () => {
       act(() => {
         window.dispatchEvent(new Event('offline'))
       })
-      expect(within(sheet).getByRole('status')).toHaveTextContent(
-        en.chrome.connectionNeeded
+      expect(within(sheet).getByText(en.chrome.connectionNeeded)).toHaveAttribute(
+        'role',
+        'status'
       )
       expect(within(sheet).getByTestId('guest-preview-sign-in')).toHaveAttribute(
         'aria-disabled',

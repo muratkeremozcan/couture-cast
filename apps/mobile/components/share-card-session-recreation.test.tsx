@@ -250,6 +250,9 @@ beforeEach(async () => {
   requests = []
   server.use(
     http.get('*/api/v1/user/profile', () => HttpResponse.json(profile)),
+    http.get('*/api/v1/auth/signup/federated', () =>
+      HttpResponse.json({ status: 'complete' })
+    ),
     http.post('*/api/v1/share-cards/prepare', async ({ request }) => {
       const bearer = request.headers.get('authorization')
       requests.push({ bearer, input: await request.json() })

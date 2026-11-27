@@ -99,7 +99,10 @@ const ALLOWED = {
   'src/components/nav-row.tsx': ['NavRow'],
   'src/features/looks/looks-screen.tsx': ['SegmentControl'],
   'src/features/premium/planner-screen.tsx': ['FreePlanPreview'],
-  'src/features/preview/style-profile-controls.tsx': ['StyleMoodRow'],
+  'src/features/preview/style-profile-controls.tsx': [
+    'StyleMoodRow',
+    'StyleMemberControls',
+  ],
   'src/features/wardrobe/wardrobe-hub-screen.tsx': ['MemberWardrobeHub'],
   'src/lib/font-scale-text.tsx': ['remeasureCap', 'createFontScaleText.FontScaleText'],
 }
@@ -185,7 +188,10 @@ const FONT_SCALE_FORMS = {
   'src/components/nav-row.tsx': { NavRow: compactLayoutScaleRead },
   'src/features/looks/looks-screen.tsx': { SegmentControl: compactLayoutScaleRead },
   'src/features/premium/planner-screen.tsx': { FreePlanPreview: compactLayoutScaleRead },
-  'src/features/preview/style-profile-controls.tsx': { StyleMoodRow: moodRowScaleRead },
+  'src/features/preview/style-profile-controls.tsx': {
+    StyleMoodRow: moodRowScaleRead,
+    StyleMemberControls: compactLayoutScaleRead,
+  },
   'src/features/wardrobe/wardrobe-hub-screen.tsx': {
     MemberWardrobeHub: compactLayoutScaleRead,
   },
@@ -542,6 +548,20 @@ describe('font-scale reads in app code', () => {
       `${file}:5 const otherLayout = fontScale >= 1.5`,
       `${file}:6 return <Text style={{ minWidth, fontSize: 12 * fontScale }} />`,
       `${file}:8 function OtherRow() { return useWindowDimensions().fontScale }`,
+    ])
+  })
+
+  test('the Tune style modal can stack its header without directly scaling text', () => {
+    const file = 'src/features/preview/style-profile-controls.tsx'
+    const source = [
+      'export function StyleMemberControls() {',
+      '  const { fontScale, width } = useWindowDimensions()',
+      '  const stackHeader = fontScale >= 1.5 && width <= 400',
+      '  return <Text style={{ fontSize: 20 * fontScale }} />',
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ [file]: source }), [
+      `${file}:4 return <Text style={{ fontSize: 20 * fontScale }} />`,
     ])
   })
 

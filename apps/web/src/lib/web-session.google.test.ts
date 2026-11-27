@@ -379,6 +379,47 @@ describe('completeWebOAuth: one outcome per callback, never a throw', () => {
     expect(sdk.signOut).not.toHaveBeenCalled()
   })
 
+  it('clears the finish step when a duplicate Google signup re-verifies the adult account', async () => {
+    const seen = profileAnswers(unauthorized, json(profile('adult-conflict')))
+    federatedAnswer(json({ status: 'needs_birthdate' }))
+    const auth = await load()
+    await expect(auth.completeWebOAuth(params('code=adult-conflict'))).resolves.toEqual({
+      kind: 'no_account',
+    })
+    installHandlers(
+      http.post(federatedPath, json({ message: 'Account already exists' }, 409))
+    )
+
+    await expect(auth.finishWebFederatedSignup('1990-01-01')).resolves.toEqual({
+      kind: 'signed_in',
+    })
+    expect(seen).toHaveLength(2)
+    expect(auth.webSessionIdentity()).toBe('adult-conflict')
+    expect(sessionStorage.getItem(FINISH_MARKER)).toBeNull()
+  })
+
+  it.each([
+    ['sign-out', null, 'no_session'],
+    ['account switch', session('other-google', 'other-bearer'), 'unavailable'],
+  ] as const)('stops duplicate signup recovery after %s', async (change, next, kind) => {
+    const seen = profileAnswers(unauthorized)
+    const federated = federatedAnswer(json({ status: 'needs_birthdate' }))
+    const auth = await load()
+    await expect(
+      auth.completeWebOAuth(params(`code=conflict-${encodeURIComponent(change)}`))
+    ).resolves.toEqual({ kind: 'no_account' })
+    installHandlers(
+      http.post(federatedPath, () => {
+        sdk.session = next
+        return HttpResponse.json({ message: 'Account already exists' }, { status: 409 })
+      })
+    )
+
+    await expect(auth.finishWebFederatedSignup('1990-01-01')).resolves.toEqual({ kind })
+    expect(seen).toEqual(['Bearer signed-google-session'])
+    expect(federated).toEqual(['Bearer signed-google-session'])
+  })
+
   it('complete then a 200 re-verify answers member', async () => {
     const seen = profileAnswers(unauthorized, json(profile('app-member-raced')))
     federatedAnswer(json({ status: 'complete' }))

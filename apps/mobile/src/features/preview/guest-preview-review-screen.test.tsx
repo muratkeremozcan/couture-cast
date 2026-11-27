@@ -361,10 +361,13 @@ describe('mobile carryover review (D8)', () => {
 
 describe('CC-7.21 first-run look review', () => {
   beforeEach(() => {
+    vi.stubEnv('EXPO_PUBLIC_API_BASE_URL', window.location.origin)
     lookApi.read.mockReset().mockResolvedValue(null)
     lookApi.style.mockReset().mockResolvedValue(undefined)
     lookApi.save.mockReset().mockResolvedValue({ id: 'look-saved' })
   })
+
+  afterEach(() => vi.unstubAllEnvs())
 
   it.each(['use', 'keep'] as const)(
     'stores the exact look after the visitor chooses %s',
@@ -378,7 +381,9 @@ describe('CC-7.21 first-run look review', () => {
       expect(proposed).toHaveTextContent('Cozy')
       expect(proposed).toHaveTextContent('Colorful')
       expect(lookApi.save).not.toHaveBeenCalled()
-      press(screen.getByTestId(`guest-preview-review-${choice}`))
+      const action = screen.getByTestId(`guest-preview-review-${choice}`)
+      expect(action).toBeEnabled()
+      press(action)
       await waitFor(() =>
         expect(navigation.dismissTo).toHaveBeenCalledWith({
           pathname: '/looks',
@@ -402,6 +407,27 @@ describe('CC-7.21 first-run look review', () => {
       await waitFor(() => expect(adapter.value()).toBeNull())
     }
   )
+
+  it('still saves the look when the account style read is unavailable', async () => {
+    await seed(GUEST_PREVIEW_SAVE_INTENT)
+    const client = server()
+    lookApi.read.mockRejectedValueOnce(new Error('Style temporarily unavailable'))
+    await render(<GuestPreviewReviewScreen />)
+
+    expect(await screen.findByTestId('guest-preview-review-use')).toBeDisabled()
+    const keep = screen.getByTestId('guest-preview-review-keep')
+    expect(keep).toBeEnabled()
+    press(keep)
+    await waitFor(() =>
+      expect(navigation.dismissTo).toHaveBeenCalledWith({
+        pathname: '/looks',
+        params: { segment: 'saved', filter: 'all' },
+      })
+    )
+    expect(lookApi.save).toHaveBeenCalledOnce()
+    expect(client.write).not.toHaveBeenCalled()
+    expect(lookApi.style).not.toHaveBeenCalled()
+  })
 
   it('cancels review without saving either the look or preferences', async () => {
     await seed(GUEST_PREVIEW_SAVE_INTENT)

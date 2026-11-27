@@ -541,12 +541,14 @@ describe('CC-7.21 first-run look review', () => {
     lookApi.save.mockRejectedValueOnce(new SavedLookRequestError('Consent required', 403))
     render(<GuestPreviewReview />)
     fireEvent.click(await screen.findByTestId('guest-preview-review-keep'))
-    expect(await screen.findByTestId('guest-preview-review-result')).toHaveTextContent(
-      en.review.rejected
-    )
+    const refusal = await screen.findByText(en.review.rejected)
+    expect(refusal).toHaveAttribute('role', 'alert')
     expect(client.write).not.toHaveBeenCalled()
+    expect(lookApi.style).not.toHaveBeenCalled()
     expect(screen.queryByTestId('guest-preview-review-proposed')).toBeNull()
     expect(adapter.value()).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: en.review.continue }))
+    expect(navigation.replace).toHaveBeenCalledWith('/')
   })
 
   it('opens the saved look through its confirmation while the same session is active', async () => {

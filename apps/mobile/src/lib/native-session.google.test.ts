@@ -681,9 +681,13 @@ describe('a teen waiting on a guardian', () => {
     }
   )
 
-  it.each([403, 200])(
-    'email code keeps the guardian step when the profile responds %i',
-    async (statusCode) => {
+  it.each([
+    [403, 200, 'awaiting_guardian'],
+    [200, 200, 'awaiting_guardian'],
+    [200, 503, 'unavailable'],
+  ] as const)(
+    'email code handles guardian verification with profile %i and status %i',
+    async (profileStatus, guardianStatus, reason) => {
       sdk.verifyOtp.mockImplementation(() => {
         sdk.current = {
           access_token: 'signed-native-otp-teen',
@@ -692,12 +696,13 @@ describe('a teen waiting on a guardian', () => {
         }
         return Promise.resolve({ data: { session: sdk.current }, error: null })
       })
-      pending(statusCode)
-      awaiting()
+      pending(profileStatus)
+      if (guardianStatus === 200) awaiting()
+      else answers('/api/v1/auth/signup/federated', json({ message: 'Unavailable' }, 503))
       const { session } = await load()
       await expect(
         session.verifyNativeOtp('teen@synthetic.test', '123456')
-      ).rejects.toMatchObject({ reason: 'awaiting_guardian' })
+      ).rejects.toMatchObject({ reason })
     }
   )
 })
