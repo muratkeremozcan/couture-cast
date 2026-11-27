@@ -3,15 +3,17 @@ title: 'Story CC-7.21: First run with the look first and the account on save'
 type: feature
 ticket: '7-21-first-run-look-first-account-save'
 created: '2026-11-27'
-status: in-review
+status: built
 baseline_revision: '4203dd270fdda35e0aa14b05ebc07e79b3f538ef'
 route: full
 route_source: auto
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
-review_loop_iteration: 0
+lenses_ran:
+  - 'independent-correctness'
+  - 'codex-security'
+review_loop_iteration: 1
 context:
   - '_bmad-output/planning-artifacts/epics.md'
   - '_bmad-output/implementation-artifacts/epic-7-context.md'
@@ -81,12 +83,12 @@ its mood, shuffle or swap pieces, then choose to keep that exact outfit in an ac
 
 ## Tasks & Acceptance
 
-- [ ] Lead with the complete look after age check. Place optional colors and comfort below it.
-- [ ] Open the account sheet from Save on both platforms. Preserve the look on cancel and
+- [x] Lead with the complete look after age check. Place optional colors and comfort below it.
+- [x] Open the account sheet from Save on both platforms. Preserve the look on cancel and
       re-enter the email signup flow with the eligible date.
-- [ ] Review guest choices alongside account values. Save through CC-7.2 and show CC-7.1
+- [x] Review guest choices alongside account values. Save through CC-7.2 and show CC-7.1
       confirmation at Looks > Saved. Fence writes and completion by verified session.
-- [ ] Land the TEA coverage, record review findings, mark sprint status done and link Step 78.
+- [x] Land the TEA coverage, record review findings, mark sprint status done and link Step 78.
 
 ## Implementation Notes
 
@@ -96,12 +98,36 @@ its mood, shuffle or swap pieces, then choose to keep that exact outfit in an ac
   unloads the app and clears that memory. Its finish form asks for the date again.
 - Pending teen session verification can read the owner's profile and read or update their comfort
   settings. In Looks > Saved, the guardian-guarded capsule response leaves the catalog feed usable.
+- Ordinary teen sign-in still offers the guardian invitation while approval is pending. A verified
+  preview sign-in with a current look-save intent proceeds to review.
+- Leaving the web preview and its signup flow clears the in-memory birthdate. The preview look
+  can still be reopened from Today until the preview expires.
 - Local phone-width Chromium covered the guest teaser, the under-13 block, birthdate prefill and
   preserving the swapped look when leaving the sheet or auth. Account and native coverage run in CI.
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+The combined review covered `4203dd270fdda35e0aa14b05ebc07e79b3f538ef` through
+`fdfca9eef0fd2f3cb80368f3cad699bf3504e3af`. Codex Security inspected 68 source rows and 12
+supporting changes. Its one low-severity finding is recorded as P2-1.
+
+| Finding | Resolution                                                                                                      |
+| ------- | --------------------------------------------------------------------------------------------------------------- |
+| P1-1    | Returning teen sign-in checks invitation status. Preview sign-in can continue with an active look-save intent.  |
+| P1-2    | Shared tests exercise the birthdate handoff, validated intent, catalog composition and save choices.            |
+| P1-3    | Updated preview labels, test doubles and selectors.                                                             |
+| P1-4    | Real-session harness counts include the four account-save scenarios in their policy lanes.                      |
+| P1-5    | Garment columns follow available width and text size.                                                           |
+| P1-6    | Native Google acceptance uses the prefilled date and avoids centering controls at scroll edges.                 |
+| P2-1    | Clear the in-memory date on leaving preview or preview auth. Regression tests reopen the look after navigation. |
+| P2-2    | Claim the current intent before writing. Bind style changes and completion to the verified session scope.       |
+| P2-3    | Add web and native unit coverage for look review and guarded capsule reads.                                     |
+| P2-4    | Native review completion and cancel dismiss to the existing tab stack.                                          |
+| P3-1    | Review labels use valid description-list markup.                                                                |
+| P3-2    | A consent refusal ends the review attempt.                                                                      |
+| P3-3    | Sprint status and Step 78 link to the implementation and acceptance evidence.                                   |
 
 ## Design Notes
 

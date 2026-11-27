@@ -22547,3 +22547,9 @@ Open Today as a guest. See a sample outfit before you pick a style or create an 
 - [Android guest preview](../../maestro/guest-preview.yaml) and
   [Android account conversion](../../maestro/guest-preview-conversion.yaml).
 - [Pending guardian route scope](../../apps/api/src/modules/auth/guardian-lock-route-sweep.spec.ts).
+- [Shared look intent and carryover](../../packages/utils/src/sample-wardrobe/first-run-save.spec.ts),
+  [web review](../../apps/web/src/app/components/guest-preview/guest-preview-review.test.tsx), and
+  [native review](../../apps/mobile/src/features/preview/guest-preview-review-screen.test.tsx).
+- [Web preview controls](../../apps/web/src/app/components/guest-preview/guest-preview.test.tsx),
+  [native preview controls](../../apps/mobile/src/features/preview/guest-preview-screen.test.tsx), and
+  [Android OTP confirmation](../../maestro/guest-preview/guest-preview-conversion-verify.yaml).

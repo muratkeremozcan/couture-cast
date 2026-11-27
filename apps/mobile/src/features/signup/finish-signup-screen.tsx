@@ -61,7 +61,10 @@ type FinishSignupScreenProps = {
   readIdentity?: typeof ReadIdentity
   /** The teen account the identity waits on a guardian for, or null (the birthdate form). */
   awaitingAccount?: (accessToken: string) => Promise<string | null>
-  finish?: (birthdate: string) => Promise<NativeFederatedFinishResult>
+  finish?: (
+    birthdate: string,
+    fromPreview?: boolean
+  ) => Promise<NativeFederatedFinishResult>
   cancel?: () => Promise<void>
   inviteGuardian?: (input: GuardianInvitationInput) => Promise<GuardianInvitationResponse>
 }
@@ -74,8 +77,8 @@ const session = () => import('../../lib/native-session.js')
 // teen's guardian step with the form again.
 const readSessionIdentity: typeof ReadIdentity = async () =>
   (await session()).readNativeFederatedIdentity()
-const finishSession = async (birthdate: string) =>
-  (await session()).finishNativeFederatedSignup(birthdate)
+const finishSession = async (birthdate: string, fromPreview?: boolean) =>
+  (await session()).finishNativeFederatedSignup(birthdate, fromPreview)
 const cancelSession = async () => (await session()).cancelNativeFederatedSignup()
 const awaitingSessionAccount = async (accessToken: string) =>
   (await session()).fetchNativeAwaitingGuardianAccount(accessToken)
@@ -233,7 +236,7 @@ export function FinishSignupScreen({
     setBusy('create')
     try {
       // An under-13 birthdate still goes to the server, which deletes the Google identity.
-      const result = await finish(birthdate)
+      const result = fromPreview ? await finish(birthdate, true) : await finish(birthdate)
       if (result.kind !== 'unavailable') {
         mobileGuestPreviewBirthdate.clear()
         setBirthdate('')

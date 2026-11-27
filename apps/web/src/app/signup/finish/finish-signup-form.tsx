@@ -150,7 +150,9 @@ export function FinishSignupForm({
     setBusy('create')
     try {
       // An under-13 birthdate still goes to the server, which deletes the Google identity.
-      const result = await finishWebFederatedSignup(birthdate)
+      const result = savingLook
+        ? await finishWebFederatedSignup(birthdate, true)
+        : await finishWebFederatedSignup(birthdate)
       if (result.kind !== 'unavailable') {
         webGuestPreviewBirthdate.clear()
         setBirthdate('')

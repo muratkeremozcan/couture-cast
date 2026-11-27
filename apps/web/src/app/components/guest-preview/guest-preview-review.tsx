@@ -3,7 +3,7 @@
 // offers the preview's comfort settings. Nothing is written without explicit consent,
 // success is shown only after a read-back, and a member change discards the proposal.
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   applyComfortCarryover,
@@ -15,6 +15,7 @@ import {
   guestPreviewReviewProposal,
   type GuestLookSaveIntent,
   type GuestPreviewStrings,
+  type GuestPreviewStore,
   type SampleComfort,
   type StyleProfileAnswers,
 } from '@couture/utils'
@@ -32,6 +33,7 @@ import {
   webGuestPreviewStore,
   type WebComfortClient,
 } from '../../../lib/guest-preview'
+import { subscribeWebStyleScope } from '../../../lib/use-web-session'
 import { resolveWebSessionToken, webSessionIdentity } from '../../../lib/web-session'
 
 type ReviewStatus =
@@ -69,6 +71,26 @@ async function loadAccountReview(
   }
 }
 
+async function claimLookSave(
+  store: GuestPreviewStore,
+  intent: GuestLookSaveIntent,
+  isCurrent: () => boolean
+) {
+  const cached = store.snapshot()
+  const snapshot = cached.persistent ? await store.syncExternal() : cached
+  const pending = snapshot.state?.conversion
+  if (
+    !isCurrent() ||
+    pending?.intent !== GUEST_PREVIEW_SAVE_INTENT ||
+    pending.key !== intent.key
+  )
+    return false
+  // Retries stay in this review, bound to its verified account and chosen settings.
+  store.clear()
+  await store.flush()
+  return isCurrent()
+}
+
 function isActiveReview(status: ReviewStatus): status is ActiveReview {
   return status.kind === 'ready' || status.kind === 'saving' || status.kind === 'failed'
 }
@@ -102,10 +124,10 @@ function ComfortColumn({
         <dt className="text-ink-muted">{strings.preferences.rain}</dt>
         <dd>{v.precipPreparedness[values.precipPreparedness]}</dd>
         {styleRows?.map(([label, value]) => (
-          <div key={label}>
+          <Fragment key={label}>
             <dt className="text-ink-muted">{label}</dt>
             <dd>{value}</dd>
-          </div>
+          </Fragment>
         ))}
       </dl>
     </div>
@@ -141,12 +163,16 @@ export function GuestPreviewReview() {
   const mounted = useRef(true)
   const [lookReview, setLookReview] = useState<LookReview | null>(null)
   const saveChoice = useRef<boolean | null>(null)
+  const scopeIsCurrent = useRef<(() => boolean) | null>(null)
 
   useEffect(() => {
     mounted.current = true
     let active = true
     const discard = () => {
       client.current = null
+      scopeIsCurrent.current = null
+      setLookReview(null)
+      setStatus({ kind: 'loading' })
       store.clear()
       router.replace('/')
     }
@@ -180,7 +206,8 @@ export function GuestPreviewReview() {
           if (identity === 'other') return discard()
           if (identity === 'unknown') return setStatus({ kind: 'load-failed' })
         }
-        if (loadedReview && !loadedReview.client.isCurrent()) return discard()
+        if (loadedReview?.client.isCurrent() === false) return discard()
+        scopeIsCurrent.current = loadedReview?.client.isCurrent ?? null
         setLookReview(loadedReview)
         setStatus({ kind: 'ready', account, proposal: draft.comfort })
       } catch {
@@ -196,16 +223,23 @@ export function GuestPreviewReview() {
       })
     }
     window.addEventListener('couture:session', onSession)
+    const unsubscribeScope = subscribeWebStyleScope(() => {
+      if (scopeIsCurrent.current?.() === false) discard()
+    })
     return () => {
       active = false
       mounted.current = false
       window.removeEventListener('couture:session', onSession)
+      unsubscribeScope()
     }
   }, [router, store, loadAttempt])
 
   function cancelLookReview() {
     if (inFlight.current) return
     client.current = null
+    scopeIsCurrent.current = null
+    setLookReview(null)
+    setStatus({ kind: 'loading' })
     store.clear()
     router.replace('/')
   }
@@ -219,58 +253,63 @@ export function GuestPreviewReview() {
     if (!lookReview || !verified || inFlight.current) return
     const { intent, client: lookClient } = lookReview
     if (!lookClient.isCurrent()) return cancelLookReview()
-    if (saveChoice.current === null) {
-      const pending = store.snapshot().state?.conversion
-      if (pending?.intent !== GUEST_PREVIEW_SAVE_INTENT || pending.key !== intent.key) {
-        cancelLookReview()
-        return
-      }
-      saveChoice.current = applySettings
-      // Once confirmed, the retry belongs to this mounted review and verified account.
-      store.clear()
-    }
     inFlight.current = true
     setStatus({ kind: 'saving', account, proposal })
     const isCurrent = () =>
       mounted.current && client.current === verified && lookClient.isCurrent()
-    try {
-      const freshComfort = saveChoice.current ? await verifiedComfortClient() : verified
-      if (freshComfort?.memberId !== verified.memberId)
-        throw new Error('Guest review session changed')
-      const saved = await completeGuestLookSave({
+    async function commit(verified: NonNullable<typeof client.current>) {
+      if (saveChoice.current === null) {
+        if (!(await claimLookSave(store, intent, isCurrent))) return null
+        saveChoice.current = applySettings
+      }
+      const comfortClient = saveChoice.current ? await verifiedComfortClient() : verified
+      if (comfortClient?.memberId !== verified.memberId) return null
+      return completeGuestLookSave({
         intent,
         applySettings: saveChoice.current,
         lookClient,
-        comfortClient: freshComfort,
+        comfortClient,
         isCurrent,
+        isRejection: isConsentRejection,
       })
-      if (saved && isCurrent()) {
-        notifySavedLooksChanged(verified.memberId)
-        showNotice({
-          id: `guest-look-saved:${saved.id}`,
-          message: t('feedback.savedToLooks'),
-          tone: 'success',
-          actions: [
-            {
-              id: 'view',
-              kind: 'view',
-              label: t('feedback.view'),
-              onPress: () => {
-                if (lookClient.isCurrent()) router.push(savedLookHref(saved.id))
-              },
-            },
-          ],
-        })
-        router.replace(savedLooksHref())
-        return
-      }
-    } catch {
-      // Keep the same idempotency key and confirmed settings for a retry.
+    }
+    let saved: Awaited<ReturnType<typeof completeGuestLookSave>> | undefined
+    try {
+      saved = await commit(verified)
+    } catch (error) {
+      if (isConsentRejection(error)) saved = 'rejected'
     } finally {
       inFlight.current = false
     }
-    if (mounted.current && client.current === verified)
+    if (!mounted.current || client.current !== verified) return
+    if (!lookClient.isCurrent() || saved === null) return cancelLookReview()
+    if (saved === 'rejected') {
+      store.clear()
+      setLookReview(null)
+      setStatus({ kind: 'rejected' })
+      return
+    }
+    if (!saved) {
       setStatus({ kind: 'failed', account, proposal })
+      return
+    }
+    notifySavedLooksChanged(verified.memberId)
+    showNotice({
+      id: `guest-look-saved:${saved.id}`,
+      message: t('feedback.savedToLooks'),
+      tone: 'success',
+      actions: [
+        {
+          id: 'view',
+          kind: 'view',
+          label: t('feedback.view'),
+          onPress: () => {
+            if (lookClient.isCurrent()) router.push(savedLookHref(saved.id))
+          },
+        },
+      ],
+    })
+    router.replace(savedLooksHref())
   }
 
   async function applyProposal(account: SampleComfort, proposal: SampleComfort) {

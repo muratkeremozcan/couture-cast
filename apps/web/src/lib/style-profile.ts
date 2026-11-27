@@ -44,16 +44,11 @@ const serverSnapshot = {
   day: null,
 } as const
 
-export async function saveWebStyleProfileForMember(
-  memberId: string,
+export async function saveWebStyleProfileForScope(
+  scope: string,
   input: StyleProfilePatch
 ) {
-  const scope = currentWebStyleScope()
-  if (
-    !scope ||
-    currentWebSessionOwner() !== memberId ||
-    !(await store.save(scope, input))
-  ) {
+  if (currentWebStyleScope() !== scope || !(await store.save(scope, input))) {
     throw new Error('Unable to save style profile for this session.')
   }
 }

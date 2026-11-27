@@ -142,18 +142,6 @@ export function GuestPreview() {
   const [savePreviewStartedAt, setSavePreviewStartedAt] = useState<number | null>(null)
   const [previewExpired, setPreviewExpired] = useState(false)
 
-  useEffect(() => {
-    const clearOnExit = () => {
-      if (window.location.pathname !== '/preview') webGuestPreviewBirthdate.clear()
-    }
-    window.addEventListener('popstate', clearOnExit)
-    return () => {
-      window.removeEventListener('popstate', clearOnExit)
-      const path = window.location.pathname
-      if (path !== '/signup' && path !== '/signin') clearOnExit()
-    }
-  }, [])
-
   const update = useCallback(
     (change: (current: GuestPreviewState) => GuestPreviewState) => {
       setNoAlternative(false)

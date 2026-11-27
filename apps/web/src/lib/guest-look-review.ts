@@ -4,7 +4,7 @@ import { requestStyleProfile } from '@couture/api-client'
 import type { GuestLookReviewClient } from '@couture/utils'
 import { createWebApiClient } from './api-client'
 import { createSavedLookFromWeb } from './saved-looks'
-import { saveWebStyleProfileForMember } from './style-profile'
+import { saveWebStyleProfileForScope } from './style-profile'
 import { currentWebStyleScope, captureWebStyleBearer } from './use-web-session'
 import { resolveWebSessionToken, webSessionIdentity } from './web-session'
 
@@ -28,7 +28,7 @@ export async function verifiedGuestLookClient(
       requestStyleProfile(createWebApiClient({ accessToken: await verifiedToken() }), {
         method: 'GET',
       }),
-    writeStyle: (input) => saveWebStyleProfileForMember(memberId, input),
+    writeStyle: (input) => saveWebStyleProfileForScope(scope, input),
     save: async (look, idempotencyKey) =>
       createSavedLookFromWeb(look, {
         accessToken: await verifiedToken(),

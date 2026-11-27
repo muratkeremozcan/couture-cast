@@ -6,9 +6,19 @@ import { applyLandingSession, readLandingSession } from '../../lib/landing-sessi
 import { releaseThemeOfDepartedOwner } from '../../lib/premium-theme'
 import { currentWebSessionOwner } from '../../lib/use-web-session'
 import { resolveFederatedFinishRoute, startWebSession } from '../../lib/web-session'
+import { webGuestPreviewBirthdate } from '../../lib/guest-preview-birthdate'
 
 // The legal pages stay readable mid-signup: Google's consent screen and the finish step link there.
 const FINISH_EXEMPT_PATHS = ['/signup/finish', '/auth/callback', '/privacy', '/terms']
+const PREVIEW_AUTH_PATHS = ['/signup', '/signin', '/signup/finish']
+
+function clearAbandonedPreviewBirthdate(pathname: string) {
+  if (pathname === '/preview') return
+  const from = new URLSearchParams(window.location.search).get('from')
+  if (from !== 'preview' || !PREVIEW_AUTH_PATHS.includes(pathname)) {
+    webGuestPreviewBirthdate.clear()
+  }
+}
 
 /**
  * Story 6.17 D3: a stored identity with no account (a reload, a closed tab, a new tab, or a
@@ -35,6 +45,7 @@ export function SessionBridge() {
   const pathname = usePathname()
   const [sessionReady, setSessionReady] = useState(false)
   useEffect(() => {
+    clearAbandonedPreviewBirthdate(pathname)
     if (sessionReady) resumeFederatedFinish()
     syncLandingSession(sessionReady)
   }, [pathname, sessionReady])

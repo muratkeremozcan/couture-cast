@@ -81,7 +81,7 @@ export default function SignInScreen() {
     try {
       if (sent) {
         traceShareCardOpener('signin-verify-press', code.length)
-        await verifyNativeOtp(email, code)
+        await verifyNativeOtp(email, code, fromPreview)
         traceShareCardOpener('signin-verify-ok')
         await leaveSignedIn()
       } else {

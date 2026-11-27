@@ -154,17 +154,20 @@ export async function completeGuestLookSave(options: {
     write: (values: SampleComfort) => Promise<unknown>
   }
   isCurrent: () => boolean
-}): Promise<{ id: string } | null> {
-  const { intent, applySettings, lookClient, comfortClient, isCurrent } = options
+  isRejection?: (error: unknown) => boolean
+}): Promise<{ id: string } | 'rejected' | null> {
+  const { intent, applySettings, lookClient, comfortClient, isCurrent, isRejection } =
+    options
   if (!isCurrent()) return null
   if (applySettings) {
     const outcome = await applyComfortCarryover({
       proposal: intent.comfort,
       ...comfortClient,
       isCurrent,
-      isRejection: () => false,
+      isRejection: (error) => isRejection?.(error) ?? false,
     })
     if (!isCurrent()) return null
+    if (outcome.status === 'rejected') return 'rejected'
     if (outcome.status !== 'saved') throw new Error('Comfort carryover failed')
     await applyGuestStyle(intent.style, lookClient, isCurrent)
     if (!isCurrent()) return null

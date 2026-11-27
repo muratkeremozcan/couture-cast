@@ -156,7 +156,7 @@ export function GuestPreviewOutfit({
       </p>
       <ul
         data-testid="guest-preview-garments"
-        className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 group-data-[first-run=true]:grid-cols-3 group-data-[first-run=true]:gap-2 sm:grid-cols-3"
+        className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 group-data-[first-run=true]:grid-cols-[repeat(auto-fit,minmax(min(100%,5.5rem),1fr))] group-data-[first-run=true]:gap-2 sm:grid-cols-3"
       >
         {result.garments.map((garment) => {
           const text = sampleGarmentText(garment, strings)
@@ -179,7 +179,7 @@ export function GuestPreviewOutfit({
                 onClick={(event) => onSwap(garment.category, event.currentTarget)}
                 data-testid={`guest-preview-swap-${garment.category}`}
                 aria-label={`${formatPreviewString(strings.outfit.swap, { category })}: ${text.name}`}
-                className="mt-auto min-h-11 max-w-full rounded-lg border border-line-strong bg-page px-3 text-xs font-semibold text-ink hover:border-ink group-data-[first-run=true]:px-1"
+                className="mt-auto min-h-11 max-w-full rounded-lg border border-line-strong bg-page px-3 text-xs font-semibold text-ink hover:border-ink group-data-[first-run=true]:px-[4px]"
               >
                 {formatPreviewString(strings.outfit.swap, { category })}
               </button>

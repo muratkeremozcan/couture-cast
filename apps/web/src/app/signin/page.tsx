@@ -92,7 +92,9 @@ export default function SignInPage() {
                 event.preventDefault()
                 setBusy(true)
                 setMessage(null)
-                const action = sent ? verifyWebOtp(email, code) : requestWebOtp(email)
+                const action = sent
+                  ? verifyWebOtp(email, code, fromPreview)
+                  : requestWebOtp(email)
                 void action
                   .then(async () => {
                     if (sent)

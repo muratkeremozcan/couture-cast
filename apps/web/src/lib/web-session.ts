@@ -4,6 +4,7 @@ import { createClient, type Session, type SupabaseClient } from '@supabase/supab
 import {
   userProfileResponseSchema,
   type SignupResponse,
+  type UserProfileResponse,
 } from '@couture/api-client/contracts/http'
 import {
   finishStepHref,
@@ -27,6 +28,7 @@ let client: SupabaseClient | undefined
 let member: string | null = null
 let principal: string | null = null
 let acceptedToken: string | null = null
+let memberRole: UserProfileResponse['user']['role'] | undefined
 let generation = 0
 type VerificationFlight = {
   principal: string
@@ -65,9 +67,15 @@ export function onWebSessionIdentity(listener: () => void): () => void {
  * finds its own token already stored. The verified principal is stored and removed with it.
  */
 function setMember(
-  verified: { principal: string; member: string; token: string } | null
+  verified: {
+    principal: string
+    member: string
+    token: string
+    role: UserProfileResponse['user']['role']
+  } | null
 ) {
   acceptedToken = verified?.token ?? null
+  memberRole = verified?.role
   if (verified === null) {
     window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
     window.sessionStorage.removeItem(WEB_SESSION_PRINCIPAL_STORAGE_KEY)
@@ -276,6 +284,7 @@ async function verifySession(session: Session | null) {
       principal: session.user.id,
       member: profile.user.id,
       token: session.access_token,
+      role: profile.user.role,
     })
     // Token refresh preserves same-owner draft/cache scope; account switching changes identity.
     publishIdentity()
@@ -380,7 +389,7 @@ export async function requestWebOtp(email: string) {
   })
   if (error) throw new WebSignInError('unavailable', 'Sign-in could not be started.')
 }
-export async function verifyWebOtp(email: string, token: string) {
+export async function verifyWebOtp(email: string, token: string, fromPreview = false) {
   const { data, error } = await webSupabase().auth.verifyOtp({
     email,
     token,
@@ -415,6 +424,21 @@ export async function verifyWebOtp(email: string, token: string) {
       )
     throw new WebSignInError('denied', 'This account is unavailable.')
   }
+  if (await needsGuardianInvitation(data.session.access_token, fromPreview))
+    throw new WebSignInError(
+      'awaiting_guardian',
+      'A guardian has to approve this account.'
+    )
+}
+
+async function needsGuardianInvitation(accessToken: string, fromPreview: boolean) {
+  if (memberRole !== 'teen' || acceptedToken !== accessToken) return false
+  if (
+    fromPreview &&
+    (await (await import('./post-signin-destination')).hasGuestLookSave())
+  )
+    return false
+  return awaitingGuardian(accessToken)
 }
 
 /**
@@ -579,10 +603,17 @@ async function refuseFederatedIdentity(): Promise<WebOAuthOutcome> {
  * After a session exists: a member is done; a 401 profile check asks the API whether the
  * finish step applies. `complete` gets exactly one more verification (TEA-3).
  */
-async function settleFederatedSession(session: Session): Promise<WebOAuthOutcome> {
+async function settleFederatedSession(
+  session: Session,
+  fromPreview = false
+): Promise<WebOAuthOutcome> {
   try {
     await accept(session)
-    if (member) return { kind: 'member' }
+    if (member) {
+      return (await needsGuardianInvitation(session.access_token, fromPreview))
+        ? { kind: 'awaiting_guardian' }
+        : { kind: 'member' }
+    }
   } catch (failure) {
     if (!sessionDenied(failure)) return { kind: 'unavailable' }
   }
@@ -651,7 +682,7 @@ export function completeWebOAuth(params: URLSearchParams): Promise<WebOAuthOutco
         return { kind: 'unavailable' }
       }
       localSignedOut = false
-      const outcome = await settleFederatedSession(data.session)
+      const outcome = await settleFederatedSession(data.session, from === 'preview')
       if (outcome.kind === 'no_account') writeFederatedFinishMarker({ from, door })
       else clearFederatedFinishMarker()
       return outcome
@@ -716,7 +747,8 @@ export type WebFederatedFinishResult =
  * verified like any sign-in. Under 13 the server deletes the identity, so this signs out.
  */
 export async function finishWebFederatedSignup(
-  birthdate: string
+  birthdate: string,
+  fromPreview = false
 ): Promise<WebFederatedFinishResult> {
   const identity = await readWebFederatedIdentity()
   if (!identity) return { kind: 'no_session' }
@@ -728,7 +760,7 @@ export async function finishWebFederatedSignup(
     if (status === 409) {
       const { data } = await webSupabase().auth.getSession()
       if (!data.session) return { kind: 'no_session' }
-      const outcome = await settleFederatedSession(data.session)
+      const outcome = await settleFederatedSession(data.session, fromPreview)
       if (outcome.kind === 'member') {
         clearFederatedFinishMarker()
         return { kind: 'signed_in' }
