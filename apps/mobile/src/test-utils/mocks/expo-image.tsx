@@ -3,7 +3,14 @@ import type { ImageProps } from 'expo-image'
 import type { CSSProperties } from 'react'
 import { StyleSheet } from 'react-native'
 
-export function Image({ source, testID, style, onLoad, onError }: ImageProps) {
+export function Image({
+  source,
+  testID,
+  style,
+  cachePolicy,
+  onLoad,
+  onError,
+}: ImageProps) {
   const image = Array.isArray(source) ? source[0] : source
   const uri =
     typeof image === 'string'
@@ -17,6 +24,7 @@ export function Image({ source, testID, style, onLoad, onError }: ImageProps) {
       aria-hidden="true"
       src={uri}
       data-testid={testID}
+      data-cache-policy={cachePolicy}
       style={StyleSheet.flatten(style) as CSSProperties}
       onLoad={({ currentTarget }) =>
         onLoad?.({

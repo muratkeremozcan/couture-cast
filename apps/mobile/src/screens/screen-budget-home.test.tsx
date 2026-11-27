@@ -138,6 +138,7 @@ import { http, HttpResponse } from 'msw'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import { press } from '@/src/test-utils/press'
 import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
+import { createSavedLooksMswHandlers } from '@/src/test-utils/saved-looks-msw'
 import {
   hasSavedLocation,
   serveScreenBudgetFixture,
@@ -301,82 +302,157 @@ describe('Screen budget: native Today', () => {
     vi.useRealTimers()
   })
 
-  it('[P0] [7.14-PIC-001/004/005] native reserves the mixed outfit and counts its 44 dp slots as tiles', async () => {
-    await setFoldViewport()
-    serveScreenBudgetFixture('populated', MEMBER)
-    const url = `${window.location.origin}/__today-test/private-top.png`
-    let release = () => undefined as void
-    const imageGate = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    let requested = false
-    const photo = Uint8Array.from(
-      atob(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
-      ),
-      (byte) => byte.charCodeAt(0)
-    )
-    server.use(
-      http.get(url, async () => {
-        requested = true
-        await imageGate
-        return HttpResponse.arrayBuffer(photo.buffer, {
-          headers: { 'content-type': 'image/png' },
+  it.each(['loaded', 'failed'] as const)(
+    '[P0] [7.14-PIC-001/004/005] native reserves the outfit when an image is %s',
+    async (outcome) => {
+      await setFoldViewport()
+      serveScreenBudgetFixture('populated', MEMBER)
+      const url = `${window.location.origin}/__today-test/private-top.png`
+      let release = () => undefined as void
+      const imageGate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      let requested = false
+      const photo = Uint8Array.from(
+        atob(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+        ),
+        (byte) => byte.charCodeAt(0)
+      )
+      server.use(
+        http.get(url, async () => {
+          requested = true
+          await imageGate
+          if (outcome === 'failed') return HttpResponse.error()
+          return HttpResponse.arrayBuffer(photo.buffer, {
+            headers: { 'content-type': 'image/png' },
+          })
+        }),
+        http.get('*/api/v1/ritual', () =>
+          HttpResponse.json({
+            data: {
+              ...mockRitualResponse.data,
+              outfits: mockRitualResponse.data.outfits.map((outfit) => ({
+                ...outfit,
+                garmentIds: ['member-top', 'default-bottom', 'default-shoes'],
+                displayGarments: [
+                  {
+                    id: 'member-top',
+                    category: 'top',
+                    imageAccess: {
+                      url,
+                      expiresAt: new Date(Date.now() + 900_000).toISOString(),
+                    },
+                  },
+                ],
+              })),
+            },
+          })
+        )
+      )
+
+      const bounds = (elements: HTMLElement[]) =>
+        elements.map((element) => {
+          const { x, y, width, height } = element.getBoundingClientRect()
+          return { x, y, width, height }
         })
-      }),
+      let before: ReturnType<typeof bounds>
+      let tracked: HTMLElement[]
+      try {
+        renderToday(WithFoldScene)
+        await todaySettled('populated')
+        const picture = await screen.findByTestId('today-outfit-picture')
+        const slots = within(picture).getAllByRole('button')
+        expect(slots).toHaveLength(3)
+        await waitFor(() => expect(requested).toBe(true))
+        expect(screen.getByTestId('today-outfit-catalog-0')).toBeVisible()
+        expect(screen.getByTestId('today-outfit-catalog-1')).toBeVisible()
+        expect(screen.getByTestId('today-outfit-catalog-2')).toBeVisible()
+        const slotBounds = bounds(slots)
+        for (const { width, height } of slotBounds) {
+          expect(width).toBeGreaterThanOrEqual(44)
+          expect(height).toBeGreaterThanOrEqual(44)
+        }
+        const [first, second, third] = slotBounds
+        expect(second!.x - (first!.x + first!.width)).toBeGreaterThanOrEqual(8)
+        expect(third!.x - (second!.x + second!.width)).toBeGreaterThanOrEqual(8)
+        tracked = [picture, ...slots, screen.getByTestId('today-primary-action')]
+        before = bounds(tracked)
+        expect((await measureNativeScreen('today')).stats.tileTargets).toBe(3)
+      } finally {
+        release()
+      }
+      if (outcome === 'loaded') {
+        expect(await screen.findByTestId('today-outfit-photo-0')).toBeVisible()
+        expect(screen.queryByTestId('today-outfit-catalog-0')).toBeNull()
+      } else {
+        await waitFor(() =>
+          expect(
+            screen.getByTestId('today-outfit-slot-0').querySelector('img')
+          ).toBeNull()
+        )
+        expect(screen.getByTestId('today-outfit-catalog-0')).toBeVisible()
+      }
+      expect(bounds(tracked)).toEqual(before)
+    },
+    30_000
+  )
+
+  it('[7.14-PIC-002/005] a guardian-pending member wears a catalog outfit, retries safely and can View and Undo', async () => {
+    serveScreenBudgetFixture('guardian-pending', MEMBER)
+    const { store, handlers } = createSavedLooksMswHandlers()
+    const keys: (string | null)[] = []
+    store.onPost = (request) => {
+      keys.push(request.headers.get('idempotency-key'))
+    }
+    store.nextPostError = () =>
+      keys.length === 1
+        ? HttpResponse.json({ message: 'Offline' }, { status: 503 })
+        : null
+    server.use(
+      ...handlers,
       http.get('*/api/v1/ritual', () =>
         HttpResponse.json({
           data: {
             ...mockRitualResponse.data,
             outfits: mockRitualResponse.data.outfits.map((outfit) => ({
               ...outfit,
-              garmentIds: ['member-top', 'default-bottom', 'default-shoes'],
-              displayGarments: [
-                {
-                  id: 'member-top',
-                  category: 'top',
-                  imageAccess: {
-                    url,
-                    expiresAt: new Date(Date.now() + 900_000).toISOString(),
-                  },
-                },
-              ],
+              garmentIds: ['default-top', 'default-shoes'],
+              displayGarments: [],
+              recommendationActionsAvailable: false,
             })),
           },
         })
       )
     )
+    renderToday()
+    expect(await screen.findByTestId('today-outfit-catalog-0')).toBeVisible()
+    expect(screen.getByTestId('today-outfit-catalog-1')).toBeVisible()
+    expect(screen.getByTestId('today-outfit-picture').querySelector('img')).toBeNull()
+    press(screen.getByTestId('today-outfit-details'))
+    expect(screen.getByTestId('outfit-comfort-notes')).toBeVisible()
+    expect(screen.queryByTestId('shop-this-look-block')).toBeNull()
+    expect(screen.queryByTestId('outfit-share-card-open')).toBeNull()
+    press(screen.getByTestId('today-outfit-details'))
 
-    const bounds = (elements: HTMLElement[]) =>
-      elements.map((element) => {
-        const { x, y, width, height } = element.getBoundingClientRect()
-        return { x, y, width, height }
-      })
-    let before: ReturnType<typeof bounds>
-    let tracked: HTMLElement[]
-    try {
-      renderToday(WithFoldScene)
-      await todaySettled('populated')
-      const picture = await screen.findByTestId('today-outfit-picture')
-      const slots = within(picture).getAllByRole('button')
-      expect(slots).toHaveLength(3)
-      await waitFor(() => expect(requested).toBe(true))
-      expect(screen.getByTestId('today-outfit-catalog-0')).toBeVisible()
-      expect(screen.getByTestId('today-outfit-catalog-1')).toBeVisible()
-      expect(screen.getByTestId('today-outfit-catalog-2')).toBeVisible()
-      for (const { width, height } of bounds(slots)) {
-        expect(width).toBeGreaterThanOrEqual(44)
-        expect(height).toBeGreaterThanOrEqual(44)
-      }
-      tracked = [picture, ...slots, screen.getByTestId('today-primary-action')]
-      before = bounds(tracked)
-      expect((await measureNativeScreen('today')).stats.tileTargets).toBe(3)
-    } finally {
-      release()
-    }
-    expect(await screen.findByTestId('today-outfit-photo-0')).toBeVisible()
-    expect(screen.queryByTestId('today-outfit-catalog-0')).toBeNull()
-    expect(bounds(tracked)).toEqual(before)
+    press(screen.getByTestId('today-primary-action'))
+    press(await screen.findByTestId('status-bar-action-retry'))
+    const view = await screen.findByTestId('status-bar-action-view')
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toBeTruthy()
+    expect(keys[1]).toBe(keys[0])
+    expect(store.items).toHaveLength(1)
+    const look = store.items[0]!
+    expect(look.wornOn).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(look.composition.map(({ category, kind }) => [category, kind])).toEqual([
+      ['top', 'catalog'],
+      ['shoes', 'catalog'],
+    ])
+    routerMock.push.mockClear()
+    press(view)
+    expect(routerMock.push).toHaveBeenCalledOnce()
+    press(screen.getByTestId('status-bar-action-undo'))
+    await waitFor(() => expect(store.items).toHaveLength(0))
   }, 30_000)
 
   for (const [id, fixture] of AUDITS) {

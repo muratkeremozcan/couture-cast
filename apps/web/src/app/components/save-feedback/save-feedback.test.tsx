@@ -1355,26 +1355,24 @@ describe('web save-feedback components', () => {
         'Change undone.'
       )
 
-      // Swap a garment -> Undo swap restores previous garment
-      const swapButtons = screen.getAllByRole('button', { name: /^Swap /i })
-      if (swapButtons[0]) {
-        await user.click(swapButtons[0])
-        const dialog = screen.getByRole('dialog')
-        const candidateRadio = within(dialog)
-          .getAllByRole('radio')
-          .find((input) => !(input as HTMLInputElement).checked)
-        expect(candidateRadio).toBeDefined()
-        await user.click(candidateRadio!)
-        await waitFor(() =>
-          expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
-            'Piece swapped.'
-          )
-        )
-        await user.click(screen.getByTestId('status-bar-action-undo'))
+      // Swap from the picture, then restore the original piece.
+      const piece = screen.getByTestId('today-outfit-slot-0')
+      const originalName = piece.getAttribute('aria-label')
+      await user.click(piece)
+      const swap = screen.getByTestId('today-outfit-swap')
+      expect(within(swap).getByRole('radio', { checked: true })).toBeVisible()
+      await user.click(within(swap).getAllByRole('radio', { checked: false })[0]!)
+      await waitFor(() =>
         expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
-          'Change undone.'
+          'Piece swapped.'
         )
-      }
+      )
+      expect(piece.getAttribute('aria-label')).not.toBe(originalName)
+      await user.click(screen.getByTestId('status-bar-action-undo'))
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Change undone.'
+      )
+      expect(piece.getAttribute('aria-label')).toBe(originalName)
 
       // Save -> View -> Undo Save
       const saveBtn = screen.getByRole('button', { name: /save/i })

@@ -22,6 +22,7 @@ import {
   type SampleGarment,
 } from '@couture/utils'
 import { useTokens } from '@/src/theme/tokens'
+import { usePhotoBeforeExpiry } from '@/src/hooks/use-photo-before-expiry'
 import { SampleGarmentArt } from '../preview/guest-preview-parts'
 
 const CATALOG_BY_ID = new Map(SAMPLE_CATALOG.garments.map((item) => [item.id, item]))
@@ -36,6 +37,7 @@ export type LooksTileCell =
       readonly kind: 'photo'
       readonly url: string
       readonly ephemeral?: boolean
+      readonly expiresAt?: number
     }
   | { readonly key: string; readonly kind: 'art'; readonly garment: SampleGarment }
   | { readonly key: string; readonly kind: 'placeholder' }
@@ -64,6 +66,7 @@ export function savedLookCells(look: SavedLookContract): LooksTileCell[] {
         kind: 'photo',
         url: slot.imageAccess.url,
         ephemeral: Boolean(look.wornOn),
+        ...(look.wornOn ? { expiresAt: Date.parse(slot.imageAccess.expiresAt) } : {}),
       }
     })
 }
@@ -113,9 +116,12 @@ function Cell({ cell }: { cell: LooksTileCell | null }) {
   // P8: a failed photo swaps to the placeholder inside the same square, so nothing moves. The
   // failure belongs to that URL, so a refreshed signed URL for the piece shows again (Codex #7).
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  const beforeExpiry = usePhotoBeforeExpiry(
+    cell?.kind === 'photo' ? cell.expiresAt : undefined
+  )
   const box = [styles.cell, { backgroundColor: colors.cardMuted }]
   if (!cell) return <View style={box} />
-  if (cell.kind === 'photo' && failedUrl !== cell.url) {
+  if (cell.kind === 'photo' && beforeExpiry && failedUrl !== cell.url) {
     const PieceImage = cell.ephemeral ? ExpoImage : Image
     return (
       <View style={box}>

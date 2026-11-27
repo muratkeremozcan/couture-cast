@@ -4109,6 +4109,7 @@ const buildMaestroFlowEnvArgs = () => [
   // Story CC-7.9: Android only; empty on iOS (scripts/lib/device-appearance-endpoint.mjs).
   '-e',
   `MAESTRO_APPEARANCE_URL=${process.env.MAESTRO_APPEARANCE_URL ?? ''}`,
+  '-e',
   `MAESTRO_TODAY_FIXTURE_URL=${process.env.MAESTRO_TODAY_FIXTURE_URL ?? ''}`,
   // Story 6.16: the synthetic address the guest conversion signs up; empty otherwise.
   '-e',

@@ -18,6 +18,7 @@ import {
   sampleGarmentText,
   todayLocalDate,
   todayLookNameKey,
+  todayRitualAnchorDate,
   todayScenarioWeather,
   todaySlotSignature,
   todaySlotCatalogItem,
@@ -94,13 +95,14 @@ export function TodayLiveOutfit({
   )
   const recommendationKey = JSON.stringify([
     snapshot.locationKey,
+    todayRitualAnchorDate(snapshot.timezone, readAt),
     outfit.id,
     outfit.garmentIds,
     outfit.recommendationActionsAvailable,
   ])
   const closet = outfit.recommendationActionsAvailable === false ? [] : wardrobe
   const baseSlots = buildTodaySlots(outfit, weather, closet)
-  const slots = applyTodaySlotEdits(baseSlots, edits[recommendationKey], closet)
+  const slots = applyTodaySlotEdits(baseSlots, edits[recommendationKey], closet, weather)
   const signature = todaySlotSignature(slots)
   const wornOn = todayLocalDate(snapshot.timezone)
   const key = `${recommendationKey}:${wornOn}:${signature}`
@@ -199,7 +201,7 @@ export function TodayLiveOutfit({
             if (!live() || signal?.aborted || !token) return false
             const attempt =
               started.current.get(key) ??
-              buildTodaySaveAttempt(outfit.id, snapshot, slots, wornOn, title)
+              buildTodaySaveAttempt(outfit.id, weather.condition, slots, wornOn, title)
             started.current.set(key, attempt)
             try {
               const record = await createSavedLookFromMobile(attempt.payload, {

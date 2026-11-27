@@ -3,14 +3,16 @@ title: "Story CC-7.14: Today's outfit as a picture"
 type: feature
 ticket: '7-14-todays-outfit-as-picture'
 created: '2026-11-26'
-status: in-review
+status: built
 baseline_revision: 'a519243dbec677047f5f4aefadd9eb6a26d62b2d'
 route: full
 route_source: auto
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
+lenses_ran:
+  - independent-correctness
+  - codex-security
 review_loop_iteration: 0
 context:
   - 'AGENTS.md'
@@ -81,7 +83,8 @@ Follow the Epic 7 trio rules. TEA owns tests, visual fixtures, snapshots, and CI
   strict decoders can still open their existing saved lists.
 - `apps/mobile/components/hero/outfit-recommendation-card.tsx` owns the native details and
   disclosed offer. Web reuses the verified commerce client and its safe partner handoff.
-- `apps/web/src/i18n/locales/` and `apps/mobile/assets/locales/` contain member-facing copy.
+- `packages/utils/src/sample-wardrobe/today-strings.ts` shares Today copy across the 10 locales.
+  Each client uses its existing localized condition names in saved look details.
 
 ## Tasks & Acceptance
 
@@ -107,6 +110,27 @@ The response keeps the existing source enum, and current Looks explicitly opts i
 ## Plan Change Log
 
 ## Review Triage Log
+
+The single combined review covered `a519243dbec677047f5f4aefadd9eb6a26d62b2d` through
+`1af2d774658a1724a5a5fd600370934515aed23d`. The independent review recorded 13 items.
+Codex Security recorded full static receipts for 86 source-like paths, 18 inventory exclusions,
+three suppressed candidates, and zero reportable findings. Runtime checks belong to CI on the
+subsequent head.
+
+| Finding       | Decision                                                                                                     |
+| ------------- | ------------------------------------------------------------------------------------------------------------ |
+| P1-1 and P1-2 | Restore the Maestro flag and cover the allowed web affiliate surface at the controller.                      |
+| P1-3          | Give both pickers consistent radio and checked semantics and exercise the original sample feedback flows.    |
+| P1-4 and P1-5 | Keep the picture and hit areas within the enlarged-text layout and scope local edits to the forecast day.    |
+| P1-6 and P2-3 | Cover shared model, web and native actions, failure states, and guardian behavior in the existing harnesses. |
+| P2-1 and P2-2 | Use catalog art for unresolved garment categories and fall back from an ineligible closet swap.              |
+| P2-4          | Apply the existing scrollbar mask to both Android variants.                                                  |
+| P3-1 and P3-2 | Save the active scenario condition and advance calendar dates safely across DST.                             |
+| P3-3          | Update the tracking records and inspect visual captures from CI.                                             |
+
+The same round also identified missing web affiliate impression attribution and expired native
+photo display. Keep `web_hero` in the existing privacy allowlist and replace expired media with
+its fallback on the open saved-look detail and tile.
 
 ## Verification
 

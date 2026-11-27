@@ -65,6 +65,7 @@ import {
   restoreSavedLookFromMobile,
 } from '@/src/lib/saved-looks'
 import { listGarmentsFromMobile } from '@/src/lib/wardrobe'
+import { usePhotoBeforeExpiry } from '@/src/hooks/use-photo-before-expiry'
 import { useTokens } from '@/src/theme/tokens'
 import { PreviewButton, SampleGarmentArt } from '../preview/guest-preview-parts'
 import { focusStylePieceControl, StylePiecePanel } from '../wardrobe/style-piece-panel'
@@ -84,6 +85,19 @@ type DetailState =
 
 function sortedSlots(look: SavedLookContract) {
   return [...look.composition].sort((a, b) => a.slotIndex - b.slotIndex)
+}
+
+function nextTodayPhotoExpiry(state: DetailState): number | undefined {
+  if (state.kind !== 'ready' || !state.look.wornOn) return
+  const current = Date.now()
+  let nextExpiry: number | undefined
+  for (const { imageAccess } of state.look.composition) {
+    const expiresAt = Date.parse(imageAccess?.expiresAt ?? '')
+    if (expiresAt > current && (nextExpiry === undefined || expiresAt < nextExpiry)) {
+      nextExpiry = expiresAt
+    }
+  }
+  return nextExpiry
 }
 
 function isSlotImageValid(
@@ -144,6 +158,7 @@ function MemberSavedLookDetail({
   const [state, setState] = useState<DetailState>(() =>
     savedLookId ? { kind: 'loading' } : { kind: 'gone' }
   )
+  usePhotoBeforeExpiry(nextTodayPhotoExpiry(state))
   const [attempt, setAttempt] = useState(0)
   const [removing, setRemoving] = useState(false)
   const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set())

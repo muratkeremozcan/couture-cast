@@ -9,7 +9,7 @@
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 // Learning path Step 71: Today's outfit as a picture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
-import type { Page } from '@playwright/test'
+import type { Page, Request, Route } from '@playwright/test'
 import {
   createSavedLookInputSchema,
   savedLookListResponseSchema,
@@ -87,51 +87,68 @@ async function serveSavedLookWrites(page: Page, memberId: string) {
   const created: SavedLookContract[] = []
   const requests: { input: CreateSavedLookInput; idempotencyKey?: string }[] = []
   const listQueries: string[] = []
+  const receipts = new Map<string, SavedLookContract>()
+  let dropResponse = false
+  function answerSave(route: Route, request: Request) {
+    const input = createSavedLookInputSchema.parse(request.postDataJSON())
+    const idempotencyKey = request.headers()['idempotency-key']
+    requests.push({ input, idempotencyKey })
+    const replay = idempotencyKey ? receipts.get(idempotencyKey) : undefined
+    if (replay) {
+      return route.fulfill({
+        status: 200,
+        json: { data: replay },
+        headers: { etag: `"saved-look:${replay.id}:0"` },
+      })
+    }
+    const at = minutesAfter(1_000 + created.length)
+    const { data } = savedLookResponseSchema.parse({
+      data: {
+        id: `created-look-${created.length + 1}`,
+        ownerUserId: memberId,
+        source: input.source === 'today' ? 'home_sample' : input.source,
+        lookId: input.lookId,
+        wornOn: input.wornOn,
+        weather: input.weather,
+        title: input.title ?? null,
+        anchorGarmentId: input.anchorGarmentId ?? null,
+        anchorSnapshot: input.anchorSnapshot ?? null,
+        composition: input.composition.map((slot) => ({
+          ...slot,
+          label: slot.label ?? null,
+          missing: false,
+          imageAccess: null,
+        })),
+        swaps: input.swaps,
+        collection: input.collection ?? null,
+        comfort: input.comfort ?? null,
+        availabilityStatus: 'ready',
+        missingGarmentIds: [],
+        needsReviewReasons: [],
+        revision: 0,
+        createdAt: at,
+        updatedAt: at,
+      },
+    })
+    created.push(data)
+    if (idempotencyKey) receipts.set(idempotencyKey, data)
+    if (dropResponse) {
+      dropResponse = false
+      return route.abort('failed')
+    }
+    return route.fulfill({
+      status: 201,
+      json: { data },
+      headers: { etag: `"saved-look:${data.id}:0"` },
+    })
+  }
   await page.route('**/api/v1/wardrobe/saved-looks**', async (route, request) => {
     const url = new URL(request.url())
     const match = /\/wardrobe\/saved-looks(?:\/([^/]+))?$/.exec(url.pathname)
     if (!match) return route.fallback()
     const [, id] = match
     const method = request.method()
-    if (!id && method === 'POST') {
-      const input = createSavedLookInputSchema.parse(request.postDataJSON())
-      requests.push({ input, idempotencyKey: request.headers()['idempotency-key'] })
-      const at = minutesAfter(1_000 + created.length)
-      const { data } = savedLookResponseSchema.parse({
-        data: {
-          id: `created-look-${created.length + 1}`,
-          ownerUserId: memberId,
-          source: input.source === 'today' ? 'home_sample' : input.source,
-          lookId: input.lookId,
-          wornOn: input.wornOn,
-          weather: input.weather,
-          title: input.title ?? null,
-          anchorGarmentId: input.anchorGarmentId ?? null,
-          anchorSnapshot: input.anchorSnapshot ?? null,
-          composition: input.composition.map((slot) => ({
-            ...slot,
-            label: slot.label ?? null,
-            missing: false,
-            imageAccess: null,
-          })),
-          swaps: input.swaps,
-          collection: input.collection ?? null,
-          comfort: input.comfort ?? null,
-          availabilityStatus: 'ready',
-          missingGarmentIds: [],
-          needsReviewReasons: [],
-          revision: 0,
-          createdAt: at,
-          updatedAt: at,
-        },
-      })
-      created.push(data)
-      return route.fulfill({
-        status: 201,
-        json: { data },
-        headers: { etag: `"saved-look:${data.id}:0"` },
-      })
-    }
+    if (!id && method === 'POST') return answerSave(route, request)
     if (method !== 'GET' || created.length === 0) return route.fallback()
     if (id) {
       const look = created.find((entry) => entry.id === id)
@@ -163,7 +180,14 @@ async function serveSavedLookWrites(page: Page, memberId: string) {
       headers: { 'cache-control': 'private, no-store' },
     })
   })
-  return { created: () => [...created], requests, listQueries }
+  return {
+    created: () => [...created],
+    requests,
+    listQueries,
+    dropNextSaveResponse: () => {
+      dropResponse = true
+    },
+  }
 }
 
 test.describe('CC-7.12 View opens the saved look @local-lane', () => {
@@ -184,7 +208,7 @@ test.describe('CC-7.12 View opens the saved look @local-lane', () => {
     await bottom.click()
     const swap = page.getByTestId('today-outfit-swap')
     await expect(swap.getByTestId('today-outfit-swap-option-0')).toHaveAttribute(
-      'aria-current',
+      'aria-checked',
       'true'
     )
     await swap.getByTestId('today-outfit-swap-option-1').click()
@@ -192,9 +216,13 @@ test.describe('CC-7.12 View opens the saved look @local-lane', () => {
 
     const wear = page.getByTestId('today-primary-action')
     await expect(wear).toHaveAccessibleName('Wear this')
+    writes.dropNextSaveResponse()
     await wear.click()
+    await page.getByTestId('status-bar-action-retry').click()
     await expect(wear).toHaveAttribute('data-save-state', 'saved')
-    expect(writes.requests).toHaveLength(1)
+    expect(writes.requests).toHaveLength(2)
+    expect(writes.requests[0]).toEqual(writes.requests[1])
+    expect(writes.created()).toHaveLength(1)
     const { input, idempotencyKey } = writes.requests[0]!
     expect(idempotencyKey).toBeTruthy()
     expect(input).toMatchObject({

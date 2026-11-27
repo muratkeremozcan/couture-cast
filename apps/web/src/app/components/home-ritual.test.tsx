@@ -887,3 +887,72 @@ it('7.7-CMP-004 a failed ritual shows the sample with the failure copy and Retry
   expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
   expect(screen.getByTestId('home-outfit-retry')).toBeVisible()
 })
+
+it('[7.14-PIC-005] retries the same dated save, keeps a second composition, and undoes only that save', async () => {
+  const user = userEvent.setup()
+  const { store, handlers } = createSavedLooksMswHandlers()
+  const answers = [503, 201, 409, 201]
+  const keys: (string | null)[] = []
+  store.onPost = (request) => {
+    keys.push(request.headers.get('Idempotency-Key'))
+  }
+  store.nextPostError = () => {
+    const status = answers.shift()
+    return status === 503 || status === 409
+      ? HttpResponse.json({ message: 'Fixture save error' }, { status })
+      : null
+  }
+  const starter = ritual(true)
+  useMswHandlers(
+    http.get('/api/v1/ritual', () => HttpResponse.json(starter)),
+    ...handlers
+  )
+  publishMember('today-saver')
+  renderHome()
+
+  const wear = await screen.findByTestId('today-primary-action')
+  await user.click(wear)
+  await user.click(await screen.findByTestId('status-bar-action-retry'))
+  await waitFor(() => expect(wear).toHaveAttribute('data-save-state', 'saved'))
+  expect(store.items).toHaveLength(1)
+  expect(keys[0]).toBeTruthy()
+  expect(keys[1]).toBe(keys[0])
+  const first = store.items[0]!
+  expect(first.wornOn).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  await user.click(screen.getByTestId('status-bar-action-view'))
+  expect(router.push).toHaveBeenCalledWith(`/looks/saved/${first.id}`)
+
+  const slot = screen.getByTestId('today-outfit-slot-0')
+  await user.click(slot)
+  await user.click(screen.getByTestId('today-outfit-swap-option-1'))
+  await user.click(wear)
+  await user.click(await screen.findByTestId('status-bar-action-retry'))
+  await waitFor(() => expect(wear).toHaveAttribute('data-save-state', 'saved'))
+  expect(keys).toHaveLength(4)
+  expect(keys[3]).not.toBe(keys[2])
+  expect(store.items).toHaveLength(2)
+  expect(store.items[0]?.composition[0]?.itemId).not.toBe(first.composition[0]?.itemId)
+
+  await user.click(screen.getByTestId('status-bar-action-undo'))
+  await waitFor(() => expect(store.items.map(({ id }) => id)).toEqual([first.id]))
+  await waitFor(() =>
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Change undone.')
+  )
+})
+
+it('[7.14-PIC-002/003] the guardian-pending catalog outfit has no recommendation-bound actions', async () => {
+  const pending = ritual(true)
+  pending.data.outfits = pending.data.outfits.map((outfit) => ({
+    ...outfit,
+    recommendationActionsAvailable: false,
+  }))
+  useMswHandlers(http.get('/api/v1/ritual', () => HttpResponse.json(pending)))
+  publishMember('pending-today-member')
+  renderHome()
+  expect(await screen.findByTestId('today-outfit-catalog-0')).toBeVisible()
+  expect(screen.getByTestId('today-outfit-picture').querySelector('img')).toBeNull()
+  await userEvent.setup().click(screen.getByTestId('today-outfit-details'))
+  expect(screen.getByText('morning comfort note')).toBeVisible()
+  expect(screen.queryByTestId('share-card-open')).toBeNull()
+  expect(screen.queryByTestId('shop-this-look-block')).toBeNull()
+})

@@ -1,5 +1,5 @@
 import { Image } from 'expo-image'
-import { useId, useEffect, useRef, useState, type ComponentRef } from 'react'
+import { useId, useRef, useState, type ComponentRef } from 'react'
 import {
   AccessibilityInfo,
   Pressable,
@@ -22,6 +22,7 @@ import {
 } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
+import { usePhotoBeforeExpiry } from '@/src/hooks/use-photo-before-expiry'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { SampleGarmentArt } from '@/src/features/preview/guest-preview-parts'
 import { useTokens } from '@/src/theme/tokens'
@@ -39,17 +40,11 @@ function usePiecePhoto(slot: TodaySlot) {
   const access = slot.imageAccess
   const [loadedUrl, setLoadedUrl] = useState<string>()
   const [unavailableUrl, setUnavailableUrl] = useState<string>()
+  const beforeExpiry = usePhotoBeforeExpiry(
+    access ? Date.parse(access.expiresAt) : undefined
+  )
   const url =
-    access && Date.parse(access.expiresAt) > Date.now() && unavailableUrl !== access.url
-      ? access.url
-      : undefined
-  useEffect(() => {
-    if (!access) return
-    const remaining = Date.parse(access.expiresAt) - Date.now()
-    if (remaining <= 0) return
-    const timer = setTimeout(() => setUnavailableUrl(access.url), remaining)
-    return () => clearTimeout(timer)
-  }, [access])
+    access && beforeExpiry && unavailableUrl !== access.url ? access.url : undefined
 
   return {
     url,
@@ -229,7 +224,7 @@ export function TodayOutfitPicture({
                 {title}
               </Text>
             </LayerSwipeHandle>
-            <ScrollView>
+            <ScrollView accessibilityRole="radiogroup" aria-labelledby={titleId}>
               {options.map((slot, index) => (
                 <Pressable
                   key={slot.itemId}
@@ -237,6 +232,7 @@ export function TodayOutfitPicture({
                   testID={`today-outfit-swap-option-${index}`}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: index === 0 }}
+                  aria-checked={index === 0}
                   style={[styles.option, { borderColor: palette.line }]}
                   onPress={() => {
                     if (swappingIndex !== null && index > 0) onChoose(swappingIndex, slot)

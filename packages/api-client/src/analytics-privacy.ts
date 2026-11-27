@@ -344,7 +344,11 @@ export const ANALYTICS_EVENT_PROPERTIES: Readonly<
     offer_id: catalogId,
     recommendation_id: catalogId,
     scenario: oneOf(scenarios),
-    surface: oneOf(['mobile_hero', ...affiliateCommunitySurfaceSchema.options]),
+    surface: oneOf([
+      'mobile_hero',
+      'web_hero',
+      ...affiliateCommunitySurfaceSchema.options,
+    ]),
     locale_region: regionCode,
   },
   premium_subscribe_tapped: {

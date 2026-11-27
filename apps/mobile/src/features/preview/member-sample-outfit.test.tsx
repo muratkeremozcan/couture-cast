@@ -107,27 +107,26 @@ describe('MemberSampleOutfit (mobile)', () => {
       }
     }
 
-    // Swap a piece -> Undo restores prior piece.
-    const swapButtons = screen.getAllByRole('button', { name: /^Swap /i })
-    if (swapButtons[0]) {
-      fireEvent.click(swapButtons[0])
-      const radios = screen.getAllByRole('radio')
-      const candidate = radios.find((el) => el.getAttribute('aria-checked') !== 'true')
-      if (candidate) {
-        fireEvent.click(candidate)
-        await waitFor(() =>
-          expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
-            'Piece swapped.'
-          )
-        )
-        fireEvent.click(screen.getByTestId('status-bar-action-undo'))
-        await waitFor(() =>
-          expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
-            'Change undone.'
-          )
-        )
-      }
-    }
+    // Swap from the picture and verify that Undo restores the original piece.
+    const piece = screen.getByTestId('today-outfit-slot-0')
+    const originalName = piece.getAttribute('aria-label')
+    fireEvent.click(piece)
+    const swap = await screen.findByTestId('today-outfit-swap')
+    expect(within(swap).getByRole('radio', { checked: true })).toBeVisible()
+    fireEvent.click(within(swap).getAllByRole('radio', { checked: false })[0]!)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Piece swapped.'
+      )
+    )
+    expect(piece.getAttribute('aria-label')).not.toBe(originalName)
+    fireEvent.click(screen.getByTestId('status-bar-action-undo'))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Change undone.'
+      )
+    )
+    expect(piece.getAttribute('aria-label')).toBe(originalName)
 
     // Every step below waits for the screen, never only for the fake API: the store changes
     // when a request lands, before the app has read the reply and rendered it, so a step that

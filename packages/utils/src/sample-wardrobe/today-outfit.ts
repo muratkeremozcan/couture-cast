@@ -99,23 +99,39 @@ export function buildTodaySlots(
     const catalog = catalogById.get(itemId)
     if (catalog) return todayCatalogSlot(catalog)
 
+    const piece = recommended.get(itemId)
+    const category = piece?.category ?? closet.get(itemId)?.category
     const placeholder = categoryByPlaceholder.get(itemId)
-    if (placeholder) {
+    if (placeholder || !category) {
+      const fallbackCategory = placeholder ?? 'top'
       const base =
-        catalogCandidates(placeholder, weather)[0] ??
-        SAMPLE_CATALOG.garments.find((piece) => piece.category === placeholder)
-      if (base) return todayCatalogSlot(base)
+        catalogCandidates(fallbackCategory, weather)[0] ??
+        SAMPLE_CATALOG.garments.find((piece) => piece.category === fallbackCategory)!
+      return todayCatalogSlot(base)
     }
 
-    const piece = recommended.get(itemId)
     return {
       itemId,
-      category: piece?.category ?? closet.get(itemId)?.category ?? 'top',
+      category,
       imageAccess: piece?.imageAccess,
       kind: 'garment',
       art: neutralArt,
     }
   })
+}
+
+function isCompatibleClosetPiece(
+  piece: TodayWardrobePiece,
+  category: SampleGarmentCategory,
+  range: ComfortRange
+): boolean {
+  return (
+    piece.category === category &&
+    piece.status === 'ready' &&
+    piece.retentionStatus === 'active' &&
+    (!piece.comfortRange ||
+      garmentSuitsRange({ comfortRanges: [piece.comfortRange] }, range))
+  )
 }
 
 export function todaySwapOptions(
@@ -129,12 +145,7 @@ export function todaySwapOptions(
   const usedIds = new Set(slots.map((slot) => slot.itemId))
   const range = buildSampleContext(sampleContextInput, weather).range
   const closet = wardrobe.flatMap((piece): TodaySlot[] =>
-    piece.category === current.category &&
-    piece.status === 'ready' &&
-    piece.retentionStatus === 'active' &&
-    (!piece.comfortRange ||
-      garmentSuitsRange({ comfortRanges: [piece.comfortRange] }, range)) &&
-    !usedIds.has(piece.id)
+    isCompatibleClosetPiece(piece, current.category, range) && !usedIds.has(piece.id)
       ? [
           {
             itemId: piece.id,
@@ -167,9 +178,11 @@ export type TodaySlotEdits = Readonly<Partial<Record<number, TodaySlot>>>
 export function applyTodaySlotEdits(
   slots: readonly TodaySlot[],
   edits: TodaySlotEdits | undefined,
-  wardrobe: readonly TodayWardrobePiece[]
+  wardrobe: readonly TodayWardrobePiece[],
+  weather: SampleWeather
 ): TodaySlot[] {
   if (!edits) return [...slots]
+  const range = buildSampleContext(sampleContextInput, weather).range
   return slots.map((slot, index) => {
     const selected = edits[index]
     if (
@@ -180,8 +193,11 @@ export function applyTodaySlotEdits(
       return slot
     }
     if (selected.kind === 'catalog') return selected
-    const piece = wardrobe.find((item) => item.id === selected.itemId)
-    return { ...selected, imageAccess: piece?.imageAccess }
+    const piece = wardrobe.find(
+      (item) =>
+        item.id === selected.itemId && isCompatibleClosetPiece(item, slot.category, range)
+    )
+    return piece ? { ...selected, imageAccess: piece.imageAccess } : slot
   })
 }
 
@@ -249,7 +265,10 @@ export function todayForecastPeriods(weather: TodayWeather, readAt: number) {
 export function todayRitualAnchorDate(timeZone: string, readAt: number) {
   const local = todayDateAndHour(timeZone)
   const { date, hour } = local(new Date(readAt))
-  return hour < scenarioHour.morning ? date : local(new Date(readAt + 86_400_000)).date
+  if (hour < scenarioHour.morning) return date
+  const tomorrow = new Date(`${date}T00:00:00Z`)
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
+  return tomorrow.toISOString().slice(0, 10)
 }
 
 export function todayScenarioWeather(
@@ -284,7 +303,7 @@ export function todayLookNameKey(weather: SampleWeather & { condition: string })
 
 export function buildTodaySaveAttempt(
   outfitId: string,
-  weather: { timezone: string; current: { condition: string } },
+  condition: string,
   slots: readonly TodaySlot[],
   wornOn: string,
   title: string
@@ -293,7 +312,7 @@ export function buildTodaySaveAttempt(
     payload: {
       source: 'today',
       lookId: `today:${wornOn}:${outfitId}`.slice(0, 64),
-      weather: weather.current.condition,
+      weather: condition,
       wornOn,
       title,
       composition: slots.map(({ itemId, category, kind }, slotIndex) => ({

@@ -90,7 +90,7 @@ export function TodayOutfitPicture({
     <>
       <div
         data-testid="today-outfit-picture"
-        className="grid h-44 grid-cols-3 auto-rows-[80px] gap-2 overflow-y-auto rounded-lg bg-page p-1"
+        className="grid h-[176px] grid-cols-3 auto-rows-[80px] gap-[8px] overflow-y-auto rounded-lg bg-page p-[4px]"
       >
         {slots.map((slot, index) => (
           <button
@@ -99,7 +99,7 @@ export function TodayOutfitPicture({
             data-testid={`today-outfit-slot-${index}`}
             aria-label={`${formatPreviewString(strings.outfit.swap, { category: strings.values.category[slot.category] })}: ${slotName(slot, strings)}`}
             aria-haspopup="dialog"
-            className="relative min-h-11 min-w-11 overflow-hidden rounded-md border border-line bg-card-muted hover:border-ink"
+            className="relative min-h-touch min-w-touch overflow-hidden rounded-md border border-line bg-card-muted hover:border-ink"
             onClick={(event) => {
               invoker.current = event.currentTarget
               setSwappingIndex(index)
@@ -118,14 +118,20 @@ export function TodayOutfitPicture({
         initialFocusRef={firstOption}
         closeLabel={strings.chrome.close}
       >
-        <div data-testid="today-outfit-swap" className="space-y-2">
+        <div
+          data-testid="today-outfit-swap"
+          role="radiogroup"
+          aria-labelledby={titleId}
+          className="space-y-2"
+        >
           {options.map((slot, index) => (
             <button
               type="button"
               key={slot.itemId}
               ref={index === 0 ? firstOption : undefined}
               data-testid={`today-outfit-swap-option-${index}`}
-              aria-current={index === 0 ? 'true' : undefined}
+              role="radio"
+              aria-checked={index === 0}
               className="flex min-h-11 w-full items-center gap-3 rounded-lg border border-line-strong px-2 py-1 text-start text-sm hover:border-ink"
               onClick={() => {
                 if (swappingIndex !== null && index > 0) onChoose(swappingIndex, slot)

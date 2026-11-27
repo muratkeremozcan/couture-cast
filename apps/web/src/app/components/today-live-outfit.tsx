@@ -18,6 +18,7 @@ import {
   getTodayOutfitStrings,
   todayLocalDate,
   todayLookNameKey,
+  todayRitualAnchorDate,
   todayScenarioWeather,
   todaySlotSignature,
   todaySwapOptions,
@@ -43,6 +44,7 @@ type SaveReceipt = Pick<SavedLookContract, 'id' | 'revision'>
 
 export function TodayLiveOutfit({
   ritual,
+  readAt,
   stale,
   initialScenario,
   owner,
@@ -50,6 +52,7 @@ export function TodayLiveOutfit({
   wardrobe,
 }: {
   ritual: RitualResponse['data']
+  readAt: number
   stale: boolean
   initialScenario?: ScenarioName
   owner: string
@@ -73,8 +76,8 @@ export function TodayLiveOutfit({
     ) ?? available[0]
   const scenario = outfit?.scenario ?? 'morning'
   const weather = useMemo(
-    () => todayScenarioWeather(ritual.weather, scenario, Date.now()),
-    [ritual.weather, scenario]
+    () => todayScenarioWeather(ritual.weather, scenario, readAt),
+    [ritual.weather, scenario, readAt]
   )
 
   useEffect(() => {
@@ -86,13 +89,14 @@ export function TodayLiveOutfit({
   if (!outfit) return null
   const recommendationKey = JSON.stringify([
     ritual.weather.locationKey,
+    todayRitualAnchorDate(ritual.weather.timezone, readAt),
     outfit.id,
     outfit.garmentIds,
     outfit.recommendationActionsAvailable,
   ])
   const closet = outfit.recommendationActionsAvailable === false ? [] : wardrobe
   const baseSlots = buildTodaySlots(outfit, weather, closet)
-  const slots = applyTodaySlotEdits(baseSlots, edits[recommendationKey], closet)
+  const slots = applyTodaySlotEdits(baseSlots, edits[recommendationKey], closet, weather)
   const signature = todaySlotSignature(slots)
   const wornOn = todayLocalDate(ritual.weather.timezone)
   const key = `${recommendationKey}:${wornOn}:${signature}`
@@ -146,7 +150,7 @@ export function TodayLiveOutfit({
             if (!live() || !token) return false
             const attempt =
               started.current.get(key) ??
-              buildTodaySaveAttempt(outfit.id, ritual.weather, slots, wornOn, title)
+              buildTodaySaveAttempt(outfit.id, weather.condition, slots, wornOn, title)
             started.current.set(key, attempt)
             try {
               const record = await createSavedLookFromWeb(attempt.payload, {

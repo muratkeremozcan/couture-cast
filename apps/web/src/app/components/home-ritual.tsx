@@ -802,6 +802,7 @@ function SetCityAction({
 /** Story CC-7.7 D5: what a return to Home shows in its first frame, per member. */
 type RitualSnapshot = {
   ritual: LiveRitual | null
+  readAt: number
   city: string | undefined
   failure: RitualFailure | null
 }
@@ -861,6 +862,7 @@ function MemberRitual({
   const snapshot = start.snapshot
   const { pieces, wardrobe } = useHomeWardrobe(owner, start.scope)
   const [ritual, setRitual] = useState<LiveRitual | null>(snapshot?.ritual ?? null)
+  const [readAt, setReadAt] = useState(() => snapshot?.readAt ?? Date.now())
   const [city, setCity] = useState<string | undefined>(snapshot?.city)
   const [failure, setFailure] = useState<RitualFailure | null>(snapshot?.failure ?? null)
   const [attempt, setAttempt] = useState(0)
@@ -900,8 +902,9 @@ function MemberRitual({
       },
       city,
       failure,
+      readAt,
     } satisfies RitualSnapshot)
-  }, [city, failure, readSettled, ritual, screen])
+  }, [city, failure, readAt, readSettled, ritual, screen])
 
   useEffect(() => {
     const token = currentWebSessionBearer()
@@ -921,6 +924,7 @@ function MemberRitual({
       return false
     }
     setBusy(true)
+    const requestStartedAt = Date.now()
     void getRitualFromWeb(token, locale, controller.signal)
       .then((data) => {
         if (!current() || !sameScope()) return
@@ -937,6 +941,7 @@ function MemberRitual({
             : undefined
         shownScopeRef.current = scope
         setRitual(data)
+        setReadAt(requestStartedAt)
         setCity(keptCity)
         setFailure(null)
         const credentials = captureLocationCredentials()
@@ -999,6 +1004,7 @@ function MemberRitual({
         >
           <TodayLiveOutfit
             ritual={liveOutfit}
+            readAt={readAt}
             initialScenario={scenario}
             stale={failure === 'failed'}
             owner={owner}

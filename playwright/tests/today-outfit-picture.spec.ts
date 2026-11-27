@@ -120,6 +120,51 @@ test.describe('CC-7.14 Today outfit picture @local-lane', () => {
     expect(shiftScore(settled.shifts, fromMs)).toBeLessThanOrEqual(0.1)
   })
 
+  test('[P0] [7.14-PIC-002] a failed photo keeps the fallback and each neighboring piece usable', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    const photo = await serveTodayPhoto(page, { fail: true })
+    const { router } = await openFixtureShell(page, interceptNetworkCall, {
+      mode: 'populated',
+      screen: 'home',
+      todayPhotoUrl: photo.url,
+    })
+    await page.goto('/')
+    await waitForShellSettled(page, router)
+    await photo.requested
+    const first = page.getByTestId('today-outfit-slot-0')
+    await expect(first.locator('img')).toHaveCount(0)
+    await expect(first.getByTestId('today-outfit-catalog-0')).toBeVisible()
+    const next = page.getByTestId('today-outfit-slot-1')
+    await next.click()
+    await expect(page.getByTestId('today-outfit-swap')).toBeVisible()
+    await page.getByTestId('today-outfit-swap-option-0').click()
+    await expect(next).toBeFocused()
+    await expect(first.getByTestId('today-outfit-catalog-0')).toBeVisible()
+  })
+
+  test('[P0] [7.14-PIC-002] the guardian-pending member can open a sample slot with catalog art', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    const { router } = await openFixtureShell(page, interceptNetworkCall, {
+      mode: 'guardian-pending',
+      screen: 'home',
+    })
+    await page.goto('/')
+    await waitForShellSettled(page, router)
+    const picture = page.getByTestId('today-outfit-picture')
+    await expect(picture.getByTestId('today-outfit-catalog-0')).toBeVisible()
+    await expect(picture.locator('img')).toHaveCount(0)
+    await picture.getByTestId('today-outfit-slot-0').click()
+    await expect(page.getByTestId('today-outfit-swap-option-0')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    await expect(page.getByTestId('shop-this-look-block')).toHaveCount(0)
+  })
+
   test('[P0] [7.14-PIC-005] each piece is a 44 px target and opens a focused same-slot Swap', async ({
     page,
     interceptNetworkCall,
