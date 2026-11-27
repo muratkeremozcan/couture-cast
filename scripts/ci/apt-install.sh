@@ -47,9 +47,23 @@ if [[ -n "$archives" ]]; then
   config+="Dir::Cache::Archives \"$archives/\";"$'\n'
 fi
 
-printf '%s' "$config" |
-  sudo -n tee /etc/apt/apt.conf.d/80-couture-ci-retries >/dev/null ||
-  { echo "::error::Could not write apt's retry settings." >&2; exit 1; }
+write_apt_config() {
+  printf '%s' "$1" |
+    sudo -n tee /etc/apt/apt.conf.d/80-couture-ci-retries >/dev/null ||
+    { echo "::error::Could not write apt's retry settings." >&2; exit 1; }
+}
+
+playwright_sources=''
+if [[ "$1" == "--playwright" && "${GITHUB_ACTIONS:-}" == true ]]; then
+  # The runner's Ubuntu source retains its mirrors, security suites and signing key.
+  # Playwright only needs Ubuntu packages. A Microsoft repository on an Ubuntu 26.04
+  # runner failed the entire index refresh with HTTP 403 (PR 298, job 140332297872).
+  playwright_sources=$'Dir::Etc::sourcelist "/etc/apt/sources.list.d/ubuntu.sources";\nDir::Etc::sourceparts "/dev/null";\n'
+  # Playwright spawns its own privileged package installer, so it reads this config too.
+  trap 'write_apt_config "$config"' EXIT
+fi
+
+write_apt_config "$config$playwright_sources"
 
 drop_archives() {
   find "$archives" -maxdepth 1 \( -type f -o -type l \) -name '*.deb' -delete
@@ -65,9 +79,8 @@ discard() {
 # back to its own archive directory, so nothing restored is read, and the install downloads.
 abandon_archives() {
   echo "::warning::$1 The install uses apt's own archive directory and downloads every package."
-  printf '%s' "$retries" |
-    sudo -n tee /etc/apt/apt.conf.d/80-couture-ci-retries >/dev/null ||
-    { echo "::error::Could not write apt's retry settings." >&2; exit 1; }
+  config=$retries
+  write_apt_config "$config$playwright_sources"
   archives=
 }
 

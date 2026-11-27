@@ -186,6 +186,7 @@ describe('CI installs Ubuntu packages only through apt-install.sh', () => {
     const body = original(SCRIPT)
       .split('\n')
       .filter((line) => !line.trim().startsWith('#'))
+      .filter((line) => !/^trap 'write_apt_config "\$config"' EXIT$/.test(line.trim()))
       .join('\n')
     assert.doesNotMatch(body, /\bkill\b|\btimeout\b|\btrap\b/)
   })
@@ -251,7 +252,12 @@ printf 'Package: %s\\nVersion: %s\\nArchitecture: %s\\n' "$p" "$v" "$a"`
   )
   try {
     const result = spawnSync('bash', [path.join(repository, SCRIPT), ...args], {
-      env: { PATH: `${stubs}:${process.env.PATH}`, APT_INSTALL_PAUSES: pauses, ...env },
+      env: {
+        PATH: `${stubs}:${process.env.PATH}`,
+        APT_INSTALL_PAUSES: pauses,
+        GITHUB_ACTIONS: '',
+        ...env,
+      },
       encoding: 'utf8',
     })
     const read = (name) => {
@@ -305,6 +311,23 @@ describe('apt-install.sh', () => {
       Array(3).fill('npx --no-install playwright install-deps chromium')
     )
     assert.deepEqual(sleeps, ['1', '2'])
+  })
+
+  test('CI Playwright uses signed Ubuntu sources through retries and restores selection on exit', () => {
+    const { status, config, installConfigs } = runScript(['--playwright', 'webkit'], {
+      env: { GITHUB_ACTIONS: 'true' },
+      statuses: [100, 100, 7],
+    })
+    assert.equal(status, 7)
+    assert.equal(installConfigs.length, 3)
+    for (const used of installConfigs) {
+      assert.match(
+        used,
+        /Dir::Etc::sourcelist "\/etc\/apt\/sources\.list\.d\/ubuntu\.sources";/
+      )
+      assert.match(used, /Dir::Etc::sourceparts "\/dev\/null";/)
+    }
+    assert.doesNotMatch(config, /Dir::Etc::source/)
   })
 
   test('gives up after the last pause with the last exit status', () => {
@@ -623,9 +646,10 @@ describe('apt-install.sh', () => {
         const archives = path.join(directory, 'ubuntu-packages')
         mkdirSync(archives)
         setup(archives)
+        const { env, ...scriptOptions } = options
         const result = runScript(['--playwright', 'webkit'], {
-          env: { APT_INSTALL_ARCHIVES: archives },
-          ...options,
+          env: { APT_INSTALL_ARCHIVES: archives, ...env },
+          ...scriptOptions,
         })
         return {
           ...result,
@@ -643,13 +667,14 @@ describe('apt-install.sh', () => {
     }
 
     test('a rejected file that stays is counted apart, and apt falls back to its own directory', () => {
-      const { status, stdout, config, left } = withArchives(
+      const { status, stdout, config, installConfigs, left } = withArchives(
         (archives) => {
           writeFileSync(path.join(archives, 'libone_1.0_amd64.deb'), 'one')
           writeFileSync(path.join(archives, 'stuck_1.0_amd64.deb'), 'old')
           writeFileSync(path.join(archives, 'libtwo_1.0_amd64.deb'), 'bad')
         },
         {
+          env: { GITHUB_ACTIONS: 'true' },
           index: indexOf([
             ['libone', '1.0', 'amd64', 'one'],
             ['libtwo', '1.0', 'amd64', 'two'],
@@ -670,6 +695,10 @@ describe('apt-install.sh', () => {
       // The last settings apt reads name no archive directory: the restored files are never used.
       assert.doesNotMatch(config, /Dir::Cache::Archives/)
       assert.match(config, /Acquire::Retries "5";/)
+      assert.equal(installConfigs.length, 1)
+      assert.match(installConfigs[0], /Dir::Etc::sourceparts "\/dev\/null";/)
+      assert.doesNotMatch(installConfigs[0], /Dir::Cache::Archives/)
+      assert.doesNotMatch(config, /Dir::Etc::source/)
     })
 
     // Codex review 18: a listing that fails part way looks like an empty restore unless its
