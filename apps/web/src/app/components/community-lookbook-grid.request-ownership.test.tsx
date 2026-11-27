@@ -1119,11 +1119,11 @@ describe('Story 6.3 screen request ownership', () => {
                     {
                       ...post(),
                       id: 'stale-feed-sentinel',
-                      caption: 'Older feed completed.',
+                      title: 'Older feed completed.',
                     },
                   ]
                 : [post()],
-            mode: read > 1 ? 'all' : 'auto',
+            nextCursor: read === 1 ? 'held-reaction-page' : null,
           }),
         })
       }),
@@ -1135,7 +1135,7 @@ describe('Story 6.3 screen request ownership', () => {
       const user = userEvent.setup()
       renderGrid()
       const controls = await screen.findByTestId('community-reactions-post-1')
-      await selectCommunityClimate(user, 'all')
+      await user.click(screen.getByTestId('load-more-button'))
       await waitFor(() => expect(reads).toBe(2))
       await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
       await waitFor(() => expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull())
@@ -1162,11 +1162,11 @@ describe('Story 6.3 screen request ownership', () => {
                     {
                       ...post(),
                       id: 'stale-feed-sentinel',
-                      caption: 'Older feed completed.',
+                      title: 'Older feed completed.',
                     },
                   ]
                 : [post()],
-            mode: read > 1 ? 'all' : 'auto',
+            nextCursor: read === 1 ? 'held-reaction-page' : null,
           }),
         })
       }),
@@ -1178,7 +1178,7 @@ describe('Story 6.3 screen request ownership', () => {
       const user = userEvent.setup()
       renderGrid()
       const controls = await screen.findByTestId('community-reactions-post-1')
-      await selectCommunityClimate(user, 'all')
+      await user.click(screen.getByTestId('load-more-button'))
       await waitFor(() => expect(reads).toBe(2))
       await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
       await within(controls).findByRole('button', { name: 'Applaud, 1' })

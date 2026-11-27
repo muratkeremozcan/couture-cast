@@ -150,7 +150,7 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     signIn()
     let attempts = 0
     useMswHandlers(
-      feedHandler({ items: [] }),
+      feedHandler({ items: [], mode: 'all' }),
       http.get(SPOTLIGHT_PATH, () => {
         attempts += 1
         return attempts === 1
@@ -224,7 +224,7 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('6.6-WEB-031 a reaction on the spotlight copy updates the feed copy of the same post (R10)', async () => {
+  it('6.6-WEB-031 a reaction on the deduplicated ranked look also appears in its detail (R10)', async () => {
     signIn()
     let summary = ZERO
     const requests: SetCommunityReactionInput[] = []
@@ -258,16 +258,20 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     const spotlightCopy = await screen.findByTestId(
       'spotlight-community-reactions-spot-1'
     )
-    const feedCopy = await screen.findByTestId('community-reactions-spot-1')
+    expect(screen.queryByTestId('community-reactions-spot-1')).toBeNull()
     await user.click(within(spotlightCopy).getByRole('button', { name: 'Applaud, 0' }))
 
-    for (const copy of [spotlightCopy, feedCopy])
-      await waitFor(() =>
-        expect(within(copy).getByRole('button', { name: 'Applaud, 1' })).toHaveAttribute(
-          'aria-pressed',
-          'true'
-        )
-      )
+    await waitFor(() =>
+      expect(
+        within(spotlightCopy).getByRole('button', { name: 'Applaud, 1' })
+      ).toHaveAttribute('aria-pressed', 'true')
+    )
+    await user.click(screen.getByTestId('spotlight-lookbook-open-spot-1'))
+    const detail = await screen.findByTestId('community-detail')
+    expect(within(detail).getByRole('button', { name: 'Applaud, 1' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
     expect(requests.map((request) => request.selection)).toEqual(['applause'])
   })
 

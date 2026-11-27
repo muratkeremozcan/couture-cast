@@ -999,7 +999,7 @@ export function registerCommunitySpotlightCases() {
     ).toHaveTextContent('Updated spotlight title')
 
     // Open Spotlight detail and confirm it renders the updated title and Edited label.
-    press(within(spotCard).getByTestId('community-card-open-spot-edit'))
+    press(within(spotCard).getByTestId('community-card-title-spot-edit'))
     const detail = await screen.findByTestId('community-spotlight-detail')
     // Codex 7.11 #10 (D12): a titled look names the layer's top bar, the edited title included.
     expect(within(detail).getByTestId('app-top-bar-title').textContent).toBe(

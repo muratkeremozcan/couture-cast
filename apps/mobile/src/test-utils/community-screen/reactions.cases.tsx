@@ -128,7 +128,7 @@ export function registerCommunityReactionsCases() {
         return HttpResponse.json({
           data: {
             ...item(),
-            caption: 'Older native detail completed.',
+            title: 'Older native detail completed.',
             reactions: raceZero,
           },
         })
@@ -454,6 +454,7 @@ export function registerCommunityReactionsCases() {
       expect(screen.getByTestId('community-climate-filter')).toHaveTextContent(
         'All climates'
       )
+      await browserUser.click(await screen.findByTestId('community-feed-load-more'))
       await waitFor(() =>
         expect(
           feedUrls.some(
@@ -475,14 +476,14 @@ export function registerCommunityReactionsCases() {
       if (index) await gate.promise
       return HttpResponse.json({
         data: feed({
-          mode: index ? 'all' : 'auto',
+          nextCursor: index ? null : 'held-mutation-page',
           items: index
             ? [
                 first,
                 {
                   ...first,
                   id: 'native-feed-sentinel',
-                  caption: 'Fenced native feed completed.',
+                  title: 'Fenced native feed completed.',
                 },
               ]
             : [first],
@@ -496,17 +497,8 @@ export function registerCommunityReactionsCases() {
     )
     try {
       await render(<CommunityScreen />)
-      // Keep an independently mounted highlighted copy while the list remounts for filtering.
-      setMockParams({ source: 'notification', type: 'community', cardId: 'post-a' })
-      server.use(
-        http.get('*/api/v1/community/posts/:postId', () =>
-          HttpResponse.json({ data: first })
-        )
-      )
-      // The second page is held, so the gate opens on the first page before the filter moves.
       await communityGateOpen()
-      await selectCommunityClimate('all')
-      await screen.findByTestId('highlighted-community-card-post-a')
+      await browserUser.click(await screen.findByTestId('community-feed-load-more'))
       await waitFor(() => expect(feedUrls).toHaveLength(2))
       await browserUser.click(screen.getByRole('button', { name: 'Applaud, 0' }))
       await waitFor(() =>

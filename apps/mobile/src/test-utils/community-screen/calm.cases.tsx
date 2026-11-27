@@ -92,10 +92,11 @@ export function registerCalmCommunityCases() {
     expect(ranked).toBeVisible()
 
     press(within(ranked).getByTestId(`community-card-open-${nearby.id}`))
-    await screen.findByTestId('community-spotlight-detail-rank')
-    expect(
-      screen.getByText('Blue layers', { selector: '[role="heading"]' })
-    ).toBeVisible()
+    const detail = await screen.findByTestId('community-spotlight-detail')
+    expect(within(detail).getByTestId('app-top-bar-title')).toHaveTextContent(
+      'Blue layers'
+    )
+    expect(within(detail).getByTestId('community-spotlight-detail-rank')).toBeVisible()
   })
 
   it('7.15-COM-004/005 the localized zero-look action loads both approved peers', async () => {

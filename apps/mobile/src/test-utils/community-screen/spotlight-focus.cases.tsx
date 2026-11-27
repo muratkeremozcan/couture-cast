@@ -127,16 +127,15 @@ export function registerCommunitySpotlightFocusCases() {
     setMockParams(teaserIntent('spot-2', 'token-77-spotlight-first'))
     await render(<CommunityScreen />)
 
-    const rank = await screen.findByTestId('community-card-title-spot-2')
     await frames(3)
-    // Ready behind the closed gate: nothing is focused, announced or reported yet.
-    expect(rank).not.toBeVisible()
+    expect(screen.queryByTestId('community-card-title-spot-2')).toBeNull()
     expect(screen.getByTestId('screen-placeholder')).toBeVisible()
     expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalled()
     expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
     expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
 
     act(() => releaseFeed())
+    const rank = await screen.findByTestId('community-card-title-spot-2')
 
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(

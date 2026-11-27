@@ -98,7 +98,7 @@ export function item(overrides: Partial<CommunityFeedItem> = {}): CommunityFeedI
     id: 'post-1',
     caption: 'Layered wool over a merino base for a damp commute.',
     altText: 'A charcoal wool coat over a cream knit, with black ankle boots.',
-    climateBand: 'temperate_wet',
+    climateBand: 'temperate_dry',
     imageAccess: { url: IMAGE_URL, expiresAt: isoIn(3600) },
     publishedAt: '2026-09-01T10:00:00.000Z',
     createdAt: '2026-08-31T10:00:00.000Z',

@@ -150,7 +150,10 @@ function journey(
   })
   serveFeed(() =>
     feedJson({
-      items: [post(), ...(state.published ? [post('post-new')] : [post('post-b')])],
+      items: [
+        ...(state.hidden ? [] : [post()]),
+        state.published ? post('post-new') : post('post-b'),
+      ],
     })
   )
   server.use(
@@ -356,7 +359,9 @@ export function registerCommunityNotificationRecoveryCases() {
       expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
     )
     expect(f.rootRequests).toHaveLength(before)
-    expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+    await waitFor(() =>
+      expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+    )
     await communityGateOpen()
     await waitFor(() =>
       expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
@@ -584,7 +589,9 @@ export function registerCommunityNotificationRecoveryCases() {
         expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
         expect(f.rootRequests).toHaveLength(before)
         if (kind === 'missing-card') {
-          expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+          await waitFor(() =>
+            expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+          )
           await communityGateOpen()
           await waitFor(() =>
             expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()

@@ -379,7 +379,9 @@ describe('MemberSampleOutfit (mobile)', () => {
         'Saved to your looks.'
       )
       expect(
-        within(screen.getByTestId('sample-saved-looks')).getAllByRole('button')
+        within(screen.getByTestId('sample-saved-looks')).getAllByRole('button', {
+          name: /^Remove /,
+        })
       ).toHaveLength(2)
     })
     await view.unmount()
@@ -418,8 +420,10 @@ describe('MemberSampleOutfit (mobile)', () => {
     expect(await screen.findByTestId('sample-save-look')).toBeInTheDocument()
     await waitFor(() =>
       expect(
-        within(screen.getByTestId('sample-saved-looks')).getAllByRole('button')
-      ).toHaveLength(2)
+        within(screen.getByTestId('sample-saved-looks')).getAllByRole('button', {
+          name: /^Remove /,
+        })
+      ).toHaveLength(1)
     )
     await view2.unmount()
   })

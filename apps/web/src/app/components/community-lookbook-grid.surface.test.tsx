@@ -857,7 +857,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         'Layered wool over a merino base for a damp commute.'
       )
       expect(screen.getByTestId('community-detail-band-post-1')).toHaveTextContent(
-        'Temperate and wet'
+        'Temperate and dry'
       )
     })
 

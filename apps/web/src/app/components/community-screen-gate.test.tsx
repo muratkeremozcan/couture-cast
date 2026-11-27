@@ -369,6 +369,7 @@ describe('7.7 Community screen gate', () => {
         .getAllByRole('article')
         .map((card) => card.id)
     const pagedRows = [
+      'spotlight-lookbook-card-spot-1',
       'lookbook-card-post-1',
       'lookbook-card-post-2',
       'lookbook-card-post-3',

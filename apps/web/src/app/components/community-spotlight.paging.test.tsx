@@ -297,7 +297,7 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
   it('6.6-WEB-037 an empty first page with a next cursor keeps View more and never shows the empty state (R12)', async () => {
     signIn()
     useMswHandlers(
-      feedHandler({ items: [] }),
+      feedHandler({ items: [], mode: 'all' }),
       http.get(SPOTLIGHT_PATH, ({ request }) =>
         new URL(request.url).searchParams.get('cursor') === null
           ? spotlightBody({ items: [], nextCursor: 'cursor-2' })

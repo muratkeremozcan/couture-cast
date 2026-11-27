@@ -129,14 +129,16 @@ export function registerCommunityFeedCases() {
       expect(within(detail).getByTestId('community-post-card-own-private')).toBeVisible()
       // The published row proves the detail renders the opener in the same pass, so the
       // other rows check its absence at the moment it would exist.
-      if (exportable)
+      expect(
+        within(detail).queryByTestId('community-share-card-open-own-private')
+      ).toBeNull()
+      if (exportable) {
+        press(within(detail).getByTestId('community-card-open-own-private'))
+        const post = await screen.findByTestId('community-post-detail')
         expect(
-          within(detail).getByTestId('community-share-card-open-own-private')
+          within(post).getByTestId('community-share-card-open-own-private')
         ).toBeVisible()
-      else
-        expect(
-          within(detail).queryByTestId('community-share-card-open-own-private')
-        ).toBeNull()
+      }
     }
   )
 
@@ -297,8 +299,10 @@ export function registerCommunityFeedCases() {
     press(await screen.findByRole('button', { name: 'Close comments' }))
     await waitFor(() => expect(findNodeHandle).toHaveBeenLastCalledWith(invoker))
     const invokerHandle = handleOf(invoker)
-    expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
-      invokerHandle
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        invokerHandle
+      )
     )
     expect(invoker).toBeVisible()
   })
@@ -325,8 +329,10 @@ export function registerCommunityFeedCases() {
     await openCommunityPostComments('post-b')
     press(await screen.findByRole('button', { name: 'Close comments' }))
     await waitFor(() => expect(findNodeHandle).toHaveBeenLastCalledWith(feedInvoker))
-    expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
-      handleOf(feedInvoker)
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        handleOf(feedInvoker)
+      )
     )
     expect(feedInvoker).not.toBe(highlightInvoker)
   })

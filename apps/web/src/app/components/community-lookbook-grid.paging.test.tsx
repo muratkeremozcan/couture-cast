@@ -270,7 +270,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         'Style Explorer 4F2A'
       )
       expect(screen.getByTestId('community-detail-band-post-1')).toHaveTextContent(
-        'Temperate and wet'
+        'Temperate and dry'
       )
     })
 

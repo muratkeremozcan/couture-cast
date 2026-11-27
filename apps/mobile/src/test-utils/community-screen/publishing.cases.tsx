@@ -91,9 +91,9 @@ export function registerCommunityPublishingCases() {
     expect(
       within(detail).getByTestId('community-card-caption-own-text')
     ).toHaveTextContent(updated.caption)
-    expect(screen.getByTestId('community-card-edited-own-text')).toHaveTextContent(
-      enUS.community.card.edited
-    )
+    expect(
+      within(detail).getByTestId('community-card-edited-own-text')
+    ).toHaveTextContent(enUS.community.card.edited)
     expect(screen.getByTestId('community-edit-status')).toHaveTextContent(
       enUS.community.compose.editSaved
     )

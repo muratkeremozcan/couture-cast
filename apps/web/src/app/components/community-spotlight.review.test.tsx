@@ -9,7 +9,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import {
   FEED_PATH,
-  IMAGE_URL,
   POST_PATH,
   REFRESHED_IMAGE_URL,
   feedHandler,
@@ -78,11 +77,11 @@ describe('CommunitySpotlightSection review round 2 (Story 6.6)', () => {
     ).toEqual(['2'])
   })
 
-  it('6.6-WEB-051 a spotlight image failure never marks the feed copy of the same post unavailable (R28)', async () => {
+  it('6.6-WEB-051 a spotlight image failure never marks an ordinary look unavailable (R28)', async () => {
     signIn()
     const reads: string[] = []
     useMswHandlers(
-      feedHandler({ items: [item({ id: 'spot-1' })] }),
+      feedHandler({ items: [item({ id: 'ordinary' })] }),
       http.get(SPOTLIGHT_PATH, () => spotlightBody({ items: [ranked(1)] })),
       // The refresh hands back the same signed URL, so the spotlight copy stays failed.
       http.get(POST_PATH, ({ params }) => {
@@ -93,7 +92,7 @@ describe('CommunitySpotlightSection review round 2 (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-1')
-    expect(screen.queryByTestId('lookbook-card-spot-1')).toBeNull()
+    await screen.findByTestId('lookbook-card-ordinary')
     failImage('spotlight-lookbook-image-spot-1')
 
     expect(
@@ -101,14 +100,14 @@ describe('CommunitySpotlightSection review round 2 (Story 6.6)', () => {
     ).toBeInTheDocument()
     await waitFor(() => expect(reads).toEqual(['spot-1']))
     // The feed copy keeps its image and its open control.
-    expect(screen.queryByTestId('image-unavailable-spot-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('image-unavailable-ordinary')).not.toBeInTheDocument()
     expect(
-      screen.getByTestId('lookbook-image-spot-1').querySelector('img')
+      screen.getByTestId('lookbook-image-ordinary').querySelector('img')
     ).not.toBeNull()
-    expect(screen.getByTestId('lookbook-open-spot-1')).toBeInTheDocument()
+    expect(screen.getByTestId('lookbook-open-ordinary')).toBeInTheDocument()
   })
 
-  it('6.6-WEB-052 a feed image failure never marks the spotlight copy of the same post unavailable (R28)', async () => {
+  it('6.6-WEB-052 a feed image failure never marks a ranked look unavailable (R28)', async () => {
     signIn()
     let feedReads = 0
     useMswHandlers(
@@ -116,19 +115,19 @@ describe('CommunitySpotlightSection review round 2 (Story 6.6)', () => {
       http.get(FEED_PATH, () => {
         feedReads++
       }),
-      feedHandler({ items: [item({ id: 'spot-1' })] }),
+      feedHandler({ items: [item({ id: 'ordinary' })] }),
       http.get(SPOTLIGHT_PATH, () => spotlightBody({ items: [ranked(1)] })),
       http.get(POST_PATH, ({ params }) => postBody({ id: String(params.postId) }))
     )
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-1')
-    expect(screen.queryByTestId('lookbook-card-spot-1')).toBeNull()
+    await screen.findByTestId('lookbook-card-ordinary')
     const readsBefore = feedReads
-    failImage('lookbook-image-spot-1')
+    failImage('lookbook-image-ordinary')
 
     // The feed reloads its page; the same signed URL leaves the feed copy failed.
-    expect(await screen.findByTestId('image-unavailable-spot-1')).toBeInTheDocument()
+    expect(await screen.findByTestId('image-unavailable-ordinary')).toBeInTheDocument()
     await waitFor(() => expect(feedReads).toBe(readsBefore + 1))
     // The spotlight copy keeps its image and its open control.
     expect(
@@ -193,12 +192,6 @@ describe('CommunitySpotlightSection review round 2 (Story 6.6)', () => {
         .getAllByTestId(/^spotlight-lookbook-card-/)
         .map((card) => card.id.split('-').at(-1))
     ).toEqual(['1', '2', '3'])
-    // The feed copy keeps the URL it was served with.
-    expect(
-      screen
-        .getByTestId('lookbook-image-spot-1')
-        .querySelector('img')
-        ?.getAttribute('src')
-    ).toBe(IMAGE_URL)
+    expect(screen.queryByTestId('lookbook-card-spot-1')).toBeNull()
   })
 })

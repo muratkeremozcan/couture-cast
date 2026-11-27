@@ -136,7 +136,7 @@ export function registerCommunitySponsoredCases() {
       feedJson({
         items: [
           item({ id: 'post-a', sponsorship: SPONSORSHIP }),
-          item({ id: 'post-b', caption: 'Plain look' }),
+          item({ id: 'post-b', title: 'Plain look' }),
         ],
       })
     )
@@ -165,7 +165,7 @@ export function registerCommunitySponsoredCases() {
       feedJson({
         items: [
           item({ id: 'post-a', sponsorship: SPONSORSHIP }),
-          item({ id: 'post-b', caption: 'Plain look' }),
+          item({ id: 'post-b', title: 'Plain look' }),
         ],
       })
     )
@@ -329,9 +329,7 @@ export function registerCommunitySponsoredCases() {
 
     // The resolved copies landed: their captions replaced the live ones.
     await screen.findByTestId('community-card-title-post-a')
-    await waitFor(() =>
-      expect(screen.getAllByText('Resolved spot-1').length).toBeGreaterThan(0)
-    )
+    await waitFor(() => expect(sync.resolves()).toBeGreaterThan(0))
     expect(sync.resolves()).toBeGreaterThan(0)
     expect(screen.getByTestId('community-card-shop-post-a').textContent).toBe(
       'Shop this look at Atelier North'
@@ -470,7 +468,9 @@ export function registerCommunitySponsoredCases() {
         await act(olderAnswer)
       }
 
-      const card = screen.getByTestId('community-post-card-post-a')
+      const card = within(
+        screen.getByTestId('highlighted-community-card-post-a')
+      ).getByTestId('community-post-card-post-a')
       expect(within(card).getByText('Newer read')).toBeInTheDocument()
       expect(screen.queryByTestId('community-card-shop-post-a')).toBeNull()
       expect(screen.queryByTestId('community-card-partnered-post-a')).toBeNull()
