@@ -33,6 +33,7 @@ import {
   isWebSessionDenial,
   resolveWebSessionToken,
   webSessionIdentity,
+  webSessionVerifiedBearer,
 } from './web-session'
 
 export type WebSessionState =
@@ -305,6 +306,34 @@ export function useWebSessionScope(): string | null {
     currentWebSessionScope,
     () => null
   )
+}
+
+// The style cache and temporary day controls also fence sign-out followed by signing back in
+// as the same verified owner. Token refresh preserves this epoch.
+let styleSessionIdentity: string | null = null
+let styleSessionEpoch = 0
+
+export function currentWebStyleScope(): string | null {
+  const identity = currentWebSessionScope()
+  if (identity !== styleSessionIdentity) {
+    styleSessionIdentity = identity
+    styleSessionEpoch += 1
+  }
+  return identity === null ? null : `${styleSessionEpoch}:${identity}`
+}
+
+if (typeof window !== 'undefined') subscribeWebSessionOwner(currentWebStyleScope)
+
+export const subscribeWebStyleScope = subscribeWebSessionOwner
+
+export function useWebStyleScope(): string | null {
+  return useSyncExternalStore(subscribeWebStyleScope, currentWebStyleScope, () => null)
+}
+
+export function captureWebStyleBearer(scope: string): string | null {
+  if (scope !== currentWebStyleScope()) return null
+  const owner = currentWebSessionOwner()
+  return owner === UNVERIFIED_BEARER_OWNER ? fixtureBearer() : webSessionVerifiedBearer()
 }
 
 /**

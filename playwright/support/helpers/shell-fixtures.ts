@@ -16,6 +16,7 @@ import {
   savedLookListResponseSchema,
   savedLookResponseSchema,
   silhouetteProfileResponseSchema,
+  styleProfileResponseSchema,
   trackedResponseSchema,
   userProfileResponseSchema,
   wardrobeOnboardingStateResponseSchema,
@@ -125,6 +126,7 @@ export function readKey(url: string, method: string) {
     'community/events': 'community-events',
     'community/notification-preferences': 'notification-preferences',
     'user/profile': 'profile',
+    'personalization/style-profile': 'style-profile',
     'wardrobe/onboarding': 'onboarding',
     'wardrobe/garments': 'garments',
     'commerce/preferences': 'commerce-preferences',
@@ -584,6 +586,9 @@ export function bodies(
       },
     }),
     profile: checked(userProfileResponseSchema, profile),
+    'style-profile': checked(styleProfileResponseSchema, {
+      data: { mood: null, palette: null, texture: null, fit: null, avoid: [] },
+    }),
     onboarding: checked(
       wardrobeOnboardingStateResponseSchema,
       options.closet?.onboarding ?? { data: onboarding }

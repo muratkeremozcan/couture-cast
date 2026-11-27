@@ -22489,3 +22489,32 @@ Use subtype tags to find a specific piece in Closet and choose which piece goes 
 - [Android smart tagging](../../maestro/garment-smart-tagging-flow.yaml)
   and [guest conversion](../../maestro/guest-preview/guest-preview-conversion-verify.yaml).
 - [Step 75](#step-75-find-mini-skirts-tights-and-socks) covers the sample closet.
+
+## Step 77: Account style profile
+
+Choose a style mood on the first look, then tune or clear the account's answers from Profile.
+Today's temperature and mood can change for the current day.
+
+### Sequence to follow
+
+1. Open Today with an empty closet. Check that the illustrated look is ready before you answer
+   anything. Pick one of the four mood pictures and check the suggested look.
+2. Open Tune my style. Continue after choosing a palette, skip the texture and fit screen,
+   then toggle a piece to avoid and finish. Reopen Profile > Style to see the saved choices.
+3. Open the day controls on Today and pick a temperature and mood. Open Looks > Ideas to see the
+   same choices. Reset them and check that the account's answers are still selected in Profile.
+4. Clear the profile in Profile > Style. Reopen it and check that the choices are empty.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-20-account-style-profile.md) and
+  [acceptance plan](../test-artifacts/test-design-7-20-account-style-profile.md).
+- [Account API journey](../../playwright/tests/api/account-style-profile.spec.ts) and
+  [phone-width style journey](../../playwright/tests/account-style-profile.spec.ts).
+- [API ownership and consent](../../apps/api/src/modules/personalization/style-profile.controller.spec.ts)
+  and [client contract](../../packages/api-client/testing/style-profile-client.spec.ts).
+- [Shared ranking and expiry](../../packages/utils/src/sample-wardrobe/style-profile.spec.ts),
+  [session and day state](../../packages/utils/src/sample-wardrobe/style-profile-store.spec.ts),
+  [native style settings](../../apps/mobile/src/features/settings/style-settings-screen.test.tsx),
+  and [native sample outfit](../../apps/mobile/src/features/preview/member-sample-outfit.test.tsx).
+- [Step 71](#step-71-todays-outfit-as-a-picture) covers the outfit picture and its swap controls.

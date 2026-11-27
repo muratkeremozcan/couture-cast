@@ -4492,6 +4492,154 @@
           "data"
         ]
       },
+      "UpdateStyleProfileInput": {
+        "type": "object",
+        "properties": {
+          "mood": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "active",
+              "chic",
+              "cozy",
+              "classic",
+              null
+            ]
+          },
+          "palette": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "neutral",
+              "colorful",
+              null
+            ]
+          },
+          "texture": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "smooth",
+              "textured",
+              null
+            ]
+          },
+          "fit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "fitted",
+              "relaxed",
+              null
+            ]
+          },
+          "avoid": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "crop-top",
+                "mini-skirt",
+                "leggings"
+              ]
+            },
+            "maxItems": 3,
+            "description": "The pieces the member prefers to avoid. Each choice may appear once."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Only supplied style preference fields are updated."
+      },
+      "StyleProfileResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "mood": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "active",
+                  "chic",
+                  "cozy",
+                  "classic",
+                  null
+                ]
+              },
+              "palette": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "neutral",
+                  "colorful",
+                  null
+                ]
+              },
+              "texture": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "smooth",
+                  "textured",
+                  null
+                ]
+              },
+              "fit": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "fitted",
+                  "relaxed",
+                  null
+                ]
+              },
+              "avoid": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "crop-top",
+                    "mini-skirt",
+                    "leggings"
+                  ]
+                },
+                "maxItems": 3,
+                "description": "The pieces the member prefers to avoid. Each choice may appear once."
+              }
+            },
+            "required": [
+              "mood",
+              "palette",
+              "texture",
+              "fit",
+              "avoid"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false,
+        "description": "The authenticated account’s style preferences."
+      },
       "CreateGarmentUploadUrlInput": {
         "type": "object",
         "properties": {
@@ -24300,6 +24448,260 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/personalization/style-profile": {
+      "get": {
+        "tags": [
+          "personalization"
+        ],
+        "summary": "Get account style preferences",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account style preferences.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StyleProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access restricted.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "personalization"
+        ],
+        "summary": "Update the supplied account style preferences",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStyleProfileInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Account style preferences.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StyleProfileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid style preferences.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access restricted.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "personalization"
+        ],
+        "summary": "Clear account style preferences",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account style preferences.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StyleProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access restricted.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
                 }
               }
             }

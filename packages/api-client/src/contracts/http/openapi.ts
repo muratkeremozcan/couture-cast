@@ -23,6 +23,7 @@ import { registerUserContracts } from './user'
 import { registerWeatherContracts } from './weather'
 import { registerRitualContracts } from './ritual'
 import { registerComfortContracts } from './comfort'
+import { registerStyleProfileContracts } from './style-profile'
 import { registerWardrobeContracts } from './wardrobe'
 import { registerSavedLooksContracts } from './saved-looks'
 import { registerCommerceContracts } from './commerce'
@@ -82,6 +83,7 @@ export function createHttpOpenApiRegistry() {
   registerWeatherContracts(registry, commonSchemas)
   registerRitualContracts(registry, commonSchemas)
   registerComfortContracts(registry, commonSchemas)
+  registerStyleProfileContracts(registry, commonSchemas)
   registerWardrobeContracts(registry, commonSchemas)
   registerSavedLooksContracts(registry, commonSchemas)
   registerCommerceContracts(registry, commonSchemas)

@@ -1,5 +1,5 @@
 import { router } from 'expo-router'
-import { useEffect, useRef, useState, type ComponentRef } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react'
 import { StyleSheet, Text, View, type Pressable } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { SavedLookContract } from '@couture/api-client/contracts/http'
@@ -10,6 +10,7 @@ import {
   createIdempotencyKey,
   createMemberSampleOutfit,
   getGuestPreviewStrings,
+  getStyleProfileStrings,
   isOfflineError,
   memberSampleWardrobeChoices,
   popLookUndoSnapshot,
@@ -27,6 +28,7 @@ import {
   type SampleBookmark,
   type SampleGarmentCategory,
   type SampleOutfitResult,
+  type SampleWeatherKey,
 } from '@couture/utils'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { TodayOutfitPicture } from '@/components/home/today-outfit-picture'
@@ -63,7 +65,9 @@ import {
   PreviewSwapSheet,
   PreviewWardrobe,
 } from './guest-preview-parts'
+import { useMobileStyleProfile } from '@/src/lib/style-profile'
 import { SampleIdeaControls } from './sample-idea-controls'
+import { StyleDayControls, StyleMemberControls } from './style-profile-controls'
 
 function buildMobileSampleAttemptKey(
   owner: string,
@@ -156,25 +160,61 @@ export function HomePlannerLink() {
   )
 }
 
-export function MemberSampleOutfit({
-  owner,
-  error,
-  busy,
-  onRetry,
-  weatherAvailable = false,
-}: {
+type SampleProps = {
   owner: string | null
   error: 'no-location' | 'generic' | null
   busy: boolean
   onRetry: () => void
   weatherAvailable?: boolean
-}) {
+  sampleWeather?: SampleWeatherKey
+  preview?: boolean
+  showStyleControls?: boolean
+}
+
+export function MemberSampleOutfit(props: SampleProps) {
+  const style = useMobileStyleProfile()
+  return (
+    <View key={style.scope ?? props.owner} style={styles.member}>
+      <MemberSampleBody {...props} style={style} />
+      {props.showStyleControls !== false && style.scope && (
+        <View style={styles.styleControls}>
+          <StyleMemberControls style={style} />
+          <StyleDayControls style={style} />
+        </View>
+      )}
+    </View>
+  )
+}
+
+function MemberSampleBody({
+  owner,
+  error,
+  busy,
+  onRetry,
+  weatherAvailable = false,
+  sampleWeather,
+  preview = false,
+  style,
+}: SampleProps & { style: ReturnType<typeof useMobileStyleProfile> }) {
   const { t, i18n } = useTranslation()
   const statusBar = useStatusBar()
   const locale = i18n.language
   const strings = getGuestPreviewStrings(locale)
   const palette = useHeroPalette()
-  const [result, setResult] = useState(createMemberSampleOutfit)
+  const { profile, day } = style
+  const base = useMemo(
+    () => createMemberSampleOutfit(sampleWeather, { profile, day }),
+    [sampleWeather, profile, day]
+  )
+  const { weather, preferences, avoid } = base.input
+  const selection = JSON.stringify([weather, preferences, avoid])
+  const [sample, setSample] = useState({ selection, result: base })
+  const result = sample.selection === selection ? sample.result : base
+  useEffect(() => {
+    setSample((current) =>
+      current.selection === selection ? current : { selection, result: base }
+    )
+  }, [selection, base])
   const [editorOpen, setEditorOpen] = useState(false)
   const [category, setCategory] = useState<SampleGarmentCategory | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -211,7 +251,10 @@ export function MemberSampleOutfit({
     updater: SampleOutfitResult | ((current: SampleOutfitResult) => SampleOutfitResult)
   ) => {
     saveRunSeqRef.current += 1
-    setResult(updater)
+    setSample((current) => ({
+      selection,
+      result: typeof updater === 'function' ? updater(current.result) : updater,
+    }))
   }
   const readLiveOnline = () => getNetworkOnline()
   const isLiveSession = (actionOwner: string | null, actionEpoch: number) =>
@@ -314,7 +357,7 @@ export function MemberSampleOutfit({
     })
   }, [owner])
 
-  const bookmarks: (SampleBookmark & {
+  const bookmarks: (SampleBookmark<SampleWeatherKey> & {
     savedLookId?: string
     needsReview?: boolean
   })[] = []
@@ -393,29 +436,17 @@ export function MemberSampleOutfit({
         onReviewChoices={() => {
           lookUndoStackRef.current = []
           statusBar.dismissNotice()
-          updateResult(createMemberSampleOutfit())
+          updateResult(base)
         }}
         onResetChoices={() => {
           lookUndoStackRef.current = []
           statusBar.dismissNotice()
-          updateResult(createMemberSampleOutfit())
+          updateResult(base)
         }}
       />
       <SampleIdeaControls
         strings={strings}
         palette={palette}
-        preferences={result.input.preferences}
-        onPreferences={(preferences) => {
-          lookUndoStackRef.current = []
-          statusBar.dismissNotice()
-          updateResult((current) => updateMemberSampleOutfit(current, { preferences }))
-        }}
-        weather={result.input.weather}
-        onWeather={(weather) => {
-          lookUndoStackRef.current = []
-          statusBar.dismissNotice()
-          updateResult((current) => updateMemberSampleOutfit(current, { weather }))
-        }}
         bookmarks={bookmarks}
         needsReviewLabel={t('savedLooks.needsReview')}
         lookId={owner && bookmarkStorage !== 'loading' ? lookId : undefined}
@@ -531,7 +562,7 @@ export function MemberSampleOutfit({
             router.push(savedLookRoute(savedLookId))
         }}
         onOpen={(bookmark) => {
-          const selected = bookmark as SampleBookmark & {
+          const selected = bookmark as SampleBookmark<SampleWeatherKey> & {
             savedLookId?: string
             needsReview?: boolean
           }
@@ -704,7 +735,7 @@ export function MemberSampleOutfit({
       ]}
     >
       <Text testID="member-sample-label" style={{ color: palette.inkMuted }}>
-        {t('home.today.sampleLook')}
+        {preview ? getStyleProfileStrings(locale).preview : t('home.today.sampleLook')}
       </Text>
       <Text
         accessibilityRole="header"
@@ -804,6 +835,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
   },
+  member: { gap: 12 },
+  styleControls: { marginHorizontal: TAB_BODY_INSET, gap: 12 },
   sampleTitle: { fontSize: 20, fontWeight: '700' },
   plan: { marginHorizontal: TAB_BODY_INSET },
 })

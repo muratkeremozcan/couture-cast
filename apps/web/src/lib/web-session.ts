@@ -47,6 +47,7 @@ const WEB_BEARER_MIN_REMAINING_MS = 5_000
  */
 export const WEB_SESSION_PRINCIPAL_STORAGE_KEY = 'couturecast.access-principal'
 export const webSessionIdentity = () => member
+export const webSessionVerifiedBearer = () => acceptedToken
 /** Calls `listener` after every identity publication; returns the unsubscribe. */
 export function onWebSessionIdentity(listener: () => void): () => void {
   window.addEventListener('couture:session', listener)

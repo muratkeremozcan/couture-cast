@@ -9,6 +9,7 @@ import {
   communitySpotlightResponseSchema,
   publishCommunityPostResponseSchema,
   reportCommunityPostResponseSchema,
+  styleProfileResponseSchema,
   withdrawCommunityPostResponseSchema,
   type CommunityFeedItem,
 } from '@couture/api-client/contracts/http'
@@ -43,6 +44,13 @@ export const mockCommunityFeedItem: CommunityFeedItem = {
 }
 
 export const handlers = [
+  http.get('*/api/v1/personalization/style-profile', () =>
+    HttpResponse.json(
+      styleProfileResponseSchema.parse({
+        data: { mood: null, palette: null, texture: null, fit: null, avoid: [] },
+      })
+    )
+  ),
   http.get('*/api/v1/community/posts/:postId/comments', () =>
     communityJson(communityCommentsResponseSchema, {
       data: { items: [], nextCursor: null, snapshot: 0, hasNewer: false },

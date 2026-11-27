@@ -9,6 +9,7 @@ import {
   communityReactionSpotlightResponseSchema,
   publishCommunityPostResponseSchema,
   reportCommunityPostResponseSchema,
+  styleProfileResponseSchema,
   withdrawCommunityPostResponseSchema,
   type CommunityFeedItem,
 } from '@couture/api-client/contracts/http'
@@ -365,6 +366,13 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
 }
 
 export const handlers = [
+  http.get('*/api/v1/personalization/style-profile', () =>
+    HttpResponse.json(
+      styleProfileResponseSchema.parse({
+        data: { mood: null, palette: null, texture: null, fit: null, avoid: [] },
+      })
+    )
+  ),
   // Story 6.6: by default the viewer has no spotlight cohort, so every screen
   // suite renders the compact empty module unless a test serves its own page.
   http.get('*/api/v1/community/spotlight', () =>

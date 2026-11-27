@@ -8,6 +8,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useWebStyleProfile } from '../../lib/style-profile'
+import { StyleDayControls } from './style-profile-controls'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Suspense,
@@ -582,7 +584,9 @@ function SavedPanel({
 
 function IdeasPanel({ showEmptyLine }: { showEmptyLine: boolean }) {
   const { t } = useTranslation('translation', { useSuspense: false })
-  const ideas = useMemo(() => looksIdeas(), [])
+  const style = useWebStyleProfile()
+  const { profile, day } = style
+  const ideas = useMemo(() => looksIdeas({ profile, day }), [profile, day])
   return (
     <div data-testid="looks-first-content">
       {showEmptyLine && (
@@ -590,6 +594,7 @@ function IdeasPanel({ showEmptyLine }: { showEmptyLine: boolean }) {
           {t('looks.empty')}
         </p>
       )}
+      <StyleDayControls key={style.scope} style={style} />
       <LooksTileGrid testId="looks-ideas-grid">
         {ideas.map((idea) => (
           <li key={idea.look.id}>

@@ -5,6 +5,8 @@
 import { router, type Href } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { ScrollView, StyleSheet, View } from 'react-native'
+import { StyleMemberControls } from '@/src/features/preview/style-profile-controls'
+import { useMobileStyleProfile } from '@/src/lib/style-profile'
 import { NavRow } from '@/src/components/nav-row'
 import { TAB_BODY_INSET, useTokens } from '@/src/theme/tokens'
 
@@ -29,12 +31,14 @@ const STYLE_ROWS: readonly { testID: string; labelKey: string; href: Href }[] = 
 export function StyleSettingsScreen() {
   const { t } = useTranslation()
   const { colors, space } = useTokens()
+  const style = useMobileStyleProfile()
   return (
     <ScrollView
       testID="settings-style-screen"
       style={{ backgroundColor: colors.page }}
       contentContainerStyle={[styles.content, { paddingVertical: space[4] }]}
     >
+      <StyleMemberControls key={style.scope} style={style} showClear />
       <View style={[styles.rows, { borderTopColor: colors.line }]}>
         {STYLE_ROWS.map((row) => (
           <NavRow
@@ -50,6 +54,6 @@ export function StyleSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: TAB_BODY_INSET },
+  content: { paddingHorizontal: TAB_BODY_INSET, gap: 16 },
   rows: { borderTopWidth: StyleSheet.hairlineWidth },
 })

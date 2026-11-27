@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Learning path Step 77: Account style profile.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-77-account-style-profile
 // Story CC-7.12 test owner (TEA): D7, View on the Home sample save confirmation opens the saved
 // look's detail, for a new save and for a save that confirmed an existing look (Codex 7.12 #1).
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
@@ -313,17 +315,25 @@ it('saves and reopens Home sample looks even when browser localStorage is blocke
     const saved = await screen.findByRole('region', { name: 'Saved on this device' })
     expect(store.items).toHaveLength(1)
 
-    const weather = screen.getByRole('combobox', { name: 'Sample weather' })
-    await user.selectOptions(weather, 'cool-windy')
-    await user.click(screen.getByText('Pick your style (optional)'))
-    await user.selectOptions(screen.getByRole('combobox', { name: /^Style$/ }), 'cozy')
+    await user.click(screen.getByTestId('style-day-open'))
+    await user.click(screen.getByTestId('style-day-temperature-cool'))
+    await user.click(screen.getByTestId('style-day-mood-cozy'))
+    expect(screen.getByTestId('guest-preview-weather-chip')).toHaveTextContent(
+      'Cool and windy'
+    )
     await user.click(screen.getByRole('button', { name: 'Try another look' }))
     await user.click(screen.getByRole('button', { name: 'Save example look' }))
     await waitFor(() => expect(within(saved).getAllByRole('button')).toHaveLength(4))
 
     await user.click(within(saved).getByRole('button', { name: 'School day' }))
     expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent('School day')
-    expect(weather).toHaveValue('mild-dry')
+    expect(screen.getByTestId('guest-preview-weather-chip')).toHaveTextContent(
+      'Mild and dry'
+    )
+    expect(screen.getByTestId('style-day-temperature-cool')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
     await user.click(within(saved).getByRole('button', { name: 'Remove School day' }))
     await waitFor(() => expect(within(saved).getAllByRole('button')).toHaveLength(2))
   } finally {

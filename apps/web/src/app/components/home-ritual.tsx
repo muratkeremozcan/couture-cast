@@ -2,7 +2,15 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   type RitualResponse,
@@ -17,6 +25,8 @@ import {
   createIdempotencyKey,
   createMemberSampleOutfit,
   getGuestPreviewStrings,
+  getStyleProfileStrings,
+  shouldShowStyleSample,
   isOfflineError,
   memberSampleWardrobeChoices,
   popLookUndoSnapshot,
@@ -28,6 +38,7 @@ import {
   savedLookMatchesHomeSample,
   savedLookToSampleBookmark,
   swapMemberSampleGarment,
+  styleForecastSampleWeather,
   todayCatalogSlot,
   undoMemberSampleSwaps,
   updateMemberSampleOutfit,
@@ -35,6 +46,7 @@ import {
   type SampleGarmentCategory,
   type SampleBookmark,
   type SampleOutfitResult,
+  type SampleWeatherKey,
   type StatusBarNoticeInput,
 } from '@couture/utils'
 import { savedLookHref } from './looks/looks-address'
@@ -56,12 +68,15 @@ import {
 import {
   currentWebSessionBearer,
   currentWebSessionScope,
+  currentWebStyleScope,
   isLiveOwner,
   isLiveScope,
   MemberScope,
-  useWebSessionScope,
+  useWebStyleScope,
   type MemberSession,
 } from '../../lib/use-web-session'
+import { useWebStyleProfile } from '../../lib/style-profile'
+import { StyleDayControls, StyleMemberControls } from './style-profile-controls'
 import { HomeCloset, useHomeWardrobe } from './home-closet'
 import { GuestPreviewOutfit } from './guest-preview/guest-preview-outfit'
 import { GuestPreviewSwapDialog } from './guest-preview/guest-preview-swap-dialog'
@@ -89,10 +104,18 @@ const todayCardClass =
 const weatherLineClass =
   'flex min-h-11 flex-wrap items-center gap-x-3 px-1 text-sm text-ink-soft'
 
-let retainedSample: { owner: string; result: SampleOutfitResult } | undefined
+let retainedSample:
+  | {
+      scope: string
+      selection: string
+      profile: ReturnType<typeof useWebStyleProfile>['profile']
+      result: SampleOutfitResult
+    }
+  | undefined
 
-function resetSampleForOwner(owner: string | null) {
-  if (retainedSample?.owner !== owner) retainedSample = undefined
+function sampleSelectionKey(result: SampleOutfitResult) {
+  const { weather, preferences, avoid } = result.input
+  return JSON.stringify([weather, preferences, avoid])
 }
 
 function buildHomeSampleAttemptKey(
@@ -165,12 +188,17 @@ async function createWebSavedLookWithKey(
   }
 }
 
-function SampleOutfit(props: {
+type SampleOutfitProps = {
   owner: string
   locale: string
   strings: GuestPreviewStrings
   actions: ReactNode
-}) {
+  style: ReturnType<typeof useWebStyleProfile>
+  sampleWeather: SampleWeatherKey
+  preview: boolean
+}
+
+function SampleOutfit(props: SampleOutfitProps) {
   const { hasProvider } = useStatusBar()
   if (hasProvider) return <SampleOutfitInner {...props} />
   return (
@@ -185,18 +213,35 @@ function SampleOutfitInner({
   locale,
   strings,
   actions,
-}: {
-  owner: string
-  locale: string
-  strings: GuestPreviewStrings
-  actions: ReactNode
-}) {
+  style,
+  sampleWeather,
+  preview,
+}: SampleOutfitProps) {
   const { t } = useTranslation(undefined, { i18n: getI18n() })
   const router = useRouter()
   const statusBar = useStatusBar()
-  const [result, setResult] = useState(() =>
-    retainedSample?.owner === owner ? retainedSample.result : createMemberSampleOutfit()
+  const { profile, day, scope } = style
+  const base = useMemo(
+    () => createMemberSampleOutfit(sampleWeather, { profile, day }),
+    [sampleWeather, profile, day]
   )
+  const selection = sampleSelectionKey(base)
+  const [sample, setSample] = useState(() =>
+    scope &&
+    retainedSample?.scope === scope &&
+    retainedSample.profile === profile &&
+    retainedSample.selection === selection
+      ? retainedSample
+      : { selection, result: base }
+  )
+  const result = sample.selection === selection ? sample.result : base
+  const isSampleCurrent = useCallback(
+    () => scope !== null && currentWebStyleScope() === scope && isLiveOwner(owner),
+    [owner, scope]
+  )
+  if (sample.selection !== selection) {
+    setSample({ selection, result: base })
+  }
   const [category, setCategory] = useState<SampleGarmentCategory | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const pickerOpener = useRef<HTMLButtonElement>(null)
@@ -231,7 +276,7 @@ function SampleOutfitInner({
   }
 
   const showScopedNotice = (input: StatusBarNoticeInput) => {
-    if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+    if (!bookmarkOwnerMounted.current || !isSampleCurrent()) return
     const shown = statusBarRef.current.showNotice(input)
     ownedNoticeIdsRef.current.add(shown.id)
   }
@@ -250,7 +295,7 @@ function SampleOutfitInner({
         if (
           controller.signal.aborted ||
           !bookmarkOwnerMounted.current ||
-          !isLiveOwner(owner)
+          !isSampleCurrent()
         )
           return
         const next =
@@ -278,7 +323,7 @@ function SampleOutfitInner({
       }
       ownedNotices.clear()
     }
-  }, [owner])
+  }, [isSampleCurrent, owner])
 
   useEffect(() => {
     if (!owner) return
@@ -292,7 +337,7 @@ function SampleOutfitInner({
         .then((items) => {
           if (
             !bookmarkOwnerMounted.current ||
-            !isLiveOwner(owner) ||
+            !isSampleCurrent() ||
             mutationVersionRef.current !== refreshVersion
           ) {
             return
@@ -310,9 +355,9 @@ function SampleOutfitInner({
         })
         .catch(() => undefined)
     })
-  }, [owner])
+  }, [isSampleCurrent, owner])
 
-  const bookmarks: (SampleBookmark & {
+  const bookmarks: (SampleBookmark<SampleWeatherKey> & {
     savedLookId?: string
     needsReview?: boolean
   })[] = []
@@ -327,13 +372,13 @@ function SampleOutfitInner({
   }
   const invoker = useRef<HTMLElement | null>(null)
   const update = (next: SampleOutfitResult) => {
-    if (!isLiveOwner(owner)) return
+    if (!isSampleCurrent()) return
     saveRunSeqRef.current += 1
-    retainedSample = { owner, result: next }
-    setResult(next)
+    if (scope) retainedSample = { scope, selection, profile, result: next }
+    setSample({ selection, result: next })
   }
   const pushUndoAndUpdate = (next: SampleOutfitResult, message: string, kind: string) => {
-    if (!isLiveOwner(owner) || next === result) return
+    if (!isSampleCurrent() || next === result) return
     lookUndoStackRef.current = pushLookUndoSnapshot(lookUndoStackRef.current, result)
     update(next)
     const seq = ++noticeSeqRef.current
@@ -348,10 +393,10 @@ function SampleOutfitInner({
           kind: 'undo',
           label: t('feedback.undo'),
           onPress: () => {
-            if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+            if (!bookmarkOwnerMounted.current || !isSampleCurrent()) return
             const { snapshot, rest } = popLookUndoSnapshot(lookUndoStackRef.current)
             lookUndoStackRef.current = rest
-            if (snapshot && isLiveOwner(owner)) {
+            if (snapshot && isSampleCurrent()) {
               update(snapshot)
               const undoSeq = ++noticeSeqRef.current
               showScopedNotice({
@@ -406,29 +451,17 @@ function SampleOutfitInner({
         onReviewChoices={() => {
           lookUndoStackRef.current = []
           dismissOwnedNotices()
-          update(createMemberSampleOutfit())
+          update(base)
         }}
         onResetChoices={() => {
           lookUndoStackRef.current = []
           dismissOwnedNotices()
-          update(createMemberSampleOutfit())
+          update(base)
         }}
       />
       <SampleIdeaControls
         nested
         strings={strings}
-        preferences={result.input.preferences}
-        onPreferences={(preferences) => {
-          lookUndoStackRef.current = []
-          dismissOwnedNotices()
-          update(updateMemberSampleOutfit(result, { preferences }))
-        }}
-        weather={result.input.weather}
-        onWeather={(weather) => {
-          lookUndoStackRef.current = []
-          dismissOwnedNotices()
-          update(updateMemberSampleOutfit(result, { weather }))
-        }}
         bookmarks={bookmarks}
         needsReviewLabel={t('savedLooks.needsReview')}
         persistent={bookmarksPersistent}
@@ -438,8 +471,7 @@ function SampleOutfitInner({
         requiresNetwork
         saveResetKey={`${owner}:${lookId ?? 'none'}:${garmentsSignature}:${result.input.weather}:${result.input.collection}:${JSON.stringify(result.input.preferences)}:${bookmarkRevision}`}
         onSave={async () => {
-          if (!lookId || !bookmarkOwnerMounted.current || !isLiveOwner(owner))
-            return false
+          if (!lookId || !bookmarkOwnerMounted.current || !isSampleCurrent()) return false
           const saveSeq = ++saveRunSeqRef.current
           lookUndoStackRef.current = []
           const payload = buildHomeSampleSavedLookInput(result)
@@ -464,7 +496,7 @@ function SampleOutfitInner({
                 setSavedLooks(refreshed)
               }
             )
-            if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
+            if (!bookmarkOwnerMounted.current || !isSampleCurrent()) return false
             if (verified) {
               if (saveRunSeqRef.current === saveSeq) {
                 lastCreatedRef.current = null
@@ -493,7 +525,7 @@ function SampleOutfitInner({
             saveAttemptKeysRef.current,
             actionToken
           )
-          if (!created || !bookmarkOwnerMounted.current || !isLiveOwner(owner)) {
+          if (!created || !bookmarkOwnerMounted.current || !isSampleCurrent()) {
             return false
           }
           deletedIdsRef.current.delete(created.id)
@@ -514,7 +546,7 @@ function SampleOutfitInner({
         }}
         onUndoSave={async () => {
           const created = lastCreatedRef.current
-          if (!created || !bookmarkOwnerMounted.current || !isLiveOwner(owner))
+          if (!created || !bookmarkOwnerMounted.current || !isSampleCurrent())
             return false
           const actionToken = currentWebSessionBearer() ?? undefined
           try {
@@ -528,7 +560,7 @@ function SampleOutfitInner({
               throw error
             }
           }
-          if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
+          if (!bookmarkOwnerMounted.current || !isSampleCurrent()) return false
           deletedIdsRef.current.add(created.id)
           mutationVersionRef.current += 1
           lastCreatedRef.current = null
@@ -545,7 +577,7 @@ function SampleOutfitInner({
           if (id) router.push(savedLookHref(id))
         }}
         onOpen={(bookmark) => {
-          const selected = bookmark as SampleBookmark & {
+          const selected = bookmark as SampleBookmark<SampleWeatherKey> & {
             savedLookId?: string
             needsReview?: boolean
           }
@@ -576,7 +608,7 @@ function SampleOutfitInner({
             error: unknown,
             retry?: () => void
           ) => {
-            if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+            if (!bookmarkOwnerMounted.current || !isSampleCurrent()) return
             const failSeq = ++noticeSeqRef.current
             const offline = isOfflineError(error) || !readLiveOnline()
             showScopedNotice({
@@ -601,7 +633,7 @@ function SampleOutfitInner({
             })
           }
           const runRemove = async () => {
-            if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+            if (!bookmarkOwnerMounted.current || !isSampleCurrent()) return
             const actionToken = currentWebSessionBearer() ?? undefined
             if (!readLiveOnline()) {
               handleRemoveError('remove', new TypeError('Failed to fetch'))
@@ -629,7 +661,7 @@ function SampleOutfitInner({
                 return
               }
             }
-            if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+            if (!bookmarkOwnerMounted.current || !isSampleCurrent()) return
             deletedIdsRef.current.add(target.id)
             mutationVersionRef.current += 1
             const next = savedLooksRef.current.filter((item) => item.id !== target.id)
@@ -654,7 +686,7 @@ function SampleOutfitInner({
                         if (
                           undoInFlight ||
                           !bookmarkOwnerMounted.current ||
-                          !isLiveOwner(owner)
+                          !isSampleCurrent()
                         ) {
                           return
                         }
@@ -670,7 +702,7 @@ function SampleOutfitInner({
                           const restored = await restoreSavedLookFromWeb(target.id, {
                             accessToken: actionToken,
                           })
-                          if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+                          if (!bookmarkOwnerMounted.current || !isSampleCurrent()) return
                           deletedIdsRef.current.delete(restored.id)
                           mutationVersionRef.current += 1
                           const restoredList = [
@@ -761,7 +793,7 @@ function SampleOutfitInner({
   return (
     <div data-testid="member-sample-outfit" className="space-y-3 text-ink">
       <p data-testid="member-sample-label" className="text-sm font-medium text-ink-soft">
-        {t('home.today.sampleLook')}
+        {preview ? getStyleProfileStrings(locale).preview : t('home.today.sampleLook')}
       </p>
       <h2 className="text-xl font-semibold">
         {result.look
@@ -889,6 +921,7 @@ function MemberRitual({
   const locale = i18n.language
   const strings = getGuestPreviewStrings(locale)
   const screen = useScreenGateScreen()
+  const style = useWebStyleProfile()
   const [start] = useState(() => {
     const scope = currentWebSessionScope()
     return {
@@ -1034,12 +1067,98 @@ function MemberRitual({
   const liveOutfit = ritual?.outfits.some(usableOutfit) ? ritual : null
   return (
     <>
-      {settled && <TodayWeather ritual={ritual} city={city} locale={locale} />}
+      {settled && (
+        <>
+          <TodayWeather ritual={ritual} city={city} locale={locale} />
+          <MemberRitualOutfit
+            ritual={ritual}
+            liveOutfit={liveOutfit}
+            style={style}
+            strings={strings}
+            locale={locale}
+            owner={owner}
+            scope={start.scope}
+            wardrobe={wardrobe}
+            readAt={readAt}
+            scenario={scenario}
+            failure={failure}
+            retry={retry}
+          />
+        </>
+      )}
+      {liveOutfit && failure === 'failed' && (
+        <div
+          data-testid="home-outfit-refresh-failed"
+          className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-page px-3 text-sm"
+        >
+          <p role="status">{t('commerce.premium.planner.freshness.stale')}</p>
+          {retry}
+        </div>
+      )}
+      {ritual?.weather.alerts.map((alert) => (
+        <details
+          key={alert.start + alert.event}
+          className="rounded-lg border border-notice-line bg-notice-surface p-2 text-notice-ink"
+        >
+          <summary className="cursor-pointer font-semibold">{alert.event}</summary>
+          <p className="mt-2 text-sm">{alert.description}</p>
+        </details>
+      ))}
+      {settled && (
+        <div className="space-y-3">
+          <StyleMemberControls key={style.scope} style={style} />
+          <StyleDayControls key={`day:${style.scope}`} style={style} />
+        </div>
+      )}
+      <HomeCloset pieces={pieces} />
+      <Link
+        href="/looks?segment=plan"
+        data-testid="home-plan-week"
+        className="flex min-h-touch items-center justify-between gap-2 border-b border-line py-3 text-sm font-semibold"
+      >
+        {t('home.today.planWeek')}
+        <span aria-hidden="true">›</span>
+      </Link>
+    </>
+  )
+}
+
+function MemberRitualOutfit({
+  ritual,
+  liveOutfit,
+  style,
+  strings,
+  locale,
+  owner,
+  scope,
+  wardrobe,
+  readAt,
+  scenario,
+  failure,
+  retry,
+}: {
+  ritual: LiveRitual | null
+  liveOutfit: LiveRitual | null
+  style: ReturnType<typeof useWebStyleProfile>
+  strings: GuestPreviewStrings
+  locale: string
+  owner: string
+  scope: string | null
+  wardrobe: ReturnType<typeof useHomeWardrobe>['wardrobe']
+  readAt: number
+  scenario?: ScenarioName
+  failure: RitualFailure | null
+  retry: ReactNode
+}) {
+  const preview = Boolean(liveOutfit && style.day)
+  const showSample = shouldShowStyleSample(liveOutfit?.outfits, style)
+  return (
+    <>
       {liveOutfit && (
         <section
-          data-testid="today-first-content"
+          data-testid={showSample ? undefined : 'today-first-content'}
           data-surface="card"
-          className={todayCardClass}
+          className={showSample ? 'hidden' : todayCardClass}
         >
           <TodayLiveOutfit
             ritual={liveOutfit}
@@ -1047,12 +1166,12 @@ function MemberRitual({
             initialScenario={scenario}
             stale={failure === 'failed'}
             owner={owner}
-            scope={start.scope}
+            scope={scope}
             wardrobe={wardrobe}
           />
         </section>
       )}
-      {settled && !liveOutfit && (
+      {showSample && (
         <section
           data-testid="today-first-content"
           data-surface="card"
@@ -1062,6 +1181,9 @@ function MemberRitual({
             owner={owner}
             locale={locale}
             strings={strings}
+            style={style}
+            sampleWeather={styleForecastSampleWeather(ritual?.weather.current)}
+            preview={preview}
             actions={
               ritual ? null : (
                 <SetCityAction
@@ -1074,33 +1196,6 @@ function MemberRitual({
           />
         </section>
       )}
-      {liveOutfit && failure === 'failed' && (
-        <div
-          data-testid="home-outfit-refresh-failed"
-          className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-page px-3 text-sm"
-        >
-          <p role="status">{t('commerce.premium.planner.freshness.stale')}</p>
-          {retry}
-        </div>
-      )}
-      {liveOutfit?.weather.alerts.map((alert) => (
-        <details
-          key={alert.start + alert.event}
-          className="rounded-lg border border-notice-line bg-notice-surface p-2 text-notice-ink"
-        >
-          <summary className="cursor-pointer font-semibold">{alert.event}</summary>
-          <p className="mt-2 text-sm">{alert.description}</p>
-        </details>
-      ))}
-      <HomeCloset pieces={pieces} />
-      <Link
-        href="/looks?segment=plan"
-        data-testid="home-plan-week"
-        className="flex min-h-touch items-center justify-between gap-2 border-b border-line py-3 text-sm font-semibold"
-      >
-        {t('home.today.planWeek')}
-        <span aria-hidden="true">›</span>
-      </Link>
     </>
   )
 }
@@ -1123,14 +1218,13 @@ function HomeRitualSession({
    * for a verified member, owner and bearer for a fixture), the switch drops A's outfit in the
    * same render, before B's reads land; a verified member's token refresh keeps the scope.
    */
-  const scope = useWebSessionScope()
+  const scope = useWebStyleScope()
   // A bearer switch the bridge did not announce is found by the ritual read: it asks for a
   // render here, which reads the new scope and remounts the section under it.
   const [, rereadScope] = useReducer((tick: number) => tick + 1, 0)
   useEffect(() => {
-    if (session.status === 'signed_in' || session.status === 'signed_out')
-      resetSampleForOwner(session.owner)
-  }, [session.owner, session.status])
+    if (retainedSample?.scope !== scope) retainedSample = undefined
+  }, [scope])
 
   if (session.status === 'signed_out') return <DemoOutfit demo={demo} />
   if (session.owner && isLiveOwner(session.owner))

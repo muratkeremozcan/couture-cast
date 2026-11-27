@@ -46,6 +46,7 @@ import { GuestPreviewOutfit } from './guest-preview-outfit'
 import { GuestPreviewSwapDialog } from './guest-preview-swap-dialog'
 import { GuestPreviewWardrobe } from './guest-preview-wardrobe'
 import { useGuestPreviewSnapshot } from './use-guest-preview'
+import { StyleMoodRow } from '../style-profile-controls'
 import { SampleIdeaControls } from './sample-idea-controls'
 
 function parseView(value: string | null): GuestPreviewView {
@@ -275,6 +276,19 @@ export function GuestPreview() {
                     update((current) => ({ ...current, votes: {} }))
                     guestPreviewAnalytics.interacted('votes_reset')
                   }}
+                />
+                <StyleMoodRow
+                  selected={state.preferences?.style}
+                  onSelect={(style) =>
+                    update((current) => ({
+                      ...current,
+                      preferences: {
+                        ...current.preferences,
+                        style: current.preferences?.style === style ? undefined : style,
+                      },
+                      selectedLookId: undefined,
+                    }))
+                  }
                 />
                 <SampleIdeaControls
                   strings={strings}

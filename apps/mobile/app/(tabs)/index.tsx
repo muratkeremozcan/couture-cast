@@ -76,6 +76,11 @@ import { HomeCloset, useHomeWardrobe } from '@/components/home/home-closet'
 import { HomeSpotlightTeaserSlot } from '@/components/home/home-spotlight-teaser'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { useMemberSessionState } from '@/src/lib/member-session'
+import { useMobileStyleProfile } from '@/src/lib/style-profile'
+import {
+  StyleDayControls,
+  StyleMemberControls,
+} from '@/src/features/preview/style-profile-controls'
 import { useStatusBar } from '@/components/save-feedback'
 import { SignedOutWelcome } from '@/src/features/preview/signed-out-welcome'
 import {
@@ -84,6 +89,8 @@ import {
 } from '@/src/features/preview/member-sample-outfit'
 import {
   getGuestPreviewStrings,
+  shouldShowStyleSample,
+  styleForecastSampleWeather,
   todayForecastPeriods,
   todayRitualAnchorDate,
 } from '@couture/utils'
@@ -249,6 +256,7 @@ export default function TabOneScreen() {
   // Story 6.16 D1: the ritual is a member request. A signed-out launch shows the
   // welcome card and sends nothing; an unverifiable session keeps its retry state.
   const [sessionState, retrySession] = useMemberSessionState()
+  const styleProfile = useMobileStyleProfile()
   const homeWardrobe = useHomeWardrobe(applicationUserId, sessionState === 'member')
   // Story 6.17 D3: a Google identity that left the finish step returns to it. On focus only,
   // so a screen pushed above Home is never hijacked (6.16 stacked-screen rule).
@@ -762,6 +770,15 @@ export default function TabOneScreen() {
 
   // The hero for the session on screen, in its own function to keep the screen's branching
   // readable. Story CC-7.7 D2: a member's slot stays empty until the ritual read settles.
+  const styleDayPreview = Boolean(liveLook && styleProfile.day)
+  const showSample = shouldShowStyleSample(ritual?.data.outfits, styleProfile)
+  const sampleWeather = styleForecastSampleWeather(weather?.current)
+  const liveStyleControls = liveLook && styleProfile.scope && (
+    <NativeView key={styleProfile.scope} style={styles.styleControls}>
+      <StyleMemberControls style={styleProfile} />
+      <StyleDayControls style={styleProfile} />
+    </NativeView>
+  )
   const renderHero = () =>
     sessionState === 'signed-out' ? (
       <NativeView testID="today-first-content">
@@ -807,56 +824,63 @@ export default function TabOneScreen() {
               />
             )}
             <NativeView testID="today-first-content">
-              {liveLook ? (
-                <TodayLiveOutfit
-                  key={identityEpoch}
-                  {...liveLook}
-                  owner={applicationUserId}
-                  epoch={identityEpoch}
-                  locale={activeLocale}
-                  wardrobe={homeWardrobe?.wardrobe ?? []}
-                  isCacheServed={isCacheServed}
-                  stale={isStale}
-                  periodPicker={
-                    showPeriods ? (
-                      <ScenarioToggles
-                        activeScenario={activeScenario}
-                        availableScenarios={availableScenarios}
-                        onScenarioChange={handleScenarioChange}
-                      />
-                    ) : null
-                  }
-                  onExport={(recommendationId, opener) => {
-                    if (
-                      openAndroidShareCard(
-                        { kind: 'outfit', recommendationId },
-                        'outfit',
-                        opener
-                      )
-                    )
-                      return
-                    shareCardInvoker.current = {
-                      node: opener,
-                      member: mobileApplicationUserId(),
+              {liveLook && (
+                <NativeView style={showSample ? styles.hidden : undefined}>
+                  <TodayLiveOutfit
+                    key={identityEpoch}
+                    {...liveLook}
+                    owner={applicationUserId}
+                    epoch={identityEpoch}
+                    locale={activeLocale}
+                    wardrobe={homeWardrobe?.wardrobe ?? []}
+                    isCacheServed={isCacheServed}
+                    stale={isStale}
+                    periodPicker={
+                      showPeriods ? (
+                        <ScenarioToggles
+                          activeScenario={activeScenario}
+                          availableScenarios={availableScenarios}
+                          onScenarioChange={handleScenarioChange}
+                        />
+                      ) : null
                     }
-                    setShareCardSource({ kind: 'outfit', recommendationId })
-                    setShareCardOpen(true)
-                    traceShareCardOpener('state-open')
-                  }}
-                />
-              ) : (
+                    onExport={(recommendationId, opener) => {
+                      if (
+                        openAndroidShareCard(
+                          { kind: 'outfit', recommendationId },
+                          'outfit',
+                          opener
+                        )
+                      )
+                        return
+                      shareCardInvoker.current = {
+                        node: opener,
+                        member: mobileApplicationUserId(),
+                      }
+                      setShareCardSource({ kind: 'outfit', recommendationId })
+                      setShareCardOpen(true)
+                      traceShareCardOpener('state-open')
+                    }}
+                  />
+                </NativeView>
+              )}
+              {showSample && (
                 <MemberSampleOutfit
-                  key={applicationUserId}
+                  key={identityEpoch}
                   owner={applicationUserId}
                   error={error}
                   busy={isLoading}
                   onRetry={handleRetry}
                   weatherAvailable={Boolean(weather)}
+                  sampleWeather={sampleWeather}
+                  preview={styleDayPreview}
+                  showStyleControls={!liveLook}
                 />
               )}
             </NativeView>
             <CachedWeatherNotice visible={isStale} />
             {weather && <WeatherAlertBanner alerts={weather.alerts} />}
+            {liveStyleControls}
           </>
         )}
         <HomeCloset pieces={homeWardrobe?.pieces} />
@@ -965,6 +989,8 @@ export default function TabOneScreen() {
 }
 
 const styles = StyleSheet.create({
+  hidden: { display: 'none' },
+  styleControls: { marginHorizontal: TAB_BODY_INSET, gap: 12 },
   // Colors follow the OS scheme at render time; this sheet keeps layout only.
   safeContainer: {
     flex: 1,

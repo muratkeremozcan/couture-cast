@@ -9,8 +9,10 @@ import {
 import {
   SAMPLE_WEATHER_KEYS,
   selectSampleOutfit,
+  type GuestSampleWeatherKey,
   type SampleOutfitResult,
   type SampleSelectionInput,
+  type SampleWeatherKey,
 } from './selector'
 
 const MAX_SAMPLE_BOOKMARKS = 8
@@ -35,7 +37,8 @@ const sampleBookmarkSchema = z
 export const sampleBookmarksSchema = z
   .array(sampleBookmarkSchema)
   .max(MAX_SAMPLE_BOOKMARKS)
-export type SampleBookmark = z.infer<typeof sampleBookmarkSchema>
+export type SampleBookmark<Weather extends SampleWeatherKey = GuestSampleWeatherKey> =
+  Omit<z.infer<typeof sampleBookmarkSchema>, 'weather'> & { weather: Weather }
 
 export function parseSampleBookmarks(
   raw: string | null,
@@ -90,8 +93,8 @@ export function saveSampleBookmark(
   ].slice(0, MAX_SAMPLE_BOOKMARKS)
 }
 
-export function openSampleBookmark(
-  bookmark: SampleBookmark,
+export function openSampleBookmark<Weather extends SampleWeatherKey>(
+  bookmark: SampleBookmark<Weather>,
   input: Pick<SampleSelectionInput, 'votes' | 'swaps'>
 ) {
   const { lookId, weather, collection, comfort, swaps } = bookmark

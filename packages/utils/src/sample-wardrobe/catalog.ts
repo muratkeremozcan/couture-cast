@@ -15,7 +15,7 @@ import type {
   SampleStylePreferences,
 } from './types'
 
-export const SAMPLE_CATALOG_VERSION = '2026-11-27.1'
+export const SAMPLE_CATALOG_VERSION = '2026-11-27.2'
 
 const PROVENANCE = {
   authored: 'couture-cast',
@@ -409,11 +409,13 @@ const ACCESSORIES: SampleGarment[] = [
 const LOOKS: SampleLook[] = [
   look('winter-knit', WOMENSWEAR, ['knit-dress', 'ankle-boots', 'wool-scarf'], true, {
     style: 'cozy',
+    fit: 'fitted',
     palette: 'colorful',
     texture: 'textured',
   }),
   look('city-wool', BOTH, ['merino-sweater', 'wool-trousers', 'leather-boots'], true, {
-    style: 'chic',
+    style: 'classic',
+    fit: 'fitted',
     palette: 'colorful',
     texture: 'textured',
   }),
@@ -422,25 +424,29 @@ const LOOKS: SampleLook[] = [
     MENSWEAR,
     ['flannel-shirt', 'dark-jeans', 'leather-boots', 'beanie'],
     true,
-    { style: 'active', palette: 'colorful', texture: 'textured' }
+    { style: 'active', fit: 'relaxed', palette: 'colorful', texture: 'textured' }
   ),
   look('soft-pleats', WOMENSWEAR, ['cable-knit', 'pleated-skirt', 'ankle-boots'], true, {
     style: 'cozy',
+    fit: 'relaxed',
     palette: 'neutral',
     texture: 'textured',
   }),
   look('office-oxford', BOTH, ['oxford-shirt', 'dark-jeans', 'loafers'], true, {
-    style: 'chic',
+    style: 'classic',
+    fit: 'fitted',
     palette: 'neutral',
     texture: 'smooth',
   }),
   look('silk-midi', WOMENSWEAR, ['silk-blouse', 'midi-skirt', 'white-sneakers'], true, {
     style: 'chic',
+    fit: 'relaxed',
     palette: 'colorful',
     texture: 'smooth',
   }),
   look('easy-chinos', MENSWEAR, ['oxford-shirt', 'chinos', 'white-sneakers'], true, {
     style: 'active',
+    fit: 'fitted',
     palette: 'neutral',
     texture: 'smooth',
   }),
@@ -449,15 +455,17 @@ const LOOKS: SampleLook[] = [
     BOTH,
     ['cotton-tee', 'linen-trousers', 'sandals', 'sunglasses'],
     true,
-    { style: 'active', palette: 'neutral', texture: 'textured' }
+    { style: 'active', fit: 'relaxed', palette: 'neutral', texture: 'textured' }
   ),
   look('sun-dress', WOMENSWEAR, ['sundress', 'sandals', 'canvas-tote'], true, {
     style: 'active',
+    fit: 'relaxed',
     palette: 'colorful',
     texture: 'smooth',
   }),
   look('wrap-day', WOMENSWEAR, ['wrap-dress', 'loafers', 'canvas-tote'], false, {
     style: 'chic',
+    fit: 'fitted',
     palette: 'colorful',
     texture: 'smooth',
   }),
@@ -466,28 +474,28 @@ const LOOKS: SampleLook[] = [
     MENSWEAR,
     ['polo-shirt', 'tailored-shorts', 'white-sneakers'],
     false,
-    { style: 'active', palette: 'colorful', texture: 'smooth' }
+    { style: 'active', fit: 'fitted', palette: 'colorful', texture: 'smooth' }
   ),
   look(
     'breezy-linen',
     MENSWEAR,
     ['linen-shirt', 'linen-trousers', 'loafers', 'canvas-tote'],
     false,
-    { style: 'cozy', palette: 'neutral', texture: 'textured' }
+    { style: 'classic', fit: 'relaxed', palette: 'neutral', texture: 'textured' }
   ),
   look(
     'mini-and-tights',
     WOMENSWEAR,
     ['ribbed-knit', 'mini-skirt', 'ankle-boots', 'opaque-tights'],
     false,
-    { style: 'cozy', palette: 'colorful', texture: 'textured' }
+    { style: 'cozy', fit: 'fitted', palette: 'colorful', texture: 'textured' }
   ),
   look(
     'weekend-layers',
     WOMENSWEAR,
     ['ribbed-knit', 'leggings', 'moto-boots', 'ribbed-socks'],
     false,
-    { style: 'cozy', palette: 'neutral', texture: 'textured' },
+    { style: 'cozy', fit: 'fitted', palette: 'neutral', texture: 'textured' },
     'moto-jacket'
   ),
   look(
@@ -495,16 +503,18 @@ const LOOKS: SampleLook[] = [
     WOMENSWEAR,
     ['merino-sweater', 'mini-skirt', 'knee-boots', 'opaque-tights'],
     false,
-    { style: 'chic', palette: 'colorful', texture: 'textured' },
+    { style: 'chic', fit: 'fitted', palette: 'colorful', texture: 'textured' },
     'lined-blazer'
   ),
   look('summer-skirt', WOMENSWEAR, ['camisole', 'maxi-skirt', 'sandals'], false, {
     style: 'chic',
+    fit: 'relaxed',
     palette: 'colorful',
     texture: 'smooth',
   }),
   look('sunny-weekend', BOTH, ['tank', 'linen-trousers', 'sandals'], false, {
     style: 'active',
+    fit: 'relaxed',
     palette: 'neutral',
     texture: 'smooth',
   }),
@@ -515,6 +525,7 @@ const LOOKS: SampleLook[] = [
     false,
     {
       style: 'active',
+      fit: 'fitted',
       palette: 'colorful',
       texture: 'smooth',
     }

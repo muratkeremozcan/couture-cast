@@ -16,6 +16,7 @@ import { RitualService, RITUAL_REDIS_CLIENT } from './ritual.service.js'
 import { RITUAL_CACHE_INVALIDATOR } from './ritual-cache.js'
 import { ComfortController } from './comfort.controller.js'
 import { ComfortService } from './comfort.service.js'
+import { StyleProfileController } from './style-profile.controller.js'
 import { PlannerController } from './planner.controller.js'
 import { PlannerService } from './planner.service.js'
 import Redis from 'ioredis'
@@ -36,7 +37,12 @@ import { getRedisConfig, redisOptionsFromConfig } from '../../config/redis.js'
     FeatureFlagsModule,
     TelemetryModule,
   ],
-  controllers: [RitualController, ComfortController, PlannerController],
+  controllers: [
+    RitualController,
+    ComfortController,
+    PlannerController,
+    StyleProfileController,
+  ],
   providers: [
     RitualService,
     RitualGarmentPhotoService,

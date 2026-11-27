@@ -127,9 +127,16 @@ test.use({
 })
 
 test.describe('CC-7.18 sample picker @local-lane', () => {
-  for (const { weather, label, from, to } of [
-    { weather: 'mild-dry', label: 'Mild and dry', from: pieces.tights, to: pieces.socks },
+  for (const { temperature, weather, label, from, to } of [
     {
+      temperature: 'mild',
+      weather: 'mild-dry',
+      label: 'Mild and dry',
+      from: pieces.tights,
+      to: pieces.socks,
+    },
+    {
+      temperature: 'cool',
       weather: 'cool-windy',
       label: 'Cool and windy',
       from: pieces.socks,
@@ -148,9 +155,12 @@ test.describe('CC-7.18 sample picker @local-lane', () => {
       const saved = stubSavedLook(interceptNetworkCall)
       await page.goto('/')
       await waitForShellSettled(page, router)
+      await page.getByTestId('style-day-open').click()
+      const choice = page.getByTestId(`style-day-temperature-${temperature}`)
+      await choice.click()
+      await expect(choice).toHaveAttribute('aria-pressed', 'true')
       const sample = page.getByTestId('member-sample-outfit')
       await sample.getByTestId('home-edit-sample').click()
-      await sample.getByRole('combobox', { name: 'Sample weather' }).selectOption(weather)
       const outfit = sample.getByTestId('guest-preview-outfit')
       await expect(outfit.getByTestId('guest-preview-weather-chip')).toHaveText(label)
 

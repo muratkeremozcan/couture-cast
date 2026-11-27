@@ -108,6 +108,7 @@ export async function cleanupUserTestData(userId: string | undefined): Promise<v
           },
         })
         await tx.comfortPreferences.deleteMany({ where: { user_id: userId } })
+        await tx.styleProfile.deleteMany({ where: { user_id: userId } })
         await tx.userProfile.deleteMany({ where: { user_id: userId } })
 
         await tx.$executeRawUnsafe('SAVEPOINT playwright_audit_cleanup')
