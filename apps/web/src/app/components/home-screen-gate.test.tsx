@@ -20,12 +20,13 @@
 // drops A's outfit and teaser in the first commit (7.7-E2E-009 swap-while-reading). CI pw-e2e on
 // b25999ca: 7.7-CMP-058 the chips stay hidden in place until the first feed answer (E2E-005).
 import type { RitualResponse, SavedLocation } from '@couture/api-client/contracts/http'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
 import { http, HttpResponse } from 'msw'
 import { useLayoutEffect } from 'react'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
+import * as webSession from '../../lib/web-session'
 import { currentWebSessionScope, useWebSessionScope } from '../../lib/use-web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { settle } from '../../test-utils/request-barrier'
@@ -549,7 +550,10 @@ describe('7.7 Home screen gate', () => {
     const { answer } = useServedSpotlight()
     const firstVisit = renderHomeGate()
     await answer(0, cityPage())
-    expect(await screen.findByText('morning fixture A')).toBeVisible()
+    const primary = await screen.findByTestId('today-primary-action')
+    await waitFor(() => expect(primary).toBeVisible())
+    fireEvent.click(primary)
+    expect(screen.getByText('morning fixture A')).toBeVisible()
     firstVisit.unmount()
 
     // Back on Home from A's snapshot: A's teaser refresh answers, A's ritual refresh is held.
@@ -575,6 +579,7 @@ describe('7.7 Home screen gate', () => {
     )
     await answer(1, cityPage())
     await waitFor(() => expect(ritualBearers).toHaveLength(2))
+    fireEvent.click(screen.getByTestId('today-primary-action'))
     expect(screen.getByText('morning fixture A')).toBeVisible()
     expect(screen.getByTestId('home-spotlight-teaser-link')).toBeVisible()
 
@@ -590,6 +595,16 @@ describe('7.7 Home screen gate', () => {
   })
 
   it('7.7-CMP-044 a pending account keeps both Today entry states out of view', () => {
+    const verification = Promise.withResolvers<string | undefined>()
+    const stored = vi.spyOn(webSession, 'hasStoredWebSession').mockReturnValue(true)
+    const resolve = vi
+      .spyOn(webSession, 'resolveWebSessionToken')
+      .mockReturnValue(verification.promise)
+    onTestFinished(() => {
+      stored.mockRestore()
+      resolve.mockRestore()
+      verification.resolve(undefined)
+    })
     document.documentElement.setAttribute('data-session', 'pending')
     render(<Home />)
     expect(screen.getByTestId('app-header')).toBeVisible()

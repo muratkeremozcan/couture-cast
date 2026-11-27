@@ -107,8 +107,9 @@ describe('TabOneScreen without a saved location', () => {
     await render(<TabOneScreen />)
 
     const sample = await screen.findByTestId('member-sample-outfit')
+    const retry = await within(sample).findByRole('button', { name: 'Try again' })
+    expect(retry).toHaveAttribute('data-testid', 'hero-retry')
     expect(within(sample).getByTestId('home-set-city')).toBeVisible()
-    expect(within(sample).getByTestId('hero-retry')).toHaveAccessibleName('Try again')
   })
 
   it('6.5-MOB-POLISH-06 defines the sample disclosure and city action in all 10 catalogs', () => {

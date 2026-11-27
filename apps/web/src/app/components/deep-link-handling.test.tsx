@@ -16,10 +16,16 @@ import { cityPage } from '../../test-utils/home-spotlight-teaser'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 
 const captureMock = vi.fn()
+const FIXTURE_BEARER = 'test-token-deep-link'
 
 function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, FIXTURE_BEARER)
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
 
 vi.mock('posthog-js', () => ({
   default: {
@@ -110,10 +116,11 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
         surface: 'web',
       })
     })
-    expect(authorizations).toEqual(['Bearer test-access-token'])
+    expect(authorizations).toEqual([`Bearer ${FIXTURE_BEARER}`])
   })
 
   it('3.7-UNIT-003: forwards a legacy Community notification to the Community tab', async () => {
+    signIn()
     const query = `?source=notification&type=community&cardId=${mockCommunityFeedItem.id}`
     setLocationSearch(query)
     render(<LookbookPrismLayout />)
@@ -217,7 +224,7 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
       expect(await screen.findByTestId('deep-link-info-banner')).toHaveTextContent(
         'This link is invalid, expired, or no longer available.'
       )
-      expect(authorizations).toEqual(['Bearer test-access-token'])
+      expect(authorizations).toEqual([`Bearer ${FIXTURE_BEARER}`])
       expect(screen.queryByTestId('lookbook-card-unavailable-look')).toBeNull()
       expect(router.replace).not.toHaveBeenCalled()
     }

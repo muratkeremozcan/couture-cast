@@ -5,7 +5,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 // Story 6.15 U-04: the SecureStore key names and options are pinned, so a rename across SDK steps
 // cannot sign members out after an in-place upgrade (R02).
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const store = vi.hoisted(() => {
   const values = new Map<string, string>()
@@ -26,6 +26,7 @@ const store = vi.hoisted(() => {
       return Promise.resolve()
     }),
     signOut: vi.fn(() => Promise.resolve({ error: null })),
+    keysAtSdkCreation: undefined as string[] | undefined,
     auth: undefined as undefined | Record<string, unknown>,
     storage: undefined as
       | undefined
@@ -71,6 +72,7 @@ vi.mock('@supabase/supabase-js', () => ({
       auth: Record<string, unknown> & { storage: NonNullable<typeof store.storage> }
     }
   ) => {
+    store.keysAtSdkCreation = [...store.values.keys()]
     store.auth = options.auth
     store.storage = options.auth.storage
     return { auth: { signOut: store.signOut } }
@@ -93,13 +95,25 @@ function session(size: number) {
   })
 }
 
-beforeEach(async () => {
-  store.values.clear()
-  vi.clearAllMocks()
+beforeAll(async () => {
+  store.values.set(KEY, 'chunked:v1:k3x9a1:2')
+  store.values.set(`${KEY}.k3x9a1.0`, '{"access_token":')
+  store.values.set(`${KEY}.k3x9a1.1`, '"synthetic"}')
+  store.values.set(`${KEY}-code-verifier`, 'synthetic-verifier')
+  store.values.set(`${KEY}-logout-pending`, '1')
   await nativeSupabase()
 })
 
+beforeEach(() => {
+  store.values.clear()
+  vi.clearAllMocks()
+})
+
 describe('native session storage', () => {
+  it('CC-7.13 clears interrupted logout credentials before the SDK can restore them', () => {
+    expect(store.keysAtSdkCreation).toEqual([])
+  })
+
   it('persists and restores a session larger than 2048 bytes without any value over the limit', async () => {
     const value = session(6000)
     expect(store.bytes(value)).toBeGreaterThan(2048)
@@ -244,6 +258,7 @@ describe('pinned SecureStore contract (U-04)', () => {
     expect(store.deleteItemAsync.mock.calls.map(([key]) => key)).toEqual([
       'couturecast.auth-session',
       'couturecast.auth-session-code-verifier',
+      'couturecast.auth-session-logout-pending',
     ])
     expect(store.values.size).toBe(0)
   })

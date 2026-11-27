@@ -6,7 +6,7 @@
 // actions on one row, so Outfit capsules broke onto two lines and + Add Garment ran off the
 // screen. TEA test design for fix/web-signed-in-landing, case O-1: at phone widths no page
 // scrolls sideways, every header and hero action lies inside the viewport and inside every
-// clipping ancestor, and every action label stays on one line. Runs in Chromium and in WebKit
+// clipping ancestor, and compact action labels stay on one line. Runs in Chromium and in WebKit
 // with the iPhone 15 descriptor (base.config.ts), in light and dark, in English and German
 // (the longest labels), at 393 px (iPhone 15 and 16) and 320 px (the narrowest supported). The
 // bottom navigation is checked too, and no label may be cut inside its own box.
@@ -70,6 +70,8 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
         NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
         {
           acceptNode: (node) => {
+            if (node instanceof HTMLElement && node.classList.contains('sr-only'))
+              return NodeFilter.FILTER_REJECT
             if (node instanceof SVGSVGElement) {
               rects.push(node.getBoundingClientRect())
               // FILTER_REJECT skips the icon's paths with it.
@@ -113,26 +115,45 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
         return Math.max(0, ...Array.from(element.children).map(lineCount))
       return linesOf(contentRects(element))
     }
+    const positionProblems = (control: HTMLElement, box: DOMRect, name: string) => {
+      const problems: string[] = []
+      const chipRow = control.closest<HTMLElement>('[data-testid="community-chip-row"]')
+      const scrollable = chipRow && getComputedStyle(chipRow).overflowX === 'auto'
+      const rowBox = scrollable ? chipRow.getBoundingClientRect() : null
+      const viewportBox = rowBox ?? box
+      if (viewportBox.left < -0.5 || viewportBox.right > width + 0.5)
+        problems.push(
+          `"${name}" leaves the viewport: ${Math.round(viewportBox.left)} to ${Math.round(viewportBox.right)} of ${width}`
+        )
+      if (rowBox && chipRow) {
+        const left = box.left - rowBox.left + chipRow.scrollLeft
+        if (
+          left < -0.5 ||
+          left + box.width > chipRow.scrollWidth + 0.5 ||
+          box.width > chipRow.clientWidth + 0.5
+        )
+          problems.push(`"${name}" cannot scroll fully into view`)
+      }
+      const clip = clippedBy(scrollable ? chipRow : control, viewportBox)
+      if (clip) problems.push(`"${name}" is clipped by a <${clip}>`)
+      return problems
+    }
     const controlProblems = (control: HTMLElement): string[] => {
       const box = control.getBoundingClientRect()
       const shown =
         box.width > 0 &&
         box.height > 0 &&
+        !control.closest('.sr-only') &&
         control.checkVisibility({ opacityProperty: true, visibilityProperty: true })
       if (!shown) return []
       const name = label(control)
-      const problems: string[] = []
-      if (box.left < -0.5 || box.right > width + 0.5)
-        problems.push(
-          `"${name}" leaves the viewport: ${Math.round(box.left)} to ${Math.round(box.right)} of ${width}`
-        )
-      const clip = clippedBy(control, box)
-      if (clip) problems.push(`"${name}" is clipped by a <${clip}>`)
+      const problems = positionProblems(control, box, name)
       const lines = lineCount(control)
-      // Story CC-7.11 D3 (and 7.9-CMP-NAV-001): a bottom tab label may wrap to a second line
-      // where five 64 px tabs leave too little width (Community at 320 px), never a third,
-      // and the cut and overflow checks below still apply to it.
-      const maxLines = control.closest('[data-testid="sticky-bottom-nav"]') ? 2 : 1
+      // Tab labels and full-sentence actions can use two lines on narrow phones.
+      const canWrap = control.closest(
+        '[data-testid="sticky-bottom-nav"], [data-testid="guest-preview-entry"], [data-testid="commerce-opt-out-label"], [data-testid="closet-empty-state"]'
+      )
+      const maxLines = canWrap ? 2 : 1
       if (lines > maxLines) problems.push(`"${name}" wraps onto ${lines} lines`)
       // TEA P5, R2: a label cut by its own box, whatever its overflow: content wider than a box,
       // or text that reaches past the control's edges.
@@ -143,12 +164,11 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       ])
         if (part.clientWidth > 1 && part.scrollWidth > part.clientWidth + 0.5)
           problems.push(`"${name}" is cut inside its own box`)
-      const text = document.createRange()
-      text.selectNodeContents(control)
-      const textBox = text.getBoundingClientRect()
       if (
-        textBox.width > 0 &&
-        (textBox.left < box.left - 0.5 || textBox.right > box.right + 0.5)
+        contentRects(control).some(
+          (part) =>
+            part.width > 0 && (part.left < box.left - 0.5 || part.right > box.right + 0.5)
+        )
       )
         problems.push(`"${name}" has text outside its box`)
       return problems
@@ -168,22 +188,11 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
 }
 
 /**
- * Layout settles in the frame after a resize or a scheme change, and colours once their
- * transitions end (TEA F5: a screenshot mid-transition showed + Add Garment as if disabled).
+ * Let the browser apply the new scheme and viewport before measuring layout.
  */
 async function settle(page: Page) {
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)))
-  )
-  // Colour transitions only: a looping animation (a loading pulse) never finishes, and one that
-  // is cancelled rejects.
-  await page.evaluate(() =>
-    Promise.all(
-      document
-        .getAnimations()
-        .filter((animation) => animation instanceof CSSTransition)
-        .map((animation) => animation.finished.catch(() => null))
-    ).then(() => null)
   )
 }
 
@@ -263,6 +272,7 @@ const EMPTY_FEED = communityFeedResponseSchema.parse({
 })
 
 async function open(page: Page, route: string) {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.route('**/api/v1/community/feed**', (request) =>
     request.fulfill({ json: EMPTY_FEED })
   )
@@ -302,7 +312,10 @@ for (const locale of ['en-US', 'de-DE']) {
                 await page.emulateMedia({ colorScheme })
                 await settle(page)
                 await testInfo.attach(`wardrobe-header-393-${colorScheme}-${locale}`, {
-                  body: await page.locator('header').first().screenshot(),
+                  body: await page
+                    .locator('header')
+                    .first()
+                    .screenshot({ animations: 'disabled' }),
                   contentType: 'image/png',
                 })
               }

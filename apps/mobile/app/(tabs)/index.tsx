@@ -1493,12 +1493,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   todayTitle: { fontSize: 20, fontWeight: '700' },
-  todayGarments: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  todayGarments: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   todayGarment: {
     flexShrink: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 8,
     fontSize: 14,
   },
   staleBanner: {

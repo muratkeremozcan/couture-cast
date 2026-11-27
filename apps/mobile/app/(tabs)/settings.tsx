@@ -728,6 +728,7 @@ function ProfileSignOut() {
         testID="profile-sign-out"
         accessibilityRole="button"
         accessibilityState={{ busy: pending, disabled: pending }}
+        aria-busy={pending}
         disabled={pending}
         style={[styles.actionButton, tone.actionButton]}
         onPress={() => void signOut()}

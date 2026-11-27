@@ -580,6 +580,7 @@ it('shows the city and garment entry links beside an editable sample when the me
   const user = userEvent.setup()
   const reads = vi.fn()
   useMswHandlers(
+    http.get('/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [] })),
     http.get('/api/v1/ritual', ({ request }) => {
       reads(request.headers.get('authorization'))
       return missingCity()
@@ -693,6 +694,7 @@ it('retries a failed recommendation, shows the verified city, and keeps the chos
 it('shows the starter wardrobe entry even when saved-city lookup fails', async () => {
   const reads = vi.fn()
   useMswHandlers(
+    http.get('/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [] })),
     http.get('/api/v1/ritual', () => HttpResponse.json(ritual(true))),
     http.get('/api/v1/locations', ({ request }) => {
       reads(request.headers.get('authorization'))

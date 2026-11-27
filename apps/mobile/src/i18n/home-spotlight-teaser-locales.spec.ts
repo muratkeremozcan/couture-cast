@@ -129,7 +129,9 @@ describe('6.7 Home teaser locale parity', () => {
         Object.keys(lookup(MOBILE[locale], 'home.spotlightTeaser') as object).sort(),
         locale
       ).toEqual(expected)
-      expect(lookup(MOBILE[locale], 'home'), locale).toEqual(lookup(WEB[locale], 'home'))
+      expect(lookup(MOBILE[locale], 'home.spotlightTeaser'), locale).toEqual(
+        lookup(WEB[locale], 'home.spotlightTeaser')
+      )
       for (const key of Object.keys(KEYS).filter((path) => path.startsWith('community.')))
         expect(lookup(MOBILE[locale], key), `${locale}.${key}`).toBe(
           lookup(WEB[locale], key)

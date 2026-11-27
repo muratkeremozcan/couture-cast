@@ -174,13 +174,11 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
     server.use(http.get('*/api/v1/ritual', () => new HttpResponse(null, { status: 500 })))
 
     await renderScreen()
-    await waitFor(() => {
-      expect(screen.getByTestId('hero-retry')).toBeTruthy()
-    })
+    const retry = await screen.findByRole('button', { name: 'Try again' })
 
     server.use(countingRitualHandler())
     const retriedAt = Date.now() - 1
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    fireEvent.click(retry)
 
     await waitFor(() => {
       expect(screen.getByTestId('weather-header')).toBeTruthy()
@@ -260,7 +258,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
       expect(screen.getByTestId('garment-tile-classic-trench-coat')).toHaveFocus()
     })
     // Cancelling must not mutate the outfit.
-    expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+    expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
     expect(mockCapture).not.toHaveBeenCalledWith(
       'hero_interaction',
       expect.objectContaining({ interactionType: 'garment_swap' })

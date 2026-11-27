@@ -13,6 +13,7 @@ import { http, HttpResponse } from 'msw'
 import { COMMUNITY_FEED_DISABLED_MESSAGE } from '@couture/api-client/contracts/http'
 import { SPOTLIGHT_TEASER_READ_FLOOR_MS } from '@couture/api-client'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { signInFixtureMember } from '../../test-utils/member-session'
 import {
   TEASER_PREFIX,
   cityPage,
@@ -226,10 +227,11 @@ describe('6.7 web Home spotlight teaser', () => {
     await settledTeaserRead(1)
     expect(teaserNodes()).toEqual([])
     await answer(2, cityPage([spotlightItem('look-member-3')]))
-    expect(await screen.findByTestId('home-spotlight-teaser-link')).toHaveAttribute(
-      'href',
-      /^\/community\?.*cardId=look-member-3&focus=spotlight&focusToken=/
-    )
+    const replacement = await screen.findByTestId('home-spotlight-teaser-link')
+    const href = new URL(replacement.getAttribute('href')!, 'http://local.test')
+    expect(href.pathname).toBe('/community')
+    expect(href.searchParams.get('cardId')).toBe('look-member-3')
+    expect(href.searchParams.get('focus')).toBe('spotlight')
 
     act(() => {
       window.sessionStorage.clear()
@@ -249,7 +251,7 @@ describe('6.7 web Home spotlight teaser', () => {
   })
 
   it('6.7-WEB-012 returns focus to Today when its selected Spotlight row is removed', async () => {
-    signIn()
+    signInFixtureMember()
     useMswHandlers(
       http.get('/api/v1/ritual', () =>
         HttpResponse.json(
@@ -271,7 +273,7 @@ describe('6.7 web Home spotlight teaser', () => {
   })
 
   it('6.7-WEB-021 posts one Home open and creates a fresh focus token per activation', async () => {
-    signIn()
+    signInFixtureMember()
     router.push.mockClear()
     const opens = useRecordedOpens()
     const { answer } = useServedSpotlight()

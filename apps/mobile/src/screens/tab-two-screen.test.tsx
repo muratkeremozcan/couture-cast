@@ -840,8 +840,10 @@ describe('SettingsScreen', () => {
 
     fireEvent.click(action)
     await waitFor(() => expect(signOutNativeSessionMock).toHaveBeenCalledTimes(2))
-    expect(action).toHaveAttribute('aria-busy', 'true')
-    expect(action).toHaveAttribute('aria-disabled', 'true')
+    await waitFor(() => {
+      expect(action).toHaveAttribute('aria-busy', 'true')
+      expect(action).toHaveAttribute('aria-disabled', 'true')
+    })
     fireEvent.click(action)
     expect(signOutNativeSessionMock).toHaveBeenCalledTimes(2)
     expect(router.navigate).not.toHaveBeenCalled()

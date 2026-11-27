@@ -60,13 +60,15 @@ tags:
     env:
       LINK: ${WIDGET_MORNING_URL}
 
-# The link reopens Today at its top; the toggles sit below the outfit card (D16).
+# The link reopens Today at its top. Open the period picker below the outfit card.
 - scrollUntilVisible:
     element:
-      id: 'scenario-toggle-morning'
+      id: 'scenario-picker'
     direction: DOWN
     visibilityPercentage: 100
     timeout: 15000
+- tapOn:
+    id: 'scenario-picker'
 - extendedWaitUntil:
     visible:
       id: 'scenario-toggle-morning'
@@ -75,6 +77,8 @@ tags:
     label: 'The am widget link selected the morning scenario'
 - takeScreenshot:
     path: maestro/artifacts/widget-deep-link-morning
+- tapOn:
+    id: 'scenario-picker'
 
 # The second link must MOVE the selection, which is what proves the first
 # assertion was not simply the app's default state agreeing with it.
@@ -83,13 +87,15 @@ tags:
     env:
       LINK: ${WIDGET_EVENING_URL}
 
-# The link reopens Today at its top; the toggles sit below the outfit card (D16).
+# Open the picker to verify which period the evening link selected.
 - scrollUntilVisible:
     element:
-      id: 'scenario-toggle-evening'
+      id: 'scenario-picker'
     direction: DOWN
     visibilityPercentage: 100
     timeout: 15000
+- tapOn:
+    id: 'scenario-picker'
 - extendedWaitUntil:
     visible:
       id: 'scenario-toggle-evening'

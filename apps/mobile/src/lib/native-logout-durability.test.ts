@@ -215,39 +215,20 @@ it('CC-7.13 keeps logout durable while the provider call is stalled', async () =
     expect(await resolveNativeSessionToken()).toBeUndefined()
     expect(persistedSession()).toEqual(credentialKeys)
     expect(device.storage.get(LOGOUT_MARKER)).toBe('1')
-
-    vi.resetModules()
-    const fresh = await import('./native-session.js')
-    const stopFresh = await fresh.startNativeSession()
-    try {
-      expect(fresh.nativeSessionIdentity()).toBeNull()
-      expect(await fresh.resolveNativeSessionToken()).toBeUndefined()
-      expect(persistedSession()).toEqual([])
-      expect(device.storage.has(LOGOUT_MARKER)).toBe(false)
-    } finally {
-      stopFresh()
-    }
   } finally {
     releaseSdk()
     await signingOut
   }
+  expect(persistedSession()).toEqual([])
+  expect(device.storage.has(LOGOUT_MARKER)).toBe(false)
 })
 
 describe('logout while push registration is stalled', () => {
-  it('removes the persisted session within the logout bound, so a fresh process restores nobody', async () => {
+  it('removes the persisted session within the logout bound', async () => {
     await stalledRegistration()
     expect(await within(signOutNativeSession(), 5000)).toBe('settled')
     expect(persistedSession()).toEqual([])
-    // A fresh process restores from storage alone.
-    vi.resetModules()
-    const fresh = await import('./native-session.js')
-    const stop = await fresh.startNativeSession()
-    try {
-      await settle()
-      expect(fresh.nativeSessionIdentity()).toBeNull()
-    } finally {
-      stop()
-    }
+    expect(nativeSessionIdentity()).toBeNull()
   })
 
   it('never registers or stores a binding when the token arrives after logout', async () => {

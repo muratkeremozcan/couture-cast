@@ -1039,6 +1039,7 @@
   },
   "home": {
     "today": {
+      "planWeek": "Planear a semana",
       "outfit": "Visual de hoje",
       "starterOutfit": "Visual inicial",
       "outfitDetails": "Detalhes do visual",

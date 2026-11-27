@@ -189,10 +189,12 @@ test('L-1: a member who signs in with Google lands on the member landing, never 
   await page.getByTestId('google-sign-in').click()
   await expect(page).toHaveURL(`${WEB}/`)
   await expectMemberLanding(page)
-  expect(await landingActionsSeen(page)).toMatchObject({
-    guest: [],
-    member: ['[data-testid="home-set-city"]'],
-  })
+  await expect
+    .poll(() => landingActionsSeen(page))
+    .toMatchObject({
+      guest: [],
+      member: ['[data-testid="home-set-city"]'],
+    })
 
   // A reload and a new tab are the same member: still no signed-out action from first paint.
   await page.reload()

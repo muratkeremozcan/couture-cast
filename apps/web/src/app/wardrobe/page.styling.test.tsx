@@ -868,6 +868,7 @@ describe('Wardrobe styling', () => {
     )
     const user = userEvent.setup()
     const view = render(home)
+    await user.click(await screen.findByTestId('home-edit-sample'))
     const saveExample = await screen.findByRole('button', { name: 'Save example look' })
     const homeWeather = () => screen.getByRole('combobox', { name: 'Sample weather' })
     await user.selectOptions(homeWeather(), 'warm-rainy')
@@ -887,6 +888,7 @@ describe('Wardrobe styling', () => {
     expect(readRecipes()).toEqual([defaultRecipe])
 
     view.rerender(home)
+    await user.click(await screen.findByTestId('home-edit-sample'))
     const savedOnHome = within(await homeSaves())
     await user.selectOptions(homeWeather(), 'mild-dry')
     const reopen = savedOnHome.getByRole('button', { name: /^(?!Remove )/ })

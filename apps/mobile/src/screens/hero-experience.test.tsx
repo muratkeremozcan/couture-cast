@@ -223,6 +223,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     })
 
     await userEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(screen.getByTestId('scenario-picker'))
     const eveningToggle = screen.getByTestId('scenario-toggle-evening')
     fireEvent.click(eveningToggle)
 
@@ -279,8 +280,8 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     try {
       fireEvent.click(leatherJacketOption)
 
-      expect(screen.queryByText('Classic Trench Coat')).toBeNull()
-      expect(screen.getByText('Leather Jacket')).toBeTruthy()
+      expect(screen.queryByTestId('garment-tile-classic-trench-coat')).toBeNull()
+      expect(screen.getByTestId('garment-tile-leather-jacket')).toBeVisible()
       // The modal leaves on its real exit animation; only the app's focus timer is faked.
       // expect.poll and vi.waitFor advance fake timers between retries, which would fire
       // that timer early, so the exit is awaited on real animation frames instead.
@@ -332,8 +333,8 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     await dragFrom(title, { dy: LAYER_SWIPE_CLOSE_PX + 40 })
     await waitFor(() => expect(screen.queryByTestId('garment-swap-modal')).toBeNull())
     // Closed without a choice: the garment stays and no swap is recorded.
-    expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
-    expect(screen.queryByText('Leather Jacket')).toBeNull()
+    expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+    expect(screen.queryByTestId('garment-tile-leather-jacket')).toBeNull()
     expect(mockCapture).not.toHaveBeenCalledWith(
       'hero_interaction',
       expect.objectContaining({ interactionType: 'garment_swap' })
@@ -375,10 +376,11 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
     await render(<TabOneScreen />)
 
-    expect(await screen.findByTestId('member-sample-outfit')).toBeVisible()
-    expect(screen.getByTestId('home-set-city')).toBeVisible()
     // maestro/network-timeout/dev-client-timeout.yaml taps Retry by this id.
-    expect(screen.getByTestId('hero-retry')).toHaveAccessibleName('Try again')
+    const retry = await screen.findByRole('button', { name: 'Try again' })
+    expect(retry).toHaveAttribute('data-testid', 'hero-retry')
+    expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
+    expect(screen.getByTestId('home-set-city')).toBeVisible()
     expect(screen.queryByTestId('weather-header-skeleton')).toBeNull()
     expect(screen.queryByTestId('outfit-recommendation-card-skeleton')).toBeNull()
   })

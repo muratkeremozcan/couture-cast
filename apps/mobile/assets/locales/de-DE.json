@@ -1099,6 +1099,7 @@
   },
   "home": {
     "today": {
+      "planWeek": "Woche planen",
       "outfit": "Heutiges Outfit",
       "starterOutfit": "Basis-Outfit",
       "outfitDetails": "Outfit-Details",

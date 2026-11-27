@@ -143,7 +143,7 @@ export function HomePlannerLink() {
   return (
     <View style={styles.plan}>
       <NavRow
-        label={t('commerce.premium.planner.openControl')}
+        label={t('home.today.planWeek')}
         testID="home-plan-week"
         onPress={() =>
           router.navigate({ pathname: '/looks', params: { segment: 'plan' } })
@@ -747,6 +747,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   sampleTitle: { fontSize: 20, fontWeight: '700' },
-  sampleArt: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  sampleArt: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   plan: { marginHorizontal: TAB_BODY_INSET },
 })

@@ -191,7 +191,11 @@ function serveTodayForecast(differs: boolean, usableOutfitCount = 3) {
       HttpResponse.json({
         data: {
           ...mockRitualResponse.data,
-          outfits: mockRitualResponse.data.outfits.slice(0, usableOutfitCount),
+          outfits: mockRitualResponse.data.outfits.map((outfit, index) =>
+            index < usableOutfitCount
+              ? outfit
+              : { ...outfit, garmentIds: [], displayGarments: [] }
+          ),
           weather: {
             ...mockRitualResponse.data.weather,
             fetchedAt: new Date(firstHour).toISOString(),
@@ -403,6 +407,10 @@ describe('Screen budget: native Today', () => {
     await todaySettled('populated')
 
     const periods = screen.getByTestId('scenario-toggles')
+    const picker = within(periods).getByTestId('scenario-picker')
+    expect(picker).toHaveAttribute('aria-expanded', 'false')
+    expect(within(periods).queryByRole('tablist')).toBeNull()
+    press(picker)
     expect(within(periods).getAllByRole('tab')).toHaveLength(3)
     press(screen.getByTestId('today-primary-action'))
     expect(screen.getByTestId('outfit-comfort-notes').textContent).toMatch(/trench coat/i)
@@ -412,6 +420,9 @@ describe('Screen budget: native Today', () => {
       'true'
     )
     expect(screen.getByTestId('outfit-comfort-notes').textContent).toMatch(/light tee/i)
+    expect(picker).toHaveAttribute('aria-expanded', 'true')
+    press(picker)
+    expect(within(periods).queryByRole('tablist')).toBeNull()
   }, 30_000)
 
   it('[P0] [7.13-NAT-002] varying weather does not offer a period selector with one outfit', async () => {
@@ -428,7 +439,7 @@ describe('Screen budget: native Today', () => {
     renderToday()
     await todaySettled('populated')
     const recent = screen.getByTestId('home-closet-strip')
-    expect(recent).toHaveAccessibleName(/recent.*top.*bottom.*outerwear/i)
+    expect(recent).toHaveAccessibleName('Recent pieces. Top, Bottom, and Outer layer')
     expect(recent.querySelectorAll('img')).toHaveLength(0)
 
     let markRequested: () => void = () => undefined

@@ -1104,7 +1104,7 @@ function MemberRitual({
         data-testid="home-plan-week"
         className="flex min-h-touch items-center justify-between gap-2 border-b border-line py-3 text-sm font-semibold"
       >
-        {t('commerce.premium.planner.openControl')}
+        {t('home.today.planWeek')}
         <span aria-hidden="true">›</span>
       </Link>
     </>

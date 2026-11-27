@@ -379,7 +379,7 @@ function SegmentControl({
             onKeyDown={onKeyDown}
             // Selected: a filled inverse segment and a heavier label, as on native, in both
             // themes (baseline review: a card surface read as sunken in dark).
-            className={`min-h-touch rounded-sm px-2 text-sm ${
+            className={`min-h-touch rounded-sm px-1 text-xs min-[360px]:px-2 min-[360px]:text-sm ${
               selected
                 ? 'bg-inverse font-semibold text-on-inverse'
                 : 'font-medium text-ink'

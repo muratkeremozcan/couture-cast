@@ -584,9 +584,7 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
 
           // Story CC-7.12 D10, D11: Plan week opens the Looks Plan segment, where a reader
           // without Premium sees the sample week with one Upgrade in place of the lock.
-          await page
-            .getByRole('link', { name: enUS.commerce.premium.planner.openControl })
-            .click()
+          await page.getByRole('link', { name: enUS.home.today.planWeek }).click()
           await expect(page).toHaveURL('/looks?segment=plan')
           const preview = page.getByTestId('plan-free-preview')
           const cta = preview.getByTestId('plan-upgrade')

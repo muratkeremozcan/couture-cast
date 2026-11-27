@@ -148,6 +148,7 @@ describe('TabOneScreen affiliate CTA', () => {
       expect(affiliateImpressions()).toHaveLength(1)
     })
 
+    fireEvent.click(screen.getByTestId('scenario-picker'))
     fireEvent.click(screen.getByTestId('scenario-toggle-evening'))
     await waitFor(() => {
       expect(screen.queryByTestId('shop-this-look-block')).toBeNull()
@@ -198,6 +199,7 @@ describe('TabOneScreen affiliate CTA', () => {
       expect(affiliateImpressions()).toHaveLength(1)
     })
 
+    fireEvent.click(screen.getByTestId('scenario-picker'))
     fireEvent.click(screen.getByTestId('scenario-toggle-evening'))
 
     await waitFor(() => {
@@ -225,6 +227,7 @@ describe('TabOneScreen affiliate CTA', () => {
     fireEvent.click(await screen.findByTestId('today-primary-action'))
     await screen.findByTestId('shop-this-look-block')
 
+    fireEvent.click(screen.getByTestId('scenario-picker'))
     fireEvent.click(screen.getByTestId('scenario-toggle-midday'))
 
     await waitFor(() => {
@@ -320,6 +323,7 @@ describe('TabOneScreen affiliate CTA', () => {
       )
     )
 
+    fireEvent.click(screen.getByTestId('scenario-picker'))
     fireEvent.click(screen.getByTestId('scenario-toggle-evening'))
     fireEvent.click(screen.getByTestId('scenario-toggle-morning'))
     await i18n.changeLanguage('tr-TR')

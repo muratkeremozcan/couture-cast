@@ -82,7 +82,9 @@ test.describe('CC-7.13 Calm Today @local-lane', () => {
     await expect(add(page)).toHaveCount(0)
     await expect(closet(page)).toHaveAttribute('href', '/wardrobe')
     await expect(closet(page).locator('img')).toHaveCount(0)
-    await expect(closet(page)).toHaveAccessibleName(/recent.*top.*bottom.*outerwear/i)
+    await expect(closet(page)).toHaveAccessibleName(
+      'Recent pieces. Top, Bottom, and Outer layer'
+    )
     await expect(page.getByTestId('community-spotlight')).toHaveCount(0)
     await expect(page.getByTestId('community-lookbook-grid')).toHaveCount(0)
     await expect(page.getByTestId('chip-navigation-bar')).toHaveCount(0)
@@ -108,6 +110,7 @@ test.describe('CC-7.13 Calm Today @local-lane', () => {
     await expect(card.getByText(/comfort note for shell-visual-member/)).toBeHidden()
 
     setScreen('looks')
+    await expect(plan(page)).toHaveAccessibleName('Plan your week')
     await plan(page).click()
     await expect(page).toHaveURL(/\/looks\?segment=plan$/)
     setScreen('profile')

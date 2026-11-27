@@ -3,7 +3,7 @@ title: 'Story CC-7.13: Calm Today with one primary job'
 type: feature
 ticket: '7-13-calm-today-one-primary-job'
 created: '2026-11-26'
-status: built
+status: done
 baseline_revision: '0d3b82a3ba9e76be509ddd816817f48a44292485'
 route: full
 route_source: auto
@@ -94,14 +94,14 @@ suites, and the two-round review maximum. TEA owns tests, fixtures, budget confi
       `today-primary-action` on live details and `home-set-city` on the fallback action.
 - [x] Place `home-closet-strip` or `home-add-garment`, `home-plan-week`, and at most one existing
       Spotlight slot after the first view. Place Sign out in Profile.
-- [ ] Coordinate the [acceptance plan](../test-artifacts/test-design-7-13-calm-today-one-primary-job.md)
+- [x] Coordinate the [acceptance plan](../test-artifacts/test-design-7-13-calm-today-one-primary-job.md)
       and Android capture with TEA. Given a 390 x 844 viewport, the first view fits the weather, card
       and action. Given the three member fixtures at default text size, each is at most 1,688 CSS px
       tall. At 320 px and 200% text, every control is reachable.
-- [ ] Given native Today with hourly data, a tap on `weather-header` opens `hourly-forecast-ribbon`.
+- [x] Given native Today with hourly data, a tap on `weather-header` opens `hourly-forecast-ribbon`.
       Given equal representative forecasts, `scenario-toggles` is absent. Given differing forecasts,
       each period can select its outfit. Include small-phone Android evidence in the PR.
-- [ ] Finish Step 70 at `../project-knowledge/learning-path-step-by-step.md` and set the story to
+- [x] Finish Step 70 at `../project-knowledge/learning-path-step-by-step.md` and set the story to
       done in `sprint-status.yaml` before the final push. The 7.12 entry is already done.
 
 ## Implementation Notes
@@ -133,7 +133,7 @@ findings. This was static coverage of the pinned range. CI verifies the subseque
   place on focus and clear on denial or wardrobe invalidation. Remove routine polling.
 - P2-1 and P2-2. Place the native cached-weather notice immediately after the card. If the forecast
   is usable and the outfit is missing, make Edit sample the primary action. Offer period selection
-  only across usable outfits with differing forecasts.
+  only across usable outfits with differing forecasts. One disclosure opens the period choices.
 - P2-3 and P2-4. Cover Spotlight focus, native Profile sign-out, and the unavailable forecast at
   enlarged text. Limit expected network failures to the affected requests.
 - P3-1 to P3-3. Record completion with the Android capture, update diagnostic anchors, add the web

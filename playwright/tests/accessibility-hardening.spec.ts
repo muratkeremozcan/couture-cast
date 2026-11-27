@@ -362,51 +362,55 @@ test.describe('Story 3.8 interaction states', () => {
     }
   })
 
-  test('reduced motion and forced colors preserve immediate visible focus', async ({
-    page,
-    interceptNetworkCall,
-    communitySession,
-  }) => {
-    expect(communitySession.userId).toBeTruthy()
-    await page.emulateMedia({ reducedMotion: 'reduce' })
-    await page.setViewportSize(viewports[0])
-    await openStablePage(page, '/', interceptNetworkCall)
+  test.describe('free Plan focus and reduced motion', () => {
+    test.use({ allowPremiumPlannerRefusal: true })
 
-    // Story CC-7.12 D11: the "Plan week" control links to the Looks Plan segment, where the
-    // planner renders as the inline rail. Plan is a tab with no back arrow, so browser back
-    // returns to Today, where the Plan link remains focusable.
-    await page.getByTestId('home-plan-week').click()
-    await expect(page).toHaveURL('/looks?segment=plan')
-    const planner = page.getByRole('complementary', { name: 'Planner Rail' })
-    await expect(planner).toBeVisible()
-    await expect(planner).toHaveCSS('animation-name', 'none')
-    await expect(
-      page.getByTestId('app-header').getByTestId('app-top-bar-back')
-    ).toHaveCount(0)
-    await page.goBack()
-    await expect(page).toHaveURL('/')
-    const planLink = page.getByTestId('home-plan-week')
-    const transitionDuration = await planLink.evaluate(
-      (node) => getComputedStyle(node).transitionDuration
-    )
-    expect(Number.parseFloat(transitionDuration)).toBeLessThanOrEqual(0.00001)
+    test('reduced motion and forced colors preserve immediate visible focus', async ({
+      page,
+      interceptNetworkCall,
+      communitySession,
+    }) => {
+      expect(communitySession.userId).toBeTruthy()
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await page.setViewportSize(viewports[0])
+      await openStablePage(page, '/', interceptNetworkCall)
 
-    await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
-    // The `home-plan-week` mouse click above leaves Chromium's
-    // `:focus-visible` heuristic in its pointer-interaction state, so a plain
-    // `planLink.focus()` stopped matching `:focus-visible` and `outlineStyle` came back
-    // `'none'` where the assertion below wants `'solid'`. One real keyboard event
-    // resets that heuristic before the script-triggered focus, matching how a
-    // keyboard user reaches this element; confirmed by removing it and reproducing
-    // the failure.
-    await page.keyboard.press('Tab')
-    await planLink.focus()
-    const forcedStyles = await planLink.evaluate((node) => {
-      const styles = getComputedStyle(node)
-      return { boxShadow: styles.boxShadow, outlineStyle: styles.outlineStyle }
+      // Story CC-7.12 D11: the "Plan week" control links to the Looks Plan segment, where the
+      // planner renders as the inline rail. Plan is a tab with no back arrow, so browser back
+      // returns to Today, where the Plan link remains focusable.
+      await page.getByTestId('home-plan-week').click()
+      await expect(page).toHaveURL('/looks?segment=plan')
+      const planner = page.getByRole('complementary', { name: 'Planner Rail' })
+      await expect(planner).toBeVisible()
+      await expect(planner).toHaveCSS('animation-name', 'none')
+      await expect(
+        page.getByTestId('app-header').getByTestId('app-top-bar-back')
+      ).toHaveCount(0)
+      await page.goBack()
+      await expect(page).toHaveURL('/')
+      const planLink = page.getByTestId('home-plan-week')
+      const transitionDuration = await planLink.evaluate(
+        (node) => getComputedStyle(node).transitionDuration
+      )
+      expect(Number.parseFloat(transitionDuration)).toBeLessThanOrEqual(0.00001)
+
+      await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
+      // The `home-plan-week` mouse click above leaves Chromium's
+      // `:focus-visible` heuristic in its pointer-interaction state, so a plain
+      // `planLink.focus()` stopped matching `:focus-visible` and `outlineStyle` came back
+      // `'none'` where the assertion below wants `'solid'`. One real keyboard event
+      // resets that heuristic before the script-triggered focus, matching how a
+      // keyboard user reaches this element; confirmed by removing it and reproducing
+      // the failure.
+      await page.keyboard.press('Tab')
+      await planLink.focus()
+      const forcedStyles = await planLink.evaluate((node) => {
+        const styles = getComputedStyle(node)
+        return { boxShadow: styles.boxShadow, outlineStyle: styles.outlineStyle }
+      })
+      expect(forcedStyles.boxShadow).toBe('none')
+      expect(forcedStyles.outlineStyle).toBe('solid')
     })
-    expect(forcedStyles.boxShadow).toBe('none')
-    expect(forcedStyles.outlineStyle).toBe('solid')
   })
 
   test('rendered top bar, Today Plan, and alert focus outlines meet 3:1 in both schemes', async ({
