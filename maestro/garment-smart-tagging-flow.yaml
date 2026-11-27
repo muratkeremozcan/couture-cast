@@ -115,7 +115,6 @@ tags:
     element:
       id: 'garment-tag-comfort-mild'
     direction: DOWN
-    centerElement: true
 
 - tapOn:
     id: 'garment-tag-comfort-mild'
