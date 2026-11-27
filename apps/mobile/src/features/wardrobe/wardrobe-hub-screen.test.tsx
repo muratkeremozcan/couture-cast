@@ -323,8 +323,10 @@ function fixtureWardrobePhoto(color: string) {
 }
 
 async function expectDetailPhoto(url: string) {
-  const photo = await screen.findByTestId('garment-detail-photo')
-  await waitFor(() => expect(photo.querySelector('img')).toHaveAttribute('src', url))
+  await waitFor(() => {
+    const photo = screen.getByTestId('garment-detail-photo')
+    expect(photo.querySelector('img')).toHaveAttribute('src', url)
+  })
 }
 
 function deferred() {
