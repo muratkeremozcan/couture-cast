@@ -125,7 +125,6 @@ test('[7.9-NVIS-U14b] masked rectangles are ignored, only for their own tab, and
     'profile',
     'wardrobe',
   ])
-  assert.deepEqual(masksFor('dark-profile', masks), masksFor('light-profile', masks))
   // Every tab hides only the scroll indicator strip in the right gutter; generated text adds more.
   const strip = [704, 160, 16, 960]
   for (const name of [
@@ -133,11 +132,12 @@ test('[7.9-NVIS-U14b] masked rectangles are ignored, only for their own tab, and
     'dark-home',
     'light-home-empty-closet',
     'light-home-missing-photo',
+    'light-profile',
+    'dark-profile',
   ]) {
     assert.deepEqual(masksFor(name, masks), [strip])
   }
   assert.deepEqual(masksFor('dark-wardrobe', masks), [strip])
-  assert.equal(masksFor('light-profile', masks).length, 2)
   assert.equal(masksFor('light-community', masks).length, 2)
   // Story CC-7.12 (Step 69): the seeded capsule's "Saved <date>" line changes every day.
   assert.deepEqual(masksFor('dark-looks', masks), [[40, 814, 220, 36], strip])

@@ -41,6 +41,10 @@ onFlowComplete:
 - runScript:
     file: subflows/set-today-visual-fixture.js
     env: { TODAY_VARIANT: 'full' }
+# The watchdog can kill Maestro before onFlowComplete restores display settings.
+- runScript:
+    file: subflows/set-system-appearance.js
+    env: { APPEARANCE_ROUTE: 'community-text', APPEARANCE_VALUE: 'false' }
 - runScript:
     file: subflows/set-system-appearance.js
     env: { APPEARANCE_ROUTE: 'night', APPEARANCE_VALUE: 'no' }
@@ -113,14 +117,13 @@ onFlowComplete:
 - tapOn:
     id: 'app-top-bar-back'
 - evalScript: ${output.restoreShellLocale = true}
-- runFlow: subflows/calm-community-enlarged-text.yaml
-
 - runFlow:
     file: subflows/set-locale.yaml
     env: { LOCALE: 'de-DE' }
 - runScript:
     file: subflows/set-system-appearance.js
     env: { APPEARANCE_ROUTE: 'community-text', APPEARANCE_VALUE: 'true' }
+- runFlow: subflows/calm-community-enlarged-text.yaml
 - runFlow:
     file: subflows/calm-closet-profile-enlarged-text.yaml
     env: { SCHEME: 'light' }
@@ -130,13 +133,3 @@ onFlowComplete:
 - runFlow:
     file: subflows/calm-closet-profile-enlarged-text.yaml
     env: { SCHEME: 'dark' }
-- runScript:
-    file: subflows/set-system-appearance.js
-    env: { APPEARANCE_ROUTE: 'community-text', APPEARANCE_VALUE: 'false' }
-- runScript:
-    file: subflows/set-system-appearance.js
-    env: { APPEARANCE_ROUTE: 'night', APPEARANCE_VALUE: 'no' }
-- runFlow:
-    file: subflows/set-locale.yaml
-    env: { LOCALE: 'en-US' }
-- evalScript: ${output.restoreShellLocale = false}

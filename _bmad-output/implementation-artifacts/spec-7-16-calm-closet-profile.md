@@ -119,6 +119,16 @@ is a same-origin path with a single leading slash.
 
 ## Plan change log
 
+The first CI run exposed a 105 px German Closet header at ordinary text and a
+lost focus target after a garment disappears during Style. The header keeps Add and
+More together. Each label can wrap. Style dismissal returns to Back when its opener
+has gone. Native Premium waits for its first destination theme read.
+
+The 320 dp Android captures showed mid-word breaks in garment and Profile labels.
+Large text on compact native screens uses full-width garment cards and stacks
+Profile values below labels. The visual flow resets device size and font scale
+on entry, then shares setup across the enlarged-text captures.
+
 ## Review triage log
 
 The independent review compared `d64216fa612b494fbad164e264068f453f9b60f8` with

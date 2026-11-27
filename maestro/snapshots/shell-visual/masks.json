@@ -36,10 +36,6 @@
   ],
   "profile": [
     {
-      "rect": [24, 240, 680, 108],
-      "reason": "account email: run-maestro signs up mobile-e2e-<uuid>@example.com each run, and the second line starts at the 32 px gutter"
-    },
-    {
       "rect": [704, 160, 16, 960],
       "reason": "Android scroll indicator: a tab's scroll view flashes it on show or scroll restore and it fades on its own clock, so a capture may or may not hold it (CI 40ee2f90 light-profile, dark-community)"
     }

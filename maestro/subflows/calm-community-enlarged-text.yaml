@@ -1,13 +1,8 @@
 # Learning path Step 72: Calm Community with an empty state.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
+# The shell visual flow sets German and enlarged text before calling this proof.
 appId: ${MAESTRO_APP_ID}
 ---
-- runFlow:
-    file: set-locale.yaml
-    env: { LOCALE: 'de-DE' }
-- runScript:
-    file: set-system-appearance.js
-    env: { APPEARANCE_ROUTE: 'community-text', APPEARANCE_VALUE: 'true' }
 - runFlow: open-community-tab.yaml
 - extendedWaitUntil:
     visible:
@@ -41,9 +36,3 @@ appId: ${MAESTRO_APP_ID}
     notVisible:
       id: 'community-climate-sheet'
     timeout: 10000
-- runScript:
-    file: set-system-appearance.js
-    env: { APPEARANCE_ROUTE: 'community-text', APPEARANCE_VALUE: 'false' }
-- runFlow:
-    file: set-locale.yaml
-    env: { LOCALE: 'en-US' }

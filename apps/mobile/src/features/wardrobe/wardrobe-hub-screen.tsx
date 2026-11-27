@@ -29,6 +29,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -204,6 +205,8 @@ function MemberWardrobeHub({
   deletion = garmentDeletion,
 }: WardrobeHubScreenProps & { epoch: number; sessionSeen: SessionSeen }) {
   const { t, i18n } = useTranslation()
+  const { fontScale, width } = useWindowDimensions()
+  const wideCards = fontScale >= 1.5 && width <= 400
   const strings = getGuestPreviewStrings(i18n.language)
   const colors = useSchemeColors()
   const secondaryButton = [styles.secondaryButton, { borderColor: colors.lineStrong }]
@@ -677,7 +680,7 @@ function MemberWardrobeHub({
                   {filteredGarments.map((garment) => (
                     <View
                       key={garment.id}
-                      style={styles.garmentCard}
+                      style={[styles.garmentCard, wideCards && styles.wideGarmentCard]}
                       testID={`garment-card-${garment.id}`}
                     >
                       {garment.status === 'ready' ? (
@@ -893,6 +896,7 @@ const styles = StyleSheet.create({
   // piece) fit between the top bar and the tab bar at 360 x 640 dp, so the tile is compact: a
   // landscape photo, a tight label and status, and the 44 pt actions kept.
   garmentCard: { width: '47%', overflow: 'hidden', borderRadius: 12, padding: 8 },
+  wideGarmentCard: { width: '100%' },
   garmentImage: { width: '100%', aspectRatio: 4 / 3, borderRadius: 8 },
   garmentLabel: { marginTop: 4, fontSize: 14, lineHeight: 20, fontWeight: '600' },
   statusBadge: {

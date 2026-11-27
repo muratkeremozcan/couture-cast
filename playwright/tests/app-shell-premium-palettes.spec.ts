@@ -32,7 +32,7 @@ test.use({
  * 7.9-E2E-008 (spec D5, risk R3): a premium palette is the member's choice and also follows the
  * system setting, so under each scheme the palette's own variant for that scheme paints Community's
  * cards and the planner, and its text stays readable there. The palette reaches the page the way a
- * member's does: Profile's theme read names it, the app writes it on <html>, and the member moves
+ * member's does: Premium's theme read names it, the app writes it on <html>, and the member moves
  * to Community and Home inside the same document. Only the theme and planner reads are answered
  * here; every other read comes from the CC-7.7 shell fixtures, and nothing is written.
  */
@@ -121,12 +121,12 @@ test.describe('CC-7.9 premium palette follows the system scheme (7.9-E2E-008) @l
         await page.goto(SHELL_TABS.profile.path)
         await page.getByTestId('profile-premium-row').click()
         await expect(page).toHaveURL('/settings/premium')
-        expect((await themeRead).status).toBe(200)
-        await waitForShellSettled(page, router)
         await expect(page.getByTestId(`premium-theme-option-${palette}`)).toHaveAttribute(
           'aria-pressed',
           'true'
         )
+        expect((await themeRead).status).toBe(200)
+        await waitForShellSettled(page, router)
         const html = page.locator('html')
         await expect(html).toHaveAttribute('data-theme', palette)
         expect(
