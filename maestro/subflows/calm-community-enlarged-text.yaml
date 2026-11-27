@@ -27,7 +27,7 @@ appId: ${MAESTRO_APP_ID}
       id: 'community-climate-sheet'
     timeout: 10000
 - assertVisible:
-    text: 'Community-Filter'
+    text: 'Klimafilter'
 - takeScreenshot:
     path: maestro/artifacts/community-accessibility/de-large-filter
 - scrollUntilVisible:
@@ -35,7 +35,6 @@ appId: ${MAESTRO_APP_ID}
       id: 'community-filter-chip-warm_dry'
     direction: DOWN
     timeout: 20000
-    centerElement: true
 - tapOn:
     id: 'community-filter-chip-warm_dry'
 - extendedWaitUntil:

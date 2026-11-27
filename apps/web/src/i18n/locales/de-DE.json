@@ -664,7 +664,7 @@
       "invalid": "Dieser Link ist ungültig, abgelaufen oder nicht mehr verfügbar."
     },
     "filters": {
-      "label": "Community-Filter",
+      "label": "Klimafilter",
       "explainer": "Klimafilter ordnen Looks nach der Wochenvorhersage am gespeicherten Ort der teilenden Person, von kalt und feucht bis warm und trocken.",
       "announce": "Looks für {{filter}} werden angezeigt.",
       "mode": {
