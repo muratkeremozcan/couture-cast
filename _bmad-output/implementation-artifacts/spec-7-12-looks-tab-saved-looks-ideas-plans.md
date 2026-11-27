@@ -292,8 +292,9 @@ member-sample-outfit.tsx:157,422`, `app/(tabs)/settings.tsx:1889` -- View and Pl
   - TEA IMPORT-001 trace, patch: a saved-looks change notice remounted the web Looks body. A
     tile's `useTranslation` with its own i18n instance could suspend under the Suspense that
     `useSearchParams` needs, so React showed the gate fallback. The Looks components read their
-    bundled strings with `useSuspense: false`, and the feed's refresh updates run in
-    `startTransition`, so a refresh keeps the mounted body, focus and scroll.
+    bundled strings with `useSuspense: false`, so a refresh keeps the mounted body, focus and
+    scroll. A `startTransition` guard was tried and removed: with it the first grid never
+    appeared in the year-ahead unit run.
   - D10: Profile's Premium section carries `id="premium"`; the planner's set-city return goes to
     `/looks?segment=plan`.
   - Analytics routes: web drops `/looks/plan` and `/wardrobe/capsules` and adds `/looks/capsules`

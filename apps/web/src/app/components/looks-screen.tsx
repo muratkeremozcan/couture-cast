@@ -10,7 +10,6 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  startTransition,
   Suspense,
   useCallback,
   useEffect,
@@ -61,6 +60,10 @@ import { ScreenGate } from './screen-gate'
 import { StickyBottomNav } from './sticky-bottom-nav'
 
 const PAGE_SIZE = 50
+
+// TEA (IMPORT-001): every Looks translation hook reads the bundled strings without suspending.
+// A suspending hook under the Suspense that `useSearchParams` needs swapped the whole body for
+// the gate fallback mid-session, which dropped the segment, focus and scroll.
 
 /** A read that started under a session scope the tab no longer holds. */
 class StaleSessionError extends Error {
@@ -222,10 +225,7 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
           return
         }
         const sources = { looks, capsules } as Sources
-        // TEA (IMPORT-001): a read's answer is a background update. Inside a transition React
-        // keeps the mounted body on screen if anything below suspends, so a refresh after a
-        // save, Undo or import never swaps the grid for the gate and never drops focus or scroll.
-        startTransition(() => setState({ ...sources, error: null, settled: true }))
+        setState({ ...sources, error: null, settled: true })
         screenSnapshot.remember(scope, 'looks', snapshotPart(filter), sources)
       })
       .catch((error: unknown) => {
@@ -257,7 +257,7 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
     if (!owner) return
     return subscribeSavedLooksChanged((changedOwner) => {
       if (changedOwner === owner || (changedOwner && changedOwner === userIdRef.current))
-        startTransition(() => setAttempt((count) => count + 1))
+        setAttempt((count) => count + 1)
     })
   }, [owner])
 
@@ -323,7 +323,7 @@ function SegmentControl({
   segment: LooksSegment
   onSelect: (segment: LooksSegment) => void
 }) {
-  const { t } = useTranslation()
+  const { t } = useTranslation('translation', { useSuspense: false })
   const refs = useRef<Record<LooksSegment, HTMLButtonElement | null>>({
     saved: null,
     ideas: null,
@@ -400,7 +400,7 @@ function FilterChips({
   filter: LooksFilter
   onSelect: (filter: LooksFilter) => void
 }) {
-  const { t } = useTranslation()
+  const { t } = useTranslation('translation', { useSuspense: false })
   return (
     <div
       role="group"
@@ -440,7 +440,7 @@ function SavedPanel({
   filter: LooksFilter
   feed: ReturnType<typeof useLooksFeed>
 }) {
-  const { t } = useTranslation()
+  const { t } = useTranslation('translation', { useSuspense: false })
   // A visitor's Saved asks for an account and reads nothing (native matches).
   if (!owner) {
     return (
@@ -550,7 +550,7 @@ function SavedPanel({
 }
 
 function IdeasPanel({ showEmptyLine }: { showEmptyLine: boolean }) {
-  const { t } = useTranslation()
+  const { t } = useTranslation('translation', { useSuspense: false })
   const ideas = useMemo(() => looksIdeas(), [])
   return (
     <div data-testid="looks-first-content">
@@ -596,7 +596,7 @@ function useLooksAddress(): {
 }
 
 function LooksBody({ owner }: { owner: string | null }) {
-  const { t } = useTranslation()
+  const { t } = useTranslation('translation', { useSuspense: false })
   const router = useRouter()
   // The address is read in the first render (this body sits under Suspense), so a return from a
   // saved look renders its grid at once and the gate can restore the scroll offset (TEA W3).
