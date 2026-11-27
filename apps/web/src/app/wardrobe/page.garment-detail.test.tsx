@@ -7,6 +7,8 @@
 // category.
 // Learning path Step 63: Garment detail and tag edit.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import {
   act,
   cleanup,
@@ -335,6 +337,54 @@ describe('Closet garment detail', () => {
     )
     expect(card('blue-top').getByTestId('garment-card-label')).toHaveTextContent(
       'Outer layer'
+    )
+  })
+
+  it('[P0] [7.19-CLOSET] saves a category-scoped subtype and filters to it', async () => {
+    closet.push(readyGarment('legacy-top'))
+    const user = userEvent.setup()
+    render(<WardrobePage />)
+    signIn()
+
+    await user.click(await screen.findByTestId('garment-open-blue-top'))
+    await user.click(await screen.findByTestId('garment-edit-tags'))
+    const subtypes = within(screen.getByRole('group', { name: 'Subtype' }))
+    expect(subtypes.queryByRole('button', { name: 'Midi skirt' })).toBeNull()
+    await user.click(subtypes.getByRole('button', { name: 'Tank top' }))
+    await user.click(screen.getByTestId('garment-tag-done'))
+
+    expect(await screen.findByTestId('status-feedback-bar')).toHaveTextContent('Saved')
+    expect(screen.getByTestId('garment-detail-subtype')).toHaveTextContent(/tank/i)
+    await user.click(topBarBack())
+    await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
+
+    await user.click(screen.getByTestId('closet-category-top'))
+    expect(screen.getByTestId('garment-open-legacy-top')).toBeVisible()
+    await user.click(screen.getByTestId('closet-subtype-tank'))
+    expect(screen.queryByTestId('garment-open-legacy-top')).toBeNull()
+    await user.click(screen.getByTestId('garment-open-blue-top'))
+    expect(await screen.findByTestId('garment-detail-subtype')).toHaveTextContent(/tank/i)
+  })
+
+  it('[P0] [7.19-CLOSET] Undo clears the subtype of a garment first read without one', async () => {
+    const user = userEvent.setup()
+    render(<WardrobePage />)
+    signIn()
+
+    await user.click(await screen.findByTestId('garment-open-blue-top'))
+    expect(await screen.findByTestId('garment-detail-subtype')).toHaveTextContent(
+      /^None$/
+    )
+    await user.click(await screen.findByTestId('garment-edit-tags'))
+    await user.click(screen.getByRole('button', { name: 'Tank top' }))
+    await user.click(screen.getByTestId('garment-tag-done'))
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-detail-subtype')).toHaveTextContent(/^Tank top$/)
+    )
+
+    await user.click(await screen.findByTestId('status-bar-action-undo'))
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-detail-subtype')).toHaveTextContent(/^None$/)
     )
   })
 

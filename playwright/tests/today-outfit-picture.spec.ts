@@ -1,6 +1,10 @@
 // Learning path Step 71: Today's outfit as a picture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
 // Test design: _bmad-output/test-artifacts/test-design-7-14-todays-outfit-as-picture.md.
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
+import { createReadyGarmentFixture } from '@couture/api-client/testing/wardrobe-fixtures'
+import { SAMPLE_CATALOG } from '@couture/utils'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
   FIXED_NOW,
@@ -206,5 +210,87 @@ test.describe('CC-7.14 Today outfit picture @local-lane', () => {
     await expect(bottom).not.toHaveAttribute('aria-label', originalName ?? '')
     await expect(picture.getByTestId('today-outfit-photo-0')).toBeVisible()
     await expect(picture.getByTestId('today-outfit-catalog-2')).toBeVisible()
+  })
+
+  test('[P0] [7.19-SWAP] offers matching owned pieces before catalog examples and keeps category fallback', async ({
+    page,
+    interceptNetworkCall,
+  }, testInfo) => {
+    const { router } = await openFixtureShell(page, interceptNetworkCall, {
+      mode: 'populated',
+      screen: 'home',
+    })
+    const ownedTops = [
+      {
+        ...createReadyGarmentFixture({
+          id: 'shell-garment-1',
+          category: 'top',
+          comfortRange: 'warm',
+        }),
+        subtype: 'tank',
+      },
+      {
+        ...createReadyGarmentFixture({
+          id: 'legacy-top',
+          category: 'top',
+          comfortRange: 'warm',
+        }),
+        subtype: null,
+      },
+      {
+        ...createReadyGarmentFixture({
+          id: 'other-tank',
+          category: 'top',
+          comfortRange: 'warm',
+        }),
+        subtype: 'tank',
+      },
+      {
+        ...createReadyGarmentFixture({
+          id: 'cold-tank',
+          category: 'top',
+          comfortRange: 'cold',
+        }),
+        subtype: 'tank',
+      },
+    ]
+    const closetRead = interceptNetworkCall({
+      method: 'GET',
+      url: '**/api/v1/wardrobe/garments*',
+      fulfillResponse: { body: { data: ownedTops } },
+    })
+    await page.goto('/')
+    expect((await closetRead).request?.headers()['x-couture-garment-subtype']).toBe('1')
+    await waitForShellSettled(page, router)
+
+    const top = page.getByTestId('today-outfit-slot-0')
+    const swap = page.getByTestId('today-outfit-swap')
+    await top.click()
+    const options = swap.getByRole('radio')
+    await expect(swap.getByRole('radio', { checked: true })).toHaveAttribute(
+      'data-garment-id',
+      'shell-garment-1'
+    )
+    await expect(options.nth(1)).toHaveAttribute('data-garment-id', 'other-tank')
+    await expect(options.nth(2)).toHaveAttribute('data-garment-id', 'legacy-top')
+    await expect(swap.locator('[data-garment-id="cold-tank"]')).toHaveCount(0)
+    await expect(options.nth(3)).toHaveAttribute('data-garment-id', /^sample:g:/)
+    const firstSampleId = await options.nth(3).getAttribute('data-garment-id')
+    expect(SAMPLE_CATALOG.garments.find(({ id }) => id === firstSampleId)?.subtype).toBe(
+      'tank'
+    )
+    await testInfo.attach('today-subtype-swap-390x844', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    })
+
+    await swap.locator('[data-garment-id="legacy-top"]').click()
+    await expect(swap).toBeHidden()
+    await expect(top).toBeFocused()
+    await top.click()
+    await expect(swap.getByRole('radio', { checked: true })).toHaveAttribute(
+      'data-garment-id',
+      'legacy-top'
+    )
   })
 })

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "1.11.0",
+    "version": "1.12.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -4938,6 +4938,30 @@
                     null
                   ],
                   "description": "Color family of the stored dominant garment color, null when none was computed. Present only when the request sends x-couture-garment-color: 1."
+                },
+                "subtype": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "camisole",
+                    "tank",
+                    "crop-top",
+                    "mini-skirt",
+                    "midi-skirt",
+                    "maxi-skirt",
+                    "leggings",
+                    "blazer",
+                    "moto-jacket",
+                    "moto-boots",
+                    "ankle-boots",
+                    "knee-boots",
+                    "tights",
+                    "socks",
+                    null
+                  ],
+                  "description": "Garment subtype, or null when unset. Present only when the request sends x-couture-garment-subtype: 1."
                 }
               },
               "required": [
@@ -5143,6 +5167,30 @@
               null
             ]
           },
+          "subtype": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "camisole",
+              "tank",
+              "crop-top",
+              "mini-skirt",
+              "midi-skirt",
+              "maxi-skirt",
+              "leggings",
+              "blazer",
+              "moto-jacket",
+              "moto-boots",
+              "ankle-boots",
+              "knee-boots",
+              "tights",
+              "socks",
+              null
+            ],
+            "description": "Optional subtype for the selected category. Null clears the subtype. Omission keeps a compatible subtype."
+          },
           "material": {
             "type": [
               "string",
@@ -5190,6 +5238,29 @@
                   null
                 ]
               },
+              "subtype": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "camisole",
+                  "tank",
+                  "crop-top",
+                  "mini-skirt",
+                  "midi-skirt",
+                  "maxi-skirt",
+                  "leggings",
+                  "blazer",
+                  "moto-jacket",
+                  "moto-boots",
+                  "ankle-boots",
+                  "knee-boots",
+                  "tights",
+                  "socks",
+                  null
+                ]
+              },
               "material": {
                 "type": [
                   "string",
@@ -5231,7 +5302,8 @@
           "category",
           "comfortRange"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "A garment subtype must belong to the selected category when set."
       },
       "UpdateGarmentTagsResponse": {
         "type": "object",
@@ -5392,6 +5464,30 @@
                   null
                 ],
                 "description": "Color family of the stored dominant garment color, null when none was computed. Present only when the request sends x-couture-garment-color: 1."
+              },
+              "subtype": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "camisole",
+                  "tank",
+                  "crop-top",
+                  "mini-skirt",
+                  "midi-skirt",
+                  "maxi-skirt",
+                  "leggings",
+                  "blazer",
+                  "moto-jacket",
+                  "moto-boots",
+                  "ankle-boots",
+                  "knee-boots",
+                  "tights",
+                  "socks",
+                  null
+                ],
+                "description": "Garment subtype, or null when unset. Present only when the request sends x-couture-garment-subtype: 1."
               }
             },
             "required": [
@@ -24242,6 +24338,19 @@
               "enum": [
                 "1"
               ],
+              "description": "Opt in to subtype on each garment independently of colorFamily."
+            },
+            "required": false,
+            "description": "Opt in to subtype on each garment independently of colorFamily.",
+            "name": "x-couture-garment-subtype",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ],
               "description": "Today wardrobe read with private photos gated on active guardian consent."
             },
             "required": false,
@@ -24252,7 +24361,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Persisted wardrobe garments. Each garment carries colorFamily only when the request sends x-couture-garment-color: 1.",
+            "description": "Persisted wardrobe garments. Each garment carries colorFamily and subtype only when the corresponding header is set to 1.",
             "content": {
               "application/json": {
                 "schema": {
@@ -24654,7 +24763,7 @@
         "tags": [
           "wardrobe"
         ],
-        "summary": "Confirm or edit garment category, material, and comfort tags",
+        "summary": "Confirm or edit garment category, subtype, material, and comfort tags",
         "security": [
           {
             "bearerAuth": []
@@ -24685,6 +24794,19 @@
             "description": "Opt in to colorFamily on each garment. Omission, or any other value, preserves the strict legacy response.",
             "name": "x-couture-garment-color",
             "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ],
+              "description": "Opt in to subtype on each garment independently of colorFamily."
+            },
+            "required": false,
+            "description": "Opt in to subtype on each garment independently of colorFamily.",
+            "name": "x-couture-garment-subtype",
+            "in": "header"
           }
         ],
         "requestBody": {
@@ -24699,7 +24821,7 @@
         },
         "responses": {
           "200": {
-            "description": "Garment tags updated successfully. The garment carries colorFamily only when the request sends x-couture-garment-color: 1.",
+            "description": "Garment tags updated successfully. The garment carries colorFamily and subtype only when the corresponding header is set to 1.",
             "content": {
               "application/json": {
                 "schema": {

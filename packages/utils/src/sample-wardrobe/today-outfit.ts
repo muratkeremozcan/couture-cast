@@ -1,4 +1,5 @@
 import { SAMPLE_CATALOG } from './catalog'
+import { preferGarmentSubtypes, type GarmentSubtype } from './garment-subtypes'
 import {
   createIdempotencyKey,
   type CreateSavedLookPayload,
@@ -23,6 +24,7 @@ export type TodayImageAccess = { url: string; expiresAt: string }
 export type TodaySlot = {
   itemId: string
   category: SampleGarmentCategory
+  subtype?: GarmentSubtype | null
   kind: SavedLookSlotKindValue
   imageAccess?: TodayImageAccess | null
   art: { key: string; primary: string; secondary: string }
@@ -31,6 +33,7 @@ export type TodaySlot = {
 type TodayWardrobePiece = {
   id: string
   category: SampleGarmentCategory | null
+  subtype?: GarmentSubtype | null
   status: string
   retentionStatus: string
   comfortRange?: ComfortRange | null
@@ -74,6 +77,7 @@ export function todayCatalogSlot(garment: SampleGarment): TodaySlot {
   return {
     itemId: garment.id,
     category: garment.category,
+    ...(garment.subtype && { subtype: garment.subtype }),
     art: garment.art,
     kind: 'catalog',
   }
@@ -100,7 +104,8 @@ export function buildTodaySlots(
     if (catalog) return todayCatalogSlot(catalog)
 
     const piece = recommended.get(itemId)
-    const category = piece?.category ?? closet.get(itemId)?.category
+    const owned = closet.get(itemId)
+    const category = piece?.category ?? owned?.category
     const placeholder = categoryByPlaceholder.get(itemId)
     if (placeholder || !category) {
       const fallbackCategory = placeholder ?? 'top'
@@ -113,6 +118,7 @@ export function buildTodaySlots(
     return {
       itemId,
       category,
+      ...(owned?.subtype && owned.category === category && { subtype: owned.subtype }),
       imageAccess: piece?.imageAccess,
       kind: 'garment',
       art: neutralArt,
@@ -150,6 +156,7 @@ export function todaySwapOptions(
           {
             itemId: piece.id,
             category: current.category,
+            ...(piece.subtype && { subtype: piece.subtype }),
             imageAccess: piece.imageAccess,
             kind: 'garment',
             art: neutralArt,
@@ -160,7 +167,12 @@ export function todaySwapOptions(
   const catalog = catalogCandidates(current.category, weather)
     .filter((piece) => !usedIds.has(piece.id))
     .map(todayCatalogSlot)
-  return [current, ...closet, ...catalog]
+  const matches = current.subtype ? [current.subtype] : []
+  return [
+    current,
+    ...preferGarmentSubtypes(closet, matches),
+    ...preferGarmentSubtypes(catalog, matches),
+  ]
 }
 
 export function todaySlotCatalogItem(slot: TodaySlot): SampleGarment | undefined {
@@ -197,7 +209,13 @@ export function applyTodaySlotEdits(
       (item) =>
         item.id === selected.itemId && isCompatibleClosetPiece(item, slot.category, range)
     )
-    return piece ? { ...selected, imageAccess: piece.imageAccess } : slot
+    return piece
+      ? {
+          ...selected,
+          ...(piece.subtype !== undefined && { subtype: piece.subtype }),
+          imageAccess: piece.imageAccess,
+        }
+      : slot
   })
 }
 

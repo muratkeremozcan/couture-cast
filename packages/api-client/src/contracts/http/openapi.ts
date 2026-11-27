@@ -177,7 +177,8 @@ export function generateHttpOpenApiDocument() {
       // optional `expected` and documents one more 409 message, GARMENT_TAGS_CHANGED.
       // Story CC-7.6 bumps the minor: one additive garment usage read, and the existing
       // garment DELETE (204) is now published. No existing operation narrows.
-      version: '1.11.0',
+      // CC-7.19 adds independently negotiated garment subtypes and optional update fields.
+      version: '1.12.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [

@@ -3,17 +3,14 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type {
-  GarmentCategory,
-  GarmentWithColor,
-} from '@couture/api-client/contracts/http'
+import type { GarmentCategory, GarmentWithTags } from '@couture/api-client/contracts/http'
 import { formatGarmentAlt, formatLocalizedList } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { isLiveScope } from '../../lib/use-web-session'
 import { listGarmentsFromWeb } from '../../lib/wardrobe'
 import { useScreenGateRead, useSectionSnapshot } from './screen-gate'
 
-const noGarments: GarmentWithColor[] = []
+const noGarments: GarmentWithTags[] = []
 
 export function useHomeWardrobe(owner: string, scope: string | null) {
   const { restored, beginRead, remember } = useSectionSnapshot<
@@ -23,7 +20,7 @@ export function useHomeWardrobe(owner: string, scope: string | null) {
   const [pieces, setPieces] = useState<(GarmentCategory | null)[] | null | undefined>(
     restored
   )
-  const [wardrobe, setWardrobe] = useState<GarmentWithColor[]>(noGarments)
+  const [wardrobe, setWardrobe] = useState<GarmentWithTags[]>(noGarments)
   useScreenGateRead('closet', pieces !== undefined)
 
   useEffect(() => {

@@ -26,7 +26,7 @@ import {
 import type {
   GarmentComfortRange,
   GarmentMaterial,
-  GarmentWithColor,
+  GarmentWithTags,
 } from '@couture/api-client/contracts/http'
 import {
   classifyGarmentTagSaveError,
@@ -37,12 +37,16 @@ import {
   formatGarmentAlt,
   formatGarmentCategory,
   formatGarmentTagLabels,
+  garmentSubtypeMatchesCategory,
+  garmentSubtypesForCategory,
+  garmentSubtypeStrings,
   garmentTagDraft,
   garmentTagsEqual,
   getGuestPreviewStrings,
   getStylePieceStrings,
   SAMPLE_GARMENT_CATEGORIES,
   SAMPLE_GARMENT_MATERIALS,
+  type GarmentSubtype,
   type GarmentTagDraft,
   type GarmentTagSaveFailure,
   type StylePieceSelection,
@@ -77,8 +81,8 @@ import {
 import { garmentDeletion, type MobileGarmentDeletion } from './garment-deletion'
 
 /** A Closet garment: list reads carry `colorFamily`; a just-committed upload may not yet. */
-export type ClosetGarment = Omit<GarmentWithColor, 'colorFamily'> &
-  Partial<Pick<GarmentWithColor, 'colorFamily'>>
+export type ClosetGarment = Omit<GarmentWithTags, 'colorFamily'> &
+  Partial<Pick<GarmentWithTags, 'colorFamily'>>
 
 /** D6: the accessibility label of a member garment photo ("Blue top"). */
 export function garmentPhotoLabel(locale: string, garment: ClosetGarment): string {
@@ -161,7 +165,7 @@ function useClosetGarments(epoch: number) {
     return () => controller.abort()
   }, [loadAttempt, loadInventory])
 
-  const replaceGarment = useCallback((updated: GarmentWithColor) => {
+  const replaceGarment = useCallback((updated: GarmentWithTags) => {
     revision.current++
     setGarments((current) =>
       current
@@ -353,7 +357,7 @@ function useGarmentTagEditor({
   garment: ClosetGarment
   owner: string | null
   epoch: number
-  onTagsSaved: (garment: GarmentWithColor) => void
+  onTagsSaved: (garment: GarmentWithTags) => void
   onRefresh: () => void
 }) {
   const { t } = useTranslation()
@@ -491,7 +495,9 @@ function useGarmentTagEditor({
       const doneCommits = doneCommitsRef.current
       await saveTags(
         actionOwner,
-        previous,
+        savedTags.subtype === undefined
+          ? previous
+          : { ...previous, subtype: previous.subtype ?? null },
         savedTags,
         () => doneCommitsRef.current === doneCommits
       )
@@ -606,7 +612,7 @@ function useGarmentTagEditor({
       setSaveState('still-saving')
       announce('still-saving', runId)
     }, SAVE_FEEDBACK_TIMINGS.stillSavingAfterMs)
-    let updated: GarmentWithColor
+    let updated: GarmentWithTags
     try {
       if (!(await ensureOnline())) {
         if (!isCurrentRun()) return
@@ -927,6 +933,47 @@ function GarmentDeleteUsageFailed({ onRetry }: { onRetry: () => void }) {
   )
 }
 
+function GarmentTagSummary({ garment }: { garment: ClosetGarment }) {
+  const { t, i18n } = useTranslation()
+  const themed = useThemedStyles()
+  const labels = formatGarmentTagLabels(i18n.language, garment)
+  const subtypeStrings = garmentSubtypeStrings(i18n.language)
+  const tagRow = (testID: string, label: string, value: string) => (
+    <View style={[styles.tagRow, themed.divider]}>
+      <Text style={[styles.tagLabel, themed.mutedText]}>{label}</Text>
+      <Text testID={testID} style={[styles.tagValue, themed.text]}>
+        {value}
+      </Text>
+    </View>
+  )
+
+  return (
+    <>
+      {tagRow(
+        'garment-detail-category',
+        t('wardrobe.detail.category'),
+        labels.category ?? ''
+      )}
+      {garmentSubtypesForCategory(garment.category).length > 0 &&
+        tagRow(
+          'garment-detail-subtype',
+          subtypeStrings.label,
+          garment.subtype ? subtypeStrings.values[garment.subtype] : subtypeStrings.none
+        )}
+      {tagRow(
+        'garment-detail-material',
+        t('wardrobe.detail.material'),
+        labels.material ?? t('wardrobe.detail.noMaterial')
+      )}
+      {tagRow(
+        'garment-detail-comfort',
+        t('wardrobe.detail.comfort'),
+        labels.comfort ?? ''
+      )}
+    </>
+  )
+}
+
 function GarmentTagPanel({
   garment,
   owner,
@@ -944,16 +991,17 @@ function GarmentTagPanel({
   /** The latest closet read failed and none is running. */
   readFailed: boolean
   deletion: MobileGarmentDeletion
-  onTagsSaved: (garment: GarmentWithColor) => void
+  onTagsSaved: (garment: GarmentWithTags) => void
   styleEntry: ReactNode
 }) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language
   const themed = useThemedStyles()
   const values = getGuestPreviewStrings(locale).values
-  const labels = formatGarmentTagLabels(locale, garment)
+  const subtypeStrings = garmentSubtypeStrings(locale)
   const editor = useGarmentTagEditor({ garment, owner, epoch, onTagsSaved, onRefresh })
   const { draft, setDraft, failure, saveState, awaitingRead } = editor
+  const subtypeOptions = garmentSubtypesForCategory(draft?.category)
   const saving = saveState !== 'idle'
   const doneBlocked = saving || awaitingRead
   const remover = useGarmentDelete({ garment, owner, epoch, deletion })
@@ -962,23 +1010,19 @@ function GarmentTagPanel({
   // detail over a tag draft.
   const editDisabled = !editor.canEdit || deleteBusy
 
-  const tagRow = (testID: string, label: string, value: string) => (
-    <View style={[styles.tagRow, themed.divider]}>
-      <Text style={[styles.tagLabel, themed.mutedText]}>{label}</Text>
-      <Text testID={testID} style={[styles.tagValue, themed.text]}>
-        {value}
-      </Text>
-    </View>
-  )
-
   const field = <V extends string>(
-    name: 'category' | 'material' | 'comfort',
+    name: 'category' | 'subtype' | 'material' | 'comfort',
     legend: string,
     options: readonly { value: V; label: string }[],
     selected: V,
     onSelect: (value: V) => void
   ) => (
-    <View style={styles.field} accessibilityRole="radiogroup" accessibilityLabel={legend}>
+    <View
+      style={styles.field}
+      accessibilityRole="radiogroup"
+      accessibilityLabel={legend}
+      testID={name === 'subtype' ? 'garment-detail-subtype-picker' : undefined}
+    >
       <Text style={[styles.legend, themed.text]}>{legend}</Text>
       <View style={styles.chips}>
         {options.map((option) => {
@@ -990,7 +1034,11 @@ function GarmentTagPanel({
               aria-checked={pressed}
               aria-disabled={saving}
               disabled={saving}
-              testID={`garment-tag-option-${name}-${option.value}`}
+              testID={
+                name === 'subtype'
+                  ? `garment-detail-subtype-${option.value}`
+                  : `garment-tag-option-${name}-${option.value}`
+              }
               onPress={() => onSelect(option.value)}
               style={[styles.chip, pressed ? themed.chipSelected : themed.chip]}
             >
@@ -1006,21 +1054,7 @@ function GarmentTagPanel({
 
   return (
     <View>
-      {tagRow(
-        'garment-detail-category',
-        t('wardrobe.detail.category'),
-        labels.category ?? ''
-      )}
-      {tagRow(
-        'garment-detail-material',
-        t('wardrobe.detail.material'),
-        labels.material ?? t('wardrobe.detail.noMaterial')
-      )}
-      {tagRow(
-        'garment-detail-comfort',
-        t('wardrobe.detail.comfort'),
-        labels.comfort ?? ''
-      )}
+      <GarmentTagSummary garment={garment} />
 
       {draft ? (
         <View testID="garment-tag-editor" style={styles.editor}>
@@ -1032,8 +1066,31 @@ function GarmentTagPanel({
               label: formatGarmentCategory(locale, value),
             })),
             draft.category,
-            (category) => setDraft({ ...draft, category })
+            (category) =>
+              setDraft({
+                ...draft,
+                category,
+                ...(draft.subtype &&
+                !garmentSubtypeMatchesCategory(category, draft.subtype)
+                  ? { subtype: null }
+                  : {}),
+              })
           )}
+          {subtypeOptions.length > 0 &&
+            field<GarmentSubtype | 'none'>(
+              'subtype',
+              subtypeStrings.label,
+              [
+                { value: 'none', label: subtypeStrings.none },
+                ...subtypeOptions.map((value) => ({
+                  value,
+                  label: subtypeStrings.values[value],
+                })),
+              ],
+              draft.subtype ?? 'none',
+              (subtype) =>
+                setDraft({ ...draft, subtype: subtype === 'none' ? null : subtype })
+            )}
           {field<GarmentMaterial | 'none'>(
             'material',
             t('wardrobe.detail.material'),

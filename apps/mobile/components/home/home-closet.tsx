@@ -2,10 +2,7 @@ import { router, useFocusEffect } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import type {
-  GarmentCategory,
-  GarmentWithColor,
-} from '@couture/api-client/contracts/http'
+import type { GarmentCategory, GarmentWithTags } from '@couture/api-client/contracts/http'
 import { formatGarmentAlt, formatLocalizedList } from '@couture/utils'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import {
@@ -22,7 +19,7 @@ export function useHomeWardrobe(owner: string | null, enabled: boolean) {
   const [result, setResult] = useState<{
     epoch: number
     pieces: (GarmentCategory | null)[] | null
-    wardrobe: GarmentWithColor[]
+    wardrobe: GarmentWithTags[]
   } | null>(null)
   useFocusEffect(
     useCallback(() => {

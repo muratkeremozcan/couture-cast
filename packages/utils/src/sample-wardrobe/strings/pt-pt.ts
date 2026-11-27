@@ -209,6 +209,9 @@ export const ptPT: GuestPreviewStrings = {
       accessory: 'acessório',
     },
     garmentType: {
+      tank: 'Tops sem mangas',
+      'crop-top': 'Tops curtos',
+      leggings: 'Leggings',
       tee: 'T-shirts',
       shirt: 'Camisas',
       sweater: 'Camisolas',
@@ -305,6 +308,36 @@ export const ptPT: GuestPreviewStrings = {
       'Nenhum conjunto é adequado a estas definições nesta coleção: {collection}.',
   },
   garments: {
+    'lined-blazer': {
+      name: 'Blazer forrado',
+      description: 'Um blazer azul-ardósia em lã de trama fechada.',
+    },
+    camisole: { name: 'Top de seda', description: 'Seda rosa com alças finas.' },
+    tank: {
+      name: 'Camisola canelada sem mangas',
+      description: 'Camisola verde-clara de algodão canelado.',
+    },
+    'crop-top': { name: 'Top curto de algodão', description: 'T-shirt curta lilás.' },
+    'maxi-skirt': {
+      name: 'Saia comprida de linho',
+      description: 'Saia comprida azul de linho.',
+    },
+    leggings: {
+      name: 'Leggings elásticas',
+      description: 'Leggings cinzento-escuras de cintura larga.',
+    },
+    'moto-jacket': {
+      name: 'Casaco de motociclista',
+      description: 'Pele preta com fecho diagonal.',
+    },
+    'moto-boots': {
+      name: 'Botas de motociclista',
+      description: 'Botas de pele escura com fivela.',
+    },
+    'knee-boots': {
+      name: 'Botas até ao joelho',
+      description: 'Botas altas de pele castanha.',
+    },
     'ribbed-knit': {
       name: 'Camisola canelada',
       description: 'Camisola de algodão creme com acabamento canelado.',
@@ -450,6 +483,26 @@ export const ptPT: GuestPreviewStrings = {
     },
   },
   looks: {
+    'weekend-layers': {
+      name: 'Camadas de fim de semana',
+      description: 'Camisola canelada, leggings, botas de motociclista e meias.',
+    },
+    'skirt-and-boots': {
+      name: 'Saia e botas altas',
+      description: 'Camisola, minissaia, collants e botas até ao joelho.',
+    },
+    'summer-skirt': {
+      name: 'Saia de verão',
+      description: 'Top de seda, saia comprida e sandálias.',
+    },
+    'sunny-weekend': {
+      name: 'Fim de semana ao sol',
+      description: 'Camisola sem mangas, calças de linho e sandálias.',
+    },
+    'midi-and-sneakers': {
+      name: 'Saia midi e sapatilhas',
+      description: 'Top curto, saia midi e sapatilhas brancas.',
+    },
     'mini-and-tights': {
       name: 'Minissaia e collants',
       description: 'Camisola canelada, minissaia ameixa, collants opacos e botins.',

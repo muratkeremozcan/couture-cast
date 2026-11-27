@@ -22443,3 +22443,49 @@ preview and back from an account save.
   [member selection tests](../../packages/utils/src/sample-wardrobe/member-outfit.spec.ts), and
   [shared grouping tests](../../packages/utils/src/sample-wardrobe/display.spec.ts).
 - [Step 71](#step-71-todays-outfit-as-a-picture) covers the picture and its swap controls.
+
+## Step 76: Garment subtypes
+
+Use subtype tags to find a specific piece in Closet and choose which piece goes into a look.
+
+### Sequence to follow
+
+1. Open a garment in Closet and edit its tags. Pick its category and an available subtype.
+   For example, choose Bottom and Mini skirt. Save and reopen the garment to check the label.
+2. In Closet, select Bottom and then Mini skirt. Clear the subtype filter to see all bottoms,
+   including pieces that have only a category.
+3. Open a slot in the live Today outfit. Check that the current item is marked and that eligible
+   closet pieces come before samples. Choose a replacement and check the outfit picture.
+4. Change the sample weather and browse the example pieces. Check how the weather changes the
+   pieces available to use in a look.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-19-garment-subtypes.md) and
+  [acceptance plan](../test-artifacts/test-design-7-19-garment-subtypes.md).
+- [Subtype and locale tests](../../packages/utils/src/sample-wardrobe/garment-subtypes.spec.ts),
+  [wardrobe HTTP tests](../../apps/api/integration/wardrobe-garment-color-http.integration.spec.ts),
+  and [generator tests](../../apps/api/src/modules/personalization/ritual-generation.engine.spec.ts).
+- [Web tagging](../../playwright/tests/wardrobe-smart-tagging.spec.ts),
+  [live Today swap](../../playwright/tests/today-outfit-picture.spec.ts),
+  [persistent tag editing](../../playwright/tests/wardrobe-garment-detail.spec.ts), and
+  [web garment detail](../../apps/web/src/app/wardrobe/page.garment-detail.test.tsx).
+- [Native tag edit](../../apps/mobile/src/features/wardrobe/garment-detail-screen.test.tsx)
+  and [native Closet filters](../../apps/mobile/src/features/wardrobe/wardrobe-hub-screen.test.tsx).
+- [Catalog invariants](../../packages/utils/src/sample-wardrobe/catalog.spec.ts),
+  [sample browse](../../packages/utils/src/sample-wardrobe/display.spec.ts), and
+  [weather ranking](../../packages/utils/src/sample-wardrobe/selector.spec.ts).
+- [Web client](../../apps/web/src/lib/wardrobe.test.ts),
+  [native client](../../apps/mobile/src/lib/wardrobe.test.ts), and
+  [wardrobe wire contract](../../packages/api-client/testing/wardrobe-contract.spec.ts).
+- [Web tag confirmation](../../apps/web/src/app/components/garment-tagging-modal.test.tsx)
+  and [native tag confirmation](../../apps/mobile/components/wardrobe/garment-tagging-modal.test.tsx).
+- [Web swap picture](../../apps/web/src/app/components/today-outfit-picture.test.tsx),
+  [native swap picture](../../apps/mobile/components/home/today-outfit-picture.test.tsx),
+  and [shared Today selection](../../packages/utils/src/sample-wardrobe/today-outfit.spec.ts).
+- [Preserving sample selections](../../packages/utils/src/sample-wardrobe/member-outfit.spec.ts).
+- [Wardrobe controller](../../apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts).
+- [Native sample closet](../../apps/mobile/src/features/preview/guest-preview-screen.test.tsx).
+- [Android smart tagging](../../maestro/garment-smart-tagging-flow.yaml)
+  and [guest conversion](../../maestro/guest-preview/guest-preview-conversion-verify.yaml).
+- [Step 75](#step-75-find-mini-skirts-tights-and-socks) covers the sample closet.

@@ -2,9 +2,11 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 // Learning path Step 58: Hosted wardrobe workers and manual tagging.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 // @vitest-environment jsdom
 import React from 'react'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
@@ -623,7 +625,7 @@ describe('GarmentTaggingModal manual mode', () => {
     expect(screen.queryByRole('button', { name: /Retry/ })).not.toBeInTheDocument()
   })
 
-  it('preselects nothing and saves exactly what the member chose', async () => {
+  it('[7.19-CLOSET] starts unset, resets the subtype on category change, and saves the new subtype', async () => {
     const user = userEvent.setup()
     const updateTagsFn = vi.fn().mockResolvedValue(mockUpdatedGarment)
     const onTagsConfirmed = vi.fn()
@@ -642,19 +644,78 @@ describe('GarmentTaggingModal manual mode', () => {
     await screen.findByText(MANUAL_COPY)
 
     expect(screen.getByRole('button', { name: 'Save tags' })).toBeDisabled()
+    expect(screen.queryByRole('radiogroup', { name: 'Subtype' })).toBeNull()
+    await user.click(screen.getByRole('radio', { name: /^Top$/ }))
+    const subtypeGroup = within(screen.getByRole('radiogroup', { name: 'Subtype' }))
+    await user.click(subtypeGroup.getByRole('radio', { name: 'None' }))
+    await user.keyboard('{ArrowRight}')
+    const camisole = subtypeGroup.getByRole('radio', { name: 'Camisole' })
+    expect(camisole).toHaveFocus()
+    expect(camisole).toBeChecked()
     // Exact name: the Cool comfort option's description also mentions outerwear.
     await user.click(screen.getByRole('radio', { name: 'Outerwear' }))
+    expect(subtypeGroup.getByRole('radio', { name: 'None' })).toBeChecked()
+    expect(subtypeGroup.queryByRole('radio', { name: 'Camisole' })).toBeNull()
+    await user.click(subtypeGroup.getByRole('radio', { name: 'Blazer' }))
     await user.click(screen.getByRole('radio', { name: /Cool/ }))
     await user.click(screen.getByRole('button', { name: 'Save tags' }))
 
     await waitFor(() => {
       expect(updateTagsFn).toHaveBeenCalledWith(
         'garment-1',
-        { category: 'outerwear', material: null, comfortRange: 'cool' },
+        {
+          category: 'outerwear',
+          material: null,
+          comfortRange: 'cool',
+          subtype: 'blazer',
+        },
         expect.any(AbortSignal)
       )
     })
     expect(onTagsConfirmed).toHaveBeenCalledWith(mockUpdatedGarment)
+  })
+
+  it.each([
+    {
+      behavior: 'omits a stored subtype that the member left untouched',
+      clear: false,
+      expectedSubtype: {},
+    },
+    {
+      behavior: 'sends null when the member chooses None',
+      clear: true,
+      expectedSubtype: { subtype: null },
+    },
+  ])('[7.19-CLOSET] $behavior', async ({ clear, expectedSubtype }) => {
+    const user = userEvent.setup()
+    const updateTagsFn = vi.fn().mockResolvedValue(mockUpdatedGarment)
+    render(
+      <GarmentTaggingModal
+        isOpen
+        onClose={vi.fn()}
+        garmentId="garment-1"
+        initialGarment={{ id: 'garment-1', category: 'top', subtype: 'camisole' }}
+        onTagsConfirmed={vi.fn()}
+        suggestTagsFn={vi
+          .fn()
+          .mockResolvedValue(createManualSuggestGarmentTagsDataFixture())}
+        updateTagsFn={updateTagsFn}
+      />
+    )
+    await screen.findByText(MANUAL_COPY)
+    const subtypes = within(screen.getByRole('radiogroup', { name: 'Subtype' }))
+    expect(subtypes.getByRole('radio', { name: 'Camisole' })).toBeChecked()
+    if (clear) await user.click(subtypes.getByRole('radio', { name: 'None' }))
+    await user.click(screen.getByRole('radio', { name: /Cool/ }))
+    await user.click(screen.getByRole('button', { name: 'Save tags' }))
+
+    await waitFor(() =>
+      expect(updateTagsFn).toHaveBeenCalledExactlyOnceWith(
+        'garment-1',
+        { category: 'top', material: null, comfortRange: 'cool', ...expectedSubtype },
+        expect.any(AbortSignal)
+      )
+    )
   })
 
   it('returns to the suggestion copy when the next garment is not manual', async () => {

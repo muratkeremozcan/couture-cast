@@ -1,6 +1,8 @@
 // Learning path Step 56: Guest wardrobe and outfit preview.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 U-SEL-*, U-SWAP and U-VOTES: the shared deterministic sample policy.
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import { describe, expect, it } from 'vitest'
 import { SAMPLE_CATALOG } from './catalog'
 import {
@@ -416,14 +418,12 @@ describe('sample swaps (U-SWAP)', () => {
   })
 
   it('ranks exact range before close matches', () => {
-    const state = input({
-      weather: 'warm-rainy',
-      comfort: comfort({ runsColdWarm: 'cold' }),
-    })
+    const state = input({ weather: 'warm-rainy' })
     const options = sampleSwapCandidates(SAMPLE_CATALOG, 'outerwear', state)
     expect(options.map((option) => option.id)).toEqual([
-      'sample:g:trench-coat',
       'sample:g:rain-shell',
+      'sample:g:trench-coat',
+      'sample:g:moto-jacket',
     ])
   })
 })

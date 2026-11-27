@@ -1,5 +1,7 @@
 # Learning path Step 30: Smart tagging and comfort metadata.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+# Learning path Step 76: Garment subtypes.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 # Story 4.2 mobile E2E: worker-backed smart tagging and persisted confirmation
 appId: ${MAESTRO_APP_ID}
 name: 'Garment smart tagging flow'
@@ -108,6 +110,11 @@ tags:
 
 - tapOn:
     id: 'garment-tag-category-bottom'
+
+- scrollUntilVisible:
+    element:
+      id: 'garment-tag-comfort-mild'
+    direction: DOWN
 
 - tapOn:
     id: 'garment-tag-comfort-mild'

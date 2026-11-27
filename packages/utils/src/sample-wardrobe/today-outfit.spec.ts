@@ -1,5 +1,7 @@
 // Learning path Step 71: Today's outfit as a picture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import { describe, expect, it, vi } from 'vitest'
 import { SAMPLE_CATALOG } from './catalog'
 import * as selector from './selector'
@@ -171,6 +173,55 @@ describe('Today outfit slots and saved composition', () => {
     expect(
       applyTodaySlotEdits([base], edits, [{ ...closet, comfortRange: 'hot' }], mild)
     ).toEqual([base])
+  })
+
+  it('[7.19-SWAP] ranks owned and sample matches and refreshes the chosen slot subtype', () => {
+    const current = { ...closet, id: 'current-tank', subtype: 'tank' } as const
+    const match = { ...closet, id: 'matching-tank', subtype: 'tank' } as const
+    const wardrobe = [closet, current, match]
+    const slots = buildTodaySlots(
+      { id: 'fixture', garmentIds: [current.id] },
+      mild,
+      wardrobe
+    )
+    expect(slots[0]).toMatchObject({ itemId: current.id, subtype: 'tank' })
+
+    const options = todaySwapOptions(slots, 0, wardrobe, mild)
+    expect(options.slice(0, 4).map(({ itemId }) => itemId)).toEqual([
+      'current-tank',
+      'matching-tank',
+      'closet-top',
+      'sample:g:tank',
+    ])
+    expect(options[4]).toMatchObject({ kind: 'catalog', category: 'top' })
+
+    const edits = { 0: options[1]! }
+    const updated = { ...match, subtype: 'crop-top' } as const
+    expect(applyTodaySlotEdits(slots, edits, [updated], mild)[0]).toMatchObject({
+      itemId: match.id,
+      subtype: 'crop-top',
+    })
+    expect(
+      applyTodaySlotEdits(slots, edits, [{ ...updated, subtype: null }], mild)[0]
+    ).toMatchObject({
+      itemId: match.id,
+      subtype: null,
+    })
+  })
+
+  it('[7.19-SWAP] omits an owned subtype that conflicts with the recommendation category', () => {
+    const owned = { ...closet, category: 'bottom', subtype: 'mini-skirt' } as const
+    const slots = buildTodaySlots(
+      {
+        id: 'stale-recommendation',
+        garmentIds: [owned.id],
+        displayGarments: [{ id: owned.id, category: 'top' }],
+      },
+      mild,
+      [owned]
+    )
+    expect(slots[0]).toMatchObject({ itemId: owned.id, category: 'top' })
+    expect(slots[0]?.subtype).toBeUndefined()
   })
 
   it('writes the selected condition, date and ordered slots without photo access', () => {

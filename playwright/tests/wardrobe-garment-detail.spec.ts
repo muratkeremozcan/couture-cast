@@ -6,6 +6,8 @@
 // - E2E-003 runs axe on the detail and the open editor.
 // Learning path Step 63: Garment detail and tag edit.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import type { Page } from '@playwright/test'
 import {
   garmentListWithColorResponseSchema,
@@ -155,9 +157,15 @@ realTest.describe('Garment detail and tag edit against the local API', () => {
         // Done names the tags the editor opened with, so a newer edit is never overwritten.
         expect(requestJson).toEqual({
           category: 'top',
+          subtype: null,
           material: 'wool',
           comfortRange: 'cold',
-          expected: { category: 'top', material: 'cotton', comfortRange: 'mild' },
+          expected: {
+            category: 'top',
+            subtype: null,
+            material: 'cotton',
+            comfortRange: 'mild',
+          },
         })
         await expect(page.getByTestId('status-feedback-bar')).toContainText('Saved')
         await expectTags(page, { category: 'Top', material: 'Wool', comfort: 'Cold' })
@@ -184,9 +192,15 @@ realTest.describe('Garment detail and tag edit against the local API', () => {
         // Undo restores the tags before this save and names the tags this save wrote.
         expect(requestJson).toEqual({
           category: 'top',
+          subtype: null,
           material: 'wool',
           comfortRange: 'cold',
-          expected: { category: 'top', material: 'wool', comfortRange: 'hot' },
+          expected: {
+            category: 'top',
+            subtype: null,
+            material: 'wool',
+            comfortRange: 'hot',
+          },
         })
         await expect(page.getByTestId('status-feedback-bar')).toContainText(
           'Change undone.'

@@ -3,6 +3,7 @@
 // Bump `catalogVersion` on any change so stored guest state from an older catalog is
 // discarded (D7).
 import type { ComfortRange } from '../comfort-rules'
+import type { GarmentSubtype } from './garment-subtypes'
 import type {
   SampleArtKey,
   SampleCatalog,
@@ -14,7 +15,7 @@ import type {
   SampleStylePreferences,
 } from './types'
 
-export const SAMPLE_CATALOG_VERSION = '2026-11-21.1'
+export const SAMPLE_CATALOG_VERSION = '2026-11-27.1'
 
 const PROVENANCE = {
   authored: 'couture-cast',
@@ -27,6 +28,7 @@ const WOMENSWEAR: readonly SampleCollection[] = ['womenswear']
 const MENSWEAR: readonly SampleCollection[] = ['menswear']
 
 type GarmentOptions = {
+  subtype?: GarmentSubtype
   material?: SampleGarmentMaterial
   wind?: boolean
   water?: boolean
@@ -44,6 +46,7 @@ function garment(
   return {
     id: `sample:g:${slug}`,
     category,
+    ...(options.subtype ? { subtype: options.subtype } : {}),
     ...(options.material ? { material: options.material } : {}),
     comfortRanges: [...comfortRanges],
     windResistant: options.wind ?? false,
@@ -59,12 +62,14 @@ function look(
   collections: readonly SampleCollection[],
   core: readonly string[],
   feedbackCard: boolean,
-  preferences?: SampleStylePreferences
+  preferences?: SampleStylePreferences,
+  layer?: string
 ): SampleLook {
   return {
     id: `sample:l:${slug}`,
     collections: [...collections],
     core: core.map((garmentSlug) => `sample:g:${garmentSlug}`),
+    ...(layer ? { layer: `sample:g:${layer}` } : {}),
     feedbackCard,
     ...(preferences ? { preferences } : {}),
   }
@@ -93,6 +98,7 @@ const OUTERWEAR: SampleGarment[] = [
     {
       material: 'wool',
       collections: WOMENSWEAR,
+      subtype: 'blazer',
     }
   ),
   garment('wool-overcoat', 'outerwear', ['cold'], ['coat', '#2f3b52', '#c9b48a'], {
@@ -124,6 +130,30 @@ const OUTERWEAR: SampleGarment[] = [
       material: 'synthetic',
       wind: true,
       water: true,
+    }
+  ),
+  garment(
+    'moto-jacket',
+    'outerwear',
+    ['cool', 'mild'],
+    ['moto-jacket', '#323238', '#a3a1a6'],
+    {
+      subtype: 'moto-jacket',
+      material: 'leather',
+      wind: true,
+      water: true,
+    }
+  ),
+  garment(
+    'lined-blazer',
+    'outerwear',
+    ['cool', 'mild'],
+    ['blazer', '#4c5365', '#ababba'],
+    {
+      subtype: 'blazer',
+      material: 'wool',
+      wind: true,
+      collections: WOMENSWEAR,
     }
   ),
 ]
@@ -168,6 +198,20 @@ const TOPS: SampleGarment[] = [
     material: 'cotton',
     collections: WOMENSWEAR,
   }),
+  garment('camisole', 'top', ['warm', 'hot'], ['camisole', '#b37c87', '#66414a'], {
+    subtype: 'camisole',
+    material: 'silk',
+    collections: WOMENSWEAR,
+  }),
+  garment('tank', 'top', ['warm', 'hot'], ['tank', '#86aaa0', '#325a50'], {
+    subtype: 'tank',
+    material: 'cotton',
+  }),
+  garment('crop-top', 'top', ['mild', 'warm'], ['crop-top', '#a9a1cc', '#564875'], {
+    subtype: 'crop-top',
+    material: 'cotton',
+    collections: WOMENSWEAR,
+  }),
 ]
 
 const BOTTOMS: SampleGarment[] = [
@@ -203,6 +247,7 @@ const BOTTOMS: SampleGarment[] = [
     }
   ),
   garment('midi-skirt', 'bottom', ['mild', 'warm'], ['skirt', '#6d5a8a', '#4b3d61'], {
+    subtype: 'midi-skirt',
     material: 'synthetic',
     collections: WOMENSWEAR,
   }),
@@ -213,6 +258,22 @@ const BOTTOMS: SampleGarment[] = [
     ['pleated-skirt', '#4a4a5c', '#2e2e3a'],
     {
       material: 'wool',
+      collections: WOMENSWEAR,
+    }
+  ),
+  garment('maxi-skirt', 'bottom', ['warm', 'hot'], ['maxi-skirt', '#566b81', '#8097af'], {
+    subtype: 'maxi-skirt',
+    material: 'linen',
+    collections: WOMENSWEAR,
+  }),
+  garment(
+    'leggings',
+    'bottom',
+    ['cold', 'cool', 'mild'],
+    ['leggings', '#34343e', '#777588'],
+    {
+      subtype: 'leggings',
+      material: 'synthetic',
       collections: WOMENSWEAR,
     }
   ),
@@ -228,6 +289,7 @@ const BOTTOMS: SampleGarment[] = [
     {
       material: 'wool',
       collections: WOMENSWEAR,
+      subtype: 'mini-skirt',
     }
   ),
 ]
@@ -260,6 +322,7 @@ const SHOES: SampleGarment[] = [
     {
       material: 'leather',
       collections: WOMENSWEAR,
+      subtype: 'ankle-boots',
     }
   ),
   garment(
@@ -282,6 +345,16 @@ const SHOES: SampleGarment[] = [
   ),
   garment('sandals', 'shoes', ['warm', 'hot'], ['sandals', '#a8784f', '#6f4c30'], {
     material: 'leather',
+  }),
+  garment('moto-boots', 'shoes', ['cold', 'cool'], ['moto-boots', '#38333b', '#77717c'], {
+    subtype: 'moto-boots',
+    material: 'leather',
+    water: true,
+  }),
+  garment('knee-boots', 'shoes', ['cold', 'cool'], ['knee-boots', '#744b3f', '#412820'], {
+    subtype: 'knee-boots',
+    material: 'leather',
+    collections: WOMENSWEAR,
   }),
 ]
 
@@ -315,6 +388,7 @@ const ACCESSORIES: SampleGarment[] = [
     {
       material: 'synthetic',
       collections: WOMENSWEAR,
+      subtype: 'tights',
     }
   ),
   garment(
@@ -325,6 +399,7 @@ const ACCESSORIES: SampleGarment[] = [
     {
       material: 'cotton',
       collections: WOMENSWEAR,
+      subtype: 'socks',
     }
   ),
 ]
@@ -406,6 +481,43 @@ const LOOKS: SampleLook[] = [
     ['ribbed-knit', 'mini-skirt', 'ankle-boots', 'opaque-tights'],
     false,
     { style: 'cozy', palette: 'colorful', texture: 'textured' }
+  ),
+  look(
+    'weekend-layers',
+    WOMENSWEAR,
+    ['ribbed-knit', 'leggings', 'moto-boots', 'ribbed-socks'],
+    false,
+    { style: 'cozy', palette: 'neutral', texture: 'textured' },
+    'moto-jacket'
+  ),
+  look(
+    'skirt-and-boots',
+    WOMENSWEAR,
+    ['merino-sweater', 'mini-skirt', 'knee-boots', 'opaque-tights'],
+    false,
+    { style: 'chic', palette: 'colorful', texture: 'textured' },
+    'lined-blazer'
+  ),
+  look('summer-skirt', WOMENSWEAR, ['camisole', 'maxi-skirt', 'sandals'], false, {
+    style: 'chic',
+    palette: 'colorful',
+    texture: 'smooth',
+  }),
+  look('sunny-weekend', BOTH, ['tank', 'linen-trousers', 'sandals'], false, {
+    style: 'active',
+    palette: 'neutral',
+    texture: 'smooth',
+  }),
+  look(
+    'midi-and-sneakers',
+    WOMENSWEAR,
+    ['crop-top', 'midi-skirt', 'white-sneakers'],
+    false,
+    {
+      style: 'active',
+      palette: 'colorful',
+      texture: 'smooth',
+    }
   ),
 ]
 

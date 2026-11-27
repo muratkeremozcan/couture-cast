@@ -1,5 +1,7 @@
 // Learning path Step 75: Find mini skirts, tights and socks.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-75-find-mini-skirts-tights-and-socks
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import { expect, it } from 'vitest'
 import { SAMPLE_CATALOG } from './catalog'
 import {
@@ -42,6 +44,7 @@ it('[7.18-PICK-001] exposes type filters and respects the selected collection', 
   expect(sampleWardrobeItems('skirts', 'all').map(({ id }) => id)).toEqual([
     'sample:g:midi-skirt',
     'sample:g:pleated-skirt',
+    'sample:g:maxi-skirt',
     'sample:g:mini-skirt',
   ])
   expect(sampleWardrobeItems('tights', 'all')).toEqual([garment('opaque-tights')])

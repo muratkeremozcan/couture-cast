@@ -4,6 +4,8 @@
 // inside the transaction, and a committed edit answers 200 even when its photo cannot be signed.
 // Learning path Step 63: Garment detail and tag edit.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { Test } from '@nestjs/testing'
@@ -15,6 +17,7 @@ import {
   GARMENT_TAGS_CHANGED_MESSAGE,
   garmentItemSchema,
   garmentItemWithColorSchema,
+  garmentTagsBadRequestErrorSchema,
   WARDROBE_GARMENT_COLOR_HEADER,
 } from '@couture/api-client/contracts/http'
 import { buildGarmentObjectPath, colorFamilyFromHex } from '@couture/utils'
@@ -249,6 +252,160 @@ describe('7.5 garment colorFamily over HTTP (pg17)', () => {
       material: 'cotton',
       comfort_range: 'mild',
     })
+  })
+})
+
+describe('7.19 garment subtype tags over HTTP (pg17)', () => {
+  const subtypeHeader = 'x-couture-garment-subtype'
+  const tags = { category: 'top', material: 'cotton', comfortRange: 'mild' }
+
+  it('[P0] [7.19-HTTP] persists a subtype and preserves the strict color-only response', async () => {
+    vi.stubEnv('TEST_ENV', 'local')
+    const owner = await member()
+    const garmentId = await readyGarment(owner.userId, BLUE_HEX)
+    const readList = () =>
+      api.get('/api/v1/wardrobe/garments').set('Authorization', owner.auth)
+
+    const initial = await readList().set(subtypeHeader, '1')
+    expect(initial.status).toBe(200)
+    expect(listOf(initial.body)).toEqual([
+      expect.objectContaining({ id: garmentId, category: 'top', subtype: null }),
+    ])
+    expect(listOf(initial.body)[0]).not.toHaveProperty('colorFamily')
+
+    const saved = await api
+      .patch(`/api/v1/wardrobe/garments/${garmentId}/tags`)
+      .set('Authorization', owner.auth)
+      .set(subtypeHeader, '1')
+      .send({ ...tags, subtype: 'crop-top' })
+    expect(saved.status).toBe(200)
+    expect(itemOf(saved.body)).toMatchObject({ id: garmentId, subtype: 'crop-top' })
+
+    const both = await readList()
+      .set(WARDROBE_GARMENT_COLOR_HEADER, '1')
+      .set(subtypeHeader, '1')
+    expect(both.status).toBe(200)
+    expect(listOf(both.body)).toEqual([
+      expect.objectContaining({
+        id: garmentId,
+        colorFamily: 'blue',
+        subtype: 'crop-top',
+      }),
+    ])
+
+    const colorOnly = await readList().set(WARDROBE_GARMENT_COLOR_HEADER, '1')
+    expect(colorOnly.status).toBe(200)
+    expect(listOf(colorOnly.body)[0]).not.toHaveProperty('subtype')
+    expect(garmentItemWithColorSchema.parse(listOf(colorOnly.body)[0]).colorFamily).toBe(
+      'blue'
+    )
+  })
+
+  it('[P0] [7.19-HTTP] rejects mismatched tags and applies omit, clear, and category change', async () => {
+    vi.stubEnv('TEST_ENV', 'local')
+    const owner = await member()
+    const garmentId = await readyGarment(owner.userId, null)
+    const patchTags = (body: Record<string, unknown>) =>
+      api
+        .patch(`/api/v1/wardrobe/garments/${garmentId}/tags`)
+        .set('Authorization', owner.auth)
+        .set(subtypeHeader, '1')
+        .send(body)
+
+    const set = await patchTags({ ...tags, subtype: 'camisole' })
+    expect(set.status).toBe(200)
+    expect(itemOf(set.body)).toMatchObject({ subtype: 'camisole' })
+
+    const mismatch = await patchTags({
+      ...tags,
+      material: 'wool',
+      subtype: 'socks',
+      expected: { ...tags, subtype: null },
+    })
+    expect(mismatch.status).toBe(400)
+    expect(garmentTagsBadRequestErrorSchema.parse(mismatch.body).message).toMatch(
+      /^Invalid garment tags/
+    )
+    const afterMismatch = await api
+      .get('/api/v1/wardrobe/garments')
+      .set('Authorization', owner.auth)
+      .set(subtypeHeader, '1')
+    expect(afterMismatch.status).toBe(200)
+    expect(listOf(afterMismatch.body)).toEqual([
+      expect.objectContaining({ id: garmentId, material: 'cotton', subtype: 'camisole' }),
+    ])
+    const preserved = await patchTags({ ...tags, comfortRange: 'warm' })
+    expect(preserved.status).toBe(200)
+    expect(itemOf(preserved.body)).toMatchObject({ subtype: 'camisole' })
+
+    const cleared = await patchTags({ ...tags, subtype: null })
+    expect(cleared.status).toBe(200)
+    expect(itemOf(cleared.body)).toMatchObject({ category: 'top', subtype: null })
+
+    expect((await patchTags({ ...tags, subtype: 'tank' })).status).toBe(200)
+    const changedCategory = await patchTags({ ...tags, category: 'shoes' })
+    expect(changedCategory.status).toBe(200)
+    expect(itemOf(changedCategory.body)).toMatchObject({
+      category: 'shoes',
+      subtype: null,
+    })
+  })
+
+  it('[P0] [7.19-HTTP] refuses an edit from before another device changed only the subtype', async () => {
+    vi.stubEnv('TEST_ENV', 'local')
+    const owner = await member()
+    const garmentId = await readyGarment(owner.userId, null)
+    const patchTags = (body: Record<string, unknown>) =>
+      api
+        .patch(`/api/v1/wardrobe/garments/${garmentId}/tags`)
+        .set('Authorization', owner.auth)
+        .set(subtypeHeader, '1')
+        .send(body)
+    const initialTags = { ...tags, subtype: null }
+
+    const first = await patchTags({ ...tags, subtype: 'tank', expected: initialTags })
+    expect(first.status).toBe(200)
+    expect(itemOf(first.body)).toMatchObject({ subtype: 'tank' })
+
+    const stale = await patchTags({ ...tags, subtype: 'camisole', expected: initialTags })
+    expect(stale.status).toBe(409)
+    expect(stale.body).toMatchObject({ message: GARMENT_TAGS_CHANGED_MESSAGE })
+
+    const fresh = await api
+      .get('/api/v1/wardrobe/garments')
+      .set('Authorization', owner.auth)
+      .set(subtypeHeader, '1')
+    expect(fresh.status).toBe(200)
+    expect(listOf(fresh.body)).toEqual([
+      expect.objectContaining({ id: garmentId, subtype: 'tank' }),
+    ])
+  })
+
+  it('[P1] [7.19-HTTP] compares a legacy mismatched subtype against the null returned to the member', async () => {
+    vi.stubEnv('TEST_ENV', 'local')
+    const owner = await member()
+    const garmentId = await readyGarment(owner.userId, null)
+    await prisma.garmentItem.update({
+      where: { id: garmentId },
+      data: { subtype: 'socks' },
+    })
+
+    const read = await api
+      .get('/api/v1/wardrobe/garments')
+      .set('Authorization', owner.auth)
+      .set(subtypeHeader, '1')
+    expect(read.status).toBe(200)
+    expect(listOf(read.body)).toEqual([
+      expect.objectContaining({ id: garmentId, category: 'top', subtype: null }),
+    ])
+
+    const saved = await api
+      .patch(`/api/v1/wardrobe/garments/${garmentId}/tags`)
+      .set('Authorization', owner.auth)
+      .set(subtypeHeader, '1')
+      .send({ ...tags, subtype: 'tank', expected: { ...tags, subtype: null } })
+    expect(saved.status).toBe(200)
+    expect(itemOf(saved.body)).toMatchObject({ id: garmentId, subtype: 'tank' })
   })
 })
 

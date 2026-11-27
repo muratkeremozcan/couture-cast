@@ -3,12 +3,14 @@
 import { isOfflineError } from '../save-feedback'
 import { formatGarmentCategory } from './garment-alt'
 import { getGuestPreviewStrings, resolveGuestPreviewLocale } from './format'
+import type { GarmentSubtype } from './garment-subtypes'
 import type { ComfortRange } from '../comfort-rules'
 import type { SampleGarmentCategory, SampleGarmentMaterial } from './types'
 
 /** D4: the editable tags. Category and comfort are required; material may be cleared. */
 export interface GarmentTagDraft {
   category: SampleGarmentCategory
+  subtype?: GarmentSubtype | null
   material: SampleGarmentMaterial | null
   comfortRange: ComfortRange
 }
@@ -16,6 +18,7 @@ export interface GarmentTagDraft {
 /** The tags of a garment as the list or the tag update returned them. */
 export interface GarmentTagSource {
   category: SampleGarmentCategory | null
+  subtype?: GarmentSubtype | null
   material: SampleGarmentMaterial | null
   comfortRange: ComfortRange | null
 }
@@ -25,6 +28,7 @@ export function garmentTagDraft(garment: GarmentTagSource): GarmentTagDraft | nu
   if (!garment.category || !garment.comfortRange) return null
   return {
     category: garment.category,
+    ...(garment.subtype !== undefined && { subtype: garment.subtype }),
     material: garment.material ?? null,
     comfortRange: garment.comfortRange,
   }
@@ -34,6 +38,7 @@ export function garmentTagDraft(garment: GarmentTagSource): GarmentTagDraft | nu
 export function garmentTagsEqual(a: GarmentTagDraft, b: GarmentTagDraft): boolean {
   return (
     a.category === b.category &&
+    (a.subtype ?? null) === (b.subtype ?? null) &&
     (a.material ?? null) === (b.material ?? null) &&
     a.comfortRange === b.comfortRange
   )

@@ -8,6 +8,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 // Learning path Step 64: Garment delete (7.6-UNIT-010..011, usage read and DELETE contract).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import {
@@ -18,6 +20,7 @@ import {
   garmentColorFamilyEnum,
   garmentItemSchema,
   garmentItemWithColorSchema,
+  garmentListClientResponseSchema,
   garmentListResponseSchema,
   garmentListWithColorResponseSchema,
   GARMENT_TAGGING_ANALYSIS_VERSION,
@@ -27,9 +30,11 @@ import {
   suggestGarmentTagsResponseSchema,
   suggestGarmentTagsWireResponseSchema,
   updateGarmentTagsResponseSchema,
+  updateGarmentTagsClientResponseSchema,
   updateGarmentTagsWithColorResponseSchema,
   uploadGarmentBytes,
   WARDROBE_GARMENT_COLOR_HEADER,
+  WARDROBE_GARMENT_SUBTYPE_HEADER,
   resolveApiUploadUrl,
   WARDROBE_UPLOAD_CACHE_CONTROL,
   uploadCommitConflictErrorSchema,
@@ -829,9 +834,9 @@ describe('7.5 opt-in garment colorFamily', () => {
     ).toThrow(/retentionStatus/)
   })
 
-  it('[P1] [7.5-UNIT-012] documents the header on the list and the tag update, at version 1.11.0', () => {
+  it('[P1] [7.5-UNIT-012] [7.19-HTTP] documents both metadata headers on the list and tag update', () => {
     const spec = generateHttpOpenApiDocument()
-    expect(spec.info.version).toBe('1.11.0')
+    expect(spec.info.version).toBe('1.12.0')
     type Operation = {
       parameters?: {
         in?: string
@@ -845,18 +850,80 @@ describe('7.5 opt-in garment colorFamily', () => {
       spec.paths?.['/api/v1/wardrobe/garments/{garmentId}/tags']?.patch,
     ] as (Operation | undefined)[]
     for (const operation of operations) {
-      const header = operation?.parameters?.find(
-        (parameter) =>
-          parameter.in === 'header' && parameter.name === WARDROBE_GARMENT_COLOR_HEADER
-      )
-      expect(header).toBeDefined()
-      expect(header?.required ?? false).toBe(false)
-      expect(header?.schema?.enum).toEqual(['1'])
+      for (const name of [
+        WARDROBE_GARMENT_COLOR_HEADER,
+        WARDROBE_GARMENT_SUBTYPE_HEADER,
+      ]) {
+        const header = operation?.parameters?.find(
+          (parameter) => parameter.in === 'header' && parameter.name === name
+        )
+        expect(header).toBeDefined()
+        expect(header?.required ?? false).toBe(false)
+        expect(header?.schema?.enum).toEqual(['1'])
+      }
     }
   })
 
   it('[P2] [7.5-UNIT-013] names the opt-in header x-couture-garment-color', () => {
     expect(WARDROBE_GARMENT_COLOR_HEADER).toBe('x-couture-garment-color')
+    expect(WARDROBE_GARMENT_SUBTYPE_HEADER).toBe('x-couture-garment-subtype')
+  })
+})
+
+describe('[7.19-HTTP] client subtype contract', () => {
+  const ready = buildGarmentItem({
+    status: 'ready',
+    category: 'top',
+    comfortRange: 'mild',
+    tagsConfirmedAt: '2026-08-04T09:30:00.000Z',
+  })
+
+  it('reads subtype metadata on list and PATCH while accepting legacy omission', () => {
+    expect(
+      garmentListClientResponseSchema.parse({ data: [ready] }).data[0]?.subtype
+    ).toBeUndefined()
+    expect(
+      updateGarmentTagsClientResponseSchema.parse({ data: ready }).data.subtype
+    ).toBeUndefined()
+    const typed = { ...ready, subtype: 'tank' }
+    expect(
+      garmentListClientResponseSchema.parse({ data: [typed] }).data[0]?.subtype
+    ).toBe('tank')
+    expect(
+      updateGarmentTagsClientResponseSchema.parse({ data: typed }).data.subtype
+    ).toBe('tank')
+
+    const malformed = { ...ready, subtype: 'unknown-subtype' }
+    expect(garmentListClientResponseSchema.safeParse({ data: [malformed] }).success).toBe(
+      false
+    )
+    expect(
+      updateGarmentTagsClientResponseSchema.safeParse({ data: malformed }).success
+    ).toBe(false)
+  })
+
+  it('accepts the prior subtype while validating the resulting category and subtype pair', () => {
+    const tags = {
+      category: 'shoes',
+      comfortRange: 'mild',
+      subtype: 'ankle-boots',
+      expected: {
+        category: 'top',
+        subtype: 'tank',
+        material: null,
+        comfortRange: 'mild',
+      },
+    }
+    expect(updateGarmentTagsInputSchema.parse(tags)).toEqual(tags)
+    expect(
+      updateGarmentTagsInputSchema.safeParse({ ...tags, subtype: 'tank' }).success
+    ).toBe(false)
+    expect(
+      garmentExpectedTagsSchema.safeParse({
+        ...tags.expected,
+        subtype: 'unknown-subtype',
+      }).success
+    ).toBe(false)
   })
 })
 

@@ -210,6 +210,9 @@ export const es419: GuestPreviewStrings = {
       accessory: 'accesorio',
     },
     garmentType: {
+      tank: 'Tops sin mangas',
+      'crop-top': 'Tops cortos',
+      leggings: 'Leggings',
       tee: 'Camisetas',
       shirt: 'Camisas',
       sweater: 'Suéteres',
@@ -306,6 +309,39 @@ export const es419: GuestPreviewStrings = {
       'Ningún conjunto de "{collection}" es adecuado para esta configuración.',
   },
   garments: {
+    'lined-blazer': {
+      name: 'Blazer forrado',
+      description: 'Un blazer azul pizarra de lana tupida.',
+    },
+    camisole: { name: 'Camisola de seda', description: 'Seda rosa con tirantes finos.' },
+    tank: {
+      name: 'Camiseta acanalada sin mangas',
+      description: 'Una camiseta verde salvia de algodón acanalado.',
+    },
+    'crop-top': {
+      name: 'Top corto de algodón',
+      description: 'Una camiseta corta de color lila.',
+    },
+    'maxi-skirt': {
+      name: 'Falda larga de lino',
+      description: 'Una falda larga azul de lino.',
+    },
+    leggings: {
+      name: 'Leggings elásticos',
+      description: 'Leggings gris oscuro con cintura ancha.',
+    },
+    'moto-jacket': {
+      name: 'Chaqueta de motociclista',
+      description: 'Cuero negro con cierre diagonal.',
+    },
+    'moto-boots': {
+      name: 'Botas de motociclista',
+      description: 'Botas de cuero oscuro con hebilla.',
+    },
+    'knee-boots': {
+      name: 'Botas hasta la rodilla',
+      description: 'Botas altas de cuero café.',
+    },
     'ribbed-knit': {
       name: 'Suéter acanalado',
       description: 'Suéter de algodón color crema con acabado acanalado.',
@@ -453,6 +489,26 @@ export const es419: GuestPreviewStrings = {
     },
   },
   looks: {
+    'weekend-layers': {
+      name: 'Capas de fin de semana',
+      description: 'Tejido acanalado, leggings, botas de motociclista y calcetines.',
+    },
+    'skirt-and-boots': {
+      name: 'Falda y botas altas',
+      description: 'Suéter, minifalda, medias y botas hasta la rodilla.',
+    },
+    'summer-skirt': {
+      name: 'Falda de verano',
+      description: 'Camisola de seda, falda larga y sandalias.',
+    },
+    'sunny-weekend': {
+      name: 'Fin de semana al sol',
+      description: 'Camiseta sin mangas, pantalón de lino y sandalias.',
+    },
+    'midi-and-sneakers': {
+      name: 'Falda midi y tenis',
+      description: 'Top corto, falda midi y tenis blancos.',
+    },
     'mini-and-tights': {
       name: 'Minifalda y medias',
       description: 'Suéter acanalado, minifalda ciruela, medias opacas y botines.',

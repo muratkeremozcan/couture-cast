@@ -1,5 +1,7 @@
 // Learning path Step 75: Find mini skirts, tights and socks.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-75-find-mini-skirts-tights-and-socks
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import { describe, expect, it } from 'vitest'
 import { saveSampleBookmark } from './bookmarks'
 import { SAMPLE_CATALOG } from './catalog'
@@ -145,8 +147,20 @@ describe('member sample outfit', () => {
     expect(selected.input.swaps).toEqual({})
   })
 
-  it('[7.18-PICK-001] uses an eligible accessory slot when no look includes the selected socks', () => {
+  it('[7.19-CATALOG] opens the Mild look that already includes the selected socks', () => {
     const original = createMemberSampleOutfit('mild-dry')
+    const lookId = memberSampleWardrobeChoices(original).get(socks.id)
+    expect(lookId).toBe('sample:l:weekend-layers')
+    const selected = applyMemberSampleGarment(original, socks, lookId!)
+    expect(selected.garments.map(({ id }) => id)).toContain(socks.id)
+    expect(selected.input.swaps).toEqual({})
+  })
+
+  it('[7.18-PICK-001] uses an eligible accessory slot when no look includes the selected socks', () => {
+    const original = selectSampleOutfit(createMemberSampleOutfit('mild-dry').input, {
+      ...SAMPLE_CATALOG,
+      looks: SAMPLE_CATALOG.looks.filter(({ id }) => id !== 'sample:l:weekend-layers'),
+    })
     expect(original.garments.some(({ category }) => category === 'accessory')).toBe(false)
     const lookId = memberSampleWardrobeChoices(original).get(socks.id)
     expect(lookId).toBe('sample:l:wrap-day')

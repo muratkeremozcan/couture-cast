@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import type {
   GarmentItemContract,
+  GarmentWithTags,
   WardrobeOnboardingStateContract,
   WardrobeOnboardingStep,
 } from '@couture/api-client/contracts/http'
@@ -119,7 +120,7 @@ function OnboardingFlow({
   const [isAdvancing, setIsAdvancing] = useState(false)
   const [isSilhouetteBusy, setIsSilhouetteBusy] = useState(false)
 
-  const [garments, setGarments] = useState<GarmentItemContract[]>([])
+  const [garments, setGarments] = useState<Omit<GarmentWithTags, 'colorFamily'>[]>([])
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false)
   const [taggingGarmentId, setTaggingGarmentId] = useState<string | null>(null)
   /** A garment still `processing` after every scheduled poll attempt; offered as a manual recheck. */
@@ -526,6 +527,7 @@ function OnboardingFlow({
         isOpen={Boolean(taggingGarmentId)}
         onClose={() => setTaggingGarmentId(null)}
         garmentId={taggingGarmentId}
+        initialGarment={garments.find((garment) => garment.id === taggingGarmentId)}
         onTagsConfirmed={handleTagsConfirmed}
         invokingElementRef={taggingInvokerRef}
       />

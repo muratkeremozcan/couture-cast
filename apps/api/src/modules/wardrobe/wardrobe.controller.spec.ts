@@ -8,6 +8,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
 // Learning path Step 63: Garment detail and tag edit (7.5-UNIT-014, header-gated colorFamily).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 /* eslint-disable @typescript-eslint/unbound-method -- assertions read the vi.fn() `status` member off the mocked Express response, which is the established pattern for these suites. */
 import { BadRequestException, RequestMethod } from '@nestjs/common'
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
@@ -522,7 +524,9 @@ describe('WardrobeController', () => {
         tags,
         { includeColor: true }
       )
-      expect(list.data.map((garment) => garment.colorFamily)).toEqual(['blue', null])
+      expect(list).toMatchObject({
+        data: [{ colorFamily: 'blue' }, { colorFamily: null }],
+      })
       expect(updated.data).toMatchObject({ category: 'top', colorFamily: 'blue' })
     })
 

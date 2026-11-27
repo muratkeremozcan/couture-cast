@@ -207,6 +207,9 @@ export const ptBR: GuestPreviewStrings = {
       accessory: 'acessório',
     },
     garmentType: {
+      tank: 'Blusas sem mangas',
+      'crop-top': 'Tops cropped',
+      leggings: 'Calças legging',
       tee: 'Camisetas',
       shirt: 'Camisas',
       sweater: 'Suéteres',
@@ -303,6 +306,39 @@ export const ptBR: GuestPreviewStrings = {
       'Nenhum look combina com essas configurações nesta coleção: {collection}.',
   },
   garments: {
+    'lined-blazer': {
+      name: 'Blazer forrado',
+      description: 'Um blazer azul-acinzentado de lã com trama fechada.',
+    },
+    camisole: {
+      name: 'Blusa de alcinha de seda',
+      description: 'Seda rosa com alças finas.',
+    },
+    tank: {
+      name: 'Regata canelada',
+      description: 'Regata verde-clara de algodão canelado.',
+    },
+    'crop-top': { name: 'Top cropped de algodão', description: 'Camiseta curta lilás.' },
+    'maxi-skirt': {
+      name: 'Saia longa de linho',
+      description: 'Saia longa azul de linho.',
+    },
+    leggings: {
+      name: 'Calça legging elástica',
+      description: 'Calça legging cinza-escura com cintura larga.',
+    },
+    'moto-jacket': {
+      name: 'Jaqueta de motociclista',
+      description: 'Couro preto com zíper diagonal.',
+    },
+    'moto-boots': {
+      name: 'Botas de motociclista',
+      description: 'Botas de couro escuro com fivela.',
+    },
+    'knee-boots': {
+      name: 'Botas até o joelho',
+      description: 'Botas altas de couro marrom.',
+    },
     'ribbed-knit': {
       name: 'Suéter canelado',
       description: 'Suéter creme de algodão com acabamento canelado.',
@@ -445,6 +481,26 @@ export const ptBR: GuestPreviewStrings = {
     },
   },
   looks: {
+    'weekend-layers': {
+      name: 'Camadas de fim de semana',
+      description: 'Blusa canelada, calça legging, botas de motociclista e meias.',
+    },
+    'skirt-and-boots': {
+      name: 'Saia e botas altas',
+      description: 'Suéter, minissaia, meia-calça e botas até o joelho.',
+    },
+    'summer-skirt': {
+      name: 'Saia de verão',
+      description: 'Blusa de alcinha de seda, saia longa e sandálias.',
+    },
+    'sunny-weekend': {
+      name: 'Fim de semana ao sol',
+      description: 'Regata, calça de linho e sandálias.',
+    },
+    'midi-and-sneakers': {
+      name: 'Saia midi e tênis',
+      description: 'Top cropped, saia midi e tênis brancos.',
+    },
     'mini-and-tights': {
       name: 'Minissaia e meia-calça',
       description: 'Suéter canelado, minissaia ameixa, meia-calça opaca e botas curtas.',

@@ -205,6 +205,9 @@ export const trTR: GuestPreviewStrings = {
       accessory: 'aksesuar',
     },
     garmentType: {
+      tank: 'Kolsuz üstler',
+      'crop-top': 'Kısa üstler',
+      leggings: 'Taytlar',
       tee: 'Tişörtler',
       shirt: 'Gömlekler',
       sweater: 'Kazaklar',
@@ -298,6 +301,24 @@ export const trTR: GuestPreviewStrings = {
     'no-eligible': 'Koleksiyon: {collection}. Bu ayarlara uyan görünüm yok.',
   },
   garments: {
+    'lined-blazer': {
+      name: 'Astarlı blazer',
+      description: 'Sık dokunmuş yünden arduvaz mavisi blazer.',
+    },
+    camisole: { name: 'İpek askılı üst', description: 'İnce askılı gül rengi ipek.' },
+    tank: { name: 'Fitilli kolsuz üst', description: 'Adaçayı yeşili fitilli pamuk.' },
+    'crop-top': { name: 'Kısa pamuklu üst', description: 'Lila rengi kısa tişört.' },
+    'maxi-skirt': {
+      name: 'Keten maksi etek',
+      description: 'Mavi renkli uzun keten etek.',
+    },
+    leggings: { name: 'Esnek tayt', description: 'Geniş belli antrasit tayt.' },
+    'moto-jacket': {
+      name: 'Deri motosiklet ceketi',
+      description: 'Çapraz fermuarlı siyah deri.',
+    },
+    'moto-boots': { name: 'Motosiklet botu', description: 'Tokalı koyu deri bot.' },
+    'knee-boots': { name: 'Diz boyu çizme', description: 'Kahverengi deri uzun çizme.' },
     'ribbed-knit': {
       name: 'Fitilli kazak',
       description: 'Fitilli yüzeye sahip krem renkli pamuklu kazak.',
@@ -425,6 +446,26 @@ export const trTR: GuestPreviewStrings = {
     },
   },
   looks: {
+    'weekend-layers': {
+      name: 'Kat kat hafta sonu',
+      description: 'Fitilli kazak, tayt, motosiklet botu ve çorap.',
+    },
+    'skirt-and-boots': {
+      name: 'Etek ve uzun çizme',
+      description: 'Kazak, mini etek, külotlu çorap ve diz boyu çizme.',
+    },
+    'summer-skirt': {
+      name: 'Yaz eteği',
+      description: 'İpek askılı üst, uzun etek ve sandalet.',
+    },
+    'sunny-weekend': {
+      name: 'Güneşli hafta sonu',
+      description: 'Kolsuz üst, keten pantolon ve sandalet.',
+    },
+    'midi-and-sneakers': {
+      name: 'Midi etek ve spor ayakkabı',
+      description: 'Kısa üst, midi etek ve beyaz spor ayakkabı.',
+    },
     'mini-and-tights': {
       name: 'Mini etek ve külotlu çorap',
       description: 'Fitilli kazak, mürdüm mini etek, opak külotlu çorap ve bot.',

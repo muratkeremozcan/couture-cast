@@ -6,6 +6,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
 // Learning path Step 63: Garment detail and tag edit (7.5-NAT-002, 7.5-NAT-006).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Story CC-7.11 test owner (TEA): the Closet opens on its grid (D4, D5): Add and More sit in the
@@ -538,6 +540,36 @@ describe('WardrobeHubScreen', () => {
     expect(within(grid).getByTestId('garment-open-filter-bottom')).toBeVisible()
     await browserUser.click(within(progress).getByRole('link'))
     expect(routerMock.push).toHaveBeenCalledWith('/wardrobe-onboarding')
+  })
+
+  it('[P0] [7.19-CLOSET] narrows a category to its selected subtype and restores legacy pieces on clear', async () => {
+    const garments = [
+      {
+        ...createReadyGarmentFixture({ id: 'midi', category: 'bottom' }),
+        subtype: 'midi-skirt',
+      },
+      {
+        ...createReadyGarmentFixture({ id: 'legacy', category: 'bottom' }),
+        subtype: null,
+      },
+      { ...createReadyGarmentFixture({ id: 'tank', category: 'top' }), subtype: 'tank' },
+    ]
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: garments }))
+    )
+    renderScreen()
+
+    const grid = within(await screen.findByTestId('closet-garment-grid'))
+    await browserUser.click(screen.getByTestId('closet-category-bottom'))
+    expect(grid.getByTestId('garment-open-legacy')).toBeVisible()
+    expect(screen.queryByTestId('closet-subtype-tank')).toBeNull()
+
+    await browserUser.click(screen.getByTestId('closet-subtype-midi-skirt'))
+    expect(grid.getByTestId('garment-open-midi')).toBeVisible()
+    expect(grid.queryByTestId('garment-open-legacy')).toBeNull()
+    await browserUser.click(screen.getByTestId('closet-subtype-all'))
+    expect(grid.getByTestId('garment-open-legacy')).toBeVisible()
+    expect(grid.queryByTestId('garment-open-tank')).toBeNull()
   })
 
   it('7.7-NAT-003 [7.11 D4] the Closet gate waits for the inventory, never the onboarding read, then a refresh keeps the closet in place', async () => {

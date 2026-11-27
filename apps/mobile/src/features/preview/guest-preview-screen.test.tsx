@@ -8,6 +8,8 @@
 // back to the item that opened it (its `returnFocusRef`). [Codex 7.11 #3], 7.11-NAT-032: each
 // preview sheet header is the layer's swipe handle, through the same close as its X.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import {
   act,
   configure,
@@ -488,9 +490,10 @@ describe('mobile guest preview surfaces', () => {
     press(screen.getByTestId('guest-preview-collection-menswear'))
     await waitFor(() =>
       expect(screen.getByTestId('guest-preview-item-count').textContent).toBe(
-        '4 sample items'
+        '5 sample items'
       )
     )
+    expect(screen.getByTestId('guest-preview-item-moto-boots')).toBeVisible()
     press(screen.getByTestId('guest-preview-item-white-sneakers'))
     const detail = await screen.findByTestId('guest-preview-item-detail')
     expect(within(detail).getByText('Synthetic')).toBeTruthy()

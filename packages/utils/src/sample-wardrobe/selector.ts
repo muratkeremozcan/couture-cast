@@ -427,9 +427,9 @@ function sameOutfit(a: SampleOutfitResult, b: SampleOutfitResult): boolean {
 export function selectSampleOutfit(
   input: SampleSelectionInput,
   catalog: SampleCatalog,
-  previous?: SampleOutfitResult
+  previous?: SampleOutfitResult,
+  context = buildSampleContext(input)
 ): SampleOutfitResult {
-  const context = buildSampleContext(input)
   const garments = garmentById(catalog)
   const base = {
     policyVersion: SAMPLE_POLICY_VERSION,
@@ -495,7 +495,8 @@ export function selectSampleOutfit(
     outfit.set(garment.category, garment)
   }
   if (needsLayer(context)) {
-    const layer = sampleSwapCandidates(catalog, 'outerwear', input, context)[0]
+    const candidates = sampleSwapCandidates(catalog, 'outerwear', input, context)
+    const layer = candidates.find(({ id }) => id === selected.layer) ?? candidates[0]
     if (layer) outfit.set('outerwear', layer)
   }
 
