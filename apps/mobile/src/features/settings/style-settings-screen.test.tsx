@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-77-account-style-profile
 import { render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
+import type * as ReactNative from 'react-native'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import {
@@ -17,8 +18,14 @@ import {
 } from '@/src/lib/mobile-auth'
 import { server } from '@/src/test-utils/msw/server'
 import { AppThemeProvider } from '@/src/theme/theme-context'
+import { StyleMoodRow } from '@/src/features/preview/style-profile-controls'
 import { StyleSettingsScreen } from './style-settings-screen'
 
+const device = vi.hoisted(() => ({ fontScale: 1 }))
+vi.mock('react-native', async (original) => ({
+  ...(await original<typeof ReactNative>()),
+  useWindowDimensions: () => ({ width: 320, height: 640, scale: 2, ...device }),
+}))
 vi.mock('expo-router', () => ({ router: { push: vi.fn() } }))
 
 const EMPTY_PROFILE: StyleProfile = {
@@ -54,9 +61,49 @@ describe('CC-7.20 Profile style on native', () => {
     setMobileApplicationUserId(MEMBER)
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     setMobileApplicationUserId(null)
     restoreToken()
+    device.fontScale = 1
+    await i18n.changeLanguage('en-US')
+  })
+
+  it('[7.20-NATIVE] keeps all four German mood choices reachable at 2x text size', async () => {
+    await i18n.changeLanguage('de-DE')
+    const onSelect = vi.fn()
+    const choices = [
+      ['active', 'Sportlich'],
+      ['chic', 'Schick'],
+      ['cozy', 'Gemütlich'],
+      ['classic', 'Klassisch'],
+    ] as const
+    const row = () => (
+      <div style={{ width: 320 }}>
+        <AppThemeProvider>
+          <StyleMoodRow selected="cozy" onSelect={onSelect} />
+        </AppThemeProvider>
+      </div>
+    )
+    const moodGroup = () => screen.getByText('Stilrichtung').nextElementSibling!
+    const view = render(row())
+    expect(getComputedStyle(moodGroup()).overflowX).not.toBe('auto')
+
+    device.fontScale = 2
+    view.rerender(row())
+    const scroll = moodGroup()
+    expect(getComputedStyle(scroll).overflowX).toBe('auto')
+    expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth)
+
+    for (const [value, label] of choices) {
+      const control = screen.getByRole('button', { name: label })
+      expect(control).toHaveAttribute('data-testid', `style-mood-${value}`)
+      expect(control).toHaveAttribute('aria-pressed', String(value === 'cozy'))
+      expect(control.getBoundingClientRect().width).toBeGreaterThanOrEqual(160)
+      control.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      await userEvent.click(control)
+      expect(onSelect).toHaveBeenLastCalledWith(value)
+    }
+    expect(scroll.scrollLeft).toBeGreaterThan(0)
   })
 
   it('[P1] [7.20-NATIVE] retries the same answers after a save failure, then reads and clears them', async () => {

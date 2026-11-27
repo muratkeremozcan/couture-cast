@@ -515,9 +515,12 @@ describe('6.7 mobile Home spotlight teaser', () => {
     setMobileApplicationUserId('member-1')
     await renderHome()
     await answer(0, cityPage())
-    const link = await screen.findByTestId('home-spotlight-teaser-link')
-    act(() => link.focus())
-    expect(document.activeElement).toBe(link)
+    // Acquire focus on the currently mounted link after the browser commits the teaser.
+    await waitFor(() => {
+      const link = screen.getByTestId('home-spotlight-teaser-link')
+      act(() => link.focus())
+      expect(link).toHaveFocus()
+    })
     act(() => setMobileApplicationUserId('member-2'))
     await waitFor(() =>
       expect(document.activeElement).toBe(

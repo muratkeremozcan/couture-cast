@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
   getStyleProfileStrings,
@@ -33,6 +40,7 @@ function PictureChoice({
   choice,
   selected,
   disabled,
+  minWidth,
   onSelect,
 }: {
   id: string
@@ -40,6 +48,7 @@ function PictureChoice({
   choice: StyleIllustratedChoice | keyof typeof STYLE_PALETTE_SWATCHES
   selected: boolean
   disabled?: boolean
+  minWidth?: number
   onSelect: () => void
 }) {
   const palette = useHeroPalette()
@@ -54,6 +63,7 @@ function PictureChoice({
       onPress={onSelect}
       style={[
         styles.choice,
+        minWidth !== undefined && [styles.wideChoice, { minWidth }],
         {
           backgroundColor: selected ? palette.card : palette.page,
           borderColor: selected ? palette.ink : palette.line,
@@ -88,22 +98,31 @@ export function StyleMoodRow({
 }) {
   const copy = useStyleCopy()
   const { ink } = useHeroPalette()
+  const { fontScale } = useWindowDimensions()
+  const scrollChoices = fontScale >= 1.5
+  const minWidth = scrollChoices ? 80 * fontScale : undefined
+  const choices = SAMPLE_STYLE_OPTIONS.style.map((mood) => (
+    <PictureChoice
+      key={mood}
+      id={`style-${day ? 'day-' : ''}mood-${mood}`}
+      label={copy[mood]}
+      choice={mood}
+      selected={selected === mood}
+      disabled={disabled}
+      minWidth={minWidth}
+      onSelect={() => onSelect(mood)}
+    />
+  ))
   return (
     <View style={styles.group}>
       <Text style={[styles.heading, { color: ink }]}>{copy.mood}</Text>
-      <View style={styles.row}>
-        {SAMPLE_STYLE_OPTIONS.style.map((mood) => (
-          <PictureChoice
-            key={mood}
-            id={`style-${day ? 'day-' : ''}mood-${mood}`}
-            label={copy[mood]}
-            choice={mood}
-            selected={selected === mood}
-            disabled={disabled}
-            onSelect={() => onSelect(mood)}
-          />
-        ))}
-      </View>
+      {scrollChoices ? (
+        <ScrollView horizontal contentContainerStyle={styles.row}>
+          {choices}
+        </ScrollView>
+      ) : (
+        <View style={styles.row}>{choices}</View>
+      )}
     </View>
   )
 }
@@ -410,6 +429,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  wideChoice: { flex: 0, paddingHorizontal: 8 },
   choiceText: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
   swatch: {
     flexDirection: 'row',

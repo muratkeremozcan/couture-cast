@@ -57,9 +57,19 @@ appId: ${MAESTRO_APP_ID}
     id: 'style-row-setup'
 - takeScreenshot:
     path: maestro/artifacts/closet-profile-accessibility/${SCHEME}-style-de-large
-- tapOn:
-    id: 'app-top-bar-back'
-- extendedWaitUntil:
-    visible:
-      id: 'settings-screen'
-    timeout: 15000
+# The first tap left Style on screen in CI 46064944145. Try again only while
+# Style is still visible, so a delayed successful Back cannot pop Profile.
+- retry:
+    maxRetries: 1
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: 'settings-style-screen'
+          commands:
+            - tapOn:
+                id: 'app-top-bar-back'
+      - extendedWaitUntil:
+          visible:
+            id: 'settings-screen'
+          timeout: 15000
