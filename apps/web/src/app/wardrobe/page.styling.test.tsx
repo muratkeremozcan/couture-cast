@@ -1171,6 +1171,23 @@ describe('Wardrobe styling', () => {
     })
     onTestFinished(() => observer.disconnect())
     window.history.replaceState(null, '', '/looks?segment=saved')
+    // The address keeps segment=saved through the import: any write that drops it is recorded
+    // with its caller's stack, so a failure names the code that stripped the query.
+    const addressDrops: string[] = []
+    for (const method of ['pushState', 'replaceState'] as const) {
+      const write = window.history[method].bind(window.history)
+      vi.spyOn(window.history, method).mockImplementation((...args) => {
+        const next = new URL(
+          String(args[2] ?? window.location.href),
+          window.location.href
+        )
+        if (next.searchParams.get('segment') !== 'saved')
+          addressDrops.push(
+            `${method}(${next.pathname}${next.search}) from ${new Error().stack?.split('\n').slice(2, 7).join(' | ')}`
+          )
+        write(...args)
+      })
+    }
     publishOwner(owner)
     render(<LooksPage />)
 
@@ -1226,6 +1243,7 @@ describe('Wardrobe styling', () => {
     expect(hides, hides.join('\n')).toEqual([])
     expect(gaps, gaps.join('\n')).toEqual([])
     expect(replaced, replaced.join('\n')).toEqual([])
+    expect(addressDrops, addressDrops.join('\n')).toEqual([])
     expect(screen.getByTestId('looks-saved-grid')).toBe(shownGrid)
     // A focused tile keeps focus across a refresh: another save for this member is a third look
     // in the account, and its notice reads Looks again with the tile still focused.
@@ -1256,6 +1274,7 @@ describe('Wardrobe styling', () => {
     observer.disconnect()
     expect(gaps, gaps.join('\n')).toEqual([])
     expect(replaced, replaced.join('\n')).toEqual([])
+    expect(addressDrops, addressDrops.join('\n')).toEqual([])
     expect(hides, hides.join('\n')).toEqual([])
     expect(screen.getByTestId('looks-saved-grid')).toBe(shownGrid)
     expect(document.activeElement).toBe(focused)

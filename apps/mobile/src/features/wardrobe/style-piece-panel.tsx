@@ -522,13 +522,24 @@ function StylePieceIdeas({
     return currentPiece(inventory)
   }
 
+  const retryFocusPending = useRef(false)
+  const [, setRetryFocusTick] = useState(0)
+  useLayoutEffect(() => {
+    if (!retryFocusPending.current || !selectedWeather.current) return
+    retryFocusPending.current = false
+    focusStylePieceControl(selectedWeather.current)
+  })
+
   const retryPhoto = async () => {
     if (retrying) return
     setRetrying(true)
     const inventory = refreshRef.current
     if ((await inventory?.refresh()) && inventory?.currentAnchor()) {
       setFailedPhotoUrl((failed) => (failed === failedPhotoUrl ? undefined : failed))
-      requestAnimationFrame(() => focusStylePieceControl(selectedWeather.current))
+      // TEA (hub flake): focus waits for the commit that shows the renewed view; a bare frame
+      // could run before it and leave focus on Close.
+      retryFocusPending.current = true
+      setRetryFocusTick((tick) => tick + 1)
     }
     setRetrying(false)
   }

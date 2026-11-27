@@ -1028,10 +1028,16 @@ describe('WardrobeHubScreen', () => {
    * renews the photo, so the selected weather option (84) takes focus. The dialog's onShow is held
    * (`holdShow`); `showAtOpen` reports it while the photo check is still running, otherwise the
    * caller reports it after the retry, the late slide-in end that once took focus back to Close.
+   * `frameBeforeCommit` lands the next frame between the renewed photo's refresh and React's
+   * render of it: every requestAnimationFrame of the renewing retry runs as a microtask, ahead of
+   * the scheduler task that commits the weather options.
    */
   async function retryFailedPhotoInPanel(
     owner: string,
-    { showAtOpen }: { showAtOpen: boolean }
+    {
+      showAtOpen,
+      frameBeforeCommit = false,
+    }: { showAtOpen: boolean; frameBeforeCommit?: boolean }
   ) {
     nativeStyleRuntime.enabled = true
     setMobileApplicationUserId(owner)
@@ -1096,8 +1102,19 @@ describe('WardrobeHubScreen', () => {
       expect(within(panel).queryByTestId('style-piece-save')).toBeNull()
 
       garment = renewal
-      await browserUser.click(retry)
-      const anchors = await within(panel).findAllByTestId('style-piece-anchor')
+      const earlyFrame = frameBeforeCommit
+        ? vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+            queueMicrotask(() => callback(performance.now()))
+            return 0
+          })
+        : undefined
+      let anchors: HTMLElement[]
+      try {
+        await browserUser.click(retry)
+        anchors = await within(panel).findAllByTestId('style-piece-anchor')
+      } finally {
+        earlyFrame?.mockRestore()
+      }
       expect(anchors).toHaveLength(3)
       for (const anchor of anchors) {
         expect(anchor.querySelector('img')).toHaveAttribute(
@@ -1117,6 +1134,16 @@ describe('WardrobeHubScreen', () => {
 
   it('refreshes an unsigned card and retries a failed photo inside the iOS styling panel', async () => {
     await retryFailedPhotoInPanel('style-native-retry-owner', { showAtOpen: true })
+  })
+
+  // Story CC-7.11 D13, CC-7.12 flake root cause: the renewing retry's frame-deferred focus once ran
+  // before React committed the renewed photo, found no weather option to focus and left focus on
+  // Close (83). A frame may land before that commit on any busy device or runner.
+  it('[P1] [7.11-NAT-031] a retry whose next frame lands before the renewed photo renders still focuses the weather option', async () => {
+    await retryFailedPhotoInPanel('style-native-early-frame-owner', {
+      showAtOpen: true,
+      frameBeforeCommit: true,
+    })
   })
 
   // [Codex 7.11 #8] Story CC-7.11 D13: the dialog's onShow focuses Close only while nothing in the
