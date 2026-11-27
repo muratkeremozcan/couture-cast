@@ -803,7 +803,7 @@ describe('WardrobeOnboardingPage', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-status-region')).toHaveTextContent(
-        'Camera access unavailable. Import photos or use the starter wardrobe.'
+        "We can't open your camera. Pick photos or try the sample closet."
       )
     })
   })
