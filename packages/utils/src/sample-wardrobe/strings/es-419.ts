@@ -89,6 +89,10 @@ export const es419: GuestPreviewStrings = {
     swap: 'Cambiar {category}',
     swapTitle: 'Elegir {category}',
     current: 'Actual',
+    weatherFit: {
+      exact: 'Ideal para este clima',
+      nearby: 'También sirve',
+    },
     showMore: 'Ver más',
     noSuitableAlternative: 'Ninguna otra prenda va con este conjunto.',
     undoSwaps: 'Deshacer cambios',

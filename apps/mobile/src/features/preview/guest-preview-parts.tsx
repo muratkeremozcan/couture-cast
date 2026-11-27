@@ -1037,33 +1037,50 @@ export function PreviewSampleSwapRows({
 }) {
   const [expanded, setExpanded] = useState(false)
   const firstRevealed = useRef<SwapButton>(null)
-  const { current, groups, hasAlternatives, hasMore } = sampleSwapDisplay(
+  const { current, tiers, hasAlternatives, hasMore } = sampleSwapDisplay(
     options.current,
     options.candidates,
     options.range,
     expanded
   )
+  const showTierHeadings = tiers.length > 1
   return (
     <>
       <View accessibilityRole="radiogroup" accessibilityLabel={label}>
         {current && renderOption(current, 0, true)}
-        {groups.map(({ fit, type, garments, firstIndex }) => {
-          const heading = strings.values.garmentType[type]
+        {tiers.map(({ fit, groups }) => {
+          const tierLabel = strings.outfit.weatherFit[fit]
           return (
-            <View key={`${fit}-${type}`} role="group" aria-label={heading}>
-              <Text
-                accessibilityRole="header"
-                style={[styles.swapGroupTitle, { color: palette.inkMuted }]}
-              >
-                {heading}
-              </Text>
-              {garments.map((garment, offset) => {
-                const index = firstIndex + offset
-                return renderOption(
-                  garment,
-                  index,
-                  false,
-                  index === SAMPLE_SWAP_INITIAL_LIMIT ? firstRevealed : undefined
+            <View
+              key={fit}
+              role={showTierHeadings ? 'group' : undefined}
+              aria-label={showTierHeadings ? tierLabel : undefined}
+            >
+              {showTierHeadings && (
+                <Text aria-hidden style={[styles.swapTierTitle, { color: palette.ink }]}>
+                  {tierLabel}
+                </Text>
+              )}
+              {groups.map(({ type, garments, firstIndex }) => {
+                const heading = strings.values.garmentType[type]
+                return (
+                  <View key={type} role="group" aria-label={heading}>
+                    <Text
+                      accessibilityRole="header"
+                      style={[styles.swapGroupTitle, { color: palette.inkMuted }]}
+                    >
+                      {heading}
+                    </Text>
+                    {garments.map((garment, offset) => {
+                      const index = firstIndex + offset
+                      return renderOption(
+                        garment,
+                        index,
+                        false,
+                        index === SAMPLE_SWAP_INITIAL_LIMIT ? firstRevealed : undefined
+                      )
+                    })}
+                  </View>
                 )
               })}
             </View>
@@ -1252,5 +1269,6 @@ const styles = StyleSheet.create({
   },
   optionText: { flex: 1, fontSize: 16 },
   swapScroll: { flexGrow: 0, flexShrink: 1 },
+  swapTierTitle: { fontWeight: '700', marginTop: 8 },
   swapGroupTitle: { fontWeight: '600', marginTop: 8, marginBottom: 4 },
 })

@@ -84,12 +84,29 @@ export function swapMemberSampleGarment(
   category: SampleGarmentCategory,
   garmentId: string
 ) {
+  return resolveMemberSampleSwap(result, category, garmentId) ?? result
+}
+
+function resolveMemberSampleSwap(
+  result: SampleOutfitResult,
+  category: SampleGarmentCategory,
+  garmentId: string
+) {
   const lookId = result.look?.id
   const current = result.garments.find((garment) => garment.category === category)
-  if (!lookId || !current || current.id === garmentId) return result
+  if (!lookId || !current) return null
+  const eligible = sampleSwapCandidates(
+    SAMPLE_CATALOG,
+    category,
+    result.input,
+    result.context
+  )
+  if (!eligible.some((garment) => garment.id === garmentId)) return null
+  if (current.id === garmentId) return result
   return selectSampleOutfit(
     {
       ...result.input,
+      selectedLookId: lookId,
       swaps: {
         ...result.input.swaps,
         [lookId]: { ...result.input.swaps[lookId], [category]: garmentId },
@@ -103,19 +120,35 @@ export function memberSampleWardrobeChoices(result: SampleOutfitResult) {
   const garments = new Map(SAMPLE_CATALOG.garments.map((piece) => [piece.id, piece]))
   const looks = new Map(SAMPLE_CATALOG.looks.map((look) => [look.id, look]))
   const currentIds = new Set(result.garments.map((piece) => piece.id))
+  const activeSwaps = result.look ? result.input.swaps[result.look.id] : undefined
+  const swappedIds = new Set(
+    result.garments.flatMap((piece) =>
+      activeSwaps?.[piece.category] === piece.id ? [piece.id] : []
+    )
+  )
   const eligibleLooks = result.eligibleLookIds.flatMap((id) => looks.get(id) ?? [])
-  const sharedPieces = (core: readonly string[]) =>
-    core.filter((id) => currentIds.has(id)).length
+  const sharedPieces = (core: readonly string[], ids: ReadonlySet<string>) =>
+    core.filter((id) => ids.has(id)).length
+  eligibleLooks.sort(
+    (first, second) =>
+      sharedPieces(second.core, currentIds) - sharedPieces(first.core, currentIds) ||
+      sharedPieces(second.core, swappedIds) - sharedPieces(first.core, swappedIds)
+  )
   const choices = new Map<string, string>()
 
   for (const category of SAMPLE_GARMENT_CATEGORIES) {
     const current = result.garments.find((piece) => piece.category === category)
     if (current && result.look) choices.set(current.id, result.look.id)
 
-    const canUseSlot = eligibleLooks
-      .filter((look) => look.core.some((id) => garments.get(id)?.category === category))
-      .sort((first, second) => sharedPieces(second.core) - sharedPieces(first.core))
-    for (const garment of sampleSwapCandidates(SAMPLE_CATALOG, category, result.input)) {
+    const canUseSlot = eligibleLooks.filter((look) =>
+      look.core.some((id) => garments.get(id)?.category === category)
+    )
+    for (const garment of sampleSwapCandidates(
+      SAMPLE_CATALOG,
+      category,
+      result.input,
+      result.context
+    )) {
       const lookId = current
         ? result.look?.id
         : (canUseSlot.find((look) => look.core.includes(garment.id)) ?? canUseSlot[0])?.id
@@ -135,7 +168,7 @@ export function applyMemberSampleGarment(
       ? result
       : selectSampleOutfit({ ...result.input, selectedLookId: lookId }, SAMPLE_CATALOG)
   return target.look?.id === lookId
-    ? swapMemberSampleGarment(target, garment.category, garment.id)
+    ? (resolveMemberSampleSwap(target, garment.category, garment.id) ?? result)
     : result
 }
 

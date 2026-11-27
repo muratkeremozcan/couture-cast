@@ -12,7 +12,10 @@ import {
 } from '@couture/utils'
 import { AccessibleModal } from './accessible-modal'
 import { SampleGarmentArt } from './guest-preview/sample-garment-art'
-import { SampleSwapRows } from './guest-preview/sample-swap-rows'
+import {
+  SampleSwapRows,
+  type SampleSwapOptionFocus,
+} from './guest-preview/sample-swap-rows'
 
 function slotName(slot: TodaySlot, strings: GuestPreviewStrings) {
   const item = todaySlotCatalogItem(slot)
@@ -98,7 +101,8 @@ export function TodayOutfitPicture({
     slot: TodaySlot,
     index: number,
     selected: boolean,
-    name = slotName(slot, strings)
+    name = slotName(slot, strings),
+    focus?: SampleSwapOptionFocus
   ) => (
     <button
       type="button"
@@ -107,6 +111,7 @@ export function TodayOutfitPicture({
       data-testid={`today-outfit-swap-option-${index}`}
       role="radio"
       aria-checked={selected}
+      {...focus}
       className="flex min-h-11 w-full items-center gap-3 rounded-lg border border-line-strong px-2 py-1 text-start text-sm hover:border-ink"
       onClick={() => {
         if (swappingIndex !== null && !selected) onChoose(swappingIndex, slot)
@@ -162,12 +167,13 @@ export function TodayOutfitPicture({
             strings={strings}
             testId="today-outfit-swap"
             showMoreTestId="today-outfit-swap-show-more"
-            renderOption={(garment, index, selected) =>
+            renderOption={(garment, index, selected, focus) =>
               renderOption(
                 todayCatalogSlot(garment),
                 index,
                 selected,
-                sampleGarmentText(garment, strings).name
+                sampleGarmentText(garment, strings).name,
+                focus
               )
             }
           />

@@ -1,7 +1,7 @@
 // Learning path Step 75: Find mini skirts, tights and socks.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-75-find-mini-skirts-tights-and-socks
 import { getGuestPreviewStrings, SAMPLE_CATALOG } from '@couture/utils'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useRef, useState } from 'react'
 import { expect, it, vi } from 'vitest'
@@ -72,10 +72,15 @@ it('[7.18-SWAP-002] shows 12 choices including the current piece and resets when
 
   await user.click(dialog.getByRole('button', { name: 'Show more' }))
   expect(dialog.getAllByRole('radio')).toHaveLength(13)
-  expect(dialog.getByTestId('guest-preview-swap-option-socks-fixture-12')).toBeVisible()
+  const revealed = dialog.getByTestId('guest-preview-swap-option-socks-fixture-12')
+  expect(revealed).toBeVisible()
+  await waitFor(() => expect(revealed).toHaveFocus())
   expect(dialog.queryByRole('button', { name: 'Show more' })).toBeNull()
 
-  await user.click(dialog.getByRole('radio', { checked: true }))
+  await user.keyboard('{ArrowDown}')
+  expect(dialog.getByRole('radio', { checked: true })).toHaveFocus()
+  expect(choose).not.toHaveBeenCalled()
+  await user.keyboard(' ')
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(choose).toHaveBeenCalledExactlyOnceWith(tights.id)
   expect(opener).toHaveFocus()

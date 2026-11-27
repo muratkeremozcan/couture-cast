@@ -90,6 +90,10 @@ export const frFR: GuestPreviewStrings = {
     swap: 'Remplacer {category}',
     swapTitle: 'Choisir {category}',
     current: 'Actuel',
+    weatherFit: {
+      exact: 'Idéal pour cette météo',
+      nearby: 'Convient aussi',
+    },
     showMore: 'Voir plus',
     noSuitableAlternative: 'Aucun autre vêtement ne va avec cette tenue.',
     undoSwaps: 'Annuler les remplacements',

@@ -3,14 +3,14 @@ title: 'Story CC-7.18: Find mini skirts, tights and socks'
 type: bugfix
 ticket: '7-18-find-mini-skirts-tights-socks'
 created: '2026-11-27'
-status: in-review
+status: done
 baseline_revision: '39bf6515fc0da0bf4c9a87b50c6353d7574fd342'
 route: full
 route_source: pinned
 risk: medium
 review: thorough
 review_source: pinned
-lenses_ran: []
+lenses_ran: [independent-full-review, codex-security-diff]
 review_loop_iteration: 0
 context:
   - '_bmad-output/planning-artifacts/epics.md'
@@ -92,10 +92,28 @@ change event, which does not fire when the member chooses that piece again.
   Playwright, native or lane suites run. Type checks and lint on touched files are permitted.
 - The web picker uses the shared full-height Back layer. Native returns focus to Browse sample
   closet when its inline picker closes. Both reuse the illustrated piece details.
+- Guests can find the same types and replace pieces in slots already present in their look.
+  The signed-in picker can open another eligible look when a selected piece needs a different
+  slot. CC-7.21 owns the guest first-run flow and when its look carries over to an account.
 
 ## Plan change log
 
 ## Review triage log
+
+The independent review and Codex Security used `39bf6515fc0da0bf4c9a87b50c6353d7574fd342` and
+`f850a9ffb589250690d17da88f2b5b5e61e01b5c`. Codex Security completed all 29 source rows and
+inspected the Playwright journey as supporting evidence. It reported zero findings.
+
+| Finding | Verdict       | Action                                                                                                                          |
+| ------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| P2-1    | Confirmed     | Use keyboard-operable radio rows with one activation per choice and deliberate arrow-key focus.                                 |
+| P2-2    | Confirmed     | Label the exact and nearby weather groups so repeated type headings carry context.                                              |
+| P2-3    | Confirmed     | Validate eligible swaps before applying them. An invalid request keeps the existing result and undo state.                      |
+| P2-4    | Confirmed     | Reset the save control when collection changes and dismiss only notices owned by the web sample editor.                         |
+| P2-5    | Confirmed     | Cover keyboard activation, expansion and focus, same-choice undo, and the native Mild journey.                                  |
+| P3-1    | Product scope | Document guest current-slot behavior and keep the guest account flow in CC-7.21.                                                |
+| P3-2    | Confirmed tie | Favor explicitly swapped pieces on tied looks. The sheet removes its rows on close and tests verify fresh pagination on reopen. |
+| P3-3    | Confirmed     | Record the review, link the member helper tests, and name the Sample weather control in Playwright.                             |
 
 ## Verification
 

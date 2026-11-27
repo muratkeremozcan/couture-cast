@@ -89,6 +89,10 @@ export const itIT: GuestPreviewStrings = {
     swap: 'Cambia {category}',
     swapTitle: 'Scegli: {category}',
     current: 'Attuale',
+    weatherFit: {
+      exact: 'Ideale per questo tempo',
+      nearby: 'Va bene anche',
+    },
     showMore: 'Mostra altro',
     noSuitableAlternative: 'Nessun altro capo va bene per questo look.',
     undoSwaps: 'Annulla i cambi',

@@ -155,11 +155,31 @@ describe('member sample outfit', () => {
     expect(selected.garments.map(({ id }) => id)).toContain(socks.id)
   })
 
+  it('[7.18-PICK-001] keeps the chosen mini skirt when adding socks to a Mild look', () => {
+    const original = createMemberSampleOutfit('mild-dry')
+    const withSkirt = swapMemberSampleGarment(original, 'bottom', miniSkirt.id)
+    const lookId = memberSampleWardrobeChoices(withSkirt).get(socks.id)
+    expect(lookId).toBe('sample:l:mini-and-tights')
+    const withSocks = applyMemberSampleGarment(withSkirt, socks, lookId!)
+    expect(withSocks.garments.map(({ id }) => id)).toEqual([
+      'sample:g:ribbed-knit',
+      'sample:g:mini-skirt',
+      'sample:g:ankle-boots',
+      'sample:g:ribbed-socks',
+    ])
+  })
+
   it('[7.18-PICK-001] omits an unavailable piece and keeps the result for a stale look', () => {
     const original = updateMemberSampleOutfit(createMemberSampleOutfit(), {
       collection: 'menswear',
     })
     expect(memberSampleWardrobeChoices(original).has(miniSkirt.id)).toBe(false)
+    expect(original.look?.id).toBe('sample:l:office-oxford')
+    expect(original.garments.map(({ category }) => category)).toContain('bottom')
+    expect(swapMemberSampleGarment(original, 'bottom', miniSkirt.id)).toBe(original)
+    expect(applyMemberSampleGarment(original, miniSkirt, 'sample:l:office-oxford')).toBe(
+      original
+    )
     expect(
       applyMemberSampleGarment(original, miniSkirt, 'sample:l:mini-and-tights')
     ).toBe(original)

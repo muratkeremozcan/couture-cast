@@ -1,6 +1,6 @@
 'use client'
 // Story 6.16 D6: swap one garment for a valid alternative in the same category and context.
-import { useId, type RefObject } from 'react'
+import type { RefObject } from 'react'
 import {
   formatPreviewString,
   sampleGarmentText,
@@ -30,7 +30,6 @@ export function GuestPreviewSwapDialog({
 } & SampleSwapOptions) {
   const label = category ? strings.values.category[category] : ''
   const title = formatPreviewString(strings.outfit.swapTitle, { category: label })
-  const groupId = useId()
   return (
     <AccessibleModal
       isOpen={category !== null}
@@ -50,26 +49,27 @@ export function GuestPreviewSwapDialog({
           testId="guest-preview-swap-options"
           showMoreTestId="guest-preview-swap-show-more"
           noAlternativeTestId="guest-preview-no-suitable"
-          renderOption={(garment, _, current) => {
+          renderOption={(garment, _, current, focus) => {
             const text = sampleGarmentText(garment, strings)
             return (
-              <label
+              <button
                 key={garment.id}
-                // Story CC-7.9 D3: the current garment is marked with `inverse`; the radio itself
-                // takes the global focus ring.
-                className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border-2 p-2 ${
+                type="button"
+                role="radio"
+                aria-checked={current}
+                {...focus}
+                onClick={() => onChoose(garment.id)}
+                data-testid={`guest-preview-swap-option-${garment.id.slice('sample:g:'.length)}`}
+                className={`flex min-h-11 w-full items-center gap-3 rounded-lg border-2 p-2 text-start ${
                   current ? 'border-inverse' : 'border-line-strong hover:border-ink'
                 }`}
               >
-                <input
-                  type="radio"
-                  name={groupId}
-                  value={garment.id}
-                  defaultChecked={current}
-                  onClick={() => onChoose(garment.id)}
-                  data-testid={`guest-preview-swap-option-${garment.id.slice('sample:g:'.length)}`}
-                  className="h-5 w-5 accent-ink"
-                />
+                <span
+                  aria-hidden="true"
+                  className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-ink"
+                >
+                  {current && <span className="h-2.5 w-2.5 rounded-full bg-ink" />}
+                </span>
                 {/* A muted tile sets the art off the dialog; its outline follows `ink`. */}
                 <span className="rounded-md bg-card-muted p-1">
                   <SampleGarmentArt garment={garment} className="h-11 w-11" />
@@ -82,7 +82,7 @@ export function GuestPreviewSwapDialog({
                     </span>
                   ) : null}
                 </span>
-              </label>
+              </button>
             )
           }}
         />

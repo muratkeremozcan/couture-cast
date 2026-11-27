@@ -436,7 +436,7 @@ function SampleOutfitInner({
         ownerKey={owner}
         useSharedFeedback
         requiresNetwork
-        saveResetKey={`${owner}:${lookId ?? 'none'}:${garmentsSignature}:${result.input.weather}:${JSON.stringify(result.input.preferences)}:${bookmarkRevision}`}
+        saveResetKey={`${owner}:${lookId ?? 'none'}:${garmentsSignature}:${result.input.weather}:${result.input.collection}:${JSON.stringify(result.input.preferences)}:${bookmarkRevision}`}
         onSave={async () => {
           if (!lookId || !bookmarkOwnerMounted.current || !isLiveOwner(owner))
             return false
@@ -738,7 +738,7 @@ function SampleOutfitInner({
             usableIds={wardrobeChoices}
             onCollection={(collection) => {
               lookUndoStackRef.current = []
-              statusBar.dismissNotice()
+              dismissOwnedNotices()
               update(updateMemberSampleOutfit(result, { collection }))
             }}
             onUse={(garment) => {

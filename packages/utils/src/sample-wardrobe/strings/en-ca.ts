@@ -88,6 +88,10 @@ export const enCA: GuestPreviewStrings = {
     swap: 'Swap {category}',
     swapTitle: 'Swap the {category}',
     current: 'Current',
+    weatherFit: {
+      exact: 'Best for this weather',
+      nearby: 'Also works',
+    },
     showMore: 'Show more',
     noSuitableAlternative: 'No other piece fits this look.',
     undoSwaps: 'Undo swaps',

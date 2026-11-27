@@ -150,7 +150,7 @@ test.describe('CC-7.18 sample picker @local-lane', () => {
       await waitForShellSettled(page, router)
       const sample = page.getByTestId('member-sample-outfit')
       await sample.getByTestId('home-edit-sample').click()
-      await sample.getByRole('combobox').selectOption(weather)
+      await sample.getByRole('combobox', { name: 'Sample weather' }).selectOption(weather)
       const outfit = sample.getByTestId('guest-preview-outfit')
       await expect(outfit.getByTestId('guest-preview-weather-chip')).toHaveText(label)
 
@@ -192,6 +192,16 @@ test.describe('CC-7.18 sample picker @local-lane', () => {
       )
       const exact = weather === 'mild-dry' ? to.id : 'wool-scarf'
       const nearby = weather === 'mild-dry' ? 'wool-scarf' : to.id
+      await expect(
+        swaps
+          .getByRole('group', { name: 'Best for this weather', exact: true })
+          .getByTestId(`guest-preview-swap-option-${exact}`)
+      ).toBeVisible()
+      await expect(
+        swaps
+          .getByRole('group', { name: 'Also works', exact: true })
+          .getByTestId(`guest-preview-swap-option-${nearby}`)
+      ).toBeVisible()
       const optionIds = await swaps
         .getByRole('radio')
         .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-testid')))
@@ -201,7 +211,7 @@ test.describe('CC-7.18 sample picker @local-lane', () => {
         optionIds.indexOf(`guest-preview-swap-option-${nearby}`)
       )
       if (weather === 'mild-dry') await attachScreen('sample-swap-phone')
-      await current.click()
+      await current.press('Space')
       await expect(swaps).toBeHidden()
       await expect(trigger).toBeFocused()
       await expect(outfitPiece(outfit, from)).toBeVisible()
@@ -212,6 +222,28 @@ test.describe('CC-7.18 sample picker @local-lane', () => {
       await expect(outfitPiece(outfit, to)).toBeVisible()
       await expect(outfitPiece(outfit, from)).toHaveCount(0)
       await expect(outfitPiece(outfit, pieces.skirt)).toBeVisible()
+
+      const announcement = page
+        .getByTestId('save-feedback-announcer')
+        .getByText('Piece swapped.', { exact: true })
+      // The live region replaces its message node when it announces an identical message again.
+      await announcement.evaluate((node) =>
+        node.setAttribute('data-original-announcement', 'true')
+      )
+      const newTrigger = outfitPiece(outfit, to).getByTestId(
+        'guest-preview-swap-accessory'
+      )
+      await newTrigger.click()
+      await swaps.getByTestId(`guest-preview-swap-option-${to.id}`).press('Enter')
+      await expect(swaps).toBeHidden()
+      await expect(announcement).toHaveAttribute('data-original-announcement', 'true')
+      await page.getByTestId('status-bar-action-undo').click()
+      await expect(outfitPiece(outfit, from)).toBeVisible()
+      await expect(outfitPiece(outfit, to)).toHaveCount(0)
+      await trigger.click()
+      await swaps.getByTestId(`guest-preview-swap-option-${to.id}`).click()
+      await expect(outfitPiece(outfit, to)).toBeVisible()
+
       await sample.getByTestId('sample-save-look').click()
       await expect(page.getByTestId('status-bar-action-view')).toBeVisible()
       const payload = saved()
@@ -248,4 +280,43 @@ test.describe('CC-7.18 sample picker @local-lane', () => {
         .toEqual(payload?.composition.map((slot) => slot.itemId))
     })
   }
+
+  test('[P0] [7.18-SAVE-002] changing the collection lets a member save the same outfit again', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    await page.clock.setFixedTime(FIXED_NOW)
+    const { router } = await openFixtureShell(page, interceptNetworkCall, {
+      mode: 'empty',
+      screen: 'home',
+    })
+    const saved = stubSavedLook(interceptNetworkCall)
+    await page.goto('/')
+    await waitForShellSettled(page, router)
+    const sample = page.getByTestId('member-sample-outfit')
+    await sample.getByTestId('home-edit-sample').click()
+    const outfit = sample.getByTestId('guest-preview-outfit')
+    await expect(outfit).toHaveAttribute('data-look-id', 'sample:l:office-oxford')
+    const save = sample.getByTestId('sample-save-look')
+    await save.click()
+    await expect(save).toHaveAttribute('data-save-state', 'saved')
+    expect(saved()).toMatchObject({ collection: 'all' })
+    const firstComposition = saved()?.composition
+
+    await sample.getByTestId('guest-preview-browse-wardrobe').click()
+    const picker = page.getByTestId('guest-preview-wardrobe')
+    await picker
+      .locator('label:has([data-testid="guest-preview-collection-menswear"])')
+      .click()
+    await expect(picker.getByTestId('guest-preview-collection-menswear')).toBeChecked()
+    await page.getByRole('dialog').getByTestId('app-top-bar-back').click()
+    await expect(outfit).toHaveAttribute('data-look-id', 'sample:l:office-oxford')
+    await expect(save).toHaveAttribute('data-save-state', 'idle')
+    await save.click()
+    await expect(save).toHaveAttribute('data-save-state', 'saved')
+    expect(saved()).toMatchObject({
+      collection: 'menswear',
+      composition: firstComposition,
+    })
+  })
 })

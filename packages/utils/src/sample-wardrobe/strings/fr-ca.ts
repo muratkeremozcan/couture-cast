@@ -91,6 +91,10 @@ export const frCA: GuestPreviewStrings = {
     swap: 'Changer {category}',
     swapTitle: 'Choisir {category}',
     current: 'Choix actuel',
+    weatherFit: {
+      exact: 'Idéal pour cette météo',
+      nearby: 'Convient aussi',
+    },
     showMore: 'Voir plus',
     noSuitableAlternative: 'Aucun autre vêtement ne va avec cette tenue.',
     undoSwaps: 'Annuler les changements',

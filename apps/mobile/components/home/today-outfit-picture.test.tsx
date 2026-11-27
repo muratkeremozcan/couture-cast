@@ -44,7 +44,9 @@ it('[7.18-SWAP-002] expands the native sample picture past 12 choices and select
   await userEvent.click(screen.getByTestId('today-outfit-swap-show-more'))
   expect(sheet.getAllByRole('radio')).toHaveLength(13)
   const scarfGroup = sheet.getByRole('group', { name: 'Scarves' })
-  await userEvent.click(within(scarfGroup).getByTestId('today-outfit-swap-option-12'))
+  const revealed = within(scarfGroup).getByTestId('today-outfit-swap-option-12')
+  await waitFor(() => expect(revealed).toHaveFocus())
+  await userEvent.click(revealed)
   expect(choose).toHaveBeenCalledExactlyOnceWith(0, todayCatalogSlot(scarf))
   await waitFor(() => expect(screen.queryByTestId('today-outfit-swap')).toBeNull())
 

@@ -87,6 +87,10 @@ export const trTR: GuestPreviewStrings = {
     swap: 'Değiştirin: {category}',
     swapTitle: 'Bir {category} seçin',
     current: 'Mevcut',
+    weatherFit: {
+      exact: 'Bu havaya en uygun',
+      nearby: 'Bunlar da olur',
+    },
     showMore: 'Daha fazla göster',
     noSuitableAlternative: 'Bu kombine uyan başka parça yok.',
     undoSwaps: 'Değişiklikleri geri alın',

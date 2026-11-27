@@ -111,24 +111,25 @@ export function sampleSwapDisplay(
 
   let nextIndex = current ? 1 : 0
   const limit = expanded ? Infinity : SAMPLE_SWAP_INITIAL_LIMIT
-  const groups = (
+  const tiers = (
     [
       ['exact', exact],
       ['nearby', nearby],
     ] as const
-  ).flatMap(([fit, tier]) =>
-    [...tier].flatMap(([type, group]) => {
+  ).flatMap(([fit, tier]) => {
+    const groups = [...tier].flatMap(([type, group]) => {
       if (nextIndex >= limit) return []
       const firstIndex = nextIndex
       const garments = group.slice(0, limit - firstIndex)
       nextIndex += garments.length
-      return [{ fit, type, garments, firstIndex }]
+      return [{ type, garments, firstIndex }]
     })
-  )
+    return groups.length > 0 ? [{ fit, groups }] : []
+  })
 
   return {
     current,
-    groups,
+    tiers,
     hasAlternatives: seen.size > Number(Boolean(current)),
     hasMore: seen.size > nextIndex,
   }

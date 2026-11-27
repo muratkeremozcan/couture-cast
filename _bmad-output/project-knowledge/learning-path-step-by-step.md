@@ -22438,6 +22438,8 @@ preview and back from an account save.
 - [Web picker journey](../../playwright/tests/sample-picker.spec.ts) and
   [native member editor tests](../../apps/mobile/src/features/preview/member-sample-outfit.test.tsx).
 - [Web swap sheet tests](../../apps/web/src/app/components/guest-preview/guest-preview-swap-dialog.test.tsx),
-  [native picture tests](../../apps/mobile/components/home/today-outfit-picture.test.tsx), and
+  [native picture tests](../../apps/mobile/components/home/today-outfit-picture.test.tsx),
+  [native swap sheet tests](../../apps/mobile/src/features/preview/preview-swap-sheet.test.tsx),
+  [member selection tests](../../packages/utils/src/sample-wardrobe/member-outfit.spec.ts), and
   [shared grouping tests](../../packages/utils/src/sample-wardrobe/display.spec.ts).
 - [Step 71](#step-71-todays-outfit-as-a-picture) covers the picture and its swap controls.

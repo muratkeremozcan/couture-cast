@@ -89,6 +89,10 @@ export const ptPT: GuestPreviewStrings = {
     swap: 'Trocar {category}',
     swapTitle: 'Escolher: {category}',
     current: 'Atual',
+    weatherFit: {
+      exact: 'Ideal para este tempo',
+      nearby: 'Também serve',
+    },
     showMore: 'Mostrar mais',
     noSuitableAlternative: 'Nenhuma outra peça combina com este conjunto.',
     undoSwaps: 'Anular trocas',

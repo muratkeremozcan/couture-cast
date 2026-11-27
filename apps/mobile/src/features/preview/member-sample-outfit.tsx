@@ -424,7 +424,7 @@ export function MemberSampleOutfit({
         ownerKey={owner}
         useSharedFeedback
         requiresNetwork
-        saveResetKey={`${owner ?? 'anon'}:${lookId ?? 'none'}:${garmentsSignature}:${result.input.weather}:${JSON.stringify(result.input.preferences)}:${bookmarkRevision}`}
+        saveResetKey={`${owner ?? 'anon'}:${lookId ?? 'none'}:${garmentsSignature}:${result.input.weather}:${result.input.collection}:${JSON.stringify(result.input.preferences)}:${bookmarkRevision}`}
         onSave={async () => {
           const actionEpoch = mobileIdentityEpoch()
           if (!lookId || !isLiveSession(owner, actionEpoch) || !owner) return false
@@ -771,6 +771,7 @@ export function MemberSampleOutfit({
             usableIds={wardrobeChoices}
             backButtonRef={pickerBack}
             onCollection={(collection) => {
+              if (collection === result.input.collection) return
               lookUndoStackRef.current = []
               statusBar.dismissNotice()
               updateResult((current) => updateMemberSampleOutfit(current, { collection }))

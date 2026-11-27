@@ -64,23 +64,30 @@ it('[7.18-SWAP-001] groups within weather tiers and carries the current choice o
     )
   ).toEqual({
     current: mini,
-    groups: [
-      { fit: 'exact', type: 'skirt', garments: [pleated, skirt], firstIndex: 1 },
-      { fit: 'exact', type: 'trousers', garments: [trousers], firstIndex: 3 },
-      { fit: 'nearby', type: 'skirt', garments: [nearby], firstIndex: 4 },
+    tiers: [
+      {
+        fit: 'exact',
+        groups: [
+          { type: 'skirt', garments: [pleated, skirt], firstIndex: 1 },
+          { type: 'trousers', garments: [trousers], firstIndex: 3 },
+        ],
+      },
+      { fit: 'nearby', groups: [{ type: 'skirt', garments: [nearby], firstIndex: 4 }] },
     ],
     hasAlternatives: true,
     hasMore: false,
   })
   expect(sampleSwapDisplay(undefined, [nearby], 'cool', false)).toEqual({
     current: undefined,
-    groups: [{ fit: 'nearby', type: 'skirt', garments: [nearby], firstIndex: 0 }],
+    tiers: [
+      { fit: 'nearby', groups: [{ type: 'skirt', garments: [nearby], firstIndex: 0 }] },
+    ],
     hasAlternatives: true,
     hasMore: false,
   })
   expect(sampleSwapDisplay(mini, [mini], 'cool', false)).toEqual({
     current: mini,
-    groups: [],
+    tiers: [],
     hasAlternatives: false,
     hasMore: false,
   })
@@ -96,14 +103,14 @@ it('[7.18-SWAP-002] applies the 12-row limit across groups and retains order on 
   const scarf = garment('wool-scarf')
   const candidates = [scarf, ...socks]
   const collapsed = sampleSwapDisplay(tights, candidates, 'mild', false)
-  expect(collapsed.groups).toEqual([
-    { fit: 'exact', type: 'socks', garments: socks, firstIndex: 1 },
+  expect(collapsed.tiers).toEqual([
+    { fit: 'exact', groups: [{ type: 'socks', garments: socks, firstIndex: 1 }] },
   ])
   expect(collapsed.hasMore).toBe(true)
   const expanded = sampleSwapDisplay(tights, candidates, 'mild', true)
-  expect(expanded.groups).toEqual([
-    ...collapsed.groups,
-    { fit: 'nearby', type: 'scarf', garments: [scarf], firstIndex: 12 },
+  expect(expanded.tiers).toEqual([
+    ...collapsed.tiers,
+    { fit: 'nearby', groups: [{ type: 'scarf', garments: [scarf], firstIndex: 12 }] },
   ])
   expect(expanded.hasMore).toBe(false)
 })

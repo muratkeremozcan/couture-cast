@@ -92,6 +92,10 @@ export const deDE: GuestPreviewStrings = {
     swap: '{category} tauschen',
     swapTitle: '{category} auswählen',
     current: 'Aktuell',
+    weatherFit: {
+      exact: 'Passt am besten zum Wetter',
+      nearby: 'Passt auch',
+    },
     showMore: 'Mehr anzeigen',
     noSuitableAlternative: 'Kein anderes Teil passt zu diesem Outfit.',
     undoSwaps: 'Tausch rückgängig machen',

@@ -17,6 +17,7 @@ alone would have passed in the earlier build.
 | ------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 7.18-PICK-001 | P0       | A signed-in member opens the sample picker on a phone viewport. With All and Mild or Cool, the member can find and preview a sample look with a mini skirt and tights and find socks as a swap. AC1 |
 | 7.18-SAVE-001 | P0       | Choose a different piece, save, and reopen the saved look. Check the chosen catalog piece in the preview, save request, and reopened outfit. AC1                                                    |
+| 7.18-SAVE-002 | P0       | Save the same outfit twice under different collections. Changing the collection restores the Save action and sends the new collection with the same pieces. AC1                                     |
 | 7.18-SWAP-001 | P0       | Inspect the accessible groups and the weather order. Confirm the current choice is marked, then select it again and check that the sheet closes without changing the look. AC2                      |
 | 7.18-SWAP-002 | P1       | With a deterministic extended assortment, assert that 12 options appear before Show more, the 13th appears afterward, and reentering the sheet restores the initial limit. AC2                      |
 
@@ -27,8 +28,11 @@ Exercise the pagination boundary with synthetic entries when the live catalog is
 
 The shared tests cover keeping the current look, opening a look with the right slot, choosing
 an eligible fallback when the exact piece is absent, rejecting unavailable choices, and preserving
-undo when the current piece is selected again. The web and native component tests exercise the
-12-row limit and confirm the next open starts collapsed.
+undo when the current piece is selected again. The picker journeys confirm that reselecting the
+current choice preserves the prior Undo action and leaves the existing announcement in place.
+The web and native component tests exercise the 12-row limit, focus on the first newly revealed
+piece, and confirm the next open starts collapsed. Web coverage exercises arrow focus, Space,
+and Enter.
 
 Use static checks locally and GitHub Actions for test execution. Verify every workflow and
 inspect retry evidence for the final PR head. The Mild web case attaches the 390 by 844 picker and
