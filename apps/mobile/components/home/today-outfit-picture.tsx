@@ -28,6 +28,7 @@ import { SampleGarmentArt } from '@/src/features/preview/guest-preview-parts'
 import { useTokens } from '@/src/theme/tokens'
 
 type Button = ComponentRef<typeof Pressable>
+const pictureHeight = 176
 
 function slotName(slot: TodaySlot, strings: GuestPreviewStrings) {
   const item = todaySlotCatalogItem(slot)
@@ -166,7 +167,10 @@ export function TodayOutfitPicture({
       <ScrollView
         testID="today-outfit-picture"
         style={[styles.picture, { backgroundColor: palette.page }]}
-        contentContainerStyle={styles.pictureContent}
+        contentContainerStyle={[
+          styles.pictureContent,
+          slots.length <= 3 && styles.singleRow,
+        ]}
         nestedScrollEnabled
         scrollEnabled={slots.length > 6}
       >
@@ -271,8 +275,9 @@ export function TodayOutfitPicture({
 }
 
 const styles = StyleSheet.create({
-  picture: { height: 176, flexGrow: 0, borderRadius: 8 },
+  picture: { height: pictureHeight, flexGrow: 0, borderRadius: 8 },
   pictureContent: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 4 },
+  singleRow: { minHeight: pictureHeight, alignContent: 'center' },
   tile: {
     width: '31%',
     minWidth: 44,
@@ -281,7 +286,7 @@ const styles = StyleSheet.create({
   slot: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 6,
+    borderRadius: 8,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -304,7 +309,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingVertical: 4,
   },
-  optionArt: { position: 'relative', borderRadius: 6, overflow: 'hidden' },
+  optionArt: { position: 'relative', borderRadius: 8, overflow: 'hidden' },
   optionLabel: { flex: 1, minWidth: 0 },
   close: {
     minHeight: 44,

@@ -699,7 +699,7 @@ describe('[7.11-NAT-034] every EdgeToEdgeModal caller', () => {
   it('finds the app layers it guards (the scan is not vacuous)', () => {
     const files = new Set(usages.map((usage) => usage.where.replace(/:\d+$/, '')))
     for (const known of [
-      '../app/(tabs)/index.tsx',
+      './home/today-outfit-picture.tsx',
       './share-card-composer.tsx',
       './community/community-spotlight-detail.tsx',
       './community/community-post-sheet.tsx',

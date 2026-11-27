@@ -6,9 +6,6 @@ import { setTimeout } from 'node:timers/promises'
 
 const route = '/__today_visual/'
 const variants = new Set(['full', 'missing', 'empty'])
-const photo = readFileSync(
-  new URL('../../apps/api/test/fixtures/garment-tagging/neutral-top.png', import.meta.url)
-)
 
 /** Only the Android visual shard uses this loopback proxy. Other API traffic is unchanged. */
 export async function startTodayVisualFixtures({
@@ -17,6 +14,12 @@ export async function startTodayVisualFixtures({
   accessToken,
   garmentId,
 }) {
+  const photo = readFileSync(
+    new URL(
+      '../../apps/api/test/fixtures/garment-tagging/neutral-top.png',
+      import.meta.url
+    )
+  )
   const upstream = new URL(apiOrigin)
   const bearer = `Bearer ${accessToken}`
   let variant = 'full'

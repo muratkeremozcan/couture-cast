@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type {
@@ -65,6 +65,7 @@ export function TodayLiveOutfit({
   wardrobe,
   isCacheServed,
   stale,
+  periodPicker,
   onExport,
 }: {
   outfit: ScenarioOutfit
@@ -76,6 +77,7 @@ export function TodayLiveOutfit({
   wardrobe: readonly GarmentWithColor[]
   isCacheServed: boolean
   stale: boolean
+  periodPicker: ReactNode
   onExport: (recommendationId: string, opener: () => number | null) => void
 }) {
   const { t } = useTranslation()
@@ -256,13 +258,16 @@ export function TodayLiveOutfit({
         />
       </View>
       {detailsOpen && (
-        <OutfitRecommendationCard
-          outfit={outfit}
-          onExport={canUseRecommendation ? onExport : undefined}
-          isCacheServed={suppressOffer}
-          isCurrent={live}
-          nested
-        />
+        <>
+          {periodPicker}
+          <OutfitRecommendationCard
+            outfit={outfit}
+            onExport={canUseRecommendation ? onExport : undefined}
+            isCacheServed={suppressOffer}
+            isCurrent={live}
+            nested
+          />
+        </>
       )}
     </View>
   )

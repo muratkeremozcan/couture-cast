@@ -817,6 +817,15 @@ export default function TabOneScreen() {
                   wardrobe={homeWardrobe?.wardrobe ?? []}
                   isCacheServed={isCacheServed}
                   stale={isStale}
+                  periodPicker={
+                    showPeriods ? (
+                      <ScenarioToggles
+                        activeScenario={activeScenario}
+                        availableScenarios={availableScenarios}
+                        onScenarioChange={handleScenarioChange}
+                      />
+                    ) : null
+                  }
                   onExport={(recommendationId, opener) => {
                     if (
                       openAndroidShareCard(
@@ -847,13 +856,6 @@ export default function TabOneScreen() {
               )}
             </NativeView>
             <CachedWeatherNotice visible={isStale} />
-            {activeOutfit && showPeriods && (
-              <ScenarioToggles
-                activeScenario={activeScenario}
-                availableScenarios={availableScenarios}
-                onScenarioChange={handleScenarioChange}
-              />
-            )}
             {weather && <WeatherAlertBanner alerts={weather.alerts} />}
           </>
         )}

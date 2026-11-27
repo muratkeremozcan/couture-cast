@@ -608,27 +608,24 @@ it('shows the city and garment entry links beside an editable sample when the me
   const rotated = look()
   expect(rotated).not.toBe(initial)
 
-  const swap = screen.getByRole('button', { name: /^Swap top:/i })
-  const originalName = swap.getAttribute('aria-label')
-  await user.click(swap)
+  const editorTop = () =>
+    within(screen.getByTestId('guest-preview-outfit')).getByRole('button', {
+      name: /^Swap top:/i,
+    })
+  const originalName = editorTop().getAttribute('aria-label')
+  await user.click(editorTop())
   expect(screen.getByRole('dialog', { name: /swap the top/i })).toBeVisible()
   await user.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).toBeNull()
-  expect(swap).toHaveFocus()
-  await user.click(swap)
+  expect(editorTop()).toHaveFocus()
+  await user.click(editorTop())
   const [option] = within(screen.getByRole('dialog')).getAllByRole('radio', {
     checked: false,
   })
   await user.click(option!)
-  expect(screen.getByRole('button', { name: /^Swap top:/i })).not.toHaveAttribute(
-    'aria-label',
-    originalName
-  )
+  expect(editorTop()).not.toHaveAttribute('aria-label', originalName)
   await user.click(screen.getByRole('button', { name: 'Undo swaps' }))
-  expect(screen.getByRole('button', { name: /^Swap top:/i })).toHaveAttribute(
-    'aria-label',
-    originalName
-  )
+  expect(editorTop()).toHaveAttribute('aria-label', originalName)
 
   view.unmount()
   renderHome()

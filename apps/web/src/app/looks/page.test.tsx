@@ -275,6 +275,7 @@ describe('7.12 Looks tab default segment (D1, P1)', () => {
       expect.objectContaining({
         owner: FIXTURE_PROFILE_ID,
         sort: 'created_desc',
+        includeToday: true,
         source: undefined,
         limit: 50,
         offset: 0,

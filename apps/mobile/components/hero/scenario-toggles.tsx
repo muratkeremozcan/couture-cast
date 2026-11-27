@@ -33,7 +33,7 @@ export function ScenarioToggles({
   if (!active) return null
 
   return (
-    <View style={styles.container} testID="scenario-toggles">
+    <View testID="scenario-toggles">
       <Pressable
         testID="scenario-picker"
         accessibilityRole="button"
@@ -99,11 +99,6 @@ export function ScenarioToggles({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: 'transparent',
-    marginHorizontal: 16,
-    marginVertical: 12,
-  },
   picker: {
     minHeight: 44,
     alignSelf: 'flex-start',

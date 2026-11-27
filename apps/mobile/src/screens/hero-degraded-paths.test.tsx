@@ -95,7 +95,10 @@ vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
 import TabOneScreen from '@/app/(tabs)/index'
 import { server } from '@/src/test-utils/msw/server'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import i18n, { initI18n } from '@/src/lib/i18n'
 
@@ -125,12 +128,14 @@ describe('TabOneScreen degraded and native-only paths', () => {
     readLatestRitualCacheMock.mockResolvedValue(null)
     saveRitualCacheMock.mockResolvedValue(undefined)
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => 'session-token')
+    setMobileApplicationUserId('degraded-today-member')
     await i18n.changeLanguage('en-US')
   })
 
   afterEach(() => {
     restoreAccessTokenResolver?.()
     restoreAccessTokenResolver = undefined
+    setMobileApplicationUserId(null)
     Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
     vi.clearAllMocks()
     vi.mocked(findNodeHandle).mockReturnValue(NATIVE_NODE_HANDLE)

@@ -90,7 +90,7 @@ export function TodayOutfitPicture({
     <>
       <div
         data-testid="today-outfit-picture"
-        className="grid h-[176px] grid-cols-3 auto-rows-[80px] gap-[8px] overflow-y-auto rounded-lg bg-page p-[4px]"
+        className={`grid h-[176px] grid-cols-3 auto-rows-[80px] gap-2 overflow-y-auto rounded-lg bg-page p-1 ${slots.length <= 3 ? 'content-center' : ''}`}
       >
         {slots.map((slot, index) => (
           <button

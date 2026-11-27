@@ -54,6 +54,7 @@ import { EventsController } from '../../../apps/api/src/modules/events/events.co
 import { EventsRepository } from '../../../apps/api/src/modules/events/events.repository'
 import { EventsService } from '../../../apps/api/src/modules/events/events.service'
 import { RitualController } from '../../../apps/api/src/modules/personalization/ritual.controller'
+import { RitualGarmentPhotoService } from '../../../apps/api/src/modules/personalization/ritual-garment-photo.service.js'
 import { RitualService } from '../../../apps/api/src/modules/personalization/ritual.service'
 import { PlannerController } from '../../../apps/api/src/modules/personalization/planner.controller'
 import { PlannerService } from '../../../apps/api/src/modules/personalization/planner.service'
@@ -382,6 +383,10 @@ export async function startLocalPactProvider({
       {
         provide: RitualService,
         useValue: mockRitualService,
+      },
+      {
+        provide: RitualGarmentPhotoService,
+        useValue: { resolve: () => Promise.resolve(new Map()) },
       },
       {
         provide: ComfortService,

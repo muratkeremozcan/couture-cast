@@ -1,7 +1,8 @@
 // Learning path Step 71: Today's outfit as a picture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { SAMPLE_CATALOG } from './catalog'
+import * as selector from './selector'
 import {
   applyTodaySlotEdits,
   buildTodaySaveAttempt,
@@ -62,6 +63,22 @@ function timestamp(value: string) {
 }
 
 describe('Today outfit slots and saved composition', () => {
+  it('uses a category illustration when the weather ranking returns no compatible catalog piece', () => {
+    const candidates = vi.spyOn(selector, 'sampleSwapCandidates').mockReturnValueOnce([])
+    try {
+      const slots = buildTodaySlots(
+        { id: 'fixture', garmentIds: ['default-outerwear'] },
+        mild,
+        []
+      )
+      expect(slots).toMatchObject([
+        { itemId: 'sample:g:fleece-zip', category: 'outerwear', kind: 'catalog' },
+      ])
+    } finally {
+      candidates.mockRestore()
+    }
+  })
+
   it('keeps ordered owned photos and resolves starter placeholders to catalog art', () => {
     const slots = buildTodaySlots(
       {

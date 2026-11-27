@@ -52,6 +52,9 @@ android {
     unitTests {
       includeAndroidResources = true
       all {
+        // Gradle already uses this Maven Central host. Robolectric's separate downloader
+        // defaults to repo1.maven.org, which rate-limited the Android 14 runtime on PR #298.
+        systemProperty 'robolectric.dependency.repo.url', 'https://repo.maven.apache.org/maven2'
         testLogging {
           events 'passed', 'skipped', 'failed'
           exceptionFormat 'full'

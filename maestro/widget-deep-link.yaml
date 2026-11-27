@@ -32,12 +32,19 @@ tags:
 
 - runFlow: subflows/open-app.yaml
 
-# Verify default state. Story CC-7.11 D16: the toggles follow the outfit card.
+# Verify the default forecast period inside Outfit details.
+- runFlow: subflows/open-today-outfit-details.yaml
 - scrollUntilVisible:
     element: 'Morning commute'
     direction: DOWN
     visibilityPercentage: 100
 - assertVisible: 'Morning commute'
+- scrollUntilVisible:
+    element:
+      id: 'today-outfit-details'
+    direction: UP
+- tapOn:
+    id: 'today-outfit-details'
 
 # Assert what the link DID, not that the screen it landed on still exists.
 #
@@ -60,7 +67,8 @@ tags:
     env:
       LINK: ${WIDGET_MORNING_URL}
 
-# The link reopens Today at its top. Open the period picker below the outfit card.
+# The link reopens Today at its top. Open Outfit details and the period picker.
+- runFlow: subflows/open-today-outfit-details.yaml
 - scrollUntilVisible:
     element:
       id: 'scenario-picker'
@@ -79,6 +87,12 @@ tags:
     path: maestro/artifacts/widget-deep-link-morning
 - tapOn:
     id: 'scenario-picker'
+- scrollUntilVisible:
+    element:
+      id: 'today-outfit-details'
+    direction: UP
+- tapOn:
+    id: 'today-outfit-details'
 
 # The second link must MOVE the selection, which is what proves the first
 # assertion was not simply the app's default state agreeing with it.
@@ -88,6 +102,7 @@ tags:
       LINK: ${WIDGET_EVENING_URL}
 
 # Open the picker to verify which period the evening link selected.
+- runFlow: subflows/open-today-outfit-details.yaml
 - scrollUntilVisible:
     element:
       id: 'scenario-picker'

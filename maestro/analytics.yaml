@@ -33,7 +33,8 @@ env:
     retryTapIfNoChange: true
     label: 'Open home'
 
-# Story CC-7.13: open the period picker below the outfit card, then switch periods.
+# Story CC-7.14: open Outfit details, then switch forecast periods.
+- runFlow: subflows/open-today-outfit-details.yaml
 - scrollUntilVisible:
     element:
       id: 'scenario-picker'

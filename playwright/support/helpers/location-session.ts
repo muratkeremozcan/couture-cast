@@ -2,7 +2,6 @@
 // for the location capture journeys.
 import { createHash } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
-import type { APIRequestContext } from '@playwright/test'
 import type {
   ApiRequestParams,
   ApiRequestResponse,
@@ -21,14 +20,15 @@ import {
   type WeatherProviderDoublePlace,
 } from '../../../scripts/lib/weather-provider-double-data.mjs'
 import { expect, test } from '../fixtures/merged-fixtures'
-import { buildUniqueId, isNonLocalEnvironment, resolveApiBaseUrl } from './api-test'
+import {
+  buildUniqueId,
+  createBirthdate,
+  isNonLocalEnvironment,
+  resolveApiBaseUrl,
+} from './api-test'
 import { seedWebSession } from './commerce-session'
 import { localDatabaseUrl } from '../../../scripts/lib/local-supabase-ports.mjs'
-import {
-  communityAccessToken,
-  deleteCommunityRowsForUser,
-  signUpCommunityUser,
-} from './community-session'
+import { communityAccessToken, deleteCommunityRowsForUser } from './community-session'
 
 export { expect }
 
@@ -52,16 +52,34 @@ export function communityArm(userId: string): 'auto' | 'all' {
   return digest.readUInt8(0) % 2 === 0 ? 'auto' : 'all'
 }
 
-async function signUpAutoArmMember(
-  request: APIRequestContext,
-  apiBaseUrl: string,
-  unique: string
-): Promise<string> {
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    const userId = await signUpCommunityUser(request, apiBaseUrl, `${unique}-${attempt}`)
-    if (communityArm(userId) === 'auto') return userId
+async function seedAutoArmMember(unique: string): Promise<string> {
+  // Pick the arm before writing the account. Signup assigns an opaque ID, so
+  // repeated signups can miss the arm and leave unused accounts in the test DB.
+  const prefix = `location-e2e-${createHash('sha256').update(unique).digest('hex')}`
+  let index = 0
+  while (communityArm(`${prefix}-${index}`) !== 'auto') index += 1
+  const userId = `${prefix}-${index}`
+  const prisma = locationPrisma()
+  try {
+    await prisma.user.create({
+      data: {
+        id: userId,
+        email: `community-e2e-${unique}@example.com`,
+        profile: {
+          create: {
+            birthdate: new Date(createBirthdate(30)),
+            preferences: {
+              compliance: { accountStatus: 'active', guardianConsentRequired: false },
+            },
+          },
+        },
+        comfort_profile: { create: {} },
+      },
+    })
+    return userId
+  } finally {
+    await prisma.$disconnect()
   }
-  throw new Error('No auto-arm member after 12 signups; the arm hash changed.')
 }
 
 /**
@@ -110,7 +128,7 @@ export type LocationSession = {
  * signed-out page renders a calm shell that reads like a broken component.
  */
 export const locationTest = test.extend<{ locationSession: LocationSession }>({
-  locationSession: async ({ context, request, apiRequest }, use, testInfo) => {
+  locationSession: async ({ context, apiRequest }, use, testInfo) => {
     test.skip(
       isNonLocalEnvironment(testInfo),
       'Location capture writes locations and needs the local weather provider double.'
@@ -118,7 +136,7 @@ export const locationTest = test.extend<{ locationSession: LocationSession }>({
 
     const apiBaseUrl = resolveApiBaseUrl(testInfo, { fallback: 'http://localhost:4000' })
     const unique = buildUniqueId('loc', testInfo)
-    const userId = await signUpAutoArmMember(request, apiBaseUrl, unique)
+    const userId = await seedAutoArmMember(unique)
     const accessToken = communityAccessToken(userId)
     const nonce = locationNonce(unique)
     const place = sentinelPlace(nonce)

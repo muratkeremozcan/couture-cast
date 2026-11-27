@@ -109,6 +109,9 @@ The response keeps the existing source enum, and current Looks explicitly opts i
 
 ## Plan Change Log
 
+Native keeps its forecast-period picker inside Outfit details. The closed Today view stays within
+the existing seven-control budget, and opening details reveals the picker when periods differ.
+
 ## Review Triage Log
 
 The single combined review covered `a519243dbec677047f5f4aefadd9eb6a26d62b2d` through

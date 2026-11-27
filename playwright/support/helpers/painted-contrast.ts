@@ -534,7 +534,7 @@ async function measure(
     const handle = await target.elementHandle()
     await handle.evaluate((el, mark) => el.setAttribute(mark, ''), MARK)
     try {
-      if (states.withShots) await settle(page)
+      if (states.withShots || attempt > 0) await settle(page)
       const exclusionAtBare = async (): Promise<Exclude | null> => {
         if (!states.outsideOnly) return null
         const box = await handle.boundingBox()
@@ -567,9 +567,10 @@ async function measure(
         (el, mark) => el.isConnected && el.hasAttribute(mark),
         MARK
       )
-      // Nothing changed is read once more before it counts as unpainted: a frame that had not
-      // repainted yet reads the same way. A label that is really hidden reads zero again.
-      if (stable && (ink.painted > 0 || attempt > 0)) return ink
+      // Recheck empty or uneven samples after the page settles. A native select can repaint
+      // between shots, as the report reason did in the CC-7.14 burn-in. Stable uneven samples
+      // and unpainted labels still reach the caller's contrast assertions.
+      if (stable && ((ink.painted > 0 && ink.uniform) || attempt > 0)) return ink
     } finally {
       await handle
         .evaluate((el, mark) => el.removeAttribute(mark), MARK)

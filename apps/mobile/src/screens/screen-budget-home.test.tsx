@@ -307,7 +307,7 @@ describe('Screen budget: native Today', () => {
     async (outcome) => {
       await setFoldViewport()
       serveScreenBudgetFixture('populated', MEMBER)
-      const url = `${window.location.origin}/__today-test/private-top.png`
+      const url = `${window.location.origin}/__today-test/private-top-${outcome}.png`
       let release = () => undefined as void
       const imageGate = new Promise<void>((resolve) => {
         release = resolve
@@ -407,7 +407,7 @@ describe('Screen budget: native Today', () => {
     }
     store.nextPostError = () =>
       keys.length === 1
-        ? HttpResponse.json({ message: 'Offline' }, { status: 503 })
+        ? HttpResponse.json({ message: 'Save temporarily unavailable' }, { status: 503 })
         : null
     server.use(
       ...handlers,
@@ -545,7 +545,10 @@ describe('Screen budget: native Today', () => {
     await todaySettled('populated')
 
     const weather = screen.getByTestId('weather-header')
+    const details = screen.getByTestId('today-outfit-details')
+    press(details)
     expect(screen.queryByTestId('scenario-toggles')).toBeNull()
+    press(details)
     expect(weather).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByTestId('hourly-forecast-ribbon')).toBeNull()
     press(weather)
@@ -562,13 +565,14 @@ describe('Screen budget: native Today', () => {
     renderToday()
     await todaySettled('populated')
 
+    expect(screen.queryByTestId('scenario-toggles')).toBeNull()
+    press(screen.getByTestId('today-outfit-details'))
     const periods = screen.getByTestId('scenario-toggles')
     const picker = within(periods).getByTestId('scenario-picker')
     expect(picker).toHaveAttribute('aria-expanded', 'false')
     expect(within(periods).queryByRole('tablist')).toBeNull()
     press(picker)
     expect(within(periods).getAllByRole('tab')).toHaveLength(3)
-    press(screen.getByTestId('today-outfit-details'))
     expect(screen.getByTestId('outfit-comfort-notes').textContent).toMatch(/trench coat/i)
     press(within(periods).getByTestId('scenario-toggle-midday'))
     expect(within(periods).getByTestId('scenario-toggle-midday')).toHaveAttribute(
@@ -586,6 +590,7 @@ describe('Screen budget: native Today', () => {
     serveTodayForecast(true, 1)
     renderToday()
     await todaySettled('populated')
+    press(screen.getByTestId('today-outfit-details'))
     expect(screen.queryByTestId('scenario-toggles')).toBeNull()
     expect(screen.getByTestId('today-primary-action')).toBeVisible()
   }, 30_000)

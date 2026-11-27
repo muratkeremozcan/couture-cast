@@ -13,6 +13,7 @@ export function createIdentityDoubles() {
   const guardianConsentStateService = {
     canTeenAccess: () => Promise.resolve(true),
     canTeenAccessNonUploadSurface: () => Promise.resolve(true),
+    canTeenViewPrivateGarmentPhotos: () => Promise.resolve(true),
   } as unknown as GuardianConsentStateService
   const accessTokenIdentityService = {
     resolveIdentity(token: string) {

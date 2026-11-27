@@ -26,11 +26,19 @@ appId: ${MAESTRO_APP_ID}
 - assertNotVisible:
     id: 'today-outfit-photo-0'
 - runFlow:
+    file: shell-visual-tab.yaml
+    env: { TAB_ID: 'tab-home', TITLE: 'Today', SCHEME: 'light' }
+- runFlow:
     when:
       true: ${TODAY_VARIANT === 'empty'}
     commands:
-      - assertVisible:
-          id: 'home-add-garment'
-- runFlow:
-    file: shell-visual-tab.yaml
-    env: { TAB_ID: 'tab-home', TITLE: 'Today', SCHEME: 'light' }
+      - scrollUntilVisible:
+          element:
+            id: 'home-add-garment'
+          direction: DOWN
+          visibilityPercentage: 100
+      - scrollUntilVisible:
+          element:
+            id: 'weather-header'
+          direction: UP
+          visibilityPercentage: 100
