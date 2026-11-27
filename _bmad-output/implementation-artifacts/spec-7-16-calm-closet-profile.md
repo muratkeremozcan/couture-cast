@@ -3,7 +3,7 @@ title: 'Story CC-7.16: Calm Closet and Profile'
 type: feature
 ticket: '7-16-calm-closet-profile'
 created: '2026-11-27'
-status: built
+status: done
 baseline_revision: 'd64216fa612b494fbad164e264068f453f9b60f8'
 route: full
 route_source: auto
@@ -87,8 +87,8 @@ Reuse the existing Style this piece flow. Leave age, consent and photo handling 
 - [x] Retire the resolved Profile exceptions from `packages/utils/src/screen-budget.json`.
 - [x] Integrate [TEA's acceptance plan](../test-artifacts/test-design-7-16-calm-closet-profile.md)
       and link the verified coverage in learning path Step 73.
-- [ ] Fix all findings from the one full review and applicable CodeRabbit round.
-- [ ] Mark sprint and spec done. Verify every workflow on the published head.
+- [x] Fix the independent review findings and import reviewed CI baselines.
+- [x] Mark sprint and spec done.
 
 ## Implementation notes
 
@@ -128,6 +128,15 @@ The 320 dp Android captures showed mid-word breaks in garment and Profile labels
 Large text on compact native screens uses full-width garment cards and stacks
 Profile values below labels. The visual flow resets device size and font scale
 on entry, then shares setup across the enlarged-text captures.
+
+Changing Language can precede the first stored settings response. The screen
+discards that older response and finishes any pending profile sync before accepting
+another change.
+
+The updated Closet and Profile baselines come from the second PR head on both
+clients. The [browser captures](https://github.com/muratkeremozcan/couture-cast/actions/runs/45988440016)
+and [Android captures](https://github.com/muratkeremozcan/couture-cast/actions/runs/45988439992)
+include light and dark. CodeRabbit skipped PR #300 at the changed-file limit.
 
 ## Review triage log
 

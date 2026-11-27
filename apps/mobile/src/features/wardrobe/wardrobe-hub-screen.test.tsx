@@ -1111,7 +1111,7 @@ describe('WardrobeHubScreen', () => {
   })
 
   /**
-   * Story CC-7.11 D13: the iOS retry flow inside Style this piece. The card refreshes an unsigned
+   * Story CC-7.11 D13: the iOS retry flow inside Style this piece. Detail refreshes an unsigned
    * photo, the panel opens on a held photo check that fails, one retry stays unsigned and the next
    * renews the photo, so the selected weather option (84) takes focus. The dialog's onShow is held
    * (`holdShow`); `showAtOpen` reports it while the photo check is still running, otherwise the
@@ -1140,15 +1140,15 @@ describe('WardrobeHubScreen', () => {
     }
     const renewal = { ...ready, imageAccess: fixtureWardrobePhoto('#563312') }
     let garment: typeof ready = unsigned
-    let holdVerification = false
     const verification = deferred()
+    const unsignedRetry = deferred()
+    let heldRead: ReturnType<typeof deferred> | undefined
     server.use(
       http.get('*/api/v1/wardrobe/garments', async () => {
         const current = garment
-        if (holdVerification) {
-          holdVerification = false
-          await verification.promise
-        }
+        const pending = heldRead
+        heldRead = undefined
+        await pending?.promise
         return HttpResponse.json({ data: [current] })
       })
     )
@@ -1162,7 +1162,7 @@ describe('WardrobeHubScreen', () => {
       await waitFor(() => expect(opener).toBeEnabled())
 
       garment = failedPhoto
-      holdVerification = true
+      heldRead = verification
       nativeStyleRuntime.holdShow = true
       nativeStyleRuntime.focus.mockClear()
       await browserUser.click(opener)
@@ -1185,7 +1185,10 @@ describe('WardrobeHubScreen', () => {
       await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(83))
       const retry = within(panel).getByTestId('style-piece-refresh')
       garment = unsigned
+      heldRead = unsignedRetry
       press(retry)
+      await waitFor(() => expect(retry).toBeDisabled())
+      unsignedRetry.resolve()
       await waitFor(() => expect(retry).toBeEnabled())
       expect(within(panel).queryByTestId('style-piece-save')).toBeNull()
 
@@ -1214,6 +1217,7 @@ describe('WardrobeHubScreen', () => {
       return { finishShow: finishShow!, panel }
     } finally {
       verification.resolve()
+      unsignedRetry.resolve()
     }
   }
 

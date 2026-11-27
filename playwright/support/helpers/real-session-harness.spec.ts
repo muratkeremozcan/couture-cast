@@ -611,8 +611,8 @@ describe('the lane runs the tests of its guardian consent policy', () => {
     ).toBe('required_13_15')
   })
 
-  it('expects sixty-three tests under off and five under required_13_15', () => {
-    expect(expectedRealSessionTests('off')).toBe(63)
+  it('expects sixty-five tests under off and five under required_13_15', () => {
+    expect(expectedRealSessionTests('off')).toBe(65)
     expect(expectedRealSessionTests('required_13_15')).toBe(5)
     expect(EXPECTED_CONSENT_REQUIRED_TESTS).toBe(5)
   })

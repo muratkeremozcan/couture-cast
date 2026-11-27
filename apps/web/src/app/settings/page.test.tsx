@@ -41,17 +41,19 @@ import { settle } from '../../test-utils/request-barrier'
 import SettingsPage from './page'
 import AccountPage from './account/page'
 import AboutPage from './about/page'
+import LanguagePage from './language/page'
 import PlacesPage from './places/page'
 import PremiumPage from './premium/page'
 
 const navigation = vi.hoisted(() => ({ prerendering: false }))
+const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
 
 vi.mock('next/navigation', async () => {
   const { use } = await import('react')
   const unanswered = new Promise<never>(() => undefined)
   return {
     usePathname: () => '/settings',
-    useRouter: () => ({ push: vi.fn() }),
+    useRouter: () => router,
     useSearchParams: () => {
       // A statically rendered page bails out of search params during prerender: the reader
       // suspends until the client renders it.
@@ -293,6 +295,36 @@ describe('Web settings page', () => {
     expect(landmarks[0]?.closest('[data-surface="page"]')).not.toBeNull()
     expect(document.querySelector('[data-focus-surface]')).toBeNull()
     expect(screen.getByTestId('sticky-bottom-nav')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['/settings?checkout=success#premium', '/settings/premium?checkout=success#premium'],
+    [
+      '/settings?addLocation=1&returnTo=%2Fcommunity#locations',
+      '/settings/places?addLocation=1&returnTo=%2Fcommunity#locations',
+    ],
+  ])('7.16 routes the saved entry %s to its destination', (entry, destination) => {
+    const previousUrl = window.location.href
+    const previousState: unknown = window.history.state
+    onTestFinished(() => window.history.replaceState(previousState, '', previousUrl))
+    router.replace.mockClear()
+    window.history.replaceState(null, '', entry)
+
+    render(<SettingsPage />)
+
+    expect(router.replace).toHaveBeenCalledExactlyOnceWith(destination)
+  })
+
+  it('7.16 reports the active browser language on the Language destination', async () => {
+    await getI18n().changeLanguage('de-DE')
+    render(<LanguagePage />)
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Sprache')
+    expect(screen.getByText('Deutsch', { exact: true })).toBeVisible()
+    expect(screen.getByTestId('settings-learn-more')).toHaveTextContent(
+      deDE.settings.profile.languageHelp
+    )
+    expect(screen.getByText(deDE.settings.profile.browserLanguageHelp)).not.toBeVisible()
   })
 
   it('5.1-WEB-SETTINGS-02 renders the disclosure above the toggle, signed out, with no request', async () => {
@@ -623,6 +655,49 @@ describe('Web settings page', () => {
       'jade@example.test'
     )
     expect(screen.queryByTestId('profile-account-name')).toBeNull()
+  })
+
+  it('7.16 reserves the Account email until its read settles and reports unavailability on failure', async () => {
+    signIn()
+    const read = deferred<void>()
+    onTestFinished(() => read.resolve())
+    useMswHandlers(
+      http.get(PROFILE_PATH, async () => {
+        await read.promise
+        return HttpResponse.json({ message: 'Profile unavailable' }, { status: 503 })
+      })
+    )
+    render(<AccountPage />)
+
+    expect(await screen.findByTestId('profile-account-reserved')).toBeInTheDocument()
+    expect(screen.getByTestId('profile-account')).toHaveAttribute('aria-busy', 'true')
+    read.resolve()
+
+    expect(await screen.findByTestId('profile-account-email')).toHaveTextContent(
+      'Unavailable'
+    )
+    expect(screen.getByTestId('profile-account')).toHaveAttribute('aria-busy', 'false')
+    expect(screen.queryByTestId('profile-account-name')).toBeNull()
+  })
+
+  it('7.16 shows the signed-out palette state when Premium rejects the theme read', async () => {
+    signIn()
+    useMswHandlers(
+      subscriptionHandler(),
+      http.get(THEME_PATH, () =>
+        HttpResponse.json(
+          { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' },
+          { status: 401 }
+        )
+      )
+    )
+    render(<PremiumPage />)
+
+    expect(await screen.findByTestId('premium-theme-locked')).toHaveTextContent(
+      'Sign in and subscribe to Premium'
+    )
+    expect(screen.queryByTestId('premium-theme-gallery')).toBeNull()
+    expect(screen.queryByTestId('premium-theme-error')).toBeNull()
   })
 
   it('7.16 distinguishes an unset name and primary place from a failed read', async () => {

@@ -896,6 +896,31 @@ describe('WardrobePage direct garment entry', () => {
 describe('WardrobePage garment grid', () => {
   beforeEach(resetWardrobeMocks)
 
+  it('7.16 filters the Closet by category and restores the full grid with All', async () => {
+    const user = userEvent.setup()
+    listGarmentsFromWeb.mockResolvedValue([
+      garmentFixture('tee', 'ready', { category: 'top' }),
+      garmentFixture('trousers', 'ready', { category: 'bottom' }),
+    ])
+    render(<WardrobePage />)
+
+    const tops = await screen.findByTestId('closet-category-top')
+    const all = screen.getByTestId('closet-category-all')
+    expect(all).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('garment-card-tee')).toBeVisible()
+    expect(screen.getByTestId('garment-card-trousers')).toBeVisible()
+
+    await user.click(tops)
+    expect(tops).toHaveAttribute('aria-pressed', 'true')
+    expect(all).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('garment-card-tee')).toBeVisible()
+    expect(screen.queryByTestId('garment-card-trousers')).not.toBeInTheDocument()
+
+    await user.click(all)
+    expect(all).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('garment-card-trousers')).toBeVisible()
+  })
+
   it('opens the capture modal from the empty-state call to action', async () => {
     const user = userEvent.setup()
     render(<WardrobePage />)

@@ -49,6 +49,8 @@ vi.mock('@/components/edit-screen-info', () => ({
   default: () => null,
 }))
 
+vi.mock('@/src/lib/settings-storage', { spy: true })
+
 const {
   analyticsCaptureMock,
   analyticsDistinctIdMock,
@@ -158,7 +160,7 @@ vi.mock('@/src/lib/community', () => ({
 
 import i18n, { initI18n } from '../lib/i18n'
 import { mockSubscriptionNone } from '../test-utils/msw/handlers'
-import { getSavedSettings } from '../lib/settings-storage'
+import { getSavedSettings } from '@/src/lib/settings-storage'
 import { setMobileAnalyticsDiagnosticsEnabled } from '../analytics/mobile-analytics-diagnostics'
 import { router } from 'expo-router'
 import SettingsScreen from '../../app/(tabs)/settings'
@@ -460,6 +462,37 @@ describe('SettingsScreen', () => {
         to_locale: 'tr-TR',
       })
     )
+  })
+
+  it('keeps the saved selection when an older stored locale arrives late', async () => {
+    const staleRead = held<Awaited<ReturnType<typeof getSavedSettings>>>()
+    const readSettings = vi
+      .mocked(getSavedSettings)
+      .mockReturnValueOnce(staleRead.promise)
+    await render(<LanguageScreen />)
+    expect(readSettings).toHaveReturnedWith(staleRead.promise)
+
+    const turkish = screen.getByTestId('locale-btn-tr-TR')
+    const english = screen.getByTestId('locale-btn-en-US')
+    fireEvent.click(turkish)
+
+    await waitFor(() => {
+      expect(turkish).toHaveAttribute('aria-pressed', 'true')
+      expect(english).toBeEnabled()
+    })
+
+    await act(async () => {
+      staleRead.release({ locale: 'en-US', localeSyncPending: true })
+      await staleRead.promise
+    })
+
+    expect(turkish).toHaveAttribute('aria-pressed', 'true')
+    expect(english).toHaveAttribute('aria-pressed', 'false')
+    expect(updatePreferredLocaleMock.mock.calls).toEqual([['tr-TR']])
+    expect(await getSavedSettings()).toEqual({
+      locale: 'tr-TR',
+      localeSyncPending: false,
+    })
   })
 
   it('surfaces persistence failures without syncing an unpersisted locale', async () => {

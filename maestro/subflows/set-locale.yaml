@@ -43,15 +43,44 @@ appId: ${MAESTRO_APP_ID}
     direction: DOWN
     timeout: 15000
 
-- tapOn:
-    id: 'locale-btn-${LOCALE}'
-    retryTapIfNoChange: true
-    label: 'Switch the app locale to ${LOCALE}'
+# The heading can translate before the selection is persisted and the choices are enabled again.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: 'locale-btn-${LOCALE}'
+              enabled: true
+          commands:
+            - tapOn:
+                id: 'locale-btn-${LOCALE}'
+                label: 'Switch the app locale to ${LOCALE}'
+      - extendedWaitUntil:
+          visible:
+            id: 'locale-btn-${LOCALE}'
+            selected: true
+          timeout: 8000
+      - extendedWaitUntil:
+          visible:
+            id: 'locale-btn-(?!${LOCALE}).+'
+            enabled: true
+          timeout: 15000
+      - assertVisible:
+          id: 'locale-btn-${LOCALE}'
+          selected: true
 
-- waitForAnimationToEnd
-- tapOn:
-    id: 'app-top-bar-back'
-- extendedWaitUntil:
-    visible:
-      id: 'settings-screen'
-    timeout: 15000
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: 'settings-language-screen'
+          commands:
+            - tapOn:
+                id: 'app-top-bar-back'
+      - extendedWaitUntil:
+          visible:
+            id: 'settings-screen'
+          timeout: 5000

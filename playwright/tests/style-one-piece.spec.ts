@@ -365,10 +365,13 @@ test.describe('Style this piece on a phone', () => {
 
     garments.splice(garments.indexOf(ready), 1)
     await page.reload()
-    await expect(page.getByTestId(`garment-card-${processing.id}`)).toBeVisible()
-    await expect(expiredCard).toHaveCount(0)
+    await expect(page.getByTestId('garment-detail-missing')).toBeVisible()
     await expect(page.getByTestId('style-piece-open')).toHaveCount(0)
     await expect(page.getByTestId('style-piece-reopen')).toHaveCount(0)
+    await page.getByTestId('app-top-bar-back').click()
+    await expect(page).toHaveURL('/wardrobe')
+    await expect(page.getByTestId(`garment-card-${processing.id}`)).toBeVisible()
+    await expect(expiredCard).toHaveCount(0)
   })
 
   test('drops the prior photo and saved looks after a verified account switch', async ({
@@ -534,8 +537,8 @@ test.describe('Style this piece on a phone', () => {
     }
     await mockStyleWardrobe(page, baseURL!, interceptNetworkCall, inventory)
     await page.goto('/wardrobe')
-    const card = page.getByTestId(`garment-card-${garment.id}`)
-    const refresh = card.getByTestId('style-piece-refresh')
+    const detail = await openStyleDetail(page, garment.id)
+    const refresh = detail.getByTestId('style-piece-refresh')
     await expect(refresh).toHaveAccessibleName(/Refresh/)
     inventory[memberA] = [garment]
     await refresh.click()

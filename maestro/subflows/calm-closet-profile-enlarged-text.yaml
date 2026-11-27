@@ -26,9 +26,13 @@ appId: ${MAESTRO_APP_ID}
     path: maestro/artifacts/closet-profile-accessibility/${SCHEME}-profile-de-large
 - scrollUntilVisible:
     element:
-      id: 'profile-about-row'
+      id: 'profile-sign-out'
     direction: DOWN
+    visibilityPercentage: 100
     timeout: 15000
+- assertVisible:
+    id: 'profile-about-row'
+- assertVisible: 'Abmelden'
 - takeScreenshot:
     path: maestro/artifacts/closet-profile-accessibility/${SCHEME}-profile-end-de-large
 

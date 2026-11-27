@@ -3,7 +3,7 @@
 //
 // TEA-06 (story 6.15 D5 row 1): Story 6.8 reverted an app-wide AppText font-scale repair that
 // blanked text in Release. With React Native's own fix, app code needs no font-scale wrapper. The
-// only reads allowed are the share-card composer's layout rules, each with its reason:
+// first reviewed reads were the share-card composer's layout rules, each with its reason:
 // - `feedbackSlotHeight` and `ComposerFeedback`: reserve the feedback slot at the current scale so Save and Share stay
 //   put when feedback appears;
 // - `actionRowTier` and `useActionColumns`: choose halves, content or stacked buttons from labels
@@ -19,6 +19,8 @@
 //   `TabBarLabel` (tab-bar-label.tsx): the tab bar grows by what its labels grew, and a label fits
 //   its tab; on iOS the label keeps React Navigation's allowFontScaling false, since the tab's
 //   Large Content Viewer shows it at the user's size.
+// Story CC-7.16 adds two compact layouts for enlarged text: NavRow stacks its label and value,
+// and MemberWardrobeHub uses full-width cards. Both keep React Native's text scale.
 // The owner's live font fix (PR 242) adds one read that rescales no text: React Native 0.81 keeps
 // a paragraph's layout through a live text size change, so `FontScaleText` (src/lib/
 // font-scale-text.tsx) gives every paragraph's outermost Text a maxFontSizeMultiplier that follows
@@ -88,6 +90,8 @@ const ALLOWED = {
     // A type with a fontScale field: the scale the stored label heights were measured at.
     'TabLabelHeights',
   ],
+  'src/components/nav-row.tsx': ['NavRow'],
+  'src/features/wardrobe/wardrobe-hub-screen.tsx': ['MemberWardrobeHub'],
   'src/lib/font-scale-text.tsx': ['remeasureCap', 'createFontScaleText.FontScaleText'],
 }
 /**
@@ -115,18 +119,35 @@ function inRemeasureAttribute(node, source) {
   return false
 }
 
-/**
- * file -> scope path -> a test of each fontScale occurrence, for an allowed scope that may use the
- * scale in set forms only: FontScaleText reads it from useDimensions() and hands it to
- * remeasureCap, and never sizes text by it.
- */
+function readsScaleFrom(node, source, hookCall) {
+  return (
+    ts.isBindingElement(node.parent) &&
+    node.parent.name === node &&
+    !node.parent.propertyName &&
+    patternSource(node.parent)?.getText(source) === hookCall
+  )
+}
+
+function compactLayoutScaleRead(node, source) {
+  const expression = node.parent
+  return (
+    readsScaleFrom(node, source, 'useWindowDimensions()') ||
+    (ts.isBinaryExpression(expression) &&
+      expression.left === node &&
+      expression.operatorToken.kind === ts.SyntaxKind.GreaterThanEqualsToken &&
+      ts.isNumericLiteral(expression.right))
+  )
+}
+
+/** file -> scope path -> approved forms of each fontScale occurrence in that scope. */
 const FONT_SCALE_FORMS = {
+  'src/components/nav-row.tsx': { NavRow: compactLayoutScaleRead },
+  'src/features/wardrobe/wardrobe-hub-screen.tsx': {
+    MemberWardrobeHub: compactLayoutScaleRead,
+  },
   'src/lib/font-scale-text.tsx': {
     'createFontScaleText.FontScaleText': (node, source) =>
-      (ts.isBindingElement(node.parent) &&
-        node.parent.name === node &&
-        !node.parent.propertyName &&
-        patternSource(node.parent)?.getText(source) === 'useDimensions()') ||
+      readsScaleFrom(node, source, 'useDimensions()') ||
       inRemeasureAttribute(node, source),
   },
 }
@@ -421,7 +442,7 @@ export function fontScaleReads(files) {
 }
 
 describe('font-scale reads in app code', () => {
-  test('only the composer layout rules read the font scale', () => {
+  test('only reviewed functions read the font scale in the app sources', () => {
     const files = Object.fromEntries(
       sourceFiles(mobileRoot).map((file) => [
         file,
@@ -430,6 +451,20 @@ describe('font-scale reads in app code', () => {
     )
     assert.ok(Object.keys(files).length > 50, 'the scan found the app sources')
     assert.deepEqual(fontScaleReads(files), [])
+  })
+
+  test('compact row layout can compare font scale while direct text scaling is caught', () => {
+    const row = [
+      "import { Text, useWindowDimensions } from 'react-native'",
+      'export function NavRow() {',
+      '  const { fontScale, width } = useWindowDimensions()',
+      '  const stackValue = fontScale >= 1.5 && width <= 400',
+      '  return <Text style={{ fontSize: 16 * fontScale }} />',
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'src/components/nav-row.tsx': row }), [
+      'src/components/nav-row.tsx:5 return <Text style={{ fontSize: 16 * fontScale }} />',
+    ])
   })
 
   test('a seeded AppText that scales by fontScale is caught', () => {

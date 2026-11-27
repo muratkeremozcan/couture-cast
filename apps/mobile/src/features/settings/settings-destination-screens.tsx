@@ -316,6 +316,7 @@ export function LanguageSettingsScreen() {
   const [isChangingLocale, setIsChangingLocale] = useState(false)
   const [localeError, setLocaleError] = useState<string | null>(null)
   const localeChangeInFlight = useRef(false)
+  const localeRevision = useRef(0)
   useEffect(() => {
     if (localeError) {
       announce('error', localeError)
@@ -324,37 +325,38 @@ export function LanguageSettingsScreen() {
 
   useEffect(() => {
     let isActive = true
+    const revision = localeRevision.current
 
     void getSavedSettings().then(async (settings) => {
-      if (!isActive || !settings.locale) {
+      if (!isActive || revision !== localeRevision.current || !settings.locale) {
         return
       }
 
       setCurrentLocale(settings.locale)
-      if (settings.localeSyncPending && !localeChangeInFlight.current) {
-        try {
-          await updatePreferredLocaleFromMobile(settings.locale)
-          const didPersistSync = await saveSettings({ localeSyncPending: false })
-          if (!didPersistSync) {
-            throw new Error('Unable to persist locale synchronization state')
-          }
-        } catch {
-          if (isActive) {
-            setLocaleError(
-              t('settings.locale_sync_error', {
-                defaultValue:
-                  'Language changed on this device. Profile sync will retry later.',
-              })
-            )
-          }
+      if (!settings.localeSyncPending || localeChangeInFlight.current) return
+      // Finish the pending sync before a new choice can write a different locale.
+      localeChangeInFlight.current = true
+      setIsChangingLocale(true)
+      try {
+        await updatePreferredLocaleFromMobile(settings.locale)
+        const didPersistSync = await saveSettings({ localeSyncPending: false })
+        if (!didPersistSync) {
+          throw new Error('Unable to persist locale synchronization state')
         }
+      } catch {
+        if (isActive) {
+          setLocaleError(i18n.t('settings.locale_sync_error'))
+        }
+      } finally {
+        localeChangeInFlight.current = false
+        if (isActive) setIsChangingLocale(false)
       }
     })
 
     return () => {
       isActive = false
     }
-  }, [t])
+  }, [i18n])
 
   const handleLanguageChange = async (localeCode: SupportedLocale) => {
     if (localeChangeInFlight.current || localeCode === currentLocale) {
@@ -362,6 +364,7 @@ export function LanguageSettingsScreen() {
     }
 
     localeChangeInFlight.current = true
+    localeRevision.current += 1
     setIsChangingLocale(true)
     setLocaleError(null)
     const oldLocale =
