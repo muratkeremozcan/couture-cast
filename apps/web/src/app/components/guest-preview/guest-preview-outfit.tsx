@@ -179,7 +179,7 @@ export function GuestPreviewOutfit({
                 onClick={(event) => onSwap(garment.category, event.currentTarget)}
                 data-testid={`guest-preview-swap-${garment.category}`}
                 aria-label={`${formatPreviewString(strings.outfit.swap, { category })}: ${text.name}`}
-                className="mt-auto min-h-11 max-w-full rounded-lg border border-line-strong bg-page px-3 text-xs font-semibold text-ink hover:border-ink group-data-[first-run=true]:px-[4px]"
+                className="mt-auto min-h-11 max-w-full rounded-lg border border-line-strong bg-page px-3 text-xs font-semibold text-ink hover:border-ink group-data-[first-run=true]:px-1"
               >
                 {formatPreviewString(strings.outfit.swap, { category })}
               </button>
