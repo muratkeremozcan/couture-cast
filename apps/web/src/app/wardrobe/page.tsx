@@ -40,6 +40,7 @@ import {
   resolveCurrentUserId,
 } from '../../lib/wardrobe'
 import { readStorage, WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
+import { hasAppHistoryBelow } from '../../lib/app-history'
 import { LANDING_SESSION_ATTRIBUTE } from '../../lib/landing-session'
 import { hasStoredWebSession } from '../../lib/web-session'
 import { useRetryOnVerifiedSession } from '../../lib/session-retry'
@@ -511,7 +512,7 @@ function useGarmentDetailRoute(
     if (focusTarget) {
       focusAfterCloseRef.current = focusTarget
     }
-    if (readHistoryState()[GARMENT_DETAIL_HISTORY_KEY]) {
+    if (hasAppHistoryBelow() && readHistoryState()[GARMENT_DETAIL_HISTORY_KEY]) {
       // Back lands on the grid entry; the search param sync closes the detail, so browser Back
       // and this control agree. A delete closes at once so the detail never shows the piece
       // as missing while the history step lands.
@@ -519,7 +520,7 @@ function useGarmentDetailRoute(
       if (focusTarget) setDetailGarmentId(null)
       return
     }
-    // A direct link to the detail has no grid entry behind it: replace this one with the grid.
+    // A direct link or reload starts the document at the detail. Replace it with the grid.
     const url = new URL(window.location.href)
     url.searchParams.delete(GARMENT_DETAIL_PARAM)
     window.history.replaceState(null, '', url)
