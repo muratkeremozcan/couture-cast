@@ -333,9 +333,9 @@ describe('completeWebOAuth: one outcome per callback, never a throw', () => {
         json({ status: 'awaiting_guardian', accountId: 'teen-pending-1' })
       )
       const auth = await load()
-      await expect(auth.completeWebOAuth(params('code=pending-teen'))).resolves.toEqual({
-        kind: 'awaiting_guardian',
-      })
+      await expect(
+        auth.completeWebOAuth(params(`code=pending-teen-${status}`))
+      ).resolves.toEqual({ kind: 'awaiting_guardian' })
       expect(seen).toHaveLength(1)
       expect(federated).toHaveLength(1)
       expect(sdk.signOut).not.toHaveBeenCalled()
@@ -345,6 +345,39 @@ describe('completeWebOAuth: one outcome per callback, never a throw', () => {
       )
     }
   )
+
+  it('reports unavailable when the verified teen guardian status cannot be read', async () => {
+    profileAnswers(json(profile('teen-status-unavailable', 'teen')))
+    const federated = federatedAnswer(json({ message: 'Unavailable' }, 503))
+    const auth = await load()
+
+    await expect(
+      auth.completeWebOAuth(params('code=teen-status-unavailable'))
+    ).resolves.toEqual({ kind: 'unavailable' })
+
+    expect(federated).toEqual(['Bearer signed-google-session'])
+    expect(sdk.signOut).not.toHaveBeenCalled()
+  })
+
+  it('recovers a duplicate Google signup into the pending guardian step for the same account', async () => {
+    profileAnswers(unauthorized)
+    federatedAnswer(json({ status: 'needs_birthdate' }))
+    const auth = await load()
+    await expect(
+      auth.completeWebOAuth(params('code=pending-guardian-conflict'))
+    ).resolves.toEqual({ kind: 'no_account' })
+    profileAnswers(json(profile('teen-conflict', 'teen')))
+    federatedAnswer(json({ status: 'awaiting_guardian', accountId: 'teen-conflict' }))
+    installHandlers(
+      http.post(federatedPath, json({ message: 'Account already exists' }, 409))
+    )
+
+    await expect(auth.finishWebFederatedSignup('1990-01-01')).resolves.toEqual({
+      kind: 'awaiting_guardian',
+      accountId: 'teen-conflict',
+    })
+    expect(sdk.signOut).not.toHaveBeenCalled()
+  })
 
   it('complete then a 200 re-verify answers member', async () => {
     const seen = profileAnswers(unauthorized, json(profile('app-member-raced')))

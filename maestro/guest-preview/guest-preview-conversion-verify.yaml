@@ -74,5 +74,8 @@ env:
     label: 'The first look appears in Saved'
 - tapOn:
     id: 'saved-look-card-.+'
-- assertVisible:
-    id: 'saved-look-detail'
+- extendedWaitUntil:
+    visible:
+      id: 'saved-look-detail'
+    timeout: 20000
+    label: 'The saved look detail opens'

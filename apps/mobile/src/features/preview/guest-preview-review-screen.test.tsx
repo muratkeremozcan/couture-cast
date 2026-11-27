@@ -410,6 +410,7 @@ describe('CC-7.21 first-run look review', () => {
     press(await screen.findByTestId('guest-preview-review-cancel'))
     await waitFor(() => expect(navigation.dismissTo).toHaveBeenCalledWith('/'))
     expect(client.write).not.toHaveBeenCalled()
+    expect(lookApi.style).not.toHaveBeenCalled()
     expect(lookApi.save).not.toHaveBeenCalled()
     await waitFor(() => expect(adapter.value()).toBeNull())
   })

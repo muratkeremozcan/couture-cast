@@ -285,6 +285,34 @@ describe('guest preview surfaces', () => {
     expect(garmentIds()).toEqual(pieces)
   })
 
+  it('keeps the Save sheet open and preserves the look when account actions are offline', async () => {
+    const outfit = await passGate()
+    const lookId = outfit.dataset.lookId
+    fireEvent.click(screen.getByTestId('sample-save-look'))
+    const sheet = await screen.findByTestId('guest-preview-save-sheet')
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    try {
+      act(() => {
+        window.dispatchEvent(new Event('offline'))
+      })
+      expect(within(sheet).getByRole('status')).toHaveTextContent(
+        en.chrome.connectionNeeded
+      )
+      expect(within(sheet).getByTestId('guest-preview-sign-in')).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+      const create = within(sheet).getByTestId('guest-preview-create-account')
+      expect(create).toHaveAttribute('aria-disabled', 'true')
+      expect(fireEvent.click(create)).toBe(false)
+      await expect(hasGuestLookSave()).resolves.toBe(false)
+      expect(sheet).toBeVisible()
+      expect(outfit.dataset.lookId).toBe(lookId)
+    } finally {
+      online.mockRestore()
+    }
+  })
+
   it.each(['create-account', 'sign-in'] as const)(
     'stores a first-run intent when the guest chooses %s in the account sheet',
     async (door) => {

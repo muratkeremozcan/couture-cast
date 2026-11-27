@@ -78,7 +78,6 @@ env:
     element:
       id: 'guest-preview-rain-high'
     direction: DOWN
-    centerElement: true
 - tapOn:
     id: 'guest-preview-rain-high'
 

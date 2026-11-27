@@ -220,20 +220,33 @@ describe('E-CANCEL: Cancel deletes the waiting identity, then leaves', () => {
   })
 })
 
-it('lets a guardian-pending teen continue to the first-run review', async () => {
-  preview.load.mockResolvedValue({
-    state: { conversion: { intent: GUEST_PREVIEW_SAVE_INTENT } },
-    persistent: true,
-  })
-  session.awaiting.mockResolvedValue('teen-pending')
-  destination.next.mockResolvedValue('/preview/continue')
-  render(<FinishSignupForm fromPreview door="signup" />)
-  const continueButton = await screen.findByRole('button', { name: strings.continue })
-  expect(screen.getByLabelText(strings.guardianEmail)).toBeVisible()
-  fireEvent.click(continueButton)
-  await waitFor(() => expect(replace).toHaveBeenCalledWith('/preview/continue'))
-  expect(session.signOut).not.toHaveBeenCalled()
-})
+it.each(['returning', 'duplicate signup'])(
+  'lets a guardian-pending teen continue to the first-run review after %s',
+  async (entry) => {
+    preview.load.mockResolvedValue({
+      state: { conversion: { intent: GUEST_PREVIEW_SAVE_INTENT } },
+      persistent: true,
+    })
+    destination.next.mockResolvedValue('/preview/continue')
+    if (entry === 'returning') session.awaiting.mockResolvedValue('teen-pending')
+    else
+      session.finish.mockResolvedValue({
+        kind: 'awaiting_guardian',
+        accountId: 'teen-pending',
+      })
+    render(<FinishSignupForm fromPreview door="signup" />)
+    if (entry === 'duplicate signup') {
+      const field = await screen.findByLabelText(strings.birthdate)
+      fireEvent.change(field, { target: { value: birthdate(15) } })
+      fireEvent.click(screen.getByRole('button', { name: strings.create }))
+    }
+    const continueButton = await screen.findByRole('button', { name: strings.continue })
+    expect(screen.getByLabelText(strings.guardianEmail)).toBeVisible()
+    fireEvent.click(continueButton)
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/preview/continue'))
+    expect(session.signOut).not.toHaveBeenCalled()
+  }
+)
 
 it('reuses the age-check date when Google returns to a first-run look in the same app', async () => {
   const draft = createGuestPreviewState(Date.now(), SAMPLE_CATALOG)

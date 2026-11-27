@@ -223,7 +223,9 @@ test.describe('Guest preview (signed out)', () => {
           const outfit = page.getByTestId('guest-preview-outfit')
           const firstLook = de.looks['office-oxford']
           await expect(outfit).toHaveAttribute('data-look-id', 'sample:l:office-oxford')
-          await expectReadable(outfit.getByText(de.outfit.heading, { exact: true }))
+          const sampleLabel = page.getByTestId('guest-preview-label')
+          await expect(sampleLabel).toHaveText(de.firstRun.sampleLabel)
+          await expectReadable(sampleLabel)
           await expectReadable(outfit.getByRole('heading', { name: firstLook.name }))
           await expectReadable(outfit.getByText(firstLook.description, { exact: true }))
           await expectReadable(outfit.getByTestId('guest-preview-try-another'))

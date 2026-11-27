@@ -628,6 +628,41 @@ describe('a teen waiting on a guardian', () => {
       json({ status: 'awaiting_guardian', accountId: 'teen-pending-1' })
     )
 
+  it('reports unavailable when the verified teen guardian status cannot be read', async () => {
+    pending(200)
+    const status = answers(
+      '/api/v1/auth/signup/federated',
+      json({ message: 'Unavailable' }, 503)
+    )
+    const { session } = await load()
+
+    await expect(
+      session.completeNativeOAuth(`${REDIRECT}?code=teen-status-unavailable`)
+    ).resolves.toEqual({ kind: 'unavailable' })
+
+    expect(status).toEqual(['Bearer signed-native-google'])
+    expect(sdk.signOut).not.toHaveBeenCalled()
+  })
+
+  it('recovers a duplicate Google signup into the pending guardian step for the same account', async () => {
+    const { session } = await load()
+    await waitingIdentity(session, 'pending-guardian-conflict')
+    pending(200)
+    awaiting()
+    server.use(
+      http.post(
+        '*/api/v1/auth/signup/federated',
+        json({ message: 'Account already exists' }, 409)
+      )
+    )
+
+    await expect(session.finishNativeFederatedSignup('1990-01-01')).resolves.toEqual({
+      kind: 'awaiting_guardian',
+      accountId: 'teen-pending-1',
+    })
+    expect(sdk.signOut).not.toHaveBeenCalled()
+  })
+
   it.each([403, 200])(
     'Google keeps the session and guardian step when the profile responds %i',
     async (statusCode) => {

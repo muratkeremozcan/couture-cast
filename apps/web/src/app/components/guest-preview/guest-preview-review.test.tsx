@@ -25,6 +25,7 @@ import {
 } from '@couture/utils'
 import type * as GuestPreviewLib from '../../../lib/guest-preview'
 import { setWebGuestPreviewStoreForTests } from '../../../lib/guest-preview'
+import { SavedLookRequestError } from '../../../lib/saved-looks'
 import { GuestPreviewReview } from './guest-preview-review'
 
 const navigation = vi.hoisted(() => {
@@ -486,6 +487,7 @@ describe('CC-7.21 first-run look review', () => {
     fireEvent.click(await screen.findByTestId('guest-preview-review-cancel'))
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
     expect(client.write).not.toHaveBeenCalled()
+    expect(lookApi.style).not.toHaveBeenCalled()
     expect(lookApi.save).not.toHaveBeenCalled()
     await waitFor(() => expect(adapter.value()).toBeNull())
   })
@@ -536,9 +538,7 @@ describe('CC-7.21 first-run look review', () => {
   it('ends the review when the server refuses access to saved catalog looks', async () => {
     await seedProposal(GUEST_PREVIEW_SAVE_INTENT)
     const client = server()
-    lookApi.save.mockRejectedValueOnce(
-      new ResponseError(new Response(null, { status: 403 }))
-    )
+    lookApi.save.mockRejectedValueOnce(new SavedLookRequestError('Consent required', 403))
     render(<GuestPreviewReview />)
     fireEvent.click(await screen.findByTestId('guest-preview-review-keep'))
     expect(await screen.findByTestId('guest-preview-review-result')).toHaveTextContent(
@@ -562,5 +562,39 @@ describe('CC-7.21 first-run look review', () => {
     member.revision += 1
     void open?.()
     expect(navigation.push).toHaveBeenCalledOnce()
+  })
+
+  it('offers Save look only when the account style read is unavailable', async () => {
+    await seedProposal(GUEST_PREVIEW_SAVE_INTENT)
+    const client = server()
+    lookApi.read.mockRejectedValueOnce(new Error('Style temporarily unavailable'))
+    render(<GuestPreviewReview />)
+    const use = await screen.findByTestId('guest-preview-review-use')
+    expect(use).toBeDisabled()
+    const keep = screen.getByTestId('guest-preview-review-keep')
+    expect(keep).toBeEnabled()
+    fireEvent.click(keep)
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith('/looks?segment=saved')
+    )
+    expect(client.write).not.toHaveBeenCalled()
+    expect(lookApi.style).not.toHaveBeenCalled()
+  })
+
+  it('keeps the guest save available after a temporary storage read failure', async () => {
+    await seedProposal(GUEST_PREVIEW_SAVE_INTENT)
+    server()
+    render(<GuestPreviewReview />)
+    const keep = await screen.findByTestId('guest-preview-review-keep')
+    vi.spyOn(adapter, 'read').mockRejectedValueOnce(new Error('Storage unavailable'))
+    fireEvent.click(keep)
+    await screen.findByTestId('guest-preview-review-failed')
+    expect(lookApi.save).not.toHaveBeenCalled()
+    expect(adapter.value()).toContain(GUEST_PREVIEW_SAVE_INTENT)
+    fireEvent.click(keep)
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith('/looks?segment=saved')
+    )
+    expect(lookApi.save).toHaveBeenCalledOnce()
   })
 })
