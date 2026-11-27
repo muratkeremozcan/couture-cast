@@ -169,7 +169,7 @@ test.describe('Jade first use on a phone', () => {
       .getByRole('combobox', { name: 'Style', exact: true })
       .selectOption({ label: 'Cozy' })
     await page
-      .getByRole('combobox', { name: 'Palette', exact: true })
+      .getByRole('combobox', { name: 'Colors', exact: true })
       .selectOption({ value: 'colorful' })
     await page
       .getByRole('combobox', { name: 'Texture', exact: true })
@@ -448,7 +448,16 @@ test.describe('Jade first use on a phone', () => {
         .toBe('none')
       expect(allocations, 'No upload allocation during editing').toBe(0)
       if (background !== 'plain') {
-        await expect.soft(dialog.getByText(/background was kept/i)).toBeVisible()
+        await expect
+          .soft(
+            dialog.getByText(
+              "Your photo still has its background. We couldn't cut out the piece.",
+              {
+                exact: true,
+              }
+            )
+          )
+          .toBeVisible()
       }
       await preview.screenshot({ path: testInfo.outputPath('preview.png') })
 
@@ -458,7 +467,7 @@ test.describe('Jade first use on a phone', () => {
       })
       // Confirmation removes the preview. Decode the PUT using the same browser canvas.
       await confirm.click()
-      await expect(dialog.getByText('Garment Upload Complete!')).toBeVisible()
+      await expect(dialog.getByText('Piece added')).toBeVisible()
       const { requestJson } = await commit
       expect(
         put?.bytes?.length,

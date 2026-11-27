@@ -163,7 +163,7 @@
     "empty_title": "Nenhuma peça ainda",
     "empty_desc": "Tire uma foto de uma peça que você usa.",
     "capture": {
-      "title": "Capturar peça",
+      "title": "Adicione uma peça",
       "camera": "Tirar foto",
       "library": "Galeria de fotos",
       "retake": "Tirar outra foto",
@@ -205,12 +205,12 @@
       "use_image": "Usar esta imagem"
     },
     "upload": {
-      "preparing": "Preparando a validação da imagem...",
-      "requesting": "Reservando a sessão de envio...",
-      "uploading": "Enviando os dados da imagem...",
-      "verifying": "Verificando os dados no armazenamento privado...",
-      "processing": "Peça enviada. Processando a análise de cores...",
-      "ready": "Peça pronta",
+      "preparing": "Conferindo sua foto…",
+      "requesting": "Preparando para salvar…",
+      "uploading": "Salvando sua foto…",
+      "verifying": "Conferindo se a foto chegou…",
+      "processing": "Adicionando sua peça…",
+      "ready": "Peça adicionada",
       "failed": "Falha ao enviar a peça",
       "retry": "Tentar novamente o envio",
       "cancel": "Cancelar envio"

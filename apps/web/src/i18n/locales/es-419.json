@@ -456,9 +456,9 @@
       }
     },
     "capture": {
-      "title": "Captura de prenda",
+      "title": "Agrega una prenda",
       "close": "Cerrar la captura",
-      "intro": "Toma o importa una foto de una prenda para agregarla a tu clóset privado de CoutureCast.",
+      "intro": "Toma una foto o elige una de tus archivos. Quedará en tu clóset privado.",
       "takePhoto": "Tomar foto",
       "chooseFile": "Elegir archivo",
       "fileLabel": "Archivo de imagen de la prenda",
@@ -473,15 +473,15 @@
       "retake": "Volver a tomar / Elegir otra",
       "useImage": "Usar esta imagen",
       "statusAnnouncement": "Estado de la carga: {{status}}",
-      "completeTitle": "¡Prenda subida!",
-      "completeBody": "Tu prenda se subió de forma segura a tu clóset privado y está en cola para combinarla en atuendos personalizados.",
+      "completeTitle": "Prenda agregada",
+      "completeBody": "Tu prenda está en tu clóset privado. La usaremos para elegir conjuntos para ti.",
       "done": "Listo",
       "status": {
-        "preparing": "Preparando la validación de la imagen...",
-        "requestingUpload": "Asignando la sesión de carga...",
-        "uploading": "Subiendo la imagen ({{progress}} %)...",
-        "verifying": "Verificando el almacenamiento privado...",
-        "processing": "¡Prenda subida! Procesando el análisis de color..."
+        "preparing": "Revisando tu foto…",
+        "requestingUpload": "Preparando para guardar…",
+        "uploading": "Guardando tu foto…",
+        "verifying": "Comprobando que tu foto se haya guardado…",
+        "processing": "Agregando tu prenda…"
       },
       "errors": {
         "cameraUnavailable": "La cámara no está disponible en este dispositivo o contexto.",

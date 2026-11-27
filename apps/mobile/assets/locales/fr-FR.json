@@ -163,7 +163,7 @@
     "empty_title": "Aucun vêtement pour l’instant",
     "empty_desc": "Prends une photo d’un vêtement que tu portes.",
     "capture": {
-      "title": "Capture du vêtement",
+      "title": "Ajoute un vêtement",
       "camera": "Prendre une photo",
       "library": "Photothèque",
       "retake": "Reprendre la photo",
@@ -205,12 +205,12 @@
       "use_image": "Utiliser cette image"
     },
     "upload": {
-      "preparing": "Préparation de la validation de l'image...",
-      "requesting": "Attribution de la session de chargement...",
-      "uploading": "Chargement des données de l'image...",
-      "verifying": "Vérification des données privées stockées...",
-      "processing": "Vêtement chargé. Analyse des couleurs en cours...",
-      "ready": "Vêtement prêt",
+      "preparing": "On vérifie ta photo…",
+      "requesting": "On se prépare à enregistrer la photo…",
+      "uploading": "On enregistre ta photo…",
+      "verifying": "On vérifie que ta photo a bien été envoyée…",
+      "processing": "On ajoute ton vêtement…",
+      "ready": "Vêtement ajouté",
       "failed": "Le chargement du vêtement a échoué",
       "retry": "Réessayer le téléchargement",
       "cancel": "Annuler le téléchargement"

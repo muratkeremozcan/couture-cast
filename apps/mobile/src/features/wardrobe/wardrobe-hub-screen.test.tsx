@@ -1143,6 +1143,7 @@ describe('WardrobeHubScreen', () => {
     const verification = deferred()
     const unsignedRetry = deferred()
     const renewalReply = deferred()
+    const requestedUnsigned = vi.fn<(result: typeof ready) => void>()
     const requestedRenewal = vi.fn<(result: typeof ready) => void>()
     let heldRead: ReturnType<typeof deferred> | undefined
     server.use(
@@ -1150,6 +1151,7 @@ describe('WardrobeHubScreen', () => {
         const current = garment
         const pending = heldRead
         heldRead = undefined
+        if (pending === unsignedRetry) requestedUnsigned(current)
         if (pending === renewalReply) requestedRenewal(current)
         await pending?.promise
         return HttpResponse.json({ data: [current] })
@@ -1186,16 +1188,18 @@ describe('WardrobeHubScreen', () => {
 
       expect(await within(panel).findByTestId('style-piece-unavailable')).toBeVisible()
       await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(83))
-      const retry = within(panel).getByTestId('style-piece-refresh')
       const retryControl = page
         .getByTestId('style-piece-panel')
         .getByTestId('style-piece-refresh')
       garment = unsigned
       heldRead = unsignedRetry
       await retryControl.click()
-      await waitFor(() => expect(retry).toBeDisabled())
+      await waitFor(() =>
+        expect(requestedUnsigned).toHaveBeenCalledExactlyOnceWith(unsigned)
+      )
+      await expect.element(retryControl).toBeDisabled()
       unsignedRetry.resolve()
-      await waitFor(() => expect(retry).toBeEnabled())
+      await expect.element(retryControl).toBeEnabled()
       expect(within(panel).queryByTestId('style-piece-save')).toBeNull()
 
       garment = renewal

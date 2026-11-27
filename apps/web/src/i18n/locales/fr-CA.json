@@ -456,9 +456,9 @@
       }
     },
     "capture": {
-      "title": "Capture d'un vêtement",
+      "title": "Ajoute un vêtement",
       "close": "Fermer la capture",
-      "intro": "Photographiez ou importez la photo d'un vêtement pour l'ajouter à votre garde-robe CoutureCast privée.",
+      "intro": "Prends une photo ou choisis-en une dans tes fichiers. Elle sera dans ta garde-robe privée.",
       "takePhoto": "Prendre une photo",
       "chooseFile": "Choisir un fichier",
       "fileLabel": "Fichier image du vêtement",
@@ -473,15 +473,15 @@
       "retake": "Reprendre / En choisir une autre",
       "useImage": "Utiliser cette image",
       "statusAnnouncement": "État du téléversement : {{status}}",
-      "completeTitle": "Vêtement téléversé !",
-      "completeBody": "Votre vêtement a été téléversé en toute sécurité dans votre garde-robe privée et sera proposé dans vos tenues personnalisées.",
+      "completeTitle": "Vêtement ajouté",
+      "completeBody": "Ton vêtement est dans ta garde-robe privée. On l’utilisera pour te proposer des tenues.",
       "done": "Terminé",
       "status": {
-        "preparing": "Préparation de la validation de l'image...",
-        "requestingUpload": "Ouverture de la session de téléversement...",
-        "uploading": "Téléversement de l'image ({{progress}} %)...",
-        "verifying": "Vérification du stockage privé...",
-        "processing": "Vêtement téléversé ! Analyse des couleurs en cours..."
+        "preparing": "On vérifie ta photo…",
+        "requestingUpload": "On se prépare à enregistrer la photo…",
+        "uploading": "On enregistre ta photo…",
+        "verifying": "On vérifie que ta photo a bien été envoyée…",
+        "processing": "On ajoute ton vêtement…"
       },
       "errors": {
         "cameraUnavailable": "L'appareil photo n'est pas disponible sur cet appareil ou dans ce contexte.",

@@ -38,6 +38,7 @@ const sharedKeys = [
   'shareCard.sourceUnavailable',
   'shareCard.storage',
   'wardrobe.capsules.namePlaceholder',
+  'wardrobe.capture.title',
 ]
 const sharedButtons = [
   'community.compose.editText',
@@ -47,6 +48,14 @@ const sharedButtons = [
 ]
 const webKeys = [
   'settings.profile.browserLanguageHelp',
+  'wardrobe.capture.completeBody',
+  'wardrobe.capture.completeTitle',
+  'wardrobe.capture.intro',
+  'wardrobe.capture.status.preparing',
+  'wardrobe.capture.status.processing',
+  'wardrobe.capture.status.requestingUpload',
+  'wardrobe.capture.status.uploading',
+  'wardrobe.capture.status.verifying',
   'wardrobe.hub.accountFailed',
   'wardrobe.hub.accountFailedShort',
   'wardrobe.hub.emptyBody',
@@ -78,6 +87,12 @@ const nativeKeys = [
   'wardrobe.onboarding.permission_body',
   'wardrobe.onboarding.permission_denied',
   'wardrobe.tagging.poll_timeout',
+  'wardrobe.upload.preparing',
+  'wardrobe.upload.processing',
+  'wardrobe.upload.ready',
+  'wardrobe.upload.requesting',
+  'wardrobe.upload.uploading',
+  'wardrobe.upload.verifying',
 ]
 const webButtons = [
   'wardrobe.hub.emptyAction',

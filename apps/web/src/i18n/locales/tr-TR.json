@@ -456,9 +456,9 @@
       }
     },
     "capture": {
-      "title": "Kıyafet çekimi",
+      "title": "Parça ekle",
       "close": "Çekim penceresini kapat",
-      "intro": "Özel CoutureCast gardırobuna eklemek için bir kıyafetin fotoğrafını çek veya içe aktar.",
+      "intro": "Fotoğraf çek veya dosyalarından birini seç. Fotoğraf özel dolabına eklenir.",
       "takePhoto": "Fotoğraf çek",
       "chooseFile": "Dosya seç",
       "fileLabel": "Kıyafet görsel dosyası",
@@ -473,15 +473,15 @@
       "retake": "Yeniden çek / Başka seç",
       "useImage": "Bu görseli kullan",
       "statusAnnouncement": "Yükleme durumu: {{status}}",
-      "completeTitle": "Kıyafet yüklendi!",
-      "completeBody": "Kıyafetin özel gardırobuna güvenle yüklendi ve kişisel kombin eşleştirmesi için sıraya alındı.",
+      "completeTitle": "Parça eklendi",
+      "completeBody": "Parçan özel dolabında. Sana kombin seçmek için onu kullanacağız.",
       "done": "Bitti",
       "status": {
-        "preparing": "Görsel doğrulamaya hazırlanıyor...",
-        "requestingUpload": "Yükleme oturumu açılıyor...",
-        "uploading": "Görsel yükleniyor (%{{progress}})...",
-        "verifying": "Özel depolama doğrulanıyor...",
-        "processing": "Kıyafet yüklendi! Renk analizi yapılıyor..."
+        "preparing": "Fotoğrafın kontrol ediliyor…",
+        "requestingUpload": "Kaydetmeye hazırlanılıyor…",
+        "uploading": "Fotoğrafın kaydediliyor…",
+        "verifying": "Fotoğrafın yüklenip yüklenmediği kontrol ediliyor…",
+        "processing": "Parçan ekleniyor…"
       },
       "errors": {
         "cameraUnavailable": "Kamera bu cihazda veya bu bağlamda kullanılamıyor.",

@@ -163,7 +163,7 @@
     "empty_title": "Henüz parça yok",
     "empty_desc": "Giydiğin bir parçanın fotoğrafını çek.",
     "capture": {
-      "title": "Giysi fotoğrafı",
+      "title": "Parça ekle",
       "camera": "Fotoğraf çek",
       "library": "Fotoğraf arşivi",
       "retake": "Yeniden çek",
@@ -205,12 +205,12 @@
       "use_image": "Bu görseli kullan"
     },
     "upload": {
-      "preparing": "Görsel doğrulaması hazırlanıyor...",
-      "requesting": "Yükleme oturumu ayrılıyor...",
-      "uploading": "Görsel verileri yükleniyor...",
-      "verifying": "Özel depolama verileri doğrulanıyor...",
-      "processing": "Giysi yüklendi. Renk analizi işleniyor...",
-      "ready": "Giysi hazır",
+      "preparing": "Fotoğrafın kontrol ediliyor…",
+      "requesting": "Kaydetmeye hazırlanılıyor…",
+      "uploading": "Fotoğrafın kaydediliyor…",
+      "verifying": "Fotoğrafın yüklenip yüklenmediği kontrol ediliyor…",
+      "processing": "Parçan ekleniyor…",
+      "ready": "Parça eklendi",
       "failed": "Giysi yüklenemedi",
       "retry": "Yüklemeyi Tekrar Dene",
       "cancel": "Yüklemeyi İptal Et"

@@ -456,9 +456,9 @@
       }
     },
     "capture": {
-      "title": "Garment Capture Flow",
+      "title": "Add a piece",
       "close": "Close capture modal",
-      "intro": "Photograph or import a garment photo to add to your private CoutureCast wardrobe.",
+      "intro": "Take a photo or pick one from your files. It goes in your private closet.",
       "takePhoto": "Take Photo",
       "chooseFile": "Choose File",
       "fileLabel": "Garment image file",
@@ -473,15 +473,15 @@
       "retake": "Retake / Choose Another",
       "useImage": "Use This Image",
       "statusAnnouncement": "Upload status: {{status}}",
-      "completeTitle": "Garment Upload Complete!",
-      "completeBody": "Your clothing item has been securely uploaded to your private wardrobe and is queued for personalized outfit matching.",
+      "completeTitle": "Piece added",
+      "completeBody": "Your piece is in your private closet. We’ll use it to pick outfits for you.",
       "done": "Done",
       "status": {
-        "preparing": "Preparing asset validation...",
-        "requestingUpload": "Allocating upload session...",
-        "uploading": "Uploading image bytes ({{progress}}%)...",
-        "verifying": "Verifying private storage payload...",
-        "processing": "Garment uploaded! Processing color analysis..."
+        "preparing": "Checking your photo…",
+        "requestingUpload": "Getting ready to save…",
+        "uploading": "Saving your photo…",
+        "verifying": "Checking the upload…",
+        "processing": "Adding your piece…"
       },
       "errors": {
         "cameraUnavailable": "Camera access is unavailable on this device or context.",

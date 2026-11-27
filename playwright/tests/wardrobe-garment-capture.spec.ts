@@ -84,7 +84,7 @@ captureTest.describe('Wardrobe Garment Capture Flow @local-lane', () => {
       const modalDialog = page.getByRole('dialog')
       await expect(modalDialog).toBeVisible()
       await expect(
-        page.getByRole('heading', { level: 2, name: 'Garment Capture Flow' })
+        page.getByRole('heading', { level: 2, name: 'Add a piece' })
       ).toBeVisible()
 
       await checkA11y(page, {

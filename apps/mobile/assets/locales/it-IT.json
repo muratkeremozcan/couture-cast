@@ -163,7 +163,7 @@
     "empty_title": "Nessun capo per ora",
     "empty_desc": "Scatta una foto a un capo che indossi.",
     "capture": {
-      "title": "Acquisisci capo",
+      "title": "Aggiungi un capo",
       "camera": "Scatta foto",
       "library": "Libreria foto",
       "retake": "Scatta di nuovo",
@@ -205,12 +205,12 @@
       "use_image": "Usa questa immagine"
     },
     "upload": {
-      "preparing": "Preparazione della convalida dell'immagine...",
-      "requesting": "Assegnazione della sessione di caricamento...",
-      "uploading": "Caricamento dei dati dell'immagine...",
-      "verifying": "Verifica dei dati nell'archivio privato...",
-      "processing": "Capo caricato. Analisi dei colori in corso...",
-      "ready": "Capo pronto",
+      "preparing": "Controlliamo la tua foto…",
+      "requesting": "Ci prepariamo a salvare la foto…",
+      "uploading": "Salviamo la tua foto…",
+      "verifying": "Verifichiamo che la foto sia arrivata…",
+      "processing": "Aggiungiamo il tuo capo…",
+      "ready": "Capo aggiunto",
       "failed": "Caricamento del capo non riuscito",
       "retry": "Riprova caricamento",
       "cancel": "Annulla caricamento"

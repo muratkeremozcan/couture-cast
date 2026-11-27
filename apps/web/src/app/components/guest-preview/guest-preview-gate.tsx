@@ -36,7 +36,7 @@ export function GuestPreviewGate({
       aria-labelledby={`${inputId}-heading`}
       data-testid="guest-preview-gate"
       data-surface="card"
-      className="mx-auto w-full max-w-md space-y-5 rounded-xl border border-line bg-card p-6 shadow-card"
+      className="mx-auto w-full max-w-md space-y-5 rounded-xl border border-line bg-card p-3 shadow-card [overflow-wrap:anywhere] min-[361px]:p-6"
     >
       {/* Story CC-7.9 D6: the top bar owns the page's only h1. */}
       <h2 id={`${inputId}-heading`} className="text-2xl font-semibold text-ink">

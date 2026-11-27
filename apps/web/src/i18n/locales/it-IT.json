@@ -456,9 +456,9 @@
       }
     },
     "capture": {
-      "title": "Acquisizione capo",
+      "title": "Aggiungi un capo",
       "close": "Chiudi l'acquisizione",
-      "intro": "Scatta o importa la foto di un capo per aggiungerlo al tuo guardaroba privato CoutureCast.",
+      "intro": "Scatta una foto o scegline una dai tuoi file. Finirà nel tuo armadio privato.",
       "takePhoto": "Scatta foto",
       "chooseFile": "Scegli file",
       "fileLabel": "File immagine del capo",
@@ -473,15 +473,15 @@
       "retake": "Scatta di nuovo / Scegline un'altra",
       "useImage": "Usa questa immagine",
       "statusAnnouncement": "Stato del caricamento: {{status}}",
-      "completeTitle": "Capo caricato!",
-      "completeBody": "Il tuo capo è stato caricato in modo sicuro nel tuo guardaroba privato ed è in coda per gli abbinamenti personalizzati.",
+      "completeTitle": "Capo aggiunto",
+      "completeBody": "Il capo è nel tuo armadio privato. Lo useremo per scegliere look per te.",
       "done": "Fatto",
       "status": {
-        "preparing": "Preparazione della verifica dell'immagine...",
-        "requestingUpload": "Apertura della sessione di caricamento...",
-        "uploading": "Caricamento dell'immagine ({{progress}}%)...",
-        "verifying": "Verifica dell'archivio privato...",
-        "processing": "Capo caricato! Analisi dei colori in corso..."
+        "preparing": "Controlliamo la tua foto…",
+        "requestingUpload": "Ci prepariamo a salvare la foto…",
+        "uploading": "Salviamo la tua foto…",
+        "verifying": "Verifichiamo che la foto sia arrivata…",
+        "processing": "Aggiungiamo il tuo capo…"
       },
       "errors": {
         "cameraUnavailable": "La fotocamera non è disponibile su questo dispositivo o in questo contesto.",

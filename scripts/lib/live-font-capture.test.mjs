@@ -118,7 +118,7 @@ describe('flattenHierarchy', () => {
 
   test('drops a volatile region with everything under it and counts what it dropped', () => {
     const page = node({ bounds: '[0,0][1080,2400]' }, [
-      node({ text: 'Create my outfit card', bounds: '[76,1519][1004,1597]' }),
+      node({ text: 'Make a card', bounds: '[76,1519][1004,1597]' }),
       node({
         'resource-id': 'shop-this-look-offer-title',
         text: 'Everyday Layering Tee',
@@ -139,7 +139,7 @@ describe('flattenHierarchy', () => {
     })
     assert.deepEqual(
       kept.nodes.map((entry) => entry.text),
-      ['Create my outfit card', 'Kept']
+      ['Make a card', 'Kept']
     )
     assert.equal(kept.volatileDropped, 2)
     // F-00i: each dropped region's bounds, so the probe's records inside it skip matching.

@@ -10,6 +10,14 @@ appId: ${MAESTRO_APP_ID}
     visible:
       id: 'looks-segment-plan'
     timeout: 15000
+- assertVisible:
+    id: 'looks-segment-saved'
+    above:
+      id: 'looks-segment-ideas'
+- assertVisible:
+    id: 'looks-segment-ideas'
+    above:
+      id: 'looks-segment-plan'
 - tapOn:
     id: 'looks-segment-plan'
     retryTapIfNoChange: true
@@ -22,3 +30,19 @@ appId: ${MAESTRO_APP_ID}
     id: 'plan-upgrade'
 - takeScreenshot:
     path: maestro/artifacts/teen-voice-accessibility/${SCHEME}-looks-de-large
+- scrollUntilVisible:
+    element:
+      text: 'Winterstrick'
+    direction: DOWN
+    visibilityPercentage: 100
+    timeout: 15000
+- assertVisible: 'Winterstrick'
+- scrollUntilVisible:
+    element:
+      text: 'Wolle in der Stadt'
+    direction: DOWN
+    visibilityPercentage: 100
+    timeout: 15000
+- assertVisible: 'Wolle in der Stadt'
+- takeScreenshot:
+    path: maestro/artifacts/teen-voice-accessibility/${SCHEME}-sample-week-de-large

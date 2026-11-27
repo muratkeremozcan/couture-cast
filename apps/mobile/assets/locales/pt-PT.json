@@ -163,7 +163,7 @@
     "empty_title": "Ainda sem peças",
     "empty_desc": "Tira uma fotografia de uma peça que usas.",
     "capture": {
-      "title": "Capturar peça",
+      "title": "Adiciona uma peça",
       "camera": "Tirar fotografia",
       "library": "Fototeca",
       "retake": "Tirar novamente",
@@ -205,12 +205,12 @@
       "use_image": "Usar esta imagem"
     },
     "upload": {
-      "preparing": "A preparar a validação da imagem...",
-      "requesting": "A reservar a sessão de envio...",
-      "uploading": "A enviar os dados da imagem...",
-      "verifying": "A verificar os dados no armazenamento privado...",
-      "processing": "Peça enviada. A processar a análise de cores...",
-      "ready": "Peça pronta",
+      "preparing": "A verificar a tua fotografia…",
+      "requesting": "A preparar para guardar…",
+      "uploading": "A guardar a tua fotografia…",
+      "verifying": "A verificar se a fotografia chegou…",
+      "processing": "A adicionar a tua peça…",
+      "ready": "Peça adicionada",
       "failed": "Falha ao enviar a peça",
       "retry": "Tentar envio novamente",
       "cancel": "Cancelar envio"

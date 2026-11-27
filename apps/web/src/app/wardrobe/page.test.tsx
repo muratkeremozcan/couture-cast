@@ -326,7 +326,7 @@ async function commitGarmentThroughCapture(
     new File(['fixture-image'], 'garment.png', { type: 'image/png' })
   )
   await confirmCrop(user)
-  await screen.findByText('Garment Upload Complete!')
+  await screen.findByText('Piece added')
 }
 
 async function confirmCrop(user: ReturnType<typeof userEvent.setup>) {
@@ -365,7 +365,7 @@ describe('WardrobePage persistence', () => {
     )
     await confirmCrop(user)
 
-    await screen.findByText('Garment Upload Complete!')
+    await screen.findByText('Piece added')
     expect(uploadGarmentImageFromWeb).toHaveBeenCalledOnce()
     expectPersistedGarmentCard(screen.getByTestId(`garment-card-${persistedGarment.id}`))
 
@@ -781,7 +781,7 @@ describe('WardrobePage direct garment entry', () => {
     expect(window.location.search).toBe('?entry=add&from=home')
     await user.click(within(error).getByRole('button', { name: 'Try again' }))
 
-    const capture = await screen.findByRole('dialog', { name: 'Garment Capture Flow' })
+    const capture = await screen.findByRole('dialog', { name: 'Add a piece' })
     expect(window.location.search).toBe('?from=home')
     await user.upload(
       within(capture).getByLabelText('Garment image file'),
@@ -925,7 +925,7 @@ describe('WardrobePage garment grid', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Add a photo' }))
 
-    expect(await screen.findByText('Garment Capture Flow')).toBeInTheDocument()
+    expect(await screen.findByText('Add a piece')).toBeInTheDocument()
   })
 
   it('renders a placeholder tile when a garment has no signed image URL', async () => {
@@ -955,9 +955,7 @@ describe('WardrobePage garment grid', () => {
       name: /Failed\. Choose another photo/,
     })
     await user.click(replace)
-    expect(
-      await screen.findByRole('dialog', { name: 'Garment Capture Flow' })
-    ).toBeVisible()
+    expect(await screen.findByRole('dialog', { name: 'Add a piece' })).toBeVisible()
     await user.keyboard('{Escape}')
 
     await waitFor(() => expect(replace).toHaveFocus())
@@ -1222,9 +1220,7 @@ describe('WardrobePage processing poll', () => {
       screen.getByRole('button', { name: '+ Add Garment' })
     )
     await user.click(screen.getByRole('button', { name: 'Done' }))
-    await waitFor(() =>
-      expect(screen.queryByText('Garment Capture Flow')).not.toBeInTheDocument()
-    )
+    await waitFor(() => expect(screen.queryByText('Add a piece')).not.toBeInTheDocument())
 
     releasePoll([garmentFixture('garment-poll', 'awaiting_tags')])
 
@@ -1355,9 +1351,7 @@ describe('WardrobePage processing poll', () => {
       await screen.findByRole('button', { name: 'Add a photo' })
     )
     await user.click(screen.getByRole('button', { name: 'Done' }))
-    await waitFor(() =>
-      expect(screen.queryByText('Garment Capture Flow')).not.toBeInTheDocument()
-    )
+    await waitFor(() => expect(screen.queryByText('Add a piece')).not.toBeInTheDocument())
 
     releasePoll([garmentFixture('garment-poll', 'awaiting_tags')])
     await screen.findByText('Organize Garment Tags')
@@ -1460,9 +1454,7 @@ describe('WardrobePage commit deduplication', () => {
       await screen.findByRole('button', { name: 'Add a photo' })
     )
     await user.click(screen.getByRole('button', { name: 'Done' }))
-    await waitFor(() =>
-      expect(screen.queryByText('Garment Capture Flow')).not.toBeInTheDocument()
-    )
+    await waitFor(() => expect(screen.queryByText('Add a piece')).not.toBeInTheDocument())
 
     releasePoll([garmentFixture('garment-poll', 'awaiting_tags')])
     await screen.findByText('Organize Garment Tags')

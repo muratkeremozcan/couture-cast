@@ -163,7 +163,7 @@
     "empty_title": "No pieces yet",
     "empty_desc": "Take a photo of a piece you wear.",
     "capture": {
-      "title": "Garment Capture",
+      "title": "Add a piece",
       "camera": "Take Photo",
       "library": "Photo Library",
       "retake": "Retake",
@@ -205,12 +205,12 @@
       "use_image": "Use This Image"
     },
     "upload": {
-      "preparing": "Preparing asset validation...",
-      "requesting": "Allocating upload session...",
-      "uploading": "Uploading image bytes...",
-      "verifying": "Verifying private storage payload...",
-      "processing": "Garment uploaded! Processing color analysis...",
-      "ready": "Garment ready",
+      "preparing": "Checking your photo…",
+      "requesting": "Getting ready to save…",
+      "uploading": "Saving your photo…",
+      "verifying": "Checking the upload…",
+      "processing": "Adding your piece…",
+      "ready": "Piece added",
       "failed": "Garment upload failed",
       "retry": "Retry Upload",
       "cancel": "Cancel Upload"

@@ -456,9 +456,9 @@
       }
     },
     "capture": {
-      "title": "Kleidungsstück erfassen",
+      "title": "Teil hinzufügen",
       "close": "Erfassungsdialog schließen",
-      "intro": "Fotografiere ein Kleidungsstück oder importiere ein Foto, um es deinem privaten CoutureCast-Kleiderschrank hinzuzufügen.",
+      "intro": "Mach ein Foto oder wähle eins aus deinen Dateien. Es kommt in deinen privaten Kleiderschrank.",
       "takePhoto": "Foto aufnehmen",
       "chooseFile": "Datei auswählen",
       "fileLabel": "Bilddatei des Kleidungsstücks",
@@ -473,15 +473,15 @@
       "retake": "Neu aufnehmen / anderes wählen",
       "useImage": "Dieses Bild verwenden",
       "statusAnnouncement": "Upload-Status: {{status}}",
-      "completeTitle": "Kleidungsstück hochgeladen!",
-      "completeBody": "Dein Kleidungsstück wurde sicher in deinen privaten Kleiderschrank hochgeladen und wird für persönliche Outfit-Kombinationen vorgemerkt.",
+      "completeTitle": "Teil hinzugefügt",
+      "completeBody": "Dein Teil ist in deinem privaten Kleiderschrank. Wir nutzen es, um Outfits für dich zu finden.",
       "done": "Fertig",
       "status": {
-        "preparing": "Bild wird zur Prüfung vorbereitet...",
-        "requestingUpload": "Upload-Sitzung wird angelegt...",
-        "uploading": "Bild wird hochgeladen ({{progress}} %)...",
-        "verifying": "Privater Speicher wird geprüft...",
-        "processing": "Kleidungsstück hochgeladen! Farbanalyse läuft..."
+        "preparing": "Wir prüfen dein Foto…",
+        "requestingUpload": "Wir bereiten das Speichern vor…",
+        "uploading": "Wir speichern dein Foto…",
+        "verifying": "Wir prüfen, ob dein Foto angekommen ist…",
+        "processing": "Wir fügen dein Teil hinzu…"
       },
       "errors": {
         "cameraUnavailable": "Die Kamera ist auf diesem Gerät oder in diesem Kontext nicht verfügbar.",

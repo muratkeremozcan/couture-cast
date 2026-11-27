@@ -149,7 +149,7 @@ describe('guest preview strings (U-CATALOG-STRINGS)', () => {
     expect(enUS.chrome.sampleLabel).toBe(
       'Sample looks and weather. Your closet and live weather stay separate.'
     )
-    expect(enUS.chrome.supporting).toBe('Change a setting to see a new look.')
+    expect(enUS.chrome.supporting).toBe('Try a new setting.')
     expect(enUS.chrome.conversion).toBe(
       'Make an account to add your clothes. Once you sign in, you can keep your fit and weather settings. Your sample pieces and likes stay here.'
     )

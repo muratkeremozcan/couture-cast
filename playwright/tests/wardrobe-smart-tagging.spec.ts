@@ -111,7 +111,7 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
         await page.getByRole('button', { name: '+ Add Garment' }).click()
         await page.getByLabel('Garment image file').setInputFiles(garmentFixturePath)
         await page.getByRole('button', { name: 'Use This Image' }).click()
-        await expect(page.getByText('Garment Upload Complete!')).toBeVisible()
+        await expect(page.getByText('Piece added')).toBeVisible()
         await page.getByRole('button', { name: 'Done' }).click()
       })
 

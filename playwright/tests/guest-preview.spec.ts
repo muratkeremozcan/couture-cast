@@ -186,6 +186,12 @@ test.describe('Guest preview (signed out)', () => {
           })
           await page.goto('/')
           await expect(page.locator('html')).toHaveCSS('font-size', '32px')
+          const nav = page.getByRole('navigation', { name: 'Untere Navigation' })
+          for (const label of ['Heute', 'Schrank', 'Looks', 'Community', 'Profil']) {
+            const tab = nav.getByRole('link', { name: label, exact: true })
+            await expectReadable(tab)
+            await expect(tab).toBeInViewport({ ratio: 1 })
+          }
           const de = getGuestPreviewStrings('de-DE')
           const entry = page.getByRole('link', { name: de.firstUse.sampleEntry })
           await expectReadable(entry)

@@ -88,6 +88,17 @@ The hourly forecast uses the same chance buckets as sample looks. Its labels say
 because the live forecast can include either. Sample explanations show the result of the rain
 setting without repeating the setting label. The existing thresholds still pick the outfit.
 
+The first CI run showed the sample entry text and bottom tabs clipping at 320 px with 200% text.
+The guest entry, age check and first look have compact spacing and wrap their labels.
+The bottom tabs grow with their text and the page clears the measured height.
+The member capture flow uses plain upload statuses and keeps the private closet disclosure.
+The first [Android visual run](https://github.com/muratkeremozcan/couture-cast/actions/runs/46003648554)
+passed. The web visual job now attaches the four Today screenshots after comparison so they
+can be checked even when a copy change stays within the baseline tolerance.
+Its 320 dp captures showed truncated sample look names in Plan. At enlarged text sizes, the
+Looks controls stack and each sample day puts the full look name below the weekday.
+The six Android Home and Community baselines come from the pixel-reviewed first run.
+
 ## Review triage log
 
 The independent full review and Codex Security used `a80ed17fda2d24ff748219c3983e01ed937bd384`

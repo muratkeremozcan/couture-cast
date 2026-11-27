@@ -661,7 +661,7 @@ it('retries a failed recommendation, shows the verified city, and keeps the chos
   ).toBeVisible()
   expect(within(screen.getByTestId('weather-header')).getByText('70°F')).toBeVisible()
   await user.click(within(live).getByTestId('today-outfit-details'))
-  expect(within(live).queryByRole('button', { name: 'Morning' })).toBeNull()
+  expect(within(live).queryByRole('button', { name: 'Before school' })).toBeNull()
   expect(within(live).getByRole('button', { name: 'Midday' })).toHaveAttribute(
     'aria-pressed',
     'true'
@@ -674,7 +674,7 @@ it('retries a failed recommendation, shows the verified city, and keeps the chos
     /uncategorized-id/i
   )
   expect(screen.getByText('Wind advisory')).toBeVisible()
-  await user.click(within(live).getByRole('button', { name: 'Evening' }))
+  await user.click(within(live).getByRole('button', { name: 'Going out' }))
   expect(within(live).getByText('evening comfort note')).toBeVisible()
   expect(within(live).getByTestId('share-card-open')).toBeVisible()
 

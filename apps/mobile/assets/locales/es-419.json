@@ -163,7 +163,7 @@
     "empty_title": "Aún no hay prendas",
     "empty_desc": "Toma una foto de una prenda que usas.",
     "capture": {
-      "title": "Capturar prenda",
+      "title": "Agrega una prenda",
       "camera": "Tomar foto",
       "library": "Galería de fotos",
       "retake": "Tomar otra foto",
@@ -205,12 +205,12 @@
       "use_image": "Usar esta imagen"
     },
     "upload": {
-      "preparing": "Preparando la validación de la imagen...",
-      "requesting": "Asignando la sesión de carga...",
-      "uploading": "Subiendo los datos de la imagen...",
-      "verifying": "Verificando los datos privados almacenados...",
-      "processing": "Prenda cargada. Procesando el análisis de color...",
-      "ready": "Prenda lista",
+      "preparing": "Revisando tu foto…",
+      "requesting": "Preparando para guardar…",
+      "uploading": "Guardando tu foto…",
+      "verifying": "Comprobando que tu foto se haya guardado…",
+      "processing": "Agregando tu prenda…",
+      "ready": "Prenda agregada",
       "failed": "No se pudo subir la prenda",
       "retry": "Reintentar carga",
       "cancel": "Cancelar carga"

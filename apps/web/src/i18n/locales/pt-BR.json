@@ -456,9 +456,9 @@
       }
     },
     "capture": {
-      "title": "Captura de peça",
+      "title": "Adicione uma peça",
       "close": "Fechar captura",
-      "intro": "Fotografe ou importe a foto de uma peça para adicioná-la ao seu closet privado do CoutureCast.",
+      "intro": "Tire uma foto ou escolha uma dos seus arquivos. Ela vai para seu armário privado.",
       "takePhoto": "Tirar foto",
       "chooseFile": "Escolher arquivo",
       "fileLabel": "Arquivo de imagem da peça",
@@ -473,15 +473,15 @@
       "retake": "Tirar de novo / Escolher outra",
       "useImage": "Usar esta imagem",
       "statusAnnouncement": "Status do envio: {{status}}",
-      "completeTitle": "Peça enviada!",
-      "completeBody": "Sua peça foi enviada com segurança para o seu closet privado e está na fila para combinações de looks personalizadas.",
+      "completeTitle": "Peça adicionada",
+      "completeBody": "Sua peça está no seu armário privado. Vamos usá-la para escolher looks para você.",
       "done": "Concluir",
       "status": {
-        "preparing": "Preparando a validação da imagem...",
-        "requestingUpload": "Abrindo a sessão de envio...",
-        "uploading": "Enviando a imagem ({{progress}}%)...",
-        "verifying": "Verificando o armazenamento privado...",
-        "processing": "Peça enviada! Processando a análise de cores..."
+        "preparing": "Conferindo sua foto…",
+        "requestingUpload": "Preparando para salvar…",
+        "uploading": "Salvando sua foto…",
+        "verifying": "Conferindo se a foto chegou…",
+        "processing": "Adicionando sua peça…"
       },
       "errors": {
         "cameraUnavailable": "A câmera não está disponível neste dispositivo ou contexto.",

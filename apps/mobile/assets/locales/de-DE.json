@@ -163,7 +163,7 @@
     "empty_title": "Noch keine Teile",
     "empty_desc": "Mach ein Foto von einem Teil, das du trägst.",
     "capture": {
-      "title": "Kleidungsstück erfassen",
+      "title": "Teil hinzufügen",
       "camera": "Foto aufnehmen",
       "library": "Fotomediathek",
       "retake": "Neu aufnehmen",
@@ -205,12 +205,12 @@
       "use_image": "Dieses Bild verwenden"
     },
     "upload": {
-      "preparing": "Bildprüfung wird vorbereitet...",
-      "requesting": "Upload-Sitzung wird reserviert...",
-      "uploading": "Bilddaten werden hochgeladen...",
-      "verifying": "Private Speicherdaten werden geprüft...",
-      "processing": "Kleidungsstück hochgeladen. Farbanalyse läuft...",
-      "ready": "Kleidungsstück bereit",
+      "preparing": "Wir prüfen dein Foto…",
+      "requesting": "Wir bereiten das Speichern vor…",
+      "uploading": "Wir speichern dein Foto…",
+      "verifying": "Wir prüfen, ob dein Foto angekommen ist…",
+      "processing": "Wir fügen dein Teil hinzu…",
+      "ready": "Teil hinzugefügt",
       "failed": "Upload des Kleidungsstücks fehlgeschlagen",
       "retry": "Upload wiederholen",
       "cancel": "Upload abbrechen"
