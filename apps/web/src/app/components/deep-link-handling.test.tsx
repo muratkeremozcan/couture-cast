@@ -8,23 +8,33 @@ import { http, HttpResponse } from 'msw'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { mockCommunityFeedItem } from '../../test-utils/msw/handlers'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import CommunityPage from '../community/page'
 import { createWebSpotlightActivation } from '../lib/deep-link-handler'
 import { currentWebSessionScope } from '../../lib/use-web-session'
-import { cityPage } from '../../test-utils/home-spotlight-teaser'
+import {
+  ranked,
+  sponsoredSpotlightBody,
+  SPOTLIGHT_PATH,
+} from '../../test-utils/community-spotlight'
+import { signInFixtureMember } from '../../test-utils/member-session'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 
 const captureMock = vi.fn()
 const FIXTURE_BEARER = 'test-token-deep-link'
 
 function signIn() {
-  vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, FIXTURE_BEARER)
+  signInFixtureMember(FIXTURE_BEARER)
+}
+
+const originalUrl = window.location.href
+
+function setLocationSearch(search: string, pathname = '/') {
+  window.history.replaceState(null, '', `${pathname}${search}`)
 }
 
 afterEach(() => {
-  vi.unstubAllEnvs()
+  window.sessionStorage.clear()
+  window.history.replaceState(null, '', originalUrl)
 })
 
 vi.mock('posthog-js', () => ({
@@ -37,39 +47,18 @@ vi.mock('posthog-js', () => ({
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/',
+  usePathname: () => window.location.pathname,
   useRouter: () => router,
   useSearchParams: () => new URLSearchParams(window.location.search),
 }))
 
 describe('Web Deep-Link Handling (Story 3.7)', () => {
-  const originalLocation = window.location
-
   beforeEach(() => {
     // Story6.5 transport is covered independently; these legacy presentation cases own static HTTP.
     vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
     captureMock.mockClear()
     vi.clearAllMocks()
   })
-
-  afterEach(() => {
-    window.sessionStorage.clear()
-    Object.defineProperty(window, 'location', {
-      writable: true,
-      value: originalLocation,
-    })
-  })
-
-  const setLocationSearch = (search: string) => {
-    Object.defineProperty(window, 'location', {
-      writable: true,
-      value: {
-        ...originalLocation,
-        search,
-        href: `http://localhost${search}`,
-      },
-    })
-  }
 
   it('3.7-UNIT-001: keeps the guest sample available on a widget link', async () => {
     setLocationSearch('?source=widget&size=small&slot=am')
@@ -166,31 +155,11 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
 })
 
 describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
-  const originalLocation = window.location
-
   beforeEach(() => {
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
     captureMock.mockClear()
     vi.clearAllMocks()
   })
-
-  afterEach(() => {
-    window.sessionStorage.clear()
-    Object.defineProperty(window, 'location', {
-      writable: true,
-      value: originalLocation,
-    })
-  })
-
-  const setLocationSearch = (search: string) => {
-    Object.defineProperty(window, 'location', {
-      writable: true,
-      value: {
-        ...originalLocation,
-        search,
-        href: `http://localhost${search}`,
-      },
-    })
-  }
 
   it('hydrates a watch deep link through the same slot mapping as a widget', () => {
     setLocationSearch('?source=watch&slot=pm')
@@ -218,7 +187,10 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
           return new HttpResponse(null, { status })
         })
       )
-      setLocationSearch('?source=notification&type=community&cardId=unavailable-look')
+      setLocationSearch(
+        '?source=notification&type=community&cardId=unavailable-look',
+        '/community'
+      )
       render(<CommunityPage />)
 
       expect(await screen.findByTestId('deep-link-info-banner')).toHaveTextContent(
@@ -231,14 +203,17 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
   )
 
   it.each([
-    ['Today', LookbookPrismLayout],
-    ['Community', CommunityPage],
+    ['/', LookbookPrismLayout],
+    ['/community', CommunityPage],
   ] as const)(
     'reports a signed-out notification on %s without a member probe',
-    async (_entry, Entry) => {
+    async (entry, Entry) => {
       const probe = vi.fn(() => new HttpResponse(null, { status: 403 }))
       useMswHandlers(http.get('/api/v1/community/posts/unavailable-look', probe))
-      setLocationSearch('?source=notification&type=community&cardId=unavailable-look')
+      setLocationSearch(
+        '?source=notification&type=community&cardId=unavailable-look',
+        entry
+      )
       render(<Entry />)
 
       const banner = await screen.findByTestId('deep-link-info-banner')
@@ -248,6 +223,7 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
       expect(captureMock).toHaveBeenCalledWith('deep_link_invalid', expect.anything())
       expect(probe).not.toHaveBeenCalled()
       expect(router.replace).not.toHaveBeenCalled()
+      expect(window.location.pathname).toBe(entry)
       fireEvent.click(within(banner).getByRole('button'))
       expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
     }
@@ -258,21 +234,19 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
     async (sameOwner) => {
       signIn()
       const scope = currentWebSessionScope()!
+      const look = ranked(1)
       const token = createWebSpotlightActivation(
-        'look-1',
+        look.id,
         sameOwner ? scope : `${scope}-previous`
       )
-      useMswHandlers(
-        http.get('/api/v1/community/spotlight', () =>
-          HttpResponse.json({ data: cityPage() })
-        )
-      )
+      useMswHandlers(http.get(SPOTLIGHT_PATH, () => sponsoredSpotlightBody([look])))
       setLocationSearch(
-        `?source=app&type=community&cardId=look-1&focus=spotlight&focusToken=${token}`
+        `?source=app&type=community&cardId=${look.id}&focus=spotlight&focusToken=${token}`,
+        '/community'
       )
       render(<CommunityPage />)
 
-      const card = await screen.findByTestId('spotlight-lookbook-card-look-1')
+      const card = await screen.findByTestId(`spotlight-lookbook-card-${look.id}`)
       if (sameOwner) await waitFor(() => expect(card).toHaveFocus())
       else {
         await waitFor(() =>

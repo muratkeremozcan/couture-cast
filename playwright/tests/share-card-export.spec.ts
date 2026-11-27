@@ -1273,6 +1273,8 @@ test('P-CANCEL-SAVE: closing during held save authorization prevents browser han
   await back.click()
   await expect(page).toHaveURL('/')
   await sameDocument()
+  await page.getByRole('link', { name: 'Community', exact: true }).click()
+  await expect(page).toHaveURL('/community')
   const { opener, preview, dialog } = await ownPhoto(page, null)
   await prepareRoute
   const digest = await preview.getAttribute('data-sha256')
@@ -1324,7 +1326,7 @@ test('P-CANCEL-SAVE: closing during held save authorization prevents browser han
       'closed save authorization request was cancelled'
     ).toBe(true)
     await page.goBack()
-    await expect(page).toHaveURL('/notification-settings')
+    await expect(page).toHaveURL('/')
     await sameDocument()
   } finally {
     navigationGate.release()

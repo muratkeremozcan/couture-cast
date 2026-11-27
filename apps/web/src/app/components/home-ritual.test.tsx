@@ -632,10 +632,12 @@ it('shows the city and garment entry links beside an editable sample when the me
 
   view.unmount()
   renderHome()
-  expect(await screen.findByRole('heading', { name: rotated })).toBeVisible()
+  const sampleTitle = () =>
+    screen.getByTestId('member-sample-outfit').querySelector(':scope > h2')
+  await waitFor(() => expect(sampleTitle()).toHaveTextContent(rotated ?? ''))
   publishMember('other-sample-member')
-  expect(await screen.findByRole('heading', { name: initial })).toBeVisible()
-  expect(screen.queryByRole('heading', { name: rotated })).toBeNull()
+  await waitFor(() => expect(sampleTitle()).toHaveTextContent(initial ?? ''))
+  expect(sampleTitle()).not.toHaveTextContent(rotated ?? '')
 })
 
 it('retries a failed recommendation, shows the verified city, and keeps the chosen live outfit during a failed refresh', async () => {

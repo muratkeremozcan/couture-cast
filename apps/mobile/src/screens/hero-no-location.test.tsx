@@ -93,9 +93,10 @@ describe('TabOneScreen without a saved location', () => {
 
       await render(<TabOneScreen />)
 
-      const sample = await screen.findByTestId('member-sample-outfit')
+      const city = await screen.findByRole('button', { name: cityAction })
+      const sample = screen.getByTestId('member-sample-outfit')
       expect(within(sample).getByTestId('member-sample-label')).toBeVisible()
-      expect(within(sample).getByTestId('home-set-city')).toHaveAccessibleName(cityAction)
+      expect(within(sample).getByTestId('home-set-city')).toBe(city)
       expect(screen.queryByTestId('hero-error-state')).toBeNull()
       expect(screen.queryByTestId('hero-retry')).toBeNull()
     }

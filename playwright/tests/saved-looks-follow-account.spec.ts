@@ -506,7 +506,10 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
             )
             window.localStorage.setItem(
               'couturecast.auth-session',
-              JSON.stringify({ user: { id: seed.ownerId } })
+              JSON.stringify({
+                user: { id: seed.ownerId },
+                expires_at: Math.floor(Date.now() / 1000) + 3600,
+              })
             )
             if (!window.sessionStorage.getItem('__cc73_seeded__')) {
               window.sessionStorage.setItem('__cc73_seeded__', '1')
@@ -637,7 +640,10 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
             )
             window.localStorage.setItem(
               'couturecast.auth-session',
-              JSON.stringify({ user: { id: memberId } })
+              JSON.stringify({
+                user: { id: memberId },
+                expires_at: Math.floor(Date.now() / 1000) + 3600,
+              })
             )
           },
           { memberId: otherMemberId }
