@@ -131,7 +131,7 @@ phoneTest.describe('Garment capture on a phone', () => {
       const { uploadUrl, uploadSessionId } = (
         responseJson as { data: { uploadUrl: string; uploadSessionId: string } }
       ).data
-      await expect(page.getByText('Garment Upload Complete!')).toBeVisible()
+      await expect(page.getByText('Piece added')).toBeVisible()
       await expect(page.getByText('Failed to fetch')).toHaveCount(0)
 
       // The one PUT is the signed URL exactly as given: this member's garment staging key in
@@ -352,7 +352,7 @@ phoneTest.describe('Garment capture on a phone', () => {
       })
       await page.getByRole('button', { name: 'Use This Image' }).click()
 
-      await expect(page.getByText('Garment Upload Complete!')).toBeVisible({
+      await expect(page.getByText('Piece added')).toBeVisible({
         timeout: 30_000,
       })
       await expect(
@@ -468,7 +468,7 @@ phoneTest.describe('Garment capture on a phone', () => {
       await expect(cleanup).not.toBeChecked()
       await page.getByRole('button', { name: 'Use This Image' }).click()
 
-      await expect(page.getByText('Garment Upload Complete!')).toBeVisible({
+      await expect(page.getByText('Piece added')).toBeVisible({
         timeout: 30_000,
       })
       // One PUT, to the signed storage URL, carrying a JPEG.

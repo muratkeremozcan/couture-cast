@@ -2,9 +2,9 @@
   "outfit": "Conjunto",
   "community": "Look de la comunidad",
   "scenarios": {
-    "morning": "Mañana",
+    "morning": "Antes de clases",
     "midday": "Mediodía",
-    "evening": "Noche"
+    "evening": "Para salir"
   },
   "categories": {
     "top": "Parte superior",

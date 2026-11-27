@@ -265,9 +265,7 @@ test.describe('Style this piece on a phone', () => {
   }) => {
     await mockStyleWardrobe(page, baseURL!, interceptNetworkCall, { [memberA]: [] })
     await page.goto('/wardrobe')
-    await expect(
-      page.getByRole('heading', { name: 'No garments added yet' })
-    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'No pieces yet' })).toBeVisible()
     await expect(
       page.getByRole('button', { name: '+ Add Garment', exact: true })
     ).toBeVisible()

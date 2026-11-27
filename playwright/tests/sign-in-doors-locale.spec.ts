@@ -23,7 +23,7 @@ test.describe('the sign-in doors in a French browser', () => {
     await expect(
       page.getByRole('heading', {
         level: 2,
-        name: "Commencez par la vérification de l'âge avant d'accéder à la garde-robe.",
+        name: 'Saisis ta date de naissance',
       })
     ).toBeVisible()
     await expect(page.getByLabel('Adresse e-mail')).toBeVisible()

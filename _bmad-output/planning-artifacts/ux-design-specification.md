@@ -23,6 +23,16 @@ We will anchor CoutureCast on a hybrid native foundation:
 
 This keeps development velocity high (ready-made components, accessibility baked in) while giving us room to craft distinctive garment tiles, silhouette modules, and weather-driven motion themes. Custom work concentrates on modular outfit tiles, the premium theme orchestrator, and the editorial look-book grid.
 
+### 1.2 Voice and copy
+
+- Speak to the reader as "you." Use short sentences and one idea per line of copy.
+- Write for US grade 6 or below. Start buttons with an action and use up to three words.
+- Write about school, weekends and going out. For example, "Pick a look for school."
+- Use everyday clothing words. Pair a fashion term with a picture that shows the piece.
+- Say what the weather feels like or how a piece helps. Leave percentages and match scores out.
+- Keep the meaning of age, consent and photo notices. Translate the same meaning into each locale
+  and check that the longest labels wrap on a 320 px screen.
+
 ---
 
 ## 2. Core User Experience

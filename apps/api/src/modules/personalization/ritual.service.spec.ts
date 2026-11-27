@@ -10,6 +10,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 // Learning path Step 31: Outfit capsule builder.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
+// CC-7.17 copy acceptance: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
 // Story 2.1 Task 5 step 1 owner: unit-test the algorithm, fallbacks, badges, and segment resolution in `apps/api/src/modules/personalization/ritual.service.spec.ts`
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 // Step 22 step 4 owner: verify translation key parity and placeholder replacements in apps/api/src/modules/personalization/ritual.service.spec.ts
@@ -308,8 +309,8 @@ describe('RitualService', () => {
 
     const result = await service.getOrCreateRitual('user-1')
 
-    expect(result.outfits[0]!.comfortNotes).toContain('adjusted to 52°F for comfort')
-    expect(result.outfits[1]!.comfortNotes).toContain('adjusted to 64°F for comfort')
+    expect(result.outfits[0]!.comfortNotes).toContain('We planned for 52°F to suit you.')
+    expect(result.outfits[1]!.comfortNotes).toContain('We planned for 64°F to suit you.')
   })
 
   it('respects runs_warm preference (+3C effective feels-like calibration)', async () => {
@@ -324,8 +325,8 @@ describe('RitualService', () => {
 
     const result = await service.getOrCreateRitual('user-1')
 
-    expect(result.outfits[0]!.comfortNotes).toContain('adjusted to 63°F for comfort')
-    expect(result.outfits[1]!.comfortNotes).toContain('adjusted to 75°F for comfort')
+    expect(result.outfits[0]!.comfortNotes).toContain('We planned for 63°F to suit you.')
+    expect(result.outfits[1]!.comfortNotes).toContain('We planned for 75°F to suit you.')
   })
 
   it('correctly maps wind tolerance alert badge based on user tolerance setting', async () => {
@@ -343,9 +344,7 @@ describe('RitualService', () => {
     expect(eveningOutfit?.reasoningBadges).toContainEqual({
       key: 'wind_layer',
       label: 'Wind layer',
-      bullets: [
-        'Wind speed is 6 m/s, which exceeds your wind tolerance threshold of 3 m/s.',
-      ],
+      bullets: ['Wind is strong at 6 m/s. Your wind limit is 3 m/s.'],
     })
   })
 
@@ -364,10 +363,7 @@ describe('RitualService', () => {
     expect(eveningOutfit?.reasoningBadges).toContainEqual({
       key: 'rain_ready',
       label: 'Rain-ready',
-      bullets: [
-        'Precipitation probability is 50%, which exceeds your threshold of 20%.',
-        'Precipitation amount is 0.8 mm, which exceeds your threshold of 0.1 mm.',
-      ],
+      bullets: ['It may rain. Take a raincoat.', 'It may get wet. Take an umbrella.'],
     })
   })
 
@@ -464,9 +460,9 @@ describe('RitualService', () => {
     expect(morningOutfit?.reasoningBadges).toEqual([
       {
         key: 'commute_warmth',
-        label: 'Commute warmth',
+        label: 'Morning layers',
         bullets: [
-          'Morning feels-like temperature is 57°F (adjusted to 52°F), which is below the commute warmth threshold of 54°F.',
+          'It feels like 57°F (adjusted to 52°F) this morning. Wear a warm layer.',
         ],
       },
     ])
@@ -476,9 +472,7 @@ describe('RitualService', () => {
       {
         key: 'light_layers',
         label: 'Light layers',
-        bullets: [
-          'Feels-like temperature is 70°F (adjusted to 64°F), which is between 59°F and 72°F.',
-        ],
+        bullets: ['It feels like 70°F (adjusted to 64°F). Wear light layers.'],
       },
     ])
 
@@ -487,9 +481,7 @@ describe('RitualService', () => {
       {
         key: 'evening_chill',
         label: 'Evening chill',
-        bullets: [
-          'Evening feels-like temperature is 63°F (adjusted to 57°F), which is below the evening chill threshold of 59°F.',
-        ],
+        bullets: ['It feels like 63°F (adjusted to 57°F) tonight. Wear a warm layer.'],
       },
     ])
 
@@ -499,10 +491,10 @@ describe('RitualService', () => {
     const persistedBadgeText = JSON.stringify(
       createCalls.map(([input]) => input.data.reasoning_badges)
     )
-    expect(persistedBadgeText).toContain('12°C')
+    expect(persistedBadgeText).toContain('14°C (adjusted to 11°C)')
   })
 
-  it('prevents rounding and floating-point exposure in wind and precipitation badges', async () => {
+  it('rounds wind speed and keeps precipitation measurements out of badge copy', async () => {
     const unroundedSegments = segments.map((s) => ({
       ...s,
       wind_speed: 6.000000000000001,
@@ -533,20 +525,15 @@ describe('RitualService', () => {
     expect(eveningOutfit?.reasoningBadges).toContainEqual({
       key: 'wind_layer',
       label: 'Wind layer',
-      bullets: [
-        'Wind speed is 6 m/s, which exceeds your wind tolerance threshold of 3 m/s.',
-      ],
+      bullets: ['Wind is strong at 6 m/s. Your wind limit is 3 m/s.'],
     })
 
     expect(eveningOutfit?.reasoningBadges).toContainEqual({
       key: 'rain_ready',
       label: 'Rain-ready',
-      bullets: [
-        'Precipitation probability is 50%, which exceeds your threshold of 20%.',
-        'Precipitation amount is 0.8 mm, which exceeds your threshold of 0.1 mm.',
-      ],
+      bullets: ['It may rain. Take a raincoat.', 'It may get wet. Take an umbrella.'],
     })
-    expect(eveningOutfit?.comfortNotes).toContain('Winds are high at 6 m/s')
+    expect(eveningOutfit?.comfortNotes).toContain('Wind is strong at 6 m/s')
     expect(eveningOutfit?.comfortNotes).not.toContain('6.000000000000001')
 
     weatherQueryMock.getLatestWeather = originalGetLatestWeather
@@ -579,9 +566,24 @@ describe('RitualService', () => {
             bullets: ['Bullet 2'],
           },
           // 3. Key is absent, triggers keyword inference on label
-          { label: 'Commute warmth advice', bullets: ['Bullet 3'] },
+          {
+            label: 'Commute warmth advice',
+            bullets: [
+              'Bullet 3',
+              'Morning feels-like temperature is 14°C (adjusted to 11°C), which is below the commute warmth threshold of 12°C.',
+            ],
+          },
           // 4. Key is absent, label has no match; preserves provided label
           { label: 'Completely unknown label', bullets: ['Bullet 4'] },
+          // 5. Stored rain guidance keeps both reasons while dropping the measurements.
+          {
+            key: 'rain_ready',
+            label: 'Rain-ready',
+            bullets: [
+              'Precipitation probability is 50%, which exceeds your threshold of 20%.',
+              'Precipitation amount is 0.8 mm, which exceeds your threshold of 0.1 mm.',
+            ],
+          },
         ],
         capsule_revision: 0,
         created_at: new Date('2026-07-16T05:30:00.000Z'),
@@ -605,13 +607,21 @@ describe('RitualService', () => {
         },
         {
           key: 'commute_warmth',
-          label: 'Commute warmth', // infers from label since key is absent
-          bullets: ['Bullet 3'],
+          label: 'Morning layers', // infers from label since key is absent
+          bullets: [
+            'Bullet 3',
+            'It feels like 57°F (adjusted to 52°F) this morning. Wear a warm layer.',
+          ],
         },
         {
           key: 'daily_base',
           label: 'Completely unknown label', // preserves the label since key is absent and no match found
           bullets: ['Bullet 4'],
+        },
+        {
+          key: 'rain_ready',
+          label: 'Rain-ready',
+          bullets: ['It may rain. Take a raincoat.', 'It may get wet. Take an umbrella.'],
         },
       ])
     })

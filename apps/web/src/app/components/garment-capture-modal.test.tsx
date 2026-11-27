@@ -117,7 +117,7 @@ describe('GarmentCaptureModal Component', () => {
   it('renders modal dialog when open', () => {
     render(<GarmentCaptureModal isOpen={true} onClose={vi.fn()} />)
     expect(screen.getByRole('dialog')).toBeDefined()
-    expect(screen.getByText('Garment Capture Flow')).toBeDefined()
+    expect(screen.getByText('Add a piece')).toBeDefined()
     expect(screen.getByText('Take Photo')).toBeDefined()
     expect(screen.getByText('Choose File')).toBeDefined()
   })
@@ -217,7 +217,7 @@ describe('GarmentCaptureModal Component', () => {
       />
     )
 
-    expect(screen.queryByText('Garment Upload Complete!')).toBeNull()
+    expect(screen.queryByText('Piece added')).toBeNull()
 
     const stop = vi.fn()
     const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream
@@ -233,7 +233,7 @@ describe('GarmentCaptureModal Component', () => {
     await user.click(await readyCropButton())
 
     await waitFor(() => {
-      expect(screen.getByText('Garment Upload Complete!')).toBeDefined()
+      expect(screen.getByText('Piece added')).toBeDefined()
     })
     expect(uploadGarment).toHaveBeenCalledOnce()
     expect(uploadGarment).toHaveBeenCalledWith(
@@ -526,7 +526,7 @@ describe('GarmentCaptureModal crop controls', () => {
 
     await user.click(screen.getByRole('button', { name: 'Use This Image' }))
 
-    await screen.findByText('Garment Upload Complete!')
+    await screen.findByText('Piece added')
     // A silent progress bar gives the user nothing to judge a stall by.
     expect(phases).toEqual(['requesting_upload', 'uploading', 'verifying', 'processing'])
   })
@@ -560,15 +560,15 @@ describe('GarmentCaptureModal crop controls', () => {
       previous.onProgress?.(80)
       previous.onStateChange?.('verifying')
     })
-    expect(
-      screen.getByText('Uploading image bytes (35%)...', { exact: true })
-    ).toBeVisible()
+    expect(screen.getByText('Saving your photo…', { exact: true })).toBeVisible()
+    expect(screen.queryByText('Checking the upload…', { exact: true })).toBeNull()
+    expect(screen.queryByText(/(?:35|80)%/)).toBeNull()
     await act(async () => {
       oldUpload.resolve(mockCommittedGarment)
       newUpload.resolve(mockCommittedGarment)
       await Promise.all([oldUpload.promise, newUpload.promise])
     })
-    expect(screen.getByText('Garment Upload Complete!')).toBeVisible()
+    expect(screen.getByText('Piece added')).toBeVisible()
   })
 
   it('returns to the crop step with localized copy, never the raw error text, when the upload fails', async () => {
@@ -644,7 +644,7 @@ describe('GarmentCaptureModal crop controls', () => {
     const uploadGarment = vi.fn().mockRejectedValue(new Error('storage unavailable'))
     render(<GarmentCaptureModal isOpen onClose={vi.fn()} uploadGarment={uploadGarment} />)
 
-    expect(screen.getByText('Kleidungsstück erfassen')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Teil hinzufügen' })).toBeInTheDocument()
     await user.upload(
       screen.getByLabelText('Bilddatei des Kleidungsstücks'),
       new File(['fixture-image'], 'garment.png', { type: 'image/png' })
@@ -1050,7 +1050,7 @@ describe('GarmentCaptureModal Use This Image retry through the real upload', () 
     // expired, and the same tap allocates, uploads and commits with fresh keys.
     await user.click(screen.getByRole('button', { name: 'Use This Image' }))
 
-    expect(await screen.findByText('Garment Upload Complete!')).toBeInTheDocument()
+    expect(await screen.findByText('Piece added')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(onGarmentCommitted).toHaveBeenCalledOnce()
     expect(onGarmentCommitted).toHaveBeenCalledWith(
@@ -1086,7 +1086,7 @@ describe('GarmentCaptureModal Use This Image retry through the real upload', () 
 
     await user.click(screen.getByRole('button', { name: 'Use This Image' }))
 
-    expect(await screen.findByText('Garment Upload Complete!')).toBeInTheDocument()
+    expect(await screen.findByText('Piece added')).toBeInTheDocument()
     expect(onGarmentCommitted).toHaveBeenCalledOnce()
     expect(keys.allocate).toHaveLength(1)
     expect(keys.upload).toHaveLength(1)

@@ -93,7 +93,7 @@
           "shoes": "Shoes",
           "accessory": "Accessory"
         },
-        "starterWardrobe": "Starter wardrobe pick",
+        "starterWardrobe": "Uses sample pieces",
         "reshuffle": {
           "action": "Reshuffle",
           "loading": "Reshuffling…",
@@ -302,7 +302,7 @@
       "deleteConfirmTitle": "Delete this capsule?",
       "deleteConfirmBody": "This removes the capsule. Your wardrobe garments stay.",
       "nameLabel": "Capsule name",
-      "namePlaceholder": "Work casual",
+      "namePlaceholder": "School week",
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Optional description",
       "garmentsLabel": "Garments",
@@ -400,12 +400,12 @@
     "onboarding": {
       "title": "Set up your closet",
       "garmentFallback": "Garment {{position}}",
-      "permissionTitle": "Allow camera and photo access",
-      "permissionAction": "Allow camera and photo access",
-      "permissionBody": "CoutureCast needs camera or library access to capture your garments.",
-      "permissionDenied": "We couldn't access your camera or photos. You can still import files or use the starter wardrobe.",
-      "useStarterWardrobe": "Use starter wardrobe",
-      "addAnother": "Add another garment",
+      "permissionTitle": "Allow access",
+      "permissionAction": "Allow access",
+      "permissionBody": "Give the app access to your camera or photos to add a piece.",
+      "permissionDenied": "We can't open your camera or photos. You can pick a file or try the sample closet.",
+      "useStarterWardrobe": "Use sample closet",
+      "addAnother": "Add a piece",
       "continue": "Continue",
       "back": "Back",
       "checklistTagged": "{{garment}}: tags confirmed",
@@ -417,15 +417,15 @@
       "announcements": {
         "permissionRequesting": "Requesting camera access…",
         "permissionGranted": "Camera access granted. Capture your garments.",
-        "permissionDenied": "Camera access unavailable. Import photos or use the starter wardrobe.",
+        "permissionDenied": "We can't open your camera. Pick photos or try the sample closet.",
         "tagging": "All garments captured. Confirm tags to continue.",
         "silhouette": "Set up your silhouette.",
         "garmentTagged": "{{garment}} tagged."
       },
       "errors": {
-        "loadFailed": "Unable to load your onboarding progress.",
-        "saveFailed": "Unable to save this step. Try again.",
-        "stale": "This step changed elsewhere. Review the latest version and try again."
+        "loadFailed": "We couldn't see where you left off.",
+        "saveFailed": "We couldn't save this step. Try again.",
+        "stale": "This step changed. Check the new details and try again."
       }
     },
     "silhouette": {
@@ -438,7 +438,7 @@
       "myFormGuidance": "Wear plain white or black clothing against a plain background for the cleanest overlay.",
       "myFormConfirm": "I'm wearing plain white or black clothing",
       "myFormRetry": "Retry upload",
-      "myFormRemove": "Remove My Form photo",
+      "myFormRemove": "Remove photo",
       "processing": "Processing your photo…",
       "ready": "My Form photo ready",
       "loading": "Loading your silhouette…",
@@ -456,9 +456,9 @@
       }
     },
     "capture": {
-      "title": "Garment Capture Flow",
+      "title": "Add a piece",
       "close": "Close capture modal",
-      "intro": "Photograph or import a garment photo to add to your private CoutureCast wardrobe.",
+      "intro": "Take a photo or pick one from your files. It goes in your private closet.",
       "takePhoto": "Take Photo",
       "chooseFile": "Choose File",
       "fileLabel": "Garment image file",
@@ -473,15 +473,15 @@
       "retake": "Retake / Choose Another",
       "useImage": "Use This Image",
       "statusAnnouncement": "Upload status: {{status}}",
-      "completeTitle": "Garment Upload Complete!",
-      "completeBody": "Your clothing item has been securely uploaded to your private wardrobe and is queued for personalized outfit matching.",
+      "completeTitle": "Piece added",
+      "completeBody": "Your piece is in your private closet. We’ll use it to pick outfits for you.",
       "done": "Done",
       "status": {
-        "preparing": "Preparing asset validation...",
-        "requestingUpload": "Allocating upload session...",
-        "uploading": "Uploading image bytes ({{progress}}%)...",
-        "verifying": "Verifying private storage payload...",
-        "processing": "Garment uploaded! Processing color analysis..."
+        "preparing": "Checking your photo…",
+        "requestingUpload": "Getting ready to save…",
+        "uploading": "Saving your photo…",
+        "verifying": "Checking the upload…",
+        "processing": "Adding your piece…"
       },
       "errors": {
         "cameraUnavailable": "Camera access is unavailable on this device or context.",
@@ -540,20 +540,20 @@
       "categoryAll": "All",
       "categoryFilters": "Filter by category",
       "setupProgress": "{{completed}} of {{total}} steps complete",
-      "loading": "Loading your wardrobe...",
-      "emptyTitle": "No garments added yet",
-      "emptyBody": "Snap a photo of your favorite jacket, top, or dress to get started.",
-      "emptyAction": "Snap or Import Garment",
-      "accountFailed": "Unable to load your account, so Silhouette settings are unavailable right now. Reload the page to try again.",
-      "accountFailedShort": "Unable to load your account. Reload the page to try again.",
-      "setupFailed": "Unable to check your closet setup progress.",
+      "loading": "Loading your closet",
+      "emptyTitle": "No pieces yet",
+      "emptyBody": "Take a photo of a piece you wear.",
+      "emptyAction": "Add a photo",
+      "accountFailed": "We can't load your account. Reload the page to change your fit settings.",
+      "accountFailedShort": "We can't load your account. Reload the page.",
+      "setupFailed": "We can't check your closet setup yet.",
       "addGarment": "+ Add Garment",
       "closetTitle": "Your Digital Closet",
       "closetBody": "Photograph or upload clothing items to power personalized weather guidance.",
       "needsTags": "Needs tags",
-      "taggingSlow": "Smart tagging is taking longer than expected. The garment will remain visible while processing continues.",
-      "statusRefreshFailed": "Unable to refresh garment status.",
-      "refreshFailed": "Unable to refresh your wardrobe.",
+      "taggingSlow": "Tags are taking a while. You can still see your piece.",
+      "statusRefreshFailed": "We couldn't check this piece again.",
+      "refreshFailed": "We couldn't update your closet.",
       "silhouetteSaving": "Saving changes. Please wait.",
       "status": {
         "pending_upload": "Uploading",
@@ -579,7 +579,7 @@
       "suggestedReview": "(Needs review suggested: {{value}})",
       "materialClear": "Not sure / Clear",
       "cancel": "Cancel",
-      "save": "Confirm & Save Tags",
+      "save": "Save tags",
       "saving": "Saving...",
       "errors": {
         "suggestionUnavailable": "Suggestion unavailable",
@@ -651,7 +651,7 @@
     "calm": {
       "post": "Post",
       "nearYou": "Near you",
-      "climateEmpty": "No looks in your climate yet",
+      "climateEmpty": "No looks for your weather yet",
       "seeAllClimates": "See all climates",
       "cardActions": "Post actions",
       "dismissChallenge": "Dismiss challenge",
@@ -667,8 +667,8 @@
       "invalid": "This link is invalid, expired, or no longer available."
     },
     "filters": {
-      "label": "Community filters",
-      "explainer": "Climate filters group looks by the week's forecast at each sharer's saved location, from cold and wet to warm and dry.",
+      "label": "Filter looks",
+      "explainer": "We group looks by the week's weather in each person's saved area.",
       "announce": "Showing {{filter}} looks.",
       "mode": {
         "auto": "Your climate",
@@ -789,7 +789,7 @@
     },
     "report": {
       "title": "Report this look",
-      "description": "Help keep the community safe. Choose a reason and a moderator will review it.",
+      "description": "Pick a reason. Our team will look at your report.",
       "reasonLabel": "Reason for the report",
       "detailsLabel": "More detail (optional)",
       "detailsPlaceholder": "Describe how this look breaks the community guidelines",
@@ -818,16 +818,16 @@
       "changePhoto": "Change photo",
       "preview": "Preview of the look you are about to share",
       "altLabel": "Image description",
-      "altHint": "Describe the garments, layers and colours for members using a screen reader.",
-      "altPlaceholder": "Describe the garments, layers and colours",
-      "altSuggested": "We suggested a description. Edit it so it matches your photo.",
+      "altHint": "Tell people who use a screen reader what you wear. Name the pieces and colors.",
+      "altPlaceholder": "Name the pieces and colors",
+      "altSuggested": "Here's a start. Change the words to match your photo.",
       "altConfirm": "I confirm this description matches the photo",
       "titleLabel": "Title (optional)",
       "suggestDescription": "Suggest a description from photo",
       "descriptionWorking": "Preparing a description…",
       "descriptionFailed": "Could not suggest a description. You can still write your own.",
       "captionLabel": "Description (optional)",
-      "editText": "Edit title and description",
+      "editText": "Edit text",
       "saveText": "Save changes",
       "savingText": "Saving…",
       "editSaved": "Changes saved.",
@@ -966,9 +966,9 @@
       "sendCode": "Send sign-in code",
       "verify": "Verify code",
       "codeSent": "Check your email for the sign-in code.",
-      "signinDenied": "No CoutureCast account can sign in with this email. Check the address and try again.",
-      "signinUnavailable": "Sign-in is temporarily unavailable. Try again in a moment.",
-      "signinCodeInvalid": "That code is incorrect or expired. Check your email or request a new code.",
+      "signinDenied": "You can’t sign in with this email. Check it and try again.",
+      "signinUnavailable": "Sign-in is down. Try again soon.",
+      "signinCodeInvalid": "That code is wrong or has expired. Check your email or ask for a new code.",
       "signout": "Sign out",
       "deviceSettings": "Open device settings",
       "back": "Back to community",
@@ -1056,8 +1056,8 @@
       "off": "Off",
       "learnMore": "Learn more",
       "languageHelp": "Your browser sets the language.",
-      "browserLanguageHelp": "Change your preferred language in your browser’s settings, then reload CoutureCast.",
-      "aboutHelp": "Plan outfits for the weather and keep track of your closet.",
+      "browserLanguageHelp": "Change the language in your browser. Then reload the page.",
+      "aboutHelp": "See what to wear and keep track of your clothes.",
       "themeHelp": "Choose colors for the app.",
       "privacy": "Privacy policy",
       "terms": "Terms of service",
@@ -1097,8 +1097,8 @@
       "outfitDetails": "Outfit details",
       "sampleLook": "Sample look",
       "editSample": "Edit sample",
-      "addFirstPiece": "Add your first piece",
-      "weatherUnavailable": "Weather unavailable",
+      "addFirstPiece": "Add a piece",
+      "weatherUnavailable": "No weather yet",
       "recentPieces": "Recent pieces",
       "conditions": {
         "clear": "Clear Sky",
@@ -1122,15 +1122,13 @@
       "linkLabel": "Standout look in {{label}} by {{author}}, {{count}} reactions. Opens the City Spotlight.",
       "linkLabel_one": "Standout look in {{label}} by {{author}}, {{count}} reaction. Opens the City Spotlight.",
       "linkLabel_other": "Standout look in {{label}} by {{author}}, {{count}} reactions. Opens the City Spotlight.",
-      "cta": "See it in the City Spotlight"
+      "cta": "See the look"
     }
   },
   "landing": {
-    "tagline": "Weather-aware wardrobe plans for every commute",
     "hero": {
       "eyebrow": "Daily ritual",
-      "headline": "Plan confident outfits in under 90 seconds.",
-      "body": "CoutureCast blends hyperlocal weather, your wardrobe archive, and community insight to recommend looks that respect the commute, the meeting, and the vibe."
+      "headline": "Plan confident outfits in under 90 seconds."
     },
     "lookbook": {
       "eyebrow": "Lookbook Prism",
@@ -1143,36 +1141,7 @@
         "advisory": "{{type}} advisory",
         "adjustOutfit": "Adjust outfit"
       },
-      "demo": {
-        "heading": "Daily Hero Ritual",
-        "timeCity": "08:30 AM • NYC",
-        "temperature": "18°C",
-        "humidity": "Mild Humidity • 65%",
-        "change": "+3°C from yesterday commute",
-        "primaryLook": "Primary Recommended Look",
-        "matchScore": "Match Score: {{score}}",
-        "garments": {
-          "blazer": "Onyx Blazer",
-          "scarf": "Merlot Silk Scarf",
-          "loafers": "Leather Loafers"
-        },
-        "lookA": {
-          "label": "LOOK A (Primary)",
-          "title": "Blazer & Silk Knit",
-          "body": "Warmth level tuned for brisk morning wind."
-        },
-        "lookB": {
-          "label": "LOOK B (Alternative)",
-          "title": "Trench & Merino Cardigan",
-          "body": "Higher wind protection with water-resistant shell."
-        }
-      },
       "recommendations": {
-        "personal": {
-          "eyebrow": "Commute Ready",
-          "title": "Double-Breasted Blazer & Silk Knit",
-          "description": "Optimized for 18°C morning train commute transitioning into air-conditioned office."
-        },
         "community": {
           "eyebrow": "Community Trending",
           "title": "Parisian Silk & Cashmere Blend",
@@ -1205,12 +1174,12 @@
     }
   },
   "shareCard": {
-    "launcher": "Create my outfit card",
+    "launcher": "Make a card",
     "sourceOutfit": "Outfit",
     "sourceCommunity": "Community look",
     "title": "Your share card",
-    "previewDescription": "Preview of your CoutureCast card",
-    "photoPrivacyHelp": "Your own photo stays visible, including any names or signs in the photo. Check this preview before saving.",
+    "previewDescription": "Your card preview",
+    "photoPrivacyHelp": "Your photo stays on the card. Names or signs in it will show, too. Check the card before you save.",
     "preparing": "Preparing card",
     "watermark": "Show watermark",
     "save": "Save to photos",
@@ -1235,16 +1204,16 @@
     "nativeSaveUnavailable": "Update the app to save photos.",
     "permissionDenied": "Photo access was denied. Try again when ready.",
     "permissionPermanent": "Allow photo saving in Settings.",
-    "sourceUnavailable": "This source is unavailable.",
+    "sourceUnavailable": "We couldn't open this look.",
     "previewChanged": "This card changed. Refresh the preview before saving.",
     "offline": "Connect to the internet to prepare a card.",
-    "storage": "Unable to save. Check available storage and try again.",
-    "render": "Unable to prepare this card. Try again.",
+    "storage": "Free up some space. Then try again.",
+    "render": "We couldn't make your card. Try again.",
     "unknown": "Something went wrong. Try again.",
     "scenarios": {
-      "morning": "Morning",
+      "morning": "Before school",
       "midday": "Midday",
-      "evening": "Evening"
+      "evening": "Going out"
     },
     "climateBands": {
       "cold_dry": "Cold and dry",
@@ -1676,9 +1645,9 @@
     "reopen": "Reopen",
     "remove": "Remove",
     "missingPiece": "Missing piece",
-    "missingPieceDetail": "A garment from this saved look is no longer in your closet.",
+    "missingPieceDetail": "A piece in this look is gone from your closet.",
     "needsReview": "Needs review",
-    "needsReviewDetail": "You changed tags on a piece in this look. Review it to make sure it still fits.",
+    "needsReviewDetail": "You changed a tag on a piece. Check if the look still works for you.",
     "photoUnavailable": "Photo unavailable",
     "loadFailed": "Could not load your saved looks.",
     "retry": "Retry",
@@ -1789,7 +1758,7 @@
     },
     "freePlan": {
       "week": "Sample week",
-      "line": "Premium plans your whole week around your forecast.",
+      "line": "With Premium, you can plan what to wear all week.",
       "upgrade": "Upgrade"
     },
     "loadMore": "Show more"

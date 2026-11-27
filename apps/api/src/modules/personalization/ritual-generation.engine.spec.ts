@@ -336,7 +336,7 @@ describe('generateRitualScenarios: unavailable weather', () => {
       expect(scenario.reasoningBadges).toEqual([])
       expect(scenario.capsuleId).toBeNull()
       expect(scenario.comfortNotes).toBe(
-        "Weather isn't available for this date, so we picked a versatile everyday outfit."
+        'We picked a look you can wear any day. The forecast is missing.'
       )
     }
   })

@@ -40,7 +40,7 @@ env:
       id: 'scenario-picker'
     direction: DOWN
     visibilityPercentage: 100
-- assertVisible: 'Morning commute'
+- assertVisible: 'Before school'
 - tapOn:
     id: 'scenario-picker'
 - scrollUntilVisible:

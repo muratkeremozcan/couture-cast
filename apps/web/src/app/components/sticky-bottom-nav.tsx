@@ -2,7 +2,7 @@
 // Story 5.4 Task 7 step 3 owner: own the longest-prefix active-tab resolution in `apps/web/src/app/components/sticky-bottom-nav.tsx`
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import posthog from 'posthog-js'
@@ -86,6 +86,24 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
   const { t } = useTranslation('translation', { i18n: getI18n() })
   const pathname = usePathname()
   const activeTab = resolveActiveNavTab(pathname)
+  const tabsRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const tabs = tabsRef.current
+    if (!tabs || isMobilePreview || typeof ResizeObserver === 'undefined') return
+    const clearance = '--cc-web-tab-bar-height'
+    const root = document.documentElement.style
+    const updateClearance = () => {
+      if (tabs.offsetHeight > 0) root.setProperty(clearance, `${tabs.offsetHeight}px`)
+    }
+    const observer = new ResizeObserver(updateClearance)
+    observer.observe(tabs)
+    updateClearance()
+    return () => {
+      observer.disconnect()
+      root.removeProperty(clearance)
+    }
+  }, [isMobilePreview])
+
   // The tab whose arrival the status region announces; null announces nothing.
   const [announced, setAnnounced] = useState<NavTabItem | null>(
     () => NAV_TABS.find((tab) => tab.id === activeTab) ?? null
@@ -113,13 +131,15 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
     <nav
       aria-label={t('nav.label')}
       data-testid="sticky-bottom-nav"
-      // Story CC-7.9 D1, D6: the tab bar sits on the page surface at the shell's 56 px plus the
-      // device's bottom safe area.
+      // The tab bar clears the device's safe area and grows when its labels wrap.
       className={`bottom-0 left-0 right-0 z-30 border-t border-line bg-page/95 pb-safe backdrop-blur ${
         isMobilePreview ? 'sticky flex' : 'fixed flex min-[768px]:hidden'
       }`}
     >
-      <div className="mx-auto flex h-tab-bar w-full max-w-md items-center justify-around">
+      <div
+        ref={tabsRef}
+        className="mx-auto flex min-h-tab-bar w-full max-w-md items-stretch"
+      >
         {NAV_TABS.map((tab) => {
           const isActive = activeTab === tab.id
 
@@ -138,7 +158,7 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
               // side padding, so at 320 px each has 64 px. Geist at 12 px measures "Community" at
               // 67 px semibold, so the active Community label wraps there, as D3 allows.
               data-gold={isActive ? 'tab' : undefined}
-              className={`relative flex h-full min-h-touch min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md ${
+              className={`relative flex min-h-touch min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md py-1 ${
                 isActive ? 'font-semibold text-tab-active' : 'font-medium text-ink-muted'
               }`}
             >

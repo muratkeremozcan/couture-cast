@@ -2,9 +2,9 @@
   "outfit": "Kombin",
   "community": "Topluluk kombini",
   "scenarios": {
-    "morning": "Sabah",
+    "morning": "Okuldan önce",
     "midday": "Öğle",
-    "evening": "Akşam"
+    "evening": "Dışarı çıkarken"
   },
   "categories": {
     "top": "Üst",

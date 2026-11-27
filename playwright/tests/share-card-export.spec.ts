@@ -1000,7 +1000,7 @@ test('P-OUTFIT P-CANCEL: all persisted scenarios render, and reopening retains e
   )
   const live = page.getByTestId('home-live-outfit')
   await live.getByTestId('today-outfit-details').click()
-  for (const label of ['Morning', 'Midday', 'Evening']) {
+  for (const label of ['Before school', 'Midday', 'Going out']) {
     const scenario = live.getByRole('button', { name: label, exact: true })
     await scenario.click()
     await expect(scenario).toHaveAttribute('aria-pressed', 'true')

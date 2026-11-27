@@ -115,9 +115,8 @@ describe('Profile and navigation locale parity (web)', () => {
       'settings.profile.learnMore': 'Learn more',
       'settings.profile.languageHelp': 'Your browser sets the language.',
       'settings.profile.browserLanguageHelp':
-        'Change your preferred language in your browser’s settings, then reload CoutureCast.',
-      'settings.profile.aboutHelp':
-        'Plan outfits for the weather and keep track of your closet.',
+        'Change the language in your browser. Then reload the page.',
+      'settings.profile.aboutHelp': 'See what to wear and keep track of your clothes.',
       'settings.profile.themeHelp': 'Choose colors for the app.',
       'settings.profile.privacy': 'Privacy policy',
       'settings.profile.terms': 'Terms of service',

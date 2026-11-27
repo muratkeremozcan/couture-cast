@@ -54,7 +54,7 @@ async function startedPreview() {
 }
 
 describe('mobile signup from the guest preview', () => {
-  it('shows Back to preview, then Sign in to continue once the account exists', async () => {
+  it('shows Back to preview, then Sign in once the account exists', async () => {
     const submitSignup = vi.fn().mockResolvedValue({
       userId: 'user-123',
       age: 26,

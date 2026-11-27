@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-66-one-app-shell-and-visual-system
 // Learning path Step 71: Today's outfit as a picture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
+// CC-7.17 visual evidence: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
 // Story CC-7.9 test owner (TEA): 7.9-VIS-001..008, AC6 and spec D11.
 // Test design: _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md.
 //
@@ -54,6 +55,7 @@ const todayVariants = [
   { name: 'home-empty-closet-light', mode: 'empty-closet', fail: false },
   { name: 'home-missing-photo-light', mode: 'populated', fail: true },
 ] as const
+const stableScreenshot = { animations: 'disabled', caret: 'hide' } as const
 
 test.describe('CC-7.9 tab snapshots @local-lane', () => {
   for (const scheme of SCHEMES) {
@@ -62,7 +64,7 @@ test.describe('CC-7.9 tab snapshots @local-lane', () => {
       test(`[P1] [${VIS_ID[name]}] ${screen} matches its ${scheme} baseline at 390 x 844`, async ({
         page,
         interceptNetworkCall,
-      }) => {
+      }, info) => {
         await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' })
         await page.clock.setFixedTime(FIXED_NOW)
         const photo = screen === 'home' ? await serveTodayPhoto(page) : undefined
@@ -83,10 +85,16 @@ test.describe('CC-7.9 tab snapshots @local-lane', () => {
         }
 
         await expect(page).toHaveScreenshot(`${name}.png`, {
-          animations: 'disabled',
-          caret: 'hide',
+          ...stableScreenshot,
           maxDiffPixelRatio: 0.01,
         })
+        // Copy can change fewer pixels than the screenshot comparison permits.
+        if (screen === 'home') {
+          await page.screenshot({
+            ...stableScreenshot,
+            path: info.outputPath(`${name}-actual.png`),
+          })
+        }
         expect(
           router.unknown().filter((request) => request.startsWith('GET ')),
           'reads the shell fixtures do not serve: add them to helpers/shell-fixtures.ts'
@@ -102,7 +110,7 @@ test.describe('CC-7.9 tab snapshots @local-lane', () => {
     test(`[P1] [7.14-VIS-001] ${name} matches its baseline at 390 x 844`, async ({
       page,
       interceptNetworkCall,
-    }) => {
+    }, info) => {
       await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' })
       await page.clock.setFixedTime(FIXED_NOW)
       const photo = fail ? await serveTodayPhoto(page, { fail }) : undefined
@@ -125,9 +133,12 @@ test.describe('CC-7.9 tab snapshots @local-lane', () => {
       } else await expect(page.getByTestId('home-add-garment')).toBeVisible()
 
       await expect(page).toHaveScreenshot(`${name}.png`, {
-        animations: 'disabled',
-        caret: 'hide',
+        ...stableScreenshot,
         maxDiffPixelRatio: 0.01,
+      })
+      await page.screenshot({
+        ...stableScreenshot,
+        path: info.outputPath(`${name}-actual.png`),
       })
     })
   }

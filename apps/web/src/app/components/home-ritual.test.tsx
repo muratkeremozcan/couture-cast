@@ -197,7 +197,7 @@ it('persists Home sample saves and removals to the account API across remounts',
     try {
       await openSampleEditor()
       const saved = await screen.findByRole('region', { name: 'Saved on this device' })
-      expect(within(saved).getByRole('button', { name: 'Office oxford' })).toBeVisible()
+      expect(within(saved).getByRole('button', { name: 'School day' })).toBeVisible()
     } finally {
       remounted.unmount()
     }
@@ -315,18 +315,16 @@ it('saves and reopens Home sample looks even when browser localStorage is blocke
 
     const weather = screen.getByRole('combobox', { name: 'Sample weather' })
     await user.selectOptions(weather, 'cool-windy')
-    await user.click(screen.getByText('Style preferences (optional)'))
+    await user.click(screen.getByText('Pick your style (optional)'))
     await user.selectOptions(screen.getByRole('combobox', { name: /^Style$/ }), 'cozy')
     await user.click(screen.getByRole('button', { name: 'Try another look' }))
     await user.click(screen.getByRole('button', { name: 'Save example look' }))
     await waitFor(() => expect(within(saved).getAllByRole('button')).toHaveLength(4))
 
-    await user.click(within(saved).getByRole('button', { name: 'Office oxford' }))
-    expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent(
-      'Office oxford'
-    )
+    await user.click(within(saved).getByRole('button', { name: 'School day' }))
+    expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent('School day')
     expect(weather).toHaveValue('mild-dry')
-    await user.click(within(saved).getByRole('button', { name: 'Remove Office oxford' }))
+    await user.click(within(saved).getByRole('button', { name: 'Remove School day' }))
     await waitFor(() => expect(within(saved).getAllByRole('button')).toHaveLength(2))
   } finally {
     blockedStorage.mockRestore()
@@ -663,7 +661,7 @@ it('retries a failed recommendation, shows the verified city, and keeps the chos
   ).toBeVisible()
   expect(within(screen.getByTestId('weather-header')).getByText('70°F')).toBeVisible()
   await user.click(within(live).getByTestId('today-outfit-details'))
-  expect(within(live).queryByRole('button', { name: 'Morning' })).toBeNull()
+  expect(within(live).queryByRole('button', { name: 'Before school' })).toBeNull()
   expect(within(live).getByRole('button', { name: 'Midday' })).toHaveAttribute(
     'aria-pressed',
     'true'
@@ -676,7 +674,7 @@ it('retries a failed recommendation, shows the verified city, and keeps the chos
     /uncategorized-id/i
   )
   expect(screen.getByText('Wind advisory')).toBeVisible()
-  await user.click(within(live).getByRole('button', { name: 'Evening' }))
+  await user.click(within(live).getByRole('button', { name: 'Going out' }))
   expect(within(live).getByText('evening comfort note')).toBeVisible()
   expect(within(live).getByTestId('share-card-open')).toBeVisible()
 
@@ -815,7 +813,7 @@ it('shows inline Needs review badge for unresolved Home saved looks and avoids s
 
     await waitFor(() =>
       expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
-        'Review it to make sure it still fits.'
+        'Check if the look still works for you.'
       )
     )
     expect(screen.getByTestId('guest-preview-look-name').textContent).toBe(beforeLook)

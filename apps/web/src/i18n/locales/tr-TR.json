@@ -93,7 +93,7 @@
           "shoes": "Ayakkabı",
           "accessory": "Aksesuar"
         },
-        "starterWardrobe": "Başlangıç gardırobu seçimi",
+        "starterWardrobe": "Örnek parçalar var",
         "reshuffle": {
           "action": "Yeniden karıştır",
           "loading": "Yeniden karıştırılıyor…",
@@ -302,7 +302,7 @@
       "deleteConfirmTitle": "Bu kapsül silinsin mi?",
       "deleteConfirmBody": "Bu işlem kapsülü kaldırır. Gardırobundaki parçalar kalır.",
       "nameLabel": "Kapsül adı",
-      "namePlaceholder": "Ofis rahatlığı",
+      "namePlaceholder": "Okul haftası",
       "descriptionLabel": "Açıklama",
       "descriptionPlaceholder": "İsteğe bağlı açıklama",
       "garmentsLabel": "Parçalar",
@@ -400,12 +400,12 @@
     "onboarding": {
       "title": "Gardırobunu oluştur",
       "garmentFallback": "Kıyafet {{position}}",
-      "permissionTitle": "Kamera ve fotoğraf erişimine izin ver",
-      "permissionAction": "Kamera ve fotoğraf erişimine izin ver",
-      "permissionBody": "CoutureCast, parçalarını çekebilmek için kamera veya kitaplık erişimine ihtiyaç duyar.",
-      "permissionDenied": "Kameranıza veya fotoğraflarınıza erişemedik. Yine de dosya içe aktarabilir veya başlangıç gardırobunu kullanabilirsiniz.",
-      "useStarterWardrobe": "Başlangıç gardırobunu kullan",
-      "addAnother": "Başka bir parça ekle",
+      "permissionTitle": "Erişime izin ver",
+      "permissionAction": "Erişime izin ver",
+      "permissionBody": "Parça eklemek için uygulamanın kamerana ya da fotoğraflarına erişmesine izin ver.",
+      "permissionDenied": "Kamerana veya fotoğraflarına erişemiyoruz. Dosya seçebilir ya da örnek dolabı deneyebilirsin.",
+      "useStarterWardrobe": "Örnek dolabı kullan",
+      "addAnother": "Parça ekle",
       "continue": "Devam et",
       "back": "Geri",
       "checklistTagged": "{{garment}}: etiketler onaylandı",
@@ -417,15 +417,15 @@
       "announcements": {
         "permissionRequesting": "Kamera erişimi isteniyor…",
         "permissionGranted": "Kamera erişimi verildi. Kıyafetlerini yakala.",
-        "permissionDenied": "Kamera erişimi kullanılamıyor. Fotoğraf içe aktar veya başlangıç gardırobunu kullan.",
+        "permissionDenied": "Kameranı açamıyoruz. Fotoğraf seç veya örnek dolabı dene.",
         "tagging": "Tüm kıyafetler yakalandı. Devam etmek için etiketleri onayla.",
         "silhouette": "Silüetini ayarla.",
         "garmentTagged": "{{garment}} etiketlendi."
       },
       "errors": {
-        "loadFailed": "Kurulum ilerlemen yüklenemiyor.",
-        "saveFailed": "Bu adım kaydedilemiyor. Tekrar dene.",
-        "stale": "Bu adım başka bir yerde değişti. En son sürümü gözden geçirip tekrar dene."
+        "loadFailed": "Nerede kaldığını göremedik.",
+        "saveFailed": "Bu adımı kaydedemedik. Tekrar dene.",
+        "stale": "Bu adım değişti. Yeni bilgileri kontrol edip tekrar dene."
       }
     },
     "silhouette": {
@@ -438,7 +438,7 @@
       "myFormGuidance": "En temiz kaplama için düz beyaz veya siyah kıyafetler giy ve düz bir arka plan kullan.",
       "myFormConfirm": "Düz beyaz veya siyah kıyafet giyiyorum",
       "myFormRetry": "Yüklemeyi yeniden dene",
-      "myFormRemove": "Formum fotoğrafını kaldır",
+      "myFormRemove": "Fotoğrafı kaldır",
       "processing": "Fotoğrafın işleniyor…",
       "ready": "Formum fotoğrafı hazır",
       "loading": "Silüetin yükleniyor…",
@@ -456,9 +456,9 @@
       }
     },
     "capture": {
-      "title": "Kıyafet çekimi",
+      "title": "Parça ekle",
       "close": "Çekim penceresini kapat",
-      "intro": "Özel CoutureCast gardırobuna eklemek için bir kıyafetin fotoğrafını çek veya içe aktar.",
+      "intro": "Fotoğraf çek veya dosyalarından birini seç. Fotoğraf özel dolabına eklenir.",
       "takePhoto": "Fotoğraf çek",
       "chooseFile": "Dosya seç",
       "fileLabel": "Kıyafet görsel dosyası",
@@ -473,15 +473,15 @@
       "retake": "Yeniden çek / Başka seç",
       "useImage": "Bu görseli kullan",
       "statusAnnouncement": "Yükleme durumu: {{status}}",
-      "completeTitle": "Kıyafet yüklendi!",
-      "completeBody": "Kıyafetin özel gardırobuna güvenle yüklendi ve kişisel kombin eşleştirmesi için sıraya alındı.",
+      "completeTitle": "Parça eklendi",
+      "completeBody": "Parçan özel dolabında. Sana kombin seçmek için onu kullanacağız.",
       "done": "Bitti",
       "status": {
-        "preparing": "Görsel doğrulamaya hazırlanıyor...",
-        "requestingUpload": "Yükleme oturumu açılıyor...",
-        "uploading": "Görsel yükleniyor (%{{progress}})...",
-        "verifying": "Özel depolama doğrulanıyor...",
-        "processing": "Kıyafet yüklendi! Renk analizi yapılıyor..."
+        "preparing": "Fotoğrafın kontrol ediliyor…",
+        "requestingUpload": "Kaydetmeye hazırlanılıyor…",
+        "uploading": "Fotoğrafın kaydediliyor…",
+        "verifying": "Fotoğrafın yüklenip yüklenmediği kontrol ediliyor…",
+        "processing": "Parçan ekleniyor…"
       },
       "errors": {
         "cameraUnavailable": "Kamera bu cihazda veya bu bağlamda kullanılamıyor.",
@@ -540,20 +540,20 @@
       "categoryAll": "Tümü",
       "categoryFilters": "Kategoriye göre filtrele",
       "setupProgress": "{{total}} adımın {{completed}} tanesi tamamlandı",
-      "loading": "Gardırobun yükleniyor...",
-      "emptyTitle": "Henüz kıyafet eklenmedi",
-      "emptyBody": "Başlamak için en sevdiğin ceketin, üstün ya da elbisenin fotoğrafını çek.",
-      "emptyAction": "Kıyafet çek veya içe aktar",
-      "accountFailed": "Hesabın yüklenemedi, bu yüzden Silüet ayarları şu anda kullanılamıyor. Tekrar denemek için sayfayı yenile.",
-      "accountFailedShort": "Hesabın yüklenemedi. Tekrar denemek için sayfayı yenile.",
-      "setupFailed": "Dolap kurulumu ilerlemen kontrol edilemedi.",
+      "loading": "Dolabın yükleniyor",
+      "emptyTitle": "Henüz parça yok",
+      "emptyBody": "Giydiğin bir parçanın fotoğrafını çek.",
+      "emptyAction": "Fotoğraf ekle",
+      "accountFailed": "Hesabın yüklenmedi. Kıyafet ayarlarını değiştirmek için sayfayı yenile.",
+      "accountFailedShort": "Hesabın yüklenmedi. Sayfayı yenile.",
+      "setupFailed": "Dolap kurulumunun durumuna henüz bakamıyoruz.",
       "addGarment": "+ Kıyafet ekle",
       "closetTitle": "Dijital dolabın",
       "closetBody": "Kişisel hava durumu önerileri için kıyafetlerinin fotoğrafını çek veya yükle.",
       "needsTags": "Etiket gerekli",
-      "taggingSlow": "Akıllı etiketleme beklenenden uzun sürüyor. İşleme devam ederken kıyafet görünür kalacak.",
-      "statusRefreshFailed": "Kıyafet durumu yenilenemedi.",
-      "refreshFailed": "Gardırobun yenilenemedi.",
+      "taggingSlow": "Etiketler biraz zaman alıyor. Parçanı hâlâ görebilirsin.",
+      "statusRefreshFailed": "Bu parçayı tekrar kontrol edemedik.",
+      "refreshFailed": "Dolabını güncelleyemedik.",
       "silhouetteSaving": "Değişiklikler kaydediliyor. Lütfen bekle.",
       "status": {
         "pending_upload": "Yükleniyor",
@@ -579,7 +579,7 @@
       "suggestedReview": "(Kontrol et, öneri: {{value}})",
       "materialClear": "Emin değilim / Temizle",
       "cancel": "İptal",
-      "save": "Onayla ve etiketleri kaydet",
+      "save": "Etiketleri kaydet",
       "saving": "Kaydediliyor...",
       "errors": {
         "suggestionUnavailable": "Öneri kullanılamıyor",
@@ -651,7 +651,7 @@
     "calm": {
       "post": "Paylaş",
       "nearYou": "Yakınında",
-      "climateEmpty": "İkliminde henüz kombin yok",
+      "climateEmpty": "Senin havana uygun kombin yok",
       "seeAllClimates": "Tüm iklimleri gör",
       "cardActions": "Gönderi seçenekleri",
       "dismissChallenge": "Yarışmayı gizle",
@@ -667,8 +667,8 @@
       "invalid": "Bu bağlantı geçersiz, süresi dolmuş veya artık kullanılamıyor."
     },
     "filters": {
-      "label": "Topluluk filtreleri",
-      "explainer": "İklim filtreleri kombinleri, paylaşan kişinin kayıtlı konumundaki haftalık hava tahminine göre gruplar: soğuk ve nemliden sıcak ve kuruya.",
+      "label": "Kombinleri filtrele",
+      "explainer": "Kombinleri, her kişinin kaydettiği yerdeki haftalık hava durumuna göre grupluyoruz.",
       "announce": "{{filter}} kombinleri gösteriliyor.",
       "mode": {
         "auto": "Senin iklimin",
@@ -789,7 +789,7 @@
     },
     "report": {
       "title": "Bu kombini şikayet et",
-      "description": "Topluluğu güvende tutmaya yardım et. Bir gerekçe seç, moderasyon kombini inceleyecek.",
+      "description": "Bir neden seç. Ekibimiz bildirimine bakacak.",
       "reasonLabel": "Şikayet gerekçesi",
       "detailsLabel": "Daha fazla ayrıntı (isteğe bağlı)",
       "detailsPlaceholder": "Bu kombinin topluluk kurallarını nasıl ihlal ettiğini anlat",
@@ -818,16 +818,16 @@
       "changePhoto": "Fotoğrafı değiştir",
       "preview": "Paylaşmak üzere olduğun kombinin önizlemesi",
       "altLabel": "Görsel açıklaması",
-      "altHint": "Ekran okuyucu kullanan üyeler için giysileri, katmanları ve renkleri anlat.",
-      "altPlaceholder": "Giysileri, katmanları ve renkleri anlat",
-      "altSuggested": "Bir açıklama önerdik. Fotoğrafına uyacak şekilde düzenle.",
+      "altHint": "Ekran okuyucu kullananlara ne giydiğini anlat. Parçaları ve renkleri yaz.",
+      "altPlaceholder": "Parçaları ve renkleri yaz",
+      "altSuggested": "Bir öneri yazdık. Fotoğrafına uyması için sözleri değiştir.",
       "altConfirm": "Bu açıklamanın fotoğrafla eşleştiğini onaylıyorum",
       "titleLabel": "Başlık (isteğe bağlı)",
       "suggestDescription": "Fotoğraftan açıklama öner",
       "descriptionWorking": "Açıklama hazırlanıyor…",
       "descriptionFailed": "Açıklama önerilemedi. Kendi açıklamanı yazabilirsin.",
       "captionLabel": "Açıklama (isteğe bağlı)",
-      "editText": "Başlığı ve açıklamayı düzenle",
+      "editText": "Metni düzenle",
       "saveText": "Değişiklikleri kaydet",
       "savingText": "Kaydediliyor…",
       "editSaved": "Değişiklikler kaydedildi.",
@@ -966,9 +966,9 @@
       "sendCode": "Giriş kodu gönder",
       "verify": "Kodu doğrula",
       "codeSent": "Giriş kodu için e-postanızı kontrol edin.",
-      "signinDenied": "Bu e-posta ile hiçbir CoutureCast hesabı oturum açamaz. Adresi kontrol edip yeniden deneyin.",
-      "signinUnavailable": "Oturum açma geçici olarak kullanılamıyor. Biraz sonra yeniden deneyin.",
-      "signinCodeInvalid": "Kod yanlış veya süresi dolmuş. E-postanızı kontrol edin ya da yeni bir kod isteyin.",
+      "signinDenied": "Bu e-posta ile giriş yapamazsın. Adresi kontrol edip tekrar dene.",
+      "signinUnavailable": "Şu an giriş yapılamıyor. Biraz sonra tekrar dene.",
+      "signinCodeInvalid": "Kod yanlış ya da süresi doldu. E-postana bak veya yeni kod iste.",
       "signout": "Oturumu kapat",
       "deviceSettings": "Cihaz ayarlarını aç",
       "back": "Topluluğa dön",
@@ -1056,8 +1056,8 @@
       "off": "Kapalı",
       "learnMore": "Daha fazla bilgi",
       "languageHelp": "Dili tarayıcın belirler.",
-      "browserLanguageHelp": "Tarayıcı ayarlarından tercih ettiğin dili değiştir, ardından CoutureCast’i yeniden yükle.",
-      "aboutHelp": "Hava durumuna göre kombin planla ve dolabını düzenle.",
+      "browserLanguageHelp": "Tarayıcında dili değiştir. Sonra sayfayı yenile.",
+      "aboutHelp": "Ne giyeceğini seç ve kıyafetlerini takip et.",
       "themeHelp": "Uygulamanın renklerini seç.",
       "privacy": "Gizlilik politikası",
       "terms": "Hizmet koşulları",
@@ -1097,8 +1097,8 @@
       "outfitDetails": "Kombin ayrıntıları",
       "sampleLook": "Örnek kombin",
       "editSample": "Örneği düzenle",
-      "addFirstPiece": "İlk parçanı ekle",
-      "weatherUnavailable": "Hava durumu bilgisi yok",
+      "addFirstPiece": "Parça ekle",
+      "weatherUnavailable": "Hava bilgisi yok",
       "recentPieces": "Son eklenen parçalar",
       "conditions": {
         "clear": "Açık",
@@ -1122,15 +1122,13 @@
       "linkLabel": "{{label}} öne çıkan kombini, {{author}} tarafından, {{count}} tepki. Şehir Vitrini açılır.",
       "linkLabel_one": "{{label}} öne çıkan kombini, {{author}} tarafından, {{count}} tepki. Şehir Vitrini açılır.",
       "linkLabel_other": "{{label}} öne çıkan kombini, {{author}} tarafından, {{count}} tepki. Şehir Vitrini açılır.",
-      "cta": "Şehir Vitrininde gör"
+      "cta": "Kombini gör"
     }
   },
   "landing": {
-    "tagline": "Her yolculuk için hava durumuna uygun gardırop planları",
     "hero": {
       "eyebrow": "Günlük ritüel",
-      "headline": "90 saniyeden kısa sürede kendinden emin kombinler planla.",
-      "body": "CoutureCast, yerel hava durumunu, gardırop arşivini ve topluluk görüşlerini birleştirerek yola, toplantıya ve havana uygun kombinler önerir."
+      "headline": "90 saniyeden kısa sürede kendinden emin kombinler planla."
     },
     "lookbook": {
       "eyebrow": "Lookbook Prism",
@@ -1143,36 +1141,7 @@
         "advisory": "Duyuru: {{type}}",
         "adjustOutfit": "Kıyafeti ayarla"
       },
-      "demo": {
-        "heading": "Günlük ritüel",
-        "timeCity": "08:30 • NYC",
-        "temperature": "18 °C",
-        "humidity": "Ilık nem • %65",
-        "change": "Dünkü yolculuğa göre +3 °C",
-        "primaryLook": "Önerilen ana kombin",
-        "matchScore": "Uyum puanı: {{score}}",
-        "garments": {
-          "blazer": "Oniks blazer",
-          "scarf": "Bordo ipek eşarp",
-          "loafers": "Deri loafer"
-        },
-        "lookA": {
-          "label": "KOMBİN A (ana)",
-          "title": "Blazer ve ipek triko",
-          "body": "Serin sabah rüzgârına göre ayarlanmış sıcaklık düzeyi."
-        },
-        "lookB": {
-          "label": "KOMBİN B (alternatif)",
-          "title": "Trençkot ve merinos hırka",
-          "body": "Su itici dış katmanla daha fazla rüzgâr koruması."
-        }
-      },
       "recommendations": {
-        "personal": {
-          "eyebrow": "Yolculuğa hazır",
-          "title": "Kruvaze blazer ve ipek triko",
-          "description": "18 °C sabah tren yolculuğundan klimalı ofise geçiş için ayarlandı."
-        },
         "community": {
           "eyebrow": "Toplulukta gündemde",
           "title": "Paris usulü ipek ve kaşmir karışımı",
@@ -1205,12 +1174,12 @@
     }
   },
   "shareCard": {
-    "launcher": "Kombin kartımı oluştur",
+    "launcher": "Kart yap",
     "sourceOutfit": "Kombin",
     "sourceCommunity": "Topluluk kombini",
     "title": "Paylaşım kartın",
-    "previewDescription": "CoutureCast kartının önizlemesi",
-    "photoPrivacyHelp": "Fotoğrafındaki adlar ve yazılar görünür kalır. Kaydetmeden önce bu önizlemeyi kontrol et.",
+    "previewDescription": "Kartının önizlemesi",
+    "photoPrivacyHelp": "Fotoğrafın kartta kalır. Fotoğraftaki adlar ve tabelalar da görünür. Kaydetmeden önce kartı kontrol et.",
     "preparing": "Kart hazırlanıyor",
     "watermark": "Filigranı göster",
     "save": "Fotoğraflara kaydet",
@@ -1235,16 +1204,16 @@
     "nativeSaveUnavailable": "Fotoğraf kaydetmek için uygulamayı güncelle.",
     "permissionDenied": "Fotoğraf erişimi reddedildi. Hazır olduğunda tekrar dene.",
     "permissionPermanent": "Ayarlarda fotoğraf kaydetmeye izin ver.",
-    "sourceUnavailable": "Bu kaynak kullanılamıyor.",
+    "sourceUnavailable": "Bu kombini açamadık.",
     "previewChanged": "Kart değişti. Kaydetmeden önce önizlemeyi yenile.",
     "offline": "Kart hazırlamak için internete bağlan.",
-    "storage": "Kaydedilemedi. Depolama alanını kontrol edip tekrar dene.",
-    "render": "Kart hazırlanamadı. Tekrar dene.",
+    "storage": "Biraz yer aç. Sonra tekrar dene.",
+    "render": "Kartını yapamadık. Tekrar dene.",
     "unknown": "Bir hata oluştu. Tekrar dene.",
     "scenarios": {
-      "morning": "Sabah",
+      "morning": "Okuldan önce",
       "midday": "Öğle",
-      "evening": "Akşam"
+      "evening": "Dışarı çıkarken"
     },
     "climateBands": {
       "cold_dry": "Soğuk ve kuru",
@@ -1676,9 +1645,9 @@
     "reopen": "Tekrar aç",
     "remove": "Kaldır",
     "missingPiece": "Eksik parça",
-    "missingPieceDetail": "Bu kayıtlı kombindeki bir parça artık dolabında değil.",
+    "missingPieceDetail": "Bu kombindeki bir parça artık dolabında yok.",
     "needsReview": "Gözden geçir",
-    "needsReviewDetail": "Bu kombindeki bir parçanın etiketlerini değiştirdin. Hâlâ uyumlu olduğundan emin olmak için gözden geçir.",
+    "needsReviewDetail": "Bir parçanın etiketini değiştirdin. Kombinin hâlâ sana uyup uymadığına bak.",
     "photoUnavailable": "Fotoğraf kullanılamıyor",
     "loadFailed": "Kaydedilen kombinlerin yüklenemedi.",
     "retry": "Tekrar dene",
@@ -1789,7 +1758,7 @@
     },
     "freePlan": {
       "week": "Örnek hafta",
-      "line": "Premium tüm haftanı hava tahminine göre planlar.",
+      "line": "Premium ile tüm hafta ne giyeceğini planlayabilirsin.",
       "upgrade": "Premium'a geç"
     },
     "loadMore": "Daha fazla göster"

@@ -80,9 +80,9 @@ test.describe('Guardian consent browser smoke', { tag: CONSENT_REQUIRED_TAG }, (
     cleanupTargets.push({ teenId: signupUserId })
 
     await expect(page.getByTestId('signup-success-message')).toContainText(
-      'A guardian needs to approve your account'
+      'Your guardian must approve it before you can add photos.'
     )
-    await expect(page.getByRole('heading', { name: 'Guardian invitation' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Invite a guardian' })).toBeVisible()
 
     await log.step('Send guardian invitation from the signup UI')
     await page.getByLabel('Guardian email').fill(guardianEmail)

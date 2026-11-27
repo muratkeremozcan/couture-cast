@@ -54,14 +54,14 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
       // step mounts, and neither intermediate state carries the `main#main-content`
       // id `waitForAccessibilityReady` waits for.
       await expect(
-        page.getByRole('heading', { level: 2, name: 'Allow camera and photo access' })
+        page.getByRole('heading', { level: 2, name: 'Allow access' })
       ).toBeVisible()
       await checkA11y(page, {
         includedImpacts: ['critical', 'serious', 'moderate', 'minor'],
       })
 
-      await page.getByRole('button', { name: 'Allow camera and photo access' }).click()
-      await page.getByRole('button', { name: 'Use starter wardrobe' }).click()
+      await page.getByRole('button', { name: 'Allow access' }).click()
+      await page.getByRole('button', { name: 'Use sample closet' }).click()
       await expect(page.getByTestId('silhouette-settings-panel')).toBeVisible()
       await checkA11y(page, {
         includedImpacts: ['critical', 'serious', 'moderate', 'minor'],
@@ -82,13 +82,11 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
       await page.goto('/wardrobe/onboarding')
       await waitForAccessibilityReady(page)
 
-      await page.getByRole('button', { name: 'Allow camera and photo access' }).focus()
+      await page.getByRole('button', { name: 'Allow access' }).focus()
       await page.keyboard.press('Enter')
-      await expect(
-        page.getByRole('button', { name: 'Use starter wardrobe' })
-      ).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Use sample closet' })).toBeVisible()
 
-      await page.getByRole('button', { name: 'Use starter wardrobe' }).focus()
+      await page.getByRole('button', { name: 'Use sample closet' }).focus()
       await page.keyboard.press('Enter')
       await expect(page.getByTestId('silhouette-settings-panel')).toBeVisible()
 
@@ -136,10 +134,10 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
 
       const stepRegion = page.getByTestId('onboarding-step-region')
 
-      await page.getByRole('button', { name: 'Allow camera and photo access' }).click()
+      await page.getByRole('button', { name: 'Allow access' }).click()
       await expect(stepRegion).toBeFocused()
 
-      await page.getByRole('button', { name: 'Use starter wardrobe' }).click()
+      await page.getByRole('button', { name: 'Use sample closet' }).click()
       await expect(stepRegion).toBeFocused()
 
       await page.getByRole('button', { name: 'Continue' }).click()
@@ -168,12 +166,12 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
       const liveRegion = page.getByTestId('onboarding-status-region')
       await expect(liveRegion).toHaveAttribute('aria-live', 'polite')
 
-      await page.getByRole('button', { name: 'Allow camera and photo access' }).click()
+      await page.getByRole('button', { name: 'Allow access' }).click()
       await expect(liveRegion).toContainText(
         'Camera access granted. Capture your garments.'
       )
 
-      await page.getByRole('button', { name: 'Use starter wardrobe' }).click()
+      await page.getByRole('button', { name: 'Use sample closet' }).click()
       await expect(liveRegion).toContainText('Set up your silhouette.')
     }
   )
@@ -191,8 +189,8 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
       await page.goto('/wardrobe/onboarding')
       await waitForAccessibilityReady(page)
 
-      await page.getByRole('button', { name: 'Allow camera and photo access' }).click()
-      await page.getByRole('button', { name: 'Use starter wardrobe' }).click()
+      await page.getByRole('button', { name: 'Allow access' }).click()
+      await page.getByRole('button', { name: 'Use sample closet' }).click()
       await expect(page.getByTestId('silhouette-settings-panel')).toBeVisible()
 
       const targets = page.locator(

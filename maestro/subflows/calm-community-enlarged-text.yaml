@@ -22,7 +22,7 @@ appId: ${MAESTRO_APP_ID}
       id: 'community-climate-sheet'
     timeout: 10000
 - assertVisible:
-    text: 'Klimafilter'
+    text: 'Outfits filtern'
 - takeScreenshot:
     path: maestro/artifacts/community-accessibility/de-large-filter
 - scrollUntilVisible:

@@ -16,7 +16,7 @@ export function GuestPreviewEntry() {
       data-testid="today-first-content"
       aria-labelledby="home-sample-heading"
       data-surface="card"
-      className="space-y-3 rounded-xl border border-line bg-card p-5"
+      className="min-w-0 space-y-3 rounded-xl border border-line bg-card p-3 min-[361px]:p-5"
     >
       <h2 id="home-sample-heading" className="text-2xl font-semibold">
         {strings.firstUse.outfitIdea}
@@ -36,28 +36,34 @@ export function GuestPreviewEntry() {
           data-landing="guest"
           // Story CC-7.9 D3: a guest's one main action on Home.
           data-gold="primary"
-          className="inline-flex min-h-11 items-center rounded-full bg-primary px-5 py-2 text-sm font-semibold text-on-primary"
+          className="inline-flex min-h-11 min-w-0 max-w-full items-center rounded-full bg-primary px-2 py-2 text-sm font-semibold text-on-primary min-[361px]:px-5"
         >
-          {strings.firstUse.sampleEntry}
+          <span className="min-w-0 hyphens-auto [overflow-wrap:anywhere]">
+            {strings.firstUse.sampleEntry}
+          </span>
         </Link>
         <Link
           href="/signup"
           data-testid="landing-sign-up"
           data-landing="guest"
-          className="inline-flex min-h-11 items-center text-sm font-semibold text-ink underline underline-offset-4"
+          className="inline-flex min-h-11 min-w-0 max-w-full items-center text-sm font-semibold text-ink underline underline-offset-4"
           data-ph-event="cta_clicked"
           data-ph-cta-label="Start signup"
           data-ph-cta-type="secondary"
         >
-          {strings.chrome.createAccount}
+          <span className="min-w-0 hyphens-auto [overflow-wrap:anywhere]">
+            {strings.chrome.createAccount}
+          </span>
         </Link>
         <Link
           href="/signin"
           data-testid="landing-sign-in"
           data-landing="guest"
-          className="inline-flex min-h-11 items-center text-sm font-semibold text-ink underline underline-offset-4"
+          className="inline-flex min-h-11 min-w-0 max-w-full items-center text-sm font-semibold text-ink underline underline-offset-4"
         >
-          {strings.chrome.signIn}
+          <span className="min-w-0 hyphens-auto [overflow-wrap:anywhere]">
+            {strings.chrome.signIn}
+          </span>
         </Link>
       </div>
     </section>

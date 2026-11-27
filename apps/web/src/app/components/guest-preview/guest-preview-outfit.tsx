@@ -61,7 +61,7 @@ export function GuestPreviewOutfit({
         data-testid="guest-preview-empty"
         aria-labelledby="guest-preview-empty-heading"
         data-surface={cardSurface}
-        className={`space-y-4 ${nested ? '' : 'p-6'} ${cardClass}`}
+        className={`min-w-0 space-y-4 [overflow-wrap:anywhere] ${nested ? '' : 'p-3 min-[361px]:p-6'} ${cardClass}`}
       >
         <h2 id="guest-preview-empty-heading" className="text-xl font-semibold">
           {result.reason === 'all-disliked'
@@ -97,10 +97,10 @@ export function GuestPreviewOutfit({
       data-testid="guest-preview-outfit"
       data-look-id={look.id}
       data-surface={cardSurface}
-      className={`space-y-5 ${nested ? '' : 'p-5 sm:p-6'} ${cardClass}`}
+      className={`min-w-0 space-y-5 [overflow-wrap:anywhere] ${nested ? '' : 'p-3 min-[361px]:p-5 sm:p-6'} ${cardClass}`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
+        <div className="min-w-0 max-w-full">
           {(heading || !hasSwaps) && (
             <p className="text-xs uppercase tracking-[0.12em] text-ink-muted">
               {heading ?? strings.outfit.heading}
@@ -131,7 +131,7 @@ export function GuestPreviewOutfit({
           onClick={onTryAnother}
           data-testid="guest-preview-try-another"
           data-primary-action="true"
-          className="min-h-11 rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse"
+          className="min-h-11 max-w-full rounded-lg bg-inverse px-2 text-sm font-semibold text-on-inverse min-[361px]:px-4"
         >
           {strings.outfit.tryAnother}
         </button>

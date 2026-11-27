@@ -397,7 +397,7 @@ describe('mobile save-feedback components', () => {
     await render(
       <SaveFeedbackProvider>
         <View testID="look-card">
-          <Text>Office oxford</Text>
+          <Text>School day</Text>
         </View>
         <SaveActionButton testID="save-btn" onSave={onSave} />
       </SaveFeedbackProvider>
@@ -407,7 +407,7 @@ describe('mobile save-feedback components', () => {
     await waitFor(() =>
       expect(screen.getByTestId('save-btn')).toHaveTextContent('Failed')
     )
-    expect(screen.getByTestId('look-card')).toHaveTextContent('Office oxford')
+    expect(screen.getByTestId('look-card')).toHaveTextContent('School day')
     expect(screen.getByTestId('save-action-failed-icon')).toBeVisible()
     expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
       'Could not save. Try again.'

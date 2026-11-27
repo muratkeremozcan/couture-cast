@@ -36,10 +36,10 @@ tags:
 # Story CC-7.14: the forecast-period label is inside Outfit details.
 - runFlow: subflows/open-today-outfit-details.yaml
 - scrollUntilVisible:
-    element: 'Sabah gezisi'
+    element: 'Okuldan önce'
     direction: DOWN
     visibilityPercentage: 100
-- assertVisible: 'Sabah gezisi'
+- assertVisible: 'Okuldan önce'
 - scrollUntilVisible:
     element:
       id: 'weather-header'
@@ -48,7 +48,7 @@ tags:
 - waitForAnimationToEnd
 - tapOn:
     id: 'weather-header'
-- assertVisible: 'Saatlik tahmin'
+- assertVisible: 'Saatlik hava durumu'
 
 - takeScreenshot:
     path: maestro/artifacts/localization-tr-TR

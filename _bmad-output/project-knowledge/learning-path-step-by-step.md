@@ -22384,3 +22384,34 @@ Profile moves settings to seven titled destinations and keeps Sign out at the en
 - [Android enlarged-text journey](../../maestro/subflows/calm-closet-profile-enlarged-text.yaml).
 - [Step 67](#step-67-screen-budget-guard) explains the screen limits and the ratchet.
   [Step 68](#step-68-five-tab-navigation-and-back-pattern) explains Back and the tab shell.
+
+## Step 74: Teen voice and copy
+
+Read the five tabs and first run as a new member. Check whether each button says what it does
+and each sentence helps you make a choice. Sample looks use situations such as school,
+weekends and going out.
+
+### Sequence to follow
+
+1. Start with the [voice guide](../planning-artifacts/ux-design-specification.md#12-voice-and-copy).
+   Follow the same action through the web and native locale catalogs.
+2. Open the shared sample strings. Compare the name and description of School day with its
+   stable `sample:l:office-oxford` ID. Reopen it from Looks after saving it.
+3. Open a share card and follow its label into the export renderer. Keep the photo disclosure
+   in view while checking the preview. The rendered card uses the same translated situation.
+4. Switch to German at 320 px or dp. Check first run and the member tabs in light and dark.
+   Read long labels and use their controls at the enlarged text setting.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-17-teen-voice-copy.md) and
+  [acceptance plan](../test-artifacts/test-design-7-17-teen-voice-copy.md).
+- [Shared copy checks](../../packages/utils/src/sample-wardrobe/strings.spec.ts) and
+  [share export checks](../../apps/api/src/modules/share-cards/share-card-renderer.spec.ts).
+- [Locale coverage](../../scripts/ci/teen-voice-copy.test.mjs),
+  [Today](../../playwright/tests/calm-today.spec.ts), and
+  [Looks plan](../../playwright/tests/looks-plan.spec.ts).
+- [Web first run](../../playwright/tests/guest-preview.spec.ts) and
+  [Android large text](../../maestro/subflows/teen-voice-enlarged-text.yaml).
+- [Step 70](#step-70-calm-today-with-one-primary-job) covers the first view of Today.
+  [Step 73](#step-73-calm-closet-and-profile) covers the compact member layout.

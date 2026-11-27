@@ -240,12 +240,10 @@ describe('WardrobeOnboardingPage remaining guided-flow paths', () => {
     })
 
     render(<WardrobeOnboardingPage />)
-    await user.click(
-      await screen.findByRole('button', { name: 'Allow camera and photo access' })
-    )
+    await user.click(await screen.findByRole('button', { name: 'Allow access' }))
 
     // A refused prompt must not dead-end the flow; file import still works.
-    await screen.findByRole('button', { name: 'Add another garment' })
+    await screen.findByRole('button', { name: 'Add a piece' })
     await waitFor(() =>
       expect(screen.getByTestId('onboarding-status-region')).toHaveTextContent(/camera/i)
     )

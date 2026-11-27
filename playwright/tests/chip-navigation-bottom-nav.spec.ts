@@ -94,7 +94,7 @@ test.describe('Sticky bottom navigation (Story 3.6)', () => {
     const explainer = filters.getByTestId('community-filters-explainer')
     await expect(explainer).toHaveText(enUS.community.filters.explainer)
     await expect(
-      page.getByRole('dialog', { name: 'Community filters' })
+      page.getByRole('dialog', { name: 'Filter looks' })
     ).toHaveAccessibleDescription(enUS.community.filters.explainer)
     await expect(filters.getByTestId('community-filter-cold_wet')).toHaveText(
       'Cold and wet'

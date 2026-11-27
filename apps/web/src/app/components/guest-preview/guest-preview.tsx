@@ -480,7 +480,7 @@ function PreviewFrame({
   // since it does not fit the one-row top bar.
   return (
     <AppPage>
-      <AppTopBar title={strings.chrome.entry} parentHref="/" />
+      <AppTopBar title={strings.chrome.entry} parentHref="/" wrapTitle />
       <main id="main-content" tabIndex={-1} className={`${APP_MAIN_CLASS} gap-6`}>
         <div className="flex flex-col gap-3">
           {showNav ? (
@@ -523,7 +523,7 @@ function PreviewFrame({
             <nav aria-label={strings.chrome.navLabel} data-testid="guest-preview-nav">
               <ul className="flex flex-wrap gap-2">
                 {navItems.map((item) => (
-                  <li key={item.view}>
+                  <li key={item.view} className="min-w-0 max-w-full">
                     <a
                       href={
                         item.view === 'outfit' ? '/preview' : `/preview?view=${item.view}`
@@ -534,13 +534,15 @@ function PreviewFrame({
                         event.preventDefault()
                         onNavigate?.(item.view)
                       }}
-                      className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${
+                      className={`inline-flex min-h-11 max-w-full items-center rounded-full px-2 text-sm font-semibold min-[361px]:px-4 ${
                         item.view === view
                           ? 'bg-inverse text-on-inverse'
                           : 'border border-line-strong bg-page text-ink'
                       }`}
                     >
-                      {item.label}
+                      <span className="min-w-0 hyphens-auto [overflow-wrap:anywhere]">
+                        {item.label}
+                      </span>
                     </a>
                   </li>
                 ))}

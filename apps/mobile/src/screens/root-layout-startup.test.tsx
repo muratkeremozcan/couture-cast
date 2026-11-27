@@ -308,7 +308,7 @@ describe('RootLayout startup', () => {
       expect(
         layout.screens.find((screen) => screen.name === 'preview')?.options
       ).toMatchObject({
-        title: 'Try a sample wardrobe',
+        title: 'Try sample looks',
       })
     }
   )

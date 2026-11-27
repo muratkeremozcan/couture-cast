@@ -248,7 +248,7 @@ describe('web save-feedback components', () => {
 
     render(
       <SaveFeedbackProvider>
-        <div data-testid="look-content">Office oxford</div>
+        <div data-testid="look-content">School day</div>
         <SaveActionButton data-testid="save-btn" requiresNetwork onSave={onSave} />
       </SaveFeedbackProvider>
     )
@@ -259,7 +259,7 @@ describe('web save-feedback components', () => {
 
     await user.click(screen.getByTestId('save-btn'))
     expect(onSave).not.toHaveBeenCalled()
-    expect(screen.getByTestId('look-content')).toHaveTextContent('Office oxford')
+    expect(screen.getByTestId('look-content')).toHaveTextContent('School day')
     expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
       'You are offline. Save when you reconnect.'
     )

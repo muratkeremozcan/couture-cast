@@ -1,7 +1,7 @@
 // Learning path Step 73: Calm Closet and Profile.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-73-calm-closet-and-profile
 // Test design: _bmad-output/test-artifacts/test-design-7-16-calm-closet-profile.md.
-import type { Locator, Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { suggestGarmentTagsWireResponseSchema } from '@couture/api-client/contracts/http'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
@@ -10,6 +10,7 @@ import {
   SCHEMES,
   waitForShellSettled,
 } from '../support/helpers/app-shell'
+import { expectReadable } from '../support/helpers/readable-text'
 import {
   SHELL_PROFILE_NAME,
   type ShellClosetFixture,
@@ -72,48 +73,6 @@ function closetFixture(complete: boolean): ShellClosetFixture {
       },
     },
   }
-}
-
-/** Measure the painted text bounds after scrolling each control into view. */
-async function expectReadable(control: Locator) {
-  await expect(control).toBeVisible()
-  await control.scrollIntoViewIfNeeded()
-  const overflow = await control.evaluate((element) => {
-    const bounds = element.getBoundingClientRect()
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
-    const clipped: string[] = []
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      if (!node.textContent?.trim()) continue
-      let left = Math.max(bounds.left, 0)
-      let right = Math.min(bounds.right, document.documentElement.clientWidth)
-      for (
-        let parent = node.parentElement;
-        parent && parent !== element;
-        parent = parent.parentElement
-      ) {
-        if (/^(hidden|clip)$/.test(getComputedStyle(parent).overflowX)) {
-          const clipping = parent.getBoundingClientRect()
-          left = Math.max(left, clipping.left)
-          right = Math.min(right, clipping.right)
-        }
-      }
-      const range = document.createRange()
-      range.selectNodeContents(node)
-      for (const line of Array.from(range.getClientRects())) {
-        if (
-          line.left < left - 1 ||
-          line.right > right + 1 ||
-          line.top < bounds.top - 1 ||
-          line.bottom > bounds.bottom + 1
-        ) {
-          clipped.push(node.textContent.trim())
-          break
-        }
-      }
-    }
-    return clipped
-  })
-  expect(overflow, `${control.toString()} has room for every visible label`).toEqual([])
 }
 
 async function expectNoHorizontalOverflow(page: Page) {

@@ -71,7 +71,7 @@ export const designTokenSpacing = Object.fromEntries(
  */
 const shellClearance = {
   safe: 'env(safe-area-inset-bottom, 0px)',
-  'tab-bar': `calc(${shell.tabBarHeight + space[8]}px + env(safe-area-inset-bottom, 0px))`,
+  'tab-bar': `calc(var(--cc-web-tab-bar-height, ${shell.tabBarHeight}px) + ${space[8]}px + env(safe-area-inset-bottom, 0px))`,
 }
 
 /** Emits every `--cc-*` variable: `:root`, the dark media query and each `[data-theme]`. */
@@ -122,6 +122,7 @@ export default {
       minHeight: {
         touch: `${shell.touchTarget}px`,
         'top-bar': `${shell.topBarHeight}px`,
+        'tab-bar': `${shell.tabBarHeight}px`,
       },
       minWidth: { touch: `${shell.touchTarget}px` },
       borderColor: {

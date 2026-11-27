@@ -13,9 +13,9 @@ type ScenarioTogglesProps = {
 }
 
 const scenarios: { key: ScenarioType; labelKey: string; defaultLabel: string }[] = [
-  { key: 'morning', labelKey: 'hero.scenarios.morning', defaultLabel: 'Morning commute' },
+  { key: 'morning', labelKey: 'hero.scenarios.morning', defaultLabel: 'Before school' },
   { key: 'midday', labelKey: 'hero.scenarios.midday', defaultLabel: 'Midday' },
-  { key: 'evening', labelKey: 'hero.scenarios.evening', defaultLabel: 'Evening plans' },
+  { key: 'evening', labelKey: 'hero.scenarios.evening', defaultLabel: 'Going out' },
 ]
 
 export function ScenarioToggles({

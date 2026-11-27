@@ -243,7 +243,7 @@ describe('WardrobeOnboardingPage bootstrap and step-advance failures', () => {
     render(<WardrobeOnboardingPage />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Unable to load your onboarding progress.'
+      "We couldn't see where you left off."
     )
   })
 
@@ -256,18 +256,14 @@ describe('WardrobeOnboardingPage bootstrap and step-advance failures', () => {
     })
     render(<WardrobeOnboardingPage />)
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Allow camera and photo access' })
-    )
+    await user.click(await screen.findByRole('button', { name: 'Allow access' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('step write rejected')
     // A failed advance must not announce progress the user did not make.
     expect(screen.getByTestId('onboarding-status-region')).not.toHaveTextContent(
       'Camera access granted'
     )
-    expect(
-      screen.getByRole('button', { name: 'Allow camera and photo access' })
-    ).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Allow access' })).toBeEnabled()
   })
 
   it('falls back to translated copy when a step advance rejects with a non-Error', async () => {
@@ -279,12 +275,10 @@ describe('WardrobeOnboardingPage bootstrap and step-advance failures', () => {
     })
     render(<WardrobeOnboardingPage />)
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Allow camera and photo access' })
-    )
+    await user.click(await screen.findByRole('button', { name: 'Allow access' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Unable to save this step. Try again.'
+      "We couldn't save this step. Try again."
     )
   })
 
@@ -325,7 +319,7 @@ describe('WardrobeOnboardingPage bootstrap and step-advance failures', () => {
     render(<WardrobeOnboardingPage />)
 
     // A fresh mount must start clean rather than inherit the discarded failure.
-    await screen.findByRole('button', { name: 'Allow camera and photo access' })
+    await screen.findByRole('button', { name: 'Allow access' })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -364,18 +358,14 @@ describe('WardrobeOnboardingPage bootstrap and step-advance failures', () => {
     })
     const { unmount } = render(<WardrobeOnboardingPage />)
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Allow camera and photo access' })
-    )
+    await user.click(await screen.findByRole('button', { name: 'Allow access' }))
     await waitFor(() => expect(advanceOnboardingStepFromWeb).toHaveBeenCalledTimes(1))
     unmount()
 
     settleAdvance(state({ status: 'in_progress', currentStep: 'capture', revision: 1 }))
     await waitFor(() => expect(advanceOnboardingStepFromWeb).toHaveBeenCalledTimes(1))
 
-    expect(
-      screen.queryByRole('button', { name: 'Add another garment' })
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add a piece' })).not.toBeInTheDocument()
   })
 
   it('stays silent when a step-advance rejection lands after the page unmounts', async () => {
@@ -392,9 +382,7 @@ describe('WardrobeOnboardingPage bootstrap and step-advance failures', () => {
     })
     const { unmount } = render(<WardrobeOnboardingPage />)
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Allow camera and photo access' })
-    )
+    await user.click(await screen.findByRole('button', { name: 'Allow access' }))
     await waitFor(() => expect(advanceOnboardingStepFromWeb).toHaveBeenCalledTimes(1))
     unmount()
 
@@ -408,7 +396,7 @@ describe('WardrobeOnboardingPage bootstrap and step-advance failures', () => {
       )
     render(<WardrobeOnboardingPage />)
 
-    await screen.findByRole('button', { name: 'Allow camera and photo access' })
+    await screen.findByRole('button', { name: 'Allow access' })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

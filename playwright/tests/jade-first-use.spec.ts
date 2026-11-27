@@ -154,18 +154,22 @@ test.describe('Jade first use on a phone', () => {
 
     const outfit = page.getByTestId('guest-preview-outfit')
     const nextLook = outfit.getByRole('button', { name: 'Try another look' })
-    await expect(outfit.getByRole('heading', { name: 'Office oxford' })).toBeVisible()
-    await expect(page.getByText(/sample wardrobe\. example weather/i)).toBeVisible()
-    await expect(outfit.getByText('Garment illustrations')).toBeVisible()
+    await expect(outfit.getByRole('heading', { name: 'School day' })).toBeVisible()
+    await expect(
+      page.getByText(
+        'Sample looks and weather. Your closet and live weather stay separate.'
+      )
+    ).toBeVisible()
+    await expect(outfit.getByText('Drawings of clothes')).toBeVisible()
     await nextLook.click()
     await expect(outfit.getByRole('heading', { name: 'Silk midi' })).toBeVisible()
 
-    await page.getByText('Style preferences (optional)', { exact: true }).click()
+    await page.getByText('Pick your style (optional)', { exact: true }).click()
     await page
       .getByRole('combobox', { name: 'Style', exact: true })
-      .selectOption({ label: 'Cozy and sophisticated' })
+      .selectOption({ label: 'Cozy' })
     await page
-      .getByRole('combobox', { name: 'Palette', exact: true })
+      .getByRole('combobox', { name: 'Colors', exact: true })
       .selectOption({ value: 'colorful' })
     await page
       .getByRole('combobox', { name: 'Texture', exact: true })
@@ -313,10 +317,10 @@ test.describe('Jade first use on a phone', () => {
       await page.goto('/community')
       const card = page.getByTestId(`lookbook-card-${ownLook.id}`)
       const rows = page.getByTestId('community-card-grid').getByTestId(/^lookbook-card-/)
-      const examples = page.getByRole('region', { name: 'Example inspiration' })
+      const examples = page.getByRole('region', { name: 'Look ideas' })
       await expect(card).toContainText(ownLook.title!)
       await expect(rows).toHaveCount(1)
-      await expect(examples.getByText('Garment illustrations')).toBeVisible()
+      await expect(examples.getByText('Drawings of clothes')).toBeVisible()
       await expect(examples.getByText('Sample weather · Mild and dry')).toHaveCount(3)
 
       await selectCommunityClimate(page, 'cold_wet')
@@ -444,7 +448,16 @@ test.describe('Jade first use on a phone', () => {
         .toBe('none')
       expect(allocations, 'No upload allocation during editing').toBe(0)
       if (background !== 'plain') {
-        await expect.soft(dialog.getByText(/background was kept/i)).toBeVisible()
+        await expect
+          .soft(
+            dialog.getByText(
+              "Your photo still has its background. We couldn't cut out the piece.",
+              {
+                exact: true,
+              }
+            )
+          )
+          .toBeVisible()
       }
       await preview.screenshot({ path: testInfo.outputPath('preview.png') })
 
@@ -454,7 +467,7 @@ test.describe('Jade first use on a phone', () => {
       })
       // Confirmation removes the preview. Decode the PUT using the same browser canvas.
       await confirm.click()
-      await expect(dialog.getByText('Garment Upload Complete!')).toBeVisible()
+      await expect(dialog.getByText('Piece added')).toBeVisible()
       const { requestJson } = await commit
       expect(
         put?.bytes?.length,

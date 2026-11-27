@@ -2,6 +2,7 @@
 // Story 6.16 D5: the sample weather and the three real comfort settings.
 import {
   formatPreviewString,
+  formatRainChance,
   formatSampleTemperature,
   SAMPLE_WEATHER,
   SAMPLE_WEATHER_KEYS,
@@ -37,7 +38,7 @@ export function GuestPreviewControls({
       aria-labelledby="guest-preview-controls-heading"
       data-testid="guest-preview-controls"
       data-surface="card"
-      className="space-y-5 rounded-xl border border-line bg-card p-5"
+      className="min-w-0 space-y-5 rounded-xl border border-line bg-card p-3 [overflow-wrap:anywhere] min-[361px]:p-5"
     >
       <div className="space-y-1">
         <h2
@@ -63,7 +64,7 @@ export function GuestPreviewControls({
         {formatPreviewString(strings.preferences.weatherDetail, {
           temperature: formatSampleTemperature(weather.feelsLike, locale),
           windSpeed: weather.windSpeed,
-          rainPercent: Math.round(weather.precipitationProbability * 100),
+          rainPercent: formatRainChance(weather.precipitationProbability * 100, strings),
         })}
       </p>
       <GuestPreviewChoiceGroup

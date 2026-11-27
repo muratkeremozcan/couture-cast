@@ -217,9 +217,7 @@ describe('SilhouetteSettingsPanel', () => {
     await waitFor(() => {
       expect(screen.getByText('My Form photo ready')).toBeInTheDocument()
     })
-    expect(
-      screen.getByRole('button', { name: 'Remove My Form photo' })
-    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove photo' })).toBeInTheDocument()
   })
 
   it.each([
@@ -309,7 +307,7 @@ describe('SilhouetteSettingsPanel', () => {
     const removeMyFormPhoto = vi.fn().mockResolvedValue(buildProfile({ revision: 5 }))
     renderPanel({ userId: 'user-1', getProfile, removeMyFormPhoto })
 
-    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove photo' }))
 
     await waitFor(() => {
       // Round 6: the session the profile was read under rides along, so the default remover
@@ -511,7 +509,7 @@ describe('SilhouetteSettingsPanel', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(
-        'This step changed elsewhere. Review the latest version and try again.'
+        'This step changed. Check the new details and try again.'
       )
     })
   })
@@ -615,7 +613,7 @@ describe('SilhouetteSettingsPanel', () => {
     renderPanel({ userId: 'user-1', getProfile, removeMyFormPhoto, onBusyChange })
 
     onBusyChange.mockClear()
-    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove photo' }))
 
     await waitFor(() => expect(onBusyChange).toHaveBeenCalledWith(true))
 
@@ -666,7 +664,7 @@ describe('SilhouetteSettingsPanel', () => {
     fireEvent.change(heightSlider, { target: { value: '80' } })
     await waitFor(() => expect(saveSliders).toHaveBeenCalled())
 
-    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove photo' }))
     expect(removeMyFormPhoto).toHaveBeenCalled()
 
     expect(sliderSaveSignals[0]?.aborted).toBe(false)
@@ -1318,9 +1316,7 @@ describe('SilhouetteSettingsPanel round 6 account switch with a My Form photo on
 
     // Nothing of A's is left while B's own read is still on the wire.
     expect(myFormImage()).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: 'Remove My Form photo' })
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove photo' })).not.toBeInTheDocument()
     expect(getProfile).toHaveBeenCalledTimes(2)
 
     await act(async () => {
@@ -1331,7 +1327,7 @@ describe('SilhouetteSettingsPanel round 6 account switch with a My Form photo on
       'src',
       MEMBER_B_PHOTO
     )
-    await user.click(screen.getByRole('button', { name: 'Remove My Form photo' }))
+    await user.click(screen.getByRole('button', { name: 'Remove photo' }))
 
     expect(removeMyFormPhoto).toHaveBeenCalledOnce()
     expect(removeMyFormPhoto).toHaveBeenCalledWith(
@@ -1409,9 +1405,7 @@ describe('SilhouetteSettingsPanel round 6 account switch with a My Form photo on
     expect(getProfile).toHaveBeenCalledOnce()
     expect(myFormImage()).not.toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: 'Remove My Form photo' })
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove photo' })).not.toBeInTheDocument()
   })
 
   // Learning path Step 58: Image uploads straight to storage.
@@ -1501,12 +1495,10 @@ describe('SilhouetteSettingsPanel My Form removal failures', () => {
       .mockRejectedValue(new Error('SILHOUETTE_REVISION_MISMATCH'))
     renderPanel({ userId: 'user-1', getProfile, removeMyFormPhoto })
 
-    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove photo' }))
 
     expect(
-      await screen.findByText(
-        'This step changed elsewhere. Review the latest version and try again.'
-      )
+      await screen.findByText('This step changed. Check the new details and try again.')
     ).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: 'Reload the latest version' })
@@ -1519,12 +1511,12 @@ describe('SilhouetteSettingsPanel My Form removal failures', () => {
     const removeMyFormPhoto = vi.fn().mockRejectedValue(new Error('storage unavailable'))
     renderPanel({ userId: 'user-1', getProfile, removeMyFormPhoto })
 
-    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove photo' }))
 
     expect(await screen.findByText('storage unavailable')).toBeInTheDocument()
     // The photo is still there, so the remove affordance has to come back.
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Remove My Form photo' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Remove photo' })).toBeEnabled()
     )
   })
 
@@ -1534,7 +1526,7 @@ describe('SilhouetteSettingsPanel My Form removal failures', () => {
     const removeMyFormPhoto = vi.fn().mockRejectedValue('remove socket closed')
     renderPanel({ userId: 'user-1', getProfile, removeMyFormPhoto })
 
-    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove photo' }))
 
     expect(await screen.findByText('remove socket closed')).toBeInTheDocument()
   })
@@ -1556,7 +1548,7 @@ describe('SilhouetteSettingsPanel My Form removal failures', () => {
       onProfileChange,
     })
 
-    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove photo' }))
     await waitFor(() => expect(removeMyFormPhoto).toHaveBeenCalled())
     onProfileChange.mockClear()
     unmount()
@@ -1586,7 +1578,7 @@ describe('SilhouetteSettingsPanel My Form removal failures', () => {
       onBusyChange,
     })
 
-    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove photo' }))
     await waitFor(() => expect(onBusyChange).toHaveBeenCalledWith(true))
     unmount()
     onBusyChange.mockClear()
@@ -1872,7 +1864,7 @@ describe('7.11 Silhouette route: in-flight mutations survive leaving', () => {
       removeMyFormPhoto,
     })
 
-    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove photo' }))
     expect(removeMyFormPhoto).toHaveBeenCalledTimes(1)
 
     unmount()

@@ -111,7 +111,7 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
         await page.getByRole('button', { name: '+ Add Garment' }).click()
         await page.getByLabel('Garment image file').setInputFiles(garmentFixturePath)
         await page.getByRole('button', { name: 'Use This Image' }).click()
-        await expect(page.getByText('Garment Upload Complete!')).toBeVisible()
+        await expect(page.getByText('Piece added')).toBeVisible()
         await page.getByRole('button', { name: 'Done' }).click()
       })
 
@@ -197,7 +197,7 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
         await bottomChip.press('Space')
         await expect(bottomChip).toHaveAttribute('aria-checked', 'true')
 
-        await page.getByRole('button', { name: 'Confirm & Save Tags' }).click()
+        await page.getByRole('button', { name: 'Save tags' }).click()
         await expect(
           page.getByRole('dialog', { name: 'Organize Garment Tags' })
         ).not.toBeVisible()

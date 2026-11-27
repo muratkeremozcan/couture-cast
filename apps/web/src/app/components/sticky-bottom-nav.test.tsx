@@ -10,6 +10,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// CC-7.17 wrapped-tab clearance: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
 // Story CC-7.12 test owner (TEA): 7.12-UNIT-061 (the saved look detail and the capsules manager
 // highlight Looks).
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
@@ -211,6 +212,48 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
     expect(previewNavElement.className).toContain('sticky')
     expect(previewNavElement.className).toContain('flex')
     expect(previewNavElement.className).not.toContain('min-[768px]:hidden')
+  })
+
+  it('keeps page clearance in sync with wrapped bottom tab labels', () => {
+    const observe = vi.fn()
+    const disconnect = vi.fn()
+    let notifyResize: (() => void) | undefined
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = observe
+        disconnect = disconnect
+
+        constructor(onResize: () => void) {
+          notifyResize = onResize
+        }
+      }
+    )
+    const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+    const rootStyle = document.documentElement.style
+    const clearance = '--cc-web-tab-bar-height'
+    try {
+      height.mockReturnValue(56)
+      const { unmount } = render(<BottomNavHarness />)
+      const nav = screen.getByTestId('sticky-bottom-nav')
+      expect(observe).toHaveBeenCalledExactlyOnceWith(nav.firstElementChild)
+      expect(rootStyle.getPropertyValue(clearance)).toBe('56px')
+
+      height.mockReturnValue(84)
+      notifyResize!()
+      expect(rootStyle.getPropertyValue(clearance)).toBe('84px')
+
+      height.mockReturnValue(0)
+      notifyResize!()
+      expect(rootStyle.getPropertyValue(clearance)).toBe('84px')
+
+      unmount()
+      expect(disconnect).toHaveBeenCalledOnce()
+      expect(rootStyle.getPropertyValue(clearance)).toBe('')
+    } finally {
+      height.mockRestore()
+      vi.unstubAllGlobals()
+    }
   })
 
   /*

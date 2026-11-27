@@ -202,7 +202,7 @@ class ShareCardComposerTalkBackTest {
       assertHeader("Community", "Latest looks")
       click("tab-home")
       waitFor("Outfit action") { find("outfit-share-card-open") != null }
-      waitFor("Action label Create my outfit card") { find("outfit-share-card-open")?.let { label(it) } == "Create my outfit card" }
+      waitFor("Action label Make a card") { find("outfit-share-card-open")?.let { label(it) } == "Make a card" }
       fixture("deferred")
       click("outfit-share-card-open")
       waitFor("Approved preview and enabled Save") {

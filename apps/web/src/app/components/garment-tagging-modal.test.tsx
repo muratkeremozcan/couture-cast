@@ -72,7 +72,7 @@ describe('GarmentTaggingModal Component', () => {
     // The options render before the suggestions arrive, so their presence proves
     // nothing. The confident suggestions are applied once the category is checked
     // and the form can be confirmed.
-    const confirmBtn = screen.getByRole('button', { name: 'Confirm & Save Tags' })
+    const confirmBtn = screen.getByRole('button', { name: 'Save tags' })
     await waitFor(() => {
       expect(screen.getByRole('radio', { name: /Top/ })).toHaveAttribute(
         'aria-checked',
@@ -265,7 +265,7 @@ describe('GarmentTaggingModal degraded suggestion paths', () => {
       'aria-checked',
       'false'
     )
-    expect(screen.getByRole('button', { name: 'Confirm & Save Tags' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save tags' })).toBeDisabled()
   })
 
   it('ignores a stale suggestion response after the user moves to another garment', async () => {
@@ -340,7 +340,7 @@ describe('GarmentTaggingModal degraded suggestion paths', () => {
 
     // An error banner for a garment the user left would be unexplainable.
     expect(screen.queryByText('garment-1 lookup failed')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Confirm & Save Tags' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Save tags' })).toBeEnabled()
   })
 })
 
@@ -483,7 +483,7 @@ describe('GarmentTaggingModal save failures', () => {
     })
     await waitForConfidentPreselection()
 
-    await user.click(screen.getByRole('button', { name: 'Confirm & Save Tags' }))
+    await user.click(screen.getByRole('button', { name: 'Save tags' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Tag service unavailable')
     // Closing on failure would discard the choices the user just made.
@@ -497,7 +497,7 @@ describe('GarmentTaggingModal save failures', () => {
     renderModal({ updateTagsFn: vi.fn().mockRejectedValue('gateway reset') })
     await waitForConfidentPreselection()
 
-    await user.click(screen.getByRole('button', { name: 'Confirm & Save Tags' }))
+    await user.click(screen.getByRole('button', { name: 'Save tags' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Failed to save tags. Please try again.'
@@ -515,7 +515,7 @@ describe('GarmentTaggingModal save failures', () => {
     const { rerender, onClose, onTagsConfirmed } = renderModal({ updateTagsFn })
     await waitForConfidentPreselection()
 
-    await user.click(screen.getByRole('button', { name: 'Confirm & Save Tags' }))
+    await user.click(screen.getByRole('button', { name: 'Save tags' }))
     await waitFor(() => expect(updateTagsFn).toHaveBeenCalledOnce())
 
     rerender(
@@ -554,7 +554,7 @@ describe('GarmentTaggingModal save failures', () => {
     })
     await waitForConfidentPreselection()
 
-    await user.click(screen.getByRole('button', { name: 'Confirm & Save Tags' }))
+    await user.click(screen.getByRole('button', { name: 'Save tags' }))
     await waitFor(() => expect(updateTagsFn).toHaveBeenCalledOnce())
 
     const closed = (
@@ -588,7 +588,7 @@ describe('GarmentTaggingModal save failures', () => {
     // Regression: the abandoned request never cleared `isSaving`, so every later
     // open of the tagging dialog rendered a permanently disabled "Saving..."
     // button and the garment could never be tagged again.
-    const confirm = screen.getByRole('button', { name: 'Confirm & Save Tags' })
+    const confirm = screen.getByRole('button', { name: 'Save tags' })
     expect(confirm).toBeEnabled()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
@@ -641,11 +641,11 @@ describe('GarmentTaggingModal manual mode', () => {
     )
     await screen.findByText(MANUAL_COPY)
 
-    expect(screen.getByRole('button', { name: 'Confirm & Save Tags' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save tags' })).toBeDisabled()
     // Exact name: the Cool comfort option's description also mentions outerwear.
     await user.click(screen.getByRole('radio', { name: 'Outerwear' }))
     await user.click(screen.getByRole('radio', { name: /Cool/ }))
-    await user.click(screen.getByRole('button', { name: 'Confirm & Save Tags' }))
+    await user.click(screen.getByRole('button', { name: 'Save tags' }))
 
     await waitFor(() => {
       expect(updateTagsFn).toHaveBeenCalledWith(

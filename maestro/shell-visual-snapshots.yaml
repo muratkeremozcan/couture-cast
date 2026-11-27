@@ -127,9 +127,15 @@ onFlowComplete:
 - runFlow:
     file: subflows/calm-closet-profile-enlarged-text.yaml
     env: { SCHEME: 'light' }
+- runFlow:
+    file: subflows/teen-voice-enlarged-text.yaml
+    env: { SCHEME: 'light' }
 - runScript:
     file: subflows/set-system-appearance.js
     env: { APPEARANCE_ROUTE: 'night', APPEARANCE_VALUE: 'yes' }
 - runFlow:
     file: subflows/calm-closet-profile-enlarged-text.yaml
+    env: { SCHEME: 'dark' }
+- runFlow:
+    file: subflows/teen-voice-enlarged-text.yaml
     env: { SCHEME: 'dark' }

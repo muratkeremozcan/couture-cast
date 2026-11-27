@@ -40,8 +40,8 @@ tags:
 # Expo Go exposes the React Native test ID in the native hierarchy, while
 # accessibility activation can fail to dispatch this outer Pressable's onPress.
 - tapOn:
-    text: 'Add Garment'
-    label: 'Tap the visible Add Garment label'
+    text: 'Add a photo'
+    label: 'Tap the visible Add a photo label'
 
 - waitForAnimationToEnd
 
@@ -54,7 +54,7 @@ tags:
       - tapOn:
           point: '50%,27%'
           retryTapIfNoChange: true
-          label: 'Physically tap Add Garment on iOS if accessibility activation was ignored'
+          label: 'Physically tap Add a photo on iOS if accessibility activation was ignored'
 
 - runFlow:
     when:
@@ -65,7 +65,7 @@ tags:
       - tapOn:
           point: '50%,24%'
           retryTapIfNoChange: true
-          label: 'Physically tap Add Garment on Android if accessibility activation was ignored'
+          label: 'Physically tap Add a photo on Android if accessibility activation was ignored'
 
 - extendedWaitUntil:
     visible:

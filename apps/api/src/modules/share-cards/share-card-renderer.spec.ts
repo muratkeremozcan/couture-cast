@@ -1,5 +1,6 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
+// CC-7.17 copy acceptance: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
 import * as files from 'node:fs/promises'
 import { join } from 'node:path'
 import { writeFile } from 'node:fs/promises'
@@ -39,6 +40,28 @@ async function expectPaintedText(
   expect(ink).toBeGreaterThan(50)
 }
 describe('safe card renderer', () => {
+  describe.each(['en-US', 'en-CA'] as const)('CC-7.17 share card in %s', (locale) => {
+    it.each([
+      ['morning', 'Before school'],
+      ['midday', 'Midday'],
+      ['evening', 'Going out'],
+    ] as const)(
+      '[7.17-COPY-002] renders the %s situation as %s',
+      async (scenario, copy) => {
+        const card = await renderer.prepare(
+          { kind: 'outfit', scenario, categories: ['top'] },
+          locale,
+          false
+        )
+        expect(card.accessibilityLabel.split('. ')[1]).toBe(copy)
+        expect(card.accessibilityLabel).not.toMatch(
+          /\b(?:commute|office|meeting)\b|\d\s*%/i
+        )
+        await expectPaintedText(card.bytes, 168, 48)
+      }
+    )
+  })
+
   it('U-OUTFIT U-DETERMINISTIC U-OPTIONS: deterministic RGB card with an independent watermark', async () => {
     const projection = { ...outfit, categories: [...outfit.categories] }
     const on = await renderer.render(projection, 'en-US', true)

@@ -24,6 +24,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native'
 import {
   LOOKS_FILTERS,
@@ -244,6 +245,8 @@ function SegmentControl({
 }) {
   const { t } = useTranslation()
   const { colors, radius, shell, space, type, fontWeight } = useTokens()
+  const { fontScale, width } = useWindowDimensions()
+  const stackSegments = fontScale >= 1.5 && width <= 400
   return (
     <View
       accessibilityRole="tablist"
@@ -251,6 +254,7 @@ function SegmentControl({
       testID="looks-segments"
       style={[
         styles.segments,
+        stackSegments && styles.segmentsStacked,
         { borderRadius: radius.md, borderColor: colors.lineStrong, padding: space[0.5] },
       ]}
     >
@@ -268,6 +272,7 @@ function SegmentControl({
             }}
             style={[
               styles.segment,
+              stackSegments && styles.segmentStacked,
               {
                 minHeight: shell.touchTarget,
                 borderRadius: radius.sm,
@@ -280,6 +285,7 @@ function SegmentControl({
                 color: selected ? colors.onInverse : colors.ink,
                 fontSize: type.sm.fontSize,
                 fontWeight: selected ? fontWeight.semibold : fontWeight.medium,
+                textAlign: 'center',
               }}
             >
               {t(`looks.segments.${id}`)}
@@ -566,7 +572,9 @@ const styles = StyleSheet.create({
   gate: { flex: 1 },
   content: { paddingHorizontal: TAB_BODY_INSET },
   segments: { flexDirection: 'row', borderWidth: 1 },
+  segmentsStacked: { flexDirection: 'column' },
   segment: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  segmentStacked: { flex: 0 },
   chips: { flexDirection: 'row', flexWrap: 'wrap' },
   chip: { alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   outline: { alignItems: 'center', justifyContent: 'center', borderWidth: 1 },

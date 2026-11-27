@@ -22,7 +22,7 @@ const CLIMATE_OPTIONS = [
 ] as const
 const FIRST_POST = 'calm-community-peer-1'
 const SECOND_POST = 'calm-community-peer-2'
-const EXPLAINER = /Climate filters group looks by the week's forecast/
+const EXPLAINER = "We group looks by the week's weather in each person's saved area."
 
 async function assertFitsPhone(control: Locator, width: number) {
   await control.scrollIntoViewIfNeeded()
@@ -165,7 +165,7 @@ test.describe('CC-7.15 Calm Community @local-lane', () => {
     await waitForShellSettled(page, router)
 
     const empty = page.getByTestId('community-feed-empty')
-    await expect(empty).toContainText('No looks in your climate yet')
+    await expect(empty).toContainText('No looks for your weather yet')
     await expect(empty.getByRole('button')).toHaveCount(1)
     await expect(page.getByTestId(/^(spotlight-)?lookbook-card-/)).toHaveCount(0)
     await expect(page.getByTestId('community-spotlight-view-more')).toHaveCount(0)
@@ -258,7 +258,7 @@ test.describe('CC-7.15 Calm Community @local-lane', () => {
       await post.click({ trial: true })
 
       const empty = page.getByTestId('community-feed-empty')
-      await expect(empty).toContainText('Noch keine Looks in deiner Klimazone')
+      await expect(empty).toContainText('Noch keine Outfits für dein Wetter')
       const emptyAction = empty.getByRole('button')
       await expect(emptyAction).toHaveAccessibleName('Alle Klimazonen ansehen')
       await assertFitsPhone(emptyAction, 320)

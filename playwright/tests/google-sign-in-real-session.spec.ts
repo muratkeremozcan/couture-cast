@@ -120,9 +120,7 @@ test(
         hasCodeChallenge: true,
       },
     ])
-    await expect(
-      page.getByRole('heading', { name: 'Finish creating your account' })
-    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Finish setup' })).toBeVisible()
     await expect(page.getByTestId('finish-signup-email')).toHaveText(person.email)
     // Nothing about the callback is left in history once the finish step shows (D5, TEA-12).
     expect(new URL(page.url()).search).toBe('')
@@ -182,9 +180,9 @@ async function createPendingTeen(page: Page, label: string) {
 }
 
 const AWAITING_GUARDIAN =
-  'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.'
+  'Your guardian still needs to approve your account. Send the invite, then sign in after they approve.'
 const CREATED_GUARDIAN_PENDING =
-  'Account created. A guardian needs to approve your account before wardrobe features turn on. Send the invite below, then sign in again once they approve.'
+  'Your account is set up. Your guardian must approve it before you can add photos. Send the invite, then sign in after they approve.'
 
 test(
   'E-TEEN-RESIGN: a teen waiting on a guardian signs in with Google again and gets the guardian invitation',

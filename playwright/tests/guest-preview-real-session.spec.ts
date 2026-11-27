@@ -68,7 +68,7 @@ test.describe('Guest preview and first garment with verified auth', () => {
       await choose(page, 'guest-preview-rain-high')
 
       await page
-        .getByRole('region', { name: 'Add your own garment' })
+        .getByRole('region', { name: 'Add your clothes' })
         .getByRole('link', { name: 'Create account' })
         .click()
       await expect(page).toHaveURL(/\/signup\?from=preview$/)
@@ -135,20 +135,18 @@ test.describe('Guest preview and first garment with verified auth', () => {
       await page.getByTestId('guest-preview-review-continue').click()
       // Entry is consumed when the wardrobe opens the capture dialog.
       await expect(page).toHaveURL(/\/wardrobe$/)
-      const capture = page.getByRole('dialog', { name: 'Garment Capture Flow' })
+      const capture = page.getByRole('dialog', { name: 'Add a piece' })
       await expect(capture.getByRole('button', { name: 'Choose File' })).toBeVisible()
       expect(await cameraRequests(page)).toBe(0)
 
       await capture.getByLabel('Garment image file').setInputFiles(garmentFixture)
       await capture.getByRole('button', { name: 'Use This Image' }).click()
-      await expect(
-        capture.getByRole('heading', { name: 'Garment Upload Complete!' })
-      ).toBeVisible()
+      await expect(capture.getByRole('heading', { name: 'Piece added' })).toBeVisible()
       await capture.getByRole('button', { name: 'Done', exact: true }).click()
 
       const tagging = page.getByRole('dialog', { name: 'Organize Garment Tags' })
       await tagging.getByRole('radio', { name: 'Top', exact: true }).click()
-      await tagging.getByRole('button', { name: 'Confirm & Save Tags' }).click()
+      await tagging.getByRole('button', { name: 'Save tags' }).click()
       await expect(tagging).toBeHidden()
 
       const garments = await prisma.garmentItem.findMany({ where: { user_id: userId } })
@@ -165,7 +163,7 @@ test.describe('Guest preview and first garment with verified auth', () => {
       const card = page.getByTestId(`garment-card-${garments[0]!.id}`)
       await expect(card.getByTestId(`garment-open-${garments[0]!.id}`)).toBeVisible()
       await expect(
-        page.getByRole('link', { name: /back to today.s outfit/i })
+        page.getByRole('link', { name: 'Back to outfit', exact: true })
       ).toBeVisible()
       await page.reload()
       await expect(card.getByTestId(`garment-open-${garments[0]!.id}`)).toBeVisible()
@@ -195,16 +193,18 @@ test.describe('Guest preview and first garment with verified auth', () => {
     await page.goto('/wardrobe/onboarding')
     const step = page.getByTestId('onboarding-step-region')
     const requestCamera = step.getByRole('button', {
-      name: 'Allow camera and photo access',
+      name: 'Allow access',
     })
     await expect(requestCamera).toBeVisible()
     expect(await cameraRequests(page)).toBe(0)
     await requestCamera.click()
-    await expect(step.getByRole('alert')).toContainText('You can still import files')
+    await expect(step.getByRole('alert')).toContainText(
+      'You can pick a file or try the sample closet.'
+    )
     expect(await cameraRequests(page)).toBe(1)
 
-    await step.getByRole('button', { name: 'Add another garment' }).click()
-    const capture = page.getByRole('dialog', { name: 'Garment Capture Flow' })
+    await step.getByRole('button', { name: 'Add a piece' }).click()
+    const capture = page.getByRole('dialog', { name: 'Add a piece' })
     const chooseFile = page.waitForEvent('filechooser')
     await capture.getByRole('button', { name: 'Choose File' }).click()
     await (await chooseFile).setFiles(garmentFixture)

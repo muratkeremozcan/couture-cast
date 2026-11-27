@@ -21,6 +21,9 @@
 //   Large Content Viewer shows it at the user's size.
 // Story CC-7.16 adds two compact layouts for enlarged text: NavRow stacks its label and value,
 // and MemberWardrobeHub uses full-width cards. Both keep React Native's text scale.
+// Story CC-7.17 lets the hourly forecast card grow with system text. Its width is capped
+// to the viewport, and its text retains React Native's sizing.
+// Looks also stacks the Plan segment and sample week labels at compact enlarged text.
 // The owner's live font fix (PR 242) adds one read that rescales no text: React Native 0.81 keeps
 // a paragraph's layout through a live text size change, so `FontScaleText` (src/lib/
 // font-scale-text.tsx) gives every paragraph's outermost Text a maxFontSizeMultiplier that follows
@@ -78,6 +81,7 @@ const ALLOWED = {
     'ComposerFeedback',
   ],
   'components/live-font-mount-marker.tsx': ['LiveFontMountMarker'],
+  'components/hero/hourly-forecast-ribbon.tsx': ['HourlyForecastRibbon'],
   'components/glyph-box.ts': ['glyphScale', 'glyphBoxSide', 'useGlyphBox'],
   'components/tab-bar-label.tsx': [
     'tabBarGrowth',
@@ -91,6 +95,8 @@ const ALLOWED = {
     'TabLabelHeights',
   ],
   'src/components/nav-row.tsx': ['NavRow'],
+  'src/features/looks/looks-screen.tsx': ['SegmentControl'],
+  'src/features/premium/planner-screen.tsx': ['FreePlanPreview'],
   'src/features/wardrobe/wardrobe-hub-screen.tsx': ['MemberWardrobeHub'],
   'src/lib/font-scale-text.tsx': ['remeasureCap', 'createFontScaleText.FontScaleText'],
 }
@@ -139,9 +145,26 @@ function compactLayoutScaleRead(node, source) {
   )
 }
 
+function hourlyCardScaleRead(node, source) {
+  if (readsScaleFrom(node, source, 'useWindowDimensions()')) return true
+  const width = node.parent?.parent?.parent
+  return (
+    width?.getText(source) ===
+      'Math.min(Math.max(104, width - 32), 112 * Math.max(1, fontScale))' &&
+    ts.isVariableDeclaration(width.parent) &&
+    width.parent.name.getText(source) === 'cardWidth' &&
+    width.parent.initializer === width
+  )
+}
+
 /** file -> scope path -> approved forms of each fontScale occurrence in that scope. */
 const FONT_SCALE_FORMS = {
+  'components/hero/hourly-forecast-ribbon.tsx': {
+    HourlyForecastRibbon: hourlyCardScaleRead,
+  },
   'src/components/nav-row.tsx': { NavRow: compactLayoutScaleRead },
+  'src/features/looks/looks-screen.tsx': { SegmentControl: compactLayoutScaleRead },
+  'src/features/premium/planner-screen.tsx': { FreePlanPreview: compactLayoutScaleRead },
   'src/features/wardrobe/wardrobe-hub-screen.tsx': {
     MemberWardrobeHub: compactLayoutScaleRead,
   },
@@ -464,6 +487,21 @@ describe('font-scale reads in app code', () => {
     ].join('\n')
     assert.deepEqual(fontScaleReads({ 'src/components/nav-row.tsx': row }), [
       'src/components/nav-row.tsx:5 return <Text style={{ fontSize: 16 * fontScale }} />',
+    ])
+  })
+
+  test('hourly forecast cards can expand without granting direct text scaling', () => {
+    const file = 'components/hero/hourly-forecast-ribbon.tsx'
+    const ribbon = [
+      "import { Text, useWindowDimensions } from 'react-native'",
+      'export function HourlyForecastRibbon() {',
+      '  const { width, fontScale } = useWindowDimensions()',
+      '  const cardWidth = Math.min(Math.max(104, width - 32), 112 * Math.max(1, fontScale))',
+      '  return <Text style={{ width: cardWidth, fontSize: 12 * fontScale }} />',
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ [file]: ribbon }), [
+      `${file}:5 return <Text style={{ width: cardWidth, fontSize: 12 * fontScale }} />`,
     ])
   })
 

@@ -289,7 +289,7 @@ describe('WardrobeOnboardingScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('alert').textContent).toContain(
-        'You can still import files or use the starter wardrobe.'
+        "We can't open your camera or photos. You can pick a file or try the sample closet."
       )
     })
     await screen.findByTestId('onboarding-capture-step')

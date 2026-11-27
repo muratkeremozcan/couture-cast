@@ -26,7 +26,14 @@
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native'
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+} from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import { getGuestPreviewStrings, sampleLookText, sampleWeek } from '@couture/utils'
@@ -89,6 +96,8 @@ function replaceDay(
 function FreePlanPreview({ signedOut }: { signedOut: boolean }) {
   const { t, i18n } = useTranslation()
   const { colors, radius, shell, space, type, fontWeight } = useTokens()
+  const { fontScale, width } = useWindowDimensions()
+  const stackNames = fontScale >= 1.5 && width <= 400
   const locale = i18n.resolvedLanguage ?? i18n.language
   const strings = getGuestPreviewStrings(locale)
   const weekday = new Intl.DateTimeFormat(locale, { weekday: 'long' })
@@ -134,18 +143,33 @@ function FreePlanPreview({ signedOut }: { signedOut: boolean }) {
             <View
               key={offset}
               testID={`plan-free-day-${offset}`}
-              style={[styles.dayRow, { gap: space[3], borderBottomColor: colors.line }]}
+              style={[
+                styles.dayRow,
+                { gap: space[3], borderBottomColor: colors.line },
+                stackNames && styles.dayRowStacked,
+              ]}
             >
               {garment ? <SampleGarmentArt garment={garment} size={24} /> : null}
-              <Text style={[styles.dayName, { color: colors.ink }]}>
-                {weekday.format(date)}
-              </Text>
-              <Text
-                style={[styles.dayLook, { color: colors.inkMuted }]}
-                numberOfLines={1}
+              <View
+                style={[
+                  styles.dayCopy,
+                  { gap: stackNames ? space[1] : space[3] },
+                  stackNames && styles.dayCopyStacked,
+                ]}
               >
-                {sampleLookText(idea.look, strings).name}
-              </Text>
+                <Text style={[styles.dayName, { color: colors.ink }]}>
+                  {weekday.format(date)}
+                </Text>
+                <Text
+                  style={[
+                    styles.dayLook,
+                    { color: colors.inkMuted },
+                    !stackNames && styles.dayLookInline,
+                  ]}
+                >
+                  {sampleLookText(idea.look, strings).name}
+                </Text>
+              </View>
             </View>
           )
         })}
@@ -621,8 +645,12 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  dayRowStacked: { alignItems: 'flex-start' },
+  dayCopy: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' },
+  dayCopyStacked: { flexDirection: 'column', alignItems: 'stretch' },
   dayName: { fontSize: 14, fontWeight: '600', minWidth: 96 },
-  dayLook: { flex: 1, fontSize: 14 },
+  dayLook: { fontSize: 14 },
+  dayLookInline: { flex: 1, minWidth: 0 },
   card: { gap: 8, padding: 12, borderRadius: 8, borderWidth: 1 },
   dayLabel: { fontSize: 16, fontWeight: '700' },
   starterBadge: { fontSize: 12, fontStyle: 'italic' },

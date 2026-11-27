@@ -31,9 +31,9 @@ const flowDir = path.join(root, GOOGLE_NATIVE_FLOW_DIR)
 const strings = {
   back: 'Back',
   cancelled: 'Google sign-in was cancelled.',
-  underage: 'You must be 13 or older to use CoutureCast.',
+  underage: 'You must be 13 or older',
   awaitingGuardian:
-    'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.',
+    'Your guardian still needs to approve your account. Send the invite, then sign in after they approve.',
   email: 'Email',
   sendCode: 'Send sign-in code',
   codeSent: 'Check your email for the sign-in code.',

@@ -1,0 +1,55 @@
+# Learning path Step 74: Teen voice and copy.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
+# The caller sets German, the 320 dp viewport and 2.0 font scale.
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: 'tab-looks'
+    retryTapIfNoChange: true
+# Looks retains its scroll position between the light and dark passes.
+- scrollUntilVisible:
+    element:
+      id: 'looks-segment-saved'
+    direction: UP
+    visibilityPercentage: 100
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: 'looks-segment-plan'
+    timeout: 15000
+- assertVisible:
+    id: 'looks-segment-saved'
+    above:
+      id: 'looks-segment-ideas'
+- assertVisible:
+    id: 'looks-segment-ideas'
+    above:
+      id: 'looks-segment-plan'
+- tapOn:
+    id: 'looks-segment-plan'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'plan-free-preview'
+    timeout: 15000
+- assertVisible: 'Mit Premium kannst du deine Outfits für die ganze Woche planen.'
+- assertVisible:
+    id: 'plan-upgrade'
+- takeScreenshot:
+    path: maestro/artifacts/teen-voice-accessibility/${SCHEME}-looks-de-large
+- scrollUntilVisible:
+    element:
+      text: 'Winterstrick'
+    direction: DOWN
+    visibilityPercentage: 100
+    timeout: 15000
+- assertVisible: 'Winterstrick'
+- scrollUntilVisible:
+    element:
+      text: 'Wolle in der Stadt'
+    direction: DOWN
+    visibilityPercentage: 100
+    timeout: 15000
+- assertVisible: 'Wolle in der Stadt'
+- takeScreenshot:
+    path: maestro/artifacts/teen-voice-accessibility/${SCHEME}-sample-week-de-large

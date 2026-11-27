@@ -41,6 +41,16 @@ export function formatSampleTemperature(
     : `${Math.round(celsius)}°C`
 }
 
+export function getWeatherChance(percent: number): 'none' | 'possible' | 'likely' {
+  const rounded = Math.round(percent)
+  if (!Number.isFinite(rounded) || rounded <= 0) return 'none'
+  return rounded < 50 ? 'possible' : 'likely'
+}
+
+export function formatRainChance(percent: number, strings: GuestPreviewStrings): string {
+  return strings.values.rainChance[getWeatherChance(percent)]
+}
+
 const slug = (id: string) => id.slice('sample:x:'.length)
 
 export function sampleGarmentText(
@@ -99,6 +109,8 @@ export function formatSampleExplanation(
     feelsLike: temperature(p.feelsLike),
     adjustedFeelsLike: temperature(p.adjustedFeelsLike),
     threshold: temperature(p.threshold),
+    rainPercent:
+      typeof p.rainPercent === 'number' ? formatRainChance(p.rainPercent, strings) : '',
     range: pick(values.range, p.range),
     runsColdWarm: pick(values.range, p.runsColdWarm),
     category: pick(values.category, p.category),

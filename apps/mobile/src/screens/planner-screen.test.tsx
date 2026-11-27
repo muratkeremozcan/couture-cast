@@ -133,7 +133,7 @@ async function expectFreePlanPreview() {
   const preview = await screen.findByTestId('plan-free-preview')
   expect(preview).toHaveTextContent(i18n.t('looks.freePlan.line'))
   expect(i18n.t('looks.freePlan.line')).toBe(
-    'Premium plans your whole week around your forecast.'
+    'With Premium, you can plan what to wear all week.'
   )
   const upgrades = screen.getAllByTestId('plan-upgrade')
   expect(upgrades).toHaveLength(1)

@@ -123,12 +123,12 @@ describe('finish step outcomes', () => {
     await submit('2016-05-17')
     await waitFor(() =>
       expect(screen.getByTestId('finish-signup-outcome').textContent).toBe(
-        'You must be 13 or older to use CoutureCast.'
+        'You must be 13 or older'
       )
     )
     await new Promise((resolve) => setTimeout(resolve, 200))
     expect(screen.getByTestId('finish-signup-outcome').textContent).toBe(
-      'You must be 13 or older to use CoutureCast.'
+      'You must be 13 or older'
     )
     expect(flow.read).toHaveBeenCalledTimes(1)
     // The refusal is no longer the finish step: the header drops its title.
@@ -150,7 +150,7 @@ describe('finish step outcomes', () => {
     await new Promise((resolve) => setTimeout(resolve, 200))
     expect(screen.queryByTestId('finish-signup-birthdate')).toBeNull()
     expect(screen.getByTestId('finish-signup-outcome').textContent).toMatch(
-      /guardian needs to approve/
+      /guardian must approve/
     )
     expect(flow.read).toHaveBeenCalledTimes(1)
     // The account exists: the header names the guardian wait instead of finishing it.
@@ -204,7 +204,7 @@ describe('finish step form', () => {
       </AccessibilityAnnouncerProvider>
     )
     await screen.findByTestId('finish-signup-birthdate')
-    expect(headerTitle()).toBe('Finish creating your account')
+    expect(headerTitle()).toBe('Finish setup')
   })
 
   // TEA sign-off: replaces the 13 to 15 guardian hint, which policy off removed, with the one
@@ -315,7 +315,7 @@ describe('a returning teen waiting on a guardian', () => {
     )
     await waitFor(() =>
       expect(screen.getByTestId('finish-signup-outcome').textContent).toBe(
-        'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.'
+        'Your guardian still needs to approve your account. Send the invite, then sign in after they approve.'
       )
     )
     expect(flow.awaiting).toHaveBeenCalledWith('signed-google')

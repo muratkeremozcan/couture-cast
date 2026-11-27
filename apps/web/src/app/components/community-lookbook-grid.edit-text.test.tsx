@@ -36,7 +36,7 @@ vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
 setupCommunityGridClock()
 
 const EDIT_PATH = `${POST_PATH}/text`
-const EDIT = 'Edit title and description'
+const EDIT = 'Edit text'
 const SAVE = 'Save changes'
 const original = 'Autumn layers'
 const description = 'A wool coat for the commute.'

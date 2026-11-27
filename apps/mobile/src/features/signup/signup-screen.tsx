@@ -9,11 +9,10 @@ import {
   guardianInvitationInputSchema,
 } from '@couture/api-client/contracts/http'
 import {
-  AGE_GATE_MESSAGES,
   evaluateBirthdateInput,
+  getBirthdateNotice,
   getFederatedSignInStrings,
   getGuestPreviewStrings,
-  INVALID_BIRTHDATE_MESSAGE,
 } from '@couture/utils'
 import { Text, View, createSchemeStyles } from '@/components/themed'
 import { inviteGuardianFromMobile } from '@/src/lib/guardian'
@@ -66,7 +65,7 @@ export function SignupScreen({
   const [isInviting, setIsInviting] = useState(false)
 
   const birthdateEvaluation = evaluateBirthdateInput(birthdate)
-  const inlineMessage = birthdateEvaluation.message
+  const inlineMessage = getBirthdateNotice(birthdateEvaluation, strings)
 
   useEffect(() => {
     if (errorMessage) {
@@ -84,14 +83,14 @@ export function SignupScreen({
     setInviteLink(null)
 
     if (birthdateEvaluation.kind !== 'valid') {
-      setErrorMessage(INVALID_BIRTHDATE_MESSAGE)
+      setErrorMessage(strings.invalidBirthdate)
       return
     }
 
     const { gate } = birthdateEvaluation
 
     if (!gate.allowed) {
-      setErrorMessage(AGE_GATE_MESSAGES.underage)
+      setErrorMessage(strings.underage)
       // Story 6.16 D2: an age refusal outranks the preview's self-reported gate.
       if (fromPreview) mobileGuestPreviewStore().clear()
       return

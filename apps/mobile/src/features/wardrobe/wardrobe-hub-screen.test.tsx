@@ -323,8 +323,10 @@ function fixtureWardrobePhoto(color: string) {
 }
 
 async function expectDetailPhoto(url: string) {
-  const photo = await screen.findByTestId('garment-detail-photo')
-  await waitFor(() => expect(photo.querySelector('img')).toHaveAttribute('src', url))
+  await waitFor(() => {
+    const photo = screen.getByTestId('garment-detail-photo')
+    expect(photo.querySelector('img')).toHaveAttribute('src', url)
+  })
 }
 
 function deferred() {
@@ -596,7 +598,7 @@ describe('WardrobeHubScreen', () => {
     act(() => notifyWardrobeChanged())
     await waitFor(() => expect(garmentReads).toBe(1))
 
-    expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
+    expect(screen.queryByLabelText('Loading your closet')).toBeNull()
     await waitFor(() =>
       expect(screen.getByText(i18n.t('wardrobe.empty_title'))).toBeVisible()
     )
@@ -678,7 +680,7 @@ describe('WardrobeHubScreen', () => {
     // position), no placeholder, no first-read spinner.
     expect(screen.getByTestId('screen-gate-body-closet')).toBe(body)
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
-    expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
+    expect(screen.queryByLabelText('Loading your closet')).toBeNull()
     expect(emptyTitle).toBeVisible()
     expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
     act(() => releaseReads())
@@ -1138,11 +1140,13 @@ describe('WardrobeHubScreen', () => {
       ...ready,
       imageAccess: { ...ready.imageAccess!, url: 'data:image/png;base64,AA==' },
     }
+    const detailReload = { ...ready, imageAccess: fixtureWardrobePhoto('#335522') }
     const renewal = { ...ready, imageAccess: fixtureWardrobePhoto('#563312') }
     let garment: typeof ready = unsigned
     const verification = deferred()
     const unsignedRetry = deferred()
     const renewalReply = deferred()
+    const requestedUnsigned = vi.fn<(result: typeof ready) => void>()
     const requestedRenewal = vi.fn<(result: typeof ready) => void>()
     let heldRead: ReturnType<typeof deferred> | undefined
     server.use(
@@ -1150,6 +1154,12 @@ describe('WardrobeHubScreen', () => {
         const current = garment
         const pending = heldRead
         heldRead = undefined
+        if (pending === verification) {
+          // The broken image also renders in the detail behind the dialog. Its automatic
+          // reload must finish before the test reserves a response for the panel's Retry.
+          garment = detailReload
+        }
+        if (pending === unsignedRetry) requestedUnsigned(current)
         if (pending === renewalReply) requestedRenewal(current)
         await pending?.promise
         return HttpResponse.json({ data: [current] })
@@ -1186,16 +1196,19 @@ describe('WardrobeHubScreen', () => {
 
       expect(await within(panel).findByTestId('style-piece-unavailable')).toBeVisible()
       await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(83))
-      const retry = within(panel).getByTestId('style-piece-refresh')
+      await expectDetailPhoto(detailReload.imageAccess.url)
       const retryControl = page
         .getByTestId('style-piece-panel')
         .getByTestId('style-piece-refresh')
       garment = unsigned
       heldRead = unsignedRetry
       await retryControl.click()
-      await waitFor(() => expect(retry).toBeDisabled())
+      await waitFor(() =>
+        expect(requestedUnsigned).toHaveBeenCalledExactlyOnceWith(unsigned)
+      )
+      await expect.element(retryControl).toBeDisabled()
       unsignedRetry.resolve()
-      await waitFor(() => expect(retry).toBeEnabled())
+      await expect.element(retryControl).toBeEnabled()
       expect(within(panel).queryByTestId('style-piece-save')).toBeNull()
 
       garment = renewal
@@ -1505,7 +1518,7 @@ describe('WardrobeHubScreen', () => {
 
     try {
       renderScreen()
-      await screen.findByText('No garments added yet')
+      await screen.findByText('No pieces yet')
       await captureOneGarment()
       await browserUser.click(screen.getByTestId('garment-capture-done'))
 
@@ -1626,7 +1639,7 @@ describe('WardrobeHubScreen', () => {
 
     expect(await screen.findByTestId('wardrobe-list-retry')).toBeEnabled()
     expect(screen.queryByText(i18n.t('wardrobe.empty_title'))).toBeNull()
-    expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
+    expect(screen.queryByLabelText('Loading your closet')).toBeNull()
     expect(screen.queryByTestId('wardrobe-sign-in')).toBeNull()
   })
 
@@ -1806,7 +1819,7 @@ describe('WardrobeHubScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('wardrobe-error-banner')).toHaveTextContent(
-        'Smart tagging is taking longer than expected.'
+        'Tags are taking a while. You can still see your piece.'
       )
     })
     await browserUser.click(screen.getByTestId('garment-capture-done'))

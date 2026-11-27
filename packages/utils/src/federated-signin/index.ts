@@ -2,6 +2,7 @@
 export { SUPPORTED_SIGNIN_LOCALES, type SupportedSigninLocale } from './locales'
 export {
   FEDERATED_SIGNIN_STRINGS,
+  getBirthdateNotice,
   getFederatedSignInStrings,
   resolveFederatedSignInLocale,
   type FederatedSignInStrings,

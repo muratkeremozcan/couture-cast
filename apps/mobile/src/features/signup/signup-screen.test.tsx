@@ -79,9 +79,7 @@ describe('SignupScreen', () => {
       'Account created. Sign in with your email to continue.'
     )
     // TEA sign-off N-3: the next step is a button to sign-in, and Create account is gone.
-    expect(screen.getByTestId('signup-sign-in-to-continue').textContent).toBe(
-      'Sign in to continue'
-    )
+    expect(screen.getByTestId('signup-sign-in-to-continue').textContent).toBe('Sign in')
     expect(screen.queryByRole('button', { name: 'Create account' })).toBeNull()
   })
 
@@ -114,7 +112,7 @@ describe('SignupScreen', () => {
     await i18n.changeLanguage('fr-FR')
     try {
       render(<SignupScreen submitSignup={vi.fn()} />)
-      expect(screen.getByText('Inscription conforme à la COPPA')).toBeTruthy()
+      expect(screen.getByText('Vérification de l’âge')).toBeTruthy()
       expect(screen.getByLabelText('Adresse e-mail')).toBeTruthy()
       expect(screen.getByLabelText('Date de naissance')).toBeTruthy()
       expect(screen.getByRole('button', { name: 'Créer le compte' })).toBeTruthy()
@@ -150,14 +148,14 @@ describe('SignupScreen', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
 
-    expect(screen.queryByText('Guardian invitation')).toBeNull()
+    expect(screen.queryByText('Invite a guardian')).toBeNull()
 
     await waitFor(() => {
       expect(submitSignup).toHaveBeenCalledWith({
         email: 'teen@example.com',
         birthdate: '2011-04-15',
       })
-      expect(screen.getByText('Guardian invitation')).toBeTruthy()
+      expect(screen.getByText('Invite a guardian')).toBeTruthy()
     })
 
     fireEvent.change(screen.getByLabelText('Guardian email'), {
