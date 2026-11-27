@@ -15,6 +15,7 @@ import {
   SAMPLE_CATALOG,
   sampleGarmentText,
   sampleSwapCandidates,
+  sampleOutfitSwapOptions,
   selectSampleOutfit,
   toggleSampleVote,
   toSampleSelectionInput,
@@ -206,7 +207,7 @@ export function GuestPreviewScreen() {
     if (next === 'wardrobe') guestPreviewAnalytics.interacted('wardrobe_opened')
   }
   const applySwap = (category: SampleGarmentCategory, garmentId: string) => {
-    if (!lookId) return
+    if (!lookId || result.garments.some((garment) => garment.id === garmentId)) return
     update((current) => ({
       ...current,
       swaps: {
@@ -441,14 +442,7 @@ export function GuestPreviewScreen() {
       />
       <PreviewSwapSheet
         category={swapCategory}
-        candidates={
-          swapCategory ? sampleSwapCandidates(SAMPLE_CATALOG, swapCategory, input) : []
-        }
-        currentId={
-          swapCategory
-            ? result.garments.find((garment) => garment.category === swapCategory)?.id
-            : undefined
-        }
+        {...sampleOutfitSwapOptions(result, swapCategory)}
         strings={strings}
         palette={palette}
         onChoose={(garmentId) => {

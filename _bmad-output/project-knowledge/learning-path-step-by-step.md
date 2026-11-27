@@ -22415,3 +22415,31 @@ weekends and going out.
   [Android large text](../../maestro/subflows/teen-voice-enlarged-text.yaml).
 - [Step 70](#step-70-calm-today-with-one-primary-job) covers the first view of Today.
   [Step 73](#step-73-calm-closet-and-profile) covers the compact member layout.
+
+## Step 75: Find mini skirts, tights and socks
+
+Use the sample closet on Today to find pieces by type. Follow one choice through the outfit
+preview and back from an account save.
+
+### Sequence to follow
+
+1. On Today, open Edit sample. Set Sample weather to Cool or Mild, then open Browse sample closet
+   with All examples selected.
+2. Use the Skirts, Tights and Socks filters to find each piece. Open its preview and use it in a
+   look. If the current look lacks the right slot, the picker opens a look that fits the choice.
+3. Open a swap sheet from the outfit. Check the current marker and the types in the list.
+   Pick the current piece again to close the sheet. Open it again and pick a different piece.
+4. Save the look, then reopen it in Looks > Saved. Check that the pieces match the edited preview.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-18-find-mini-skirts-tights-socks.md) and
+  [acceptance plan](../test-artifacts/test-design-7-18-find-mini-skirts-tights-socks.md).
+- [Web picker journey](../../playwright/tests/sample-picker.spec.ts) and
+  [native member editor tests](../../apps/mobile/src/features/preview/member-sample-outfit.test.tsx).
+- [Web swap sheet tests](../../apps/web/src/app/components/guest-preview/guest-preview-swap-dialog.test.tsx),
+  [native picture tests](../../apps/mobile/components/home/today-outfit-picture.test.tsx),
+  [native swap sheet tests](../../apps/mobile/src/features/preview/preview-swap-sheet.test.tsx),
+  [member selection tests](../../packages/utils/src/sample-wardrobe/member-outfit.spec.ts), and
+  [shared grouping tests](../../packages/utils/src/sample-wardrobe/display.spec.ts).
+- [Step 71](#step-71-todays-outfit-as-a-picture) covers the picture and its swap controls.

@@ -16,6 +16,7 @@ import {
   sampleGarmentText,
   sampleLookText,
   sampleSwapCandidates,
+  sampleOutfitSwapOptions,
   selectSampleOutfit,
   toggleSampleVote,
   toSampleSelectionInput,
@@ -156,8 +157,6 @@ export function GuestPreview() {
 
   const input = toSampleSelectionInput(state)
   const lookId = result.look?.id
-  const currentInSlot = (category: SampleGarmentCategory) =>
-    result.garments.find((garment) => garment.category === category)?.id
   const usableIds = new Set(
     result.garments.flatMap((garment) =>
       sampleSwapCandidates(SAMPLE_CATALOG, garment.category, input)
@@ -167,7 +166,7 @@ export function GuestPreview() {
   )
 
   const applySwap = (category: SampleGarmentCategory, garmentId: string) => {
-    if (!lookId) return
+    if (!lookId || result.garments.some((garment) => garment.id === garmentId)) return
     update((current) => ({
       ...current,
       swaps: {
@@ -365,10 +364,7 @@ export function GuestPreview() {
       )}
       <GuestPreviewSwapDialog
         category={swapCategory}
-        candidates={
-          swapCategory ? sampleSwapCandidates(SAMPLE_CATALOG, swapCategory, input) : []
-        }
-        currentId={swapCategory ? currentInSlot(swapCategory) : undefined}
+        {...sampleOutfitSwapOptions(result, swapCategory)}
         strings={strings}
         invokerRef={swapInvoker}
         onChoose={(garmentId) => {

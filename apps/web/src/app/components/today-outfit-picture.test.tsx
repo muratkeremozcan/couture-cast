@@ -1,7 +1,14 @@
 // Learning path Step 71: Today's outfit as a picture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
-import { getGuestPreviewStrings, type TodaySlot } from '@couture/utils'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+// Learning path Step 75: Find mini skirts, tights and socks.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-75-find-mini-skirts-tights-and-socks
+import {
+  getGuestPreviewStrings,
+  SAMPLE_CATALOG,
+  todayCatalogSlot,
+  type TodaySlot,
+} from '@couture/utils'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 import { TodayOutfitPicture } from './today-outfit-picture'
@@ -94,4 +101,53 @@ it('shows an expired slot as catalog art and closes Swap without a change', asyn
   await user.click(screen.getByTestId('today-outfit-swap-option-0'))
   expect(choose).not.toHaveBeenCalled()
   expect(slot).toHaveFocus()
+})
+
+it('[7.18-SWAP-002] expands the sample picture sheet and focuses the first revealed choice', async () => {
+  const current = SAMPLE_CATALOG.garments.find(
+    ({ id }) => id === 'sample:g:opaque-tights'
+  )!
+  const socks = SAMPLE_CATALOG.garments.find(({ id }) => id === 'sample:g:ribbed-socks')!
+  const scarf = SAMPLE_CATALOG.garments.find(({ id }) => id === 'sample:g:wool-scarf')!
+  const candidates = [
+    scarf,
+    ...Array.from({ length: 11 }, (_, index) => ({
+      ...socks,
+      id: `sample:g:socks-fixture-${index + 1}`,
+    })),
+  ]
+  const user = userEvent.setup()
+  const choose = vi.fn()
+  render(
+    <TodayOutfitPicture
+      slots={[todayCatalogSlot(current)]}
+      strings={strings}
+      getSampleOptions={() => ({ current, candidates, range: 'mild' })}
+      onChoose={choose}
+    />
+  )
+  const opener = screen.getByTestId('today-outfit-slot-0')
+  await user.click(opener)
+  const sheet = within(screen.getByRole('dialog'))
+  expect(sheet.getAllByRole('radio')).toHaveLength(12)
+  expect(sheet.getByRole('radio', { checked: true })).toHaveFocus()
+  expect(sheet.queryByRole('group', { name: 'Scarves' })).toBeNull()
+
+  await user.click(sheet.getByRole('button', { name: 'Show more' }))
+  expect(sheet.getAllByRole('radio')).toHaveLength(13)
+  const revealed = within(sheet.getByRole('group', { name: 'Also works' })).getByRole(
+    'radio',
+    { name: 'Wool scarf' }
+  )
+  await waitFor(() => expect(revealed).toHaveFocus())
+  await user.keyboard('{Enter}')
+  expect(choose).toHaveBeenCalledExactlyOnceWith(0, todayCatalogSlot(scarf))
+  expect(opener).toHaveFocus()
+
+  await user.click(opener)
+  const reopened = within(screen.getByRole('dialog'))
+  expect(reopened.getAllByRole('radio')).toHaveLength(12)
+  await user.keyboard(' ')
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(choose).toHaveBeenCalledTimes(1)
 })

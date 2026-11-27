@@ -5,6 +5,7 @@ import {
   AccessibilityInfo,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -23,12 +24,15 @@ import {
   SAMPLE_ART_VIEWBOX,
   SAMPLE_CATALOG,
   SAMPLE_COLLECTION_FILTERS,
-  SAMPLE_GARMENT_CATEGORIES,
+  SAMPLE_SWAP_INITIAL_LIMIT,
   SAMPLE_WEATHER,
   SAMPLE_WEATHER_KEYS,
   sampleFeedbackProgress,
   sampleGarmentText,
   sampleLookText,
+  sampleSwapDisplay,
+  sampleWardrobeCategories,
+  sampleWardrobeItems,
   type GuestPreviewState,
   type GuestPreviewStrings,
   type SampleCollectionFilter,
@@ -36,7 +40,9 @@ import {
   type SampleGarment,
   type SampleGarmentCategory,
   type SampleOutfitResult,
+  type SampleSwapOptions,
   type SampleVote,
+  type SampleWardrobeFilter,
   type GuestSampleWeatherKey,
 } from '@couture/utils'
 import {
@@ -681,8 +687,6 @@ export function PreviewFeedback({
   )
 }
 
-type CategoryFilter = SampleGarmentCategory | 'all'
-
 export function PreviewWardrobe({
   strings,
   palette,
@@ -693,27 +697,25 @@ export function PreviewWardrobe({
   onInspect,
   onUse,
   onBackToOutfit,
+  backButtonRef,
 }: {
   strings: GuestPreviewStrings
   palette: PreviewPalette
   collection: SampleCollectionFilter
-  usableIds: ReadonlySet<string>
+  usableIds: Pick<ReadonlySet<string>, 'has'>
   onCollection: (collection: SampleCollectionFilter) => void
-  onCategory: () => void
-  onInspect: () => void
+  onCategory?: () => void
+  onInspect?: () => void
   onUse: (garment: SampleGarment) => void
   onBackToOutfit: () => void
+  backButtonRef?: Ref<ComponentRef<typeof Pressable>>
 }) {
-  const [category, setCategory] = useState<CategoryFilter>('all')
+  const [category, setCategory] = useState<SampleWardrobeFilter>('all')
   const [open, setOpen] = useState<SampleGarment | null>(null)
   // Story CC-7.11 D13: the garment that opened the detail takes focus back when it closes.
   const detailOpener = useRef<unknown>(null)
   const { values } = strings
-  const items = SAMPLE_CATALOG.garments.filter(
-    (garment) =>
-      (category === 'all' || garment.category === category) &&
-      (collection === 'all' || garment.collections.includes(collection))
-  )
+  const items = sampleWardrobeItems(category, collection)
   const openText = open ? sampleGarmentText(open, strings) : null
   return (
     <View testID="guest-preview-wardrobe" style={styles.section}>
@@ -721,6 +723,7 @@ export function PreviewWardrobe({
         {strings.wardrobe.heading}
       </Text>
       <PreviewButton
+        buttonRef={backButtonRef}
         label={strings.wardrobe.backToOutfit}
         onPress={onBackToOutfit}
         testID="guest-preview-back-to-outfit"
@@ -730,16 +733,10 @@ export function PreviewWardrobe({
         legend={strings.wardrobe.category}
         testID="guest-preview-category"
         value={category}
-        options={[
-          { value: 'all' as const, label: strings.wardrobe.allCategories },
-          ...SAMPLE_GARMENT_CATEGORIES.map((key) => ({
-            value: key,
-            label: values.categoryTitle[key],
-          })),
-        ]}
+        options={sampleWardrobeCategories(strings)}
         onChange={(next) => {
           setCategory(next)
-          onCategory()
+          onCategory?.()
         }}
         palette={palette}
       />
@@ -775,7 +772,7 @@ export function PreviewWardrobe({
               onPress={(event) => {
                 detailOpener.current = event.currentTarget
                 setOpen(garment)
-                onInspect()
+                onInspect?.()
               }}
               style={[
                 styles.garment,
@@ -836,9 +833,7 @@ export function PreviewWardrobe({
             />
             {usableIds.has(open.id) ? (
               <PreviewButton
-                label={formatPreviewString(strings.outfit.swap, {
-                  category: values.category[open.category],
-                })}
+                label={strings.wardrobe.useItem}
                 onPress={() => {
                   onUse(open)
                   setOpen(null)
@@ -942,65 +937,173 @@ export function PreviewSheet({
 export function PreviewSwapSheet({
   category,
   candidates,
-  currentId,
+  current,
+  range,
   strings,
   palette,
   onChoose,
   onClose,
 }: {
   category: SampleGarmentCategory | null
-  candidates: readonly SampleGarment[]
-  currentId: string | undefined
   strings: GuestPreviewStrings
   palette: PreviewPalette
   onChoose: (garmentId: string) => void
   onClose: () => void
-}) {
+} & SampleSwapOptions) {
   const label = category ? strings.values.category[category] : ''
-  const alternatives = candidates.filter((garment) => garment.id !== currentId)
+  const title = formatPreviewString(strings.outfit.swapTitle, { category: label })
   return (
     <PreviewSheet
       visible={category !== null}
-      title={formatPreviewString(strings.outfit.swapTitle, { category: label })}
+      title={title}
       strings={strings}
       palette={palette}
       onClose={onClose}
       testID="guest-preview-swap-sheet"
     >
-      {alternatives.length === 0 ? (
-        <Text testID="guest-preview-no-suitable" style={{ color: palette.ink }}>
-          {strings.outfit.noSuitableAlternative}
-        </Text>
-      ) : (
-        <View accessibilityRole="radiogroup" accessibilityLabel={label}>
-          {candidates.map((garment) => {
-            const text = sampleGarmentText(garment, strings)
-            const checked = garment.id === currentId
-            return (
-              <Pressable
-                key={garment.id}
-                testID={`guest-preview-swap-option-${garment.id.slice('sample:g:'.length)}`}
-                accessibilityRole="radio"
-                aria-checked={checked}
-                accessibilityLabel={
-                  checked ? `${text.name} (${strings.outfit.current})` : text.name
-                }
-                onPress={() => onChoose(garment.id)}
-                style={[
-                  styles.option,
-                  { borderColor: checked ? palette.ink : palette.line },
-                ]}
-              >
-                <SampleGarmentArt garment={garment} size={40} />
-                <Text style={[styles.optionText, { color: palette.ink }]}>
-                  {checked ? `${text.name} (${strings.outfit.current})` : text.name}
-                </Text>
-              </Pressable>
-            )
-          })}
-        </View>
+      {category !== null && (
+        <ScrollView style={styles.swapScroll}>
+          <PreviewSampleSwapRows
+            options={{ current, candidates, range }}
+            label={title}
+            strings={strings}
+            palette={palette}
+            showMoreTestId="guest-preview-swap-show-more"
+            noAlternativeTestId="guest-preview-no-suitable"
+            renderOption={(garment, _, checked, ref) => {
+              const text = sampleGarmentText(garment, strings)
+              return (
+                <Pressable
+                  key={garment.id}
+                  ref={ref}
+                  testID={`guest-preview-swap-option-${garment.id.slice('sample:g:'.length)}`}
+                  accessibilityRole="radio"
+                  aria-checked={checked}
+                  accessibilityState={{ checked }}
+                  accessibilityLabel={
+                    checked ? `${text.name} (${strings.outfit.current})` : text.name
+                  }
+                  onPress={() => onChoose(garment.id)}
+                  style={[
+                    styles.option,
+                    { borderColor: checked ? palette.ink : palette.line },
+                  ]}
+                >
+                  <SampleGarmentArt garment={garment} size={40} />
+                  <Text style={[styles.optionText, { color: palette.ink }]}>
+                    {checked ? `${text.name} (${strings.outfit.current})` : text.name}
+                  </Text>
+                </Pressable>
+              )
+            }}
+          />
+        </ScrollView>
       )}
     </PreviewSheet>
+  )
+}
+
+type SwapButton = ComponentRef<typeof Pressable>
+
+export function focusPreviewButton(button: SwapButton | null) {
+  if (Platform.OS === 'web') button?.focus()
+  else {
+    const node = safeFindNodeHandle(button)
+    if (node != null) AccessibilityInfo.setAccessibilityFocus(node)
+  }
+}
+
+export function PreviewSampleSwapRows({
+  options,
+  label,
+  strings,
+  palette,
+  showMoreTestId,
+  noAlternativeTestId,
+  renderOption,
+}: {
+  options: SampleSwapOptions
+  label: string
+  strings: GuestPreviewStrings
+  palette: PreviewPalette
+  showMoreTestId: string
+  noAlternativeTestId?: string
+  renderOption: (
+    garment: SampleGarment,
+    index: number,
+    current: boolean,
+    ref?: Ref<SwapButton>
+  ) => React.ReactNode
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const firstRevealed = useRef<SwapButton>(null)
+  const { current, tiers, hasAlternatives, hasMore } = sampleSwapDisplay(
+    options.current,
+    options.candidates,
+    options.range,
+    expanded
+  )
+  const showTierHeadings = tiers.length > 1
+  return (
+    <>
+      <View accessibilityRole="radiogroup" accessibilityLabel={label}>
+        {current && renderOption(current, 0, true)}
+        {tiers.map(({ fit, groups }) => {
+          const tierLabel = strings.outfit.weatherFit[fit]
+          return (
+            <View
+              key={fit}
+              role={showTierHeadings ? 'group' : undefined}
+              aria-label={showTierHeadings ? tierLabel : undefined}
+            >
+              {showTierHeadings && (
+                <Text aria-hidden style={[styles.swapTierTitle, { color: palette.ink }]}>
+                  {tierLabel}
+                </Text>
+              )}
+              {groups.map(({ type, garments, firstIndex }) => {
+                const heading = strings.values.garmentType[type]
+                return (
+                  <View key={type} role="group" aria-label={heading}>
+                    <Text
+                      accessibilityRole="header"
+                      style={[styles.swapGroupTitle, { color: palette.inkMuted }]}
+                    >
+                      {heading}
+                    </Text>
+                    {garments.map((garment, offset) => {
+                      const index = firstIndex + offset
+                      return renderOption(
+                        garment,
+                        index,
+                        false,
+                        index === SAMPLE_SWAP_INITIAL_LIMIT ? firstRevealed : undefined
+                      )
+                    })}
+                  </View>
+                )
+              })}
+            </View>
+          )
+        })}
+      </View>
+      {!hasAlternatives && (
+        <Text testID={noAlternativeTestId} style={{ color: palette.inkMuted }}>
+          {strings.outfit.noSuitableAlternative}
+        </Text>
+      )}
+      {hasMore && (
+        <PreviewButton
+          label={strings.outfit.showMore}
+          palette={palette}
+          testID={showMoreTestId}
+          onPress={() => {
+            setExpanded(true)
+            requestAnimationFrame(() => focusPreviewButton(firstRevealed.current))
+          }}
+        />
+      )}
+    </>
   )
 }
 
@@ -1165,4 +1268,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   optionText: { flex: 1, fontSize: 16 },
+  swapScroll: { flexGrow: 0, flexShrink: 1 },
+  swapTierTitle: { fontWeight: '700', marginTop: 8 },
+  swapGroupTitle: { fontWeight: '600', marginTop: 8, marginBottom: 4 },
 })

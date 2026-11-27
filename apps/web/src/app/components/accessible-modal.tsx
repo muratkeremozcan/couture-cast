@@ -288,6 +288,7 @@ export function AccessibleModal({
       ) ?? []
     ).filter(
       (element) =>
+        element.tabIndex >= 0 &&
         element.getAttribute('aria-hidden') !== 'true' &&
         !element.classList.contains('hidden')
     )

@@ -2,13 +2,19 @@ import { SAMPLE_CATALOG } from './catalog'
 import {
   DEFAULT_SAMPLE_COMFORT,
   nextSampleLook,
+  sampleSwapCandidates,
   selectSampleOutfit,
+  type SampleOutfitResult,
   type SampleSelectionInput,
   type SampleWeatherKey,
 } from './selector'
 import type { ClimateBand } from '../climate-band'
 import { openSampleBookmark, type SampleBookmark } from './bookmarks'
-import type { SampleGarmentCategory } from './types'
+import {
+  SAMPLE_GARMENT_CATEGORIES,
+  type SampleGarment,
+  type SampleGarmentCategory,
+} from './types'
 
 export function createMemberSampleOutfit(weather: SampleWeatherKey = 'mild-dry') {
   const input: SampleSelectionInput = {
@@ -46,6 +52,7 @@ export function updateMemberSampleOutfit(
   change:
     | Pick<SampleSelectionInput, 'preferences'>
     | Pick<SampleSelectionInput, 'weather'>
+    | Pick<SampleSelectionInput, 'collection'>
 ) {
   return selectSampleOutfit(
     { ...result.input, ...change, selectedLookId: undefined },
@@ -77,11 +84,29 @@ export function swapMemberSampleGarment(
   category: SampleGarmentCategory,
   garmentId: string
 ) {
+  return resolveMemberSampleSwap(result, category, garmentId) ?? result
+}
+
+function resolveMemberSampleSwap(
+  result: SampleOutfitResult,
+  category: SampleGarmentCategory,
+  garmentId: string
+) {
   const lookId = result.look?.id
-  if (!lookId) return result
+  const current = result.garments.find((garment) => garment.category === category)
+  if (!lookId || !current) return null
+  const eligible = sampleSwapCandidates(
+    SAMPLE_CATALOG,
+    category,
+    result.input,
+    result.context
+  )
+  if (!eligible.some((garment) => garment.id === garmentId)) return null
+  if (current.id === garmentId) return result
   return selectSampleOutfit(
     {
       ...result.input,
+      selectedLookId: lookId,
       swaps: {
         ...result.input.swaps,
         [lookId]: { ...result.input.swaps[lookId], [category]: garmentId },
@@ -89,6 +114,62 @@ export function swapMemberSampleGarment(
     },
     SAMPLE_CATALOG
   )
+}
+
+export function memberSampleWardrobeChoices(result: SampleOutfitResult) {
+  const garments = new Map(SAMPLE_CATALOG.garments.map((piece) => [piece.id, piece]))
+  const looks = new Map(SAMPLE_CATALOG.looks.map((look) => [look.id, look]))
+  const currentIds = new Set(result.garments.map((piece) => piece.id))
+  const activeSwaps = result.look ? result.input.swaps[result.look.id] : undefined
+  const swappedIds = new Set(
+    result.garments.flatMap((piece) =>
+      activeSwaps?.[piece.category] === piece.id ? [piece.id] : []
+    )
+  )
+  const eligibleLooks = result.eligibleLookIds.flatMap((id) => looks.get(id) ?? [])
+  const sharedPieces = (core: readonly string[], ids: ReadonlySet<string>) =>
+    core.filter((id) => ids.has(id)).length
+  eligibleLooks.sort(
+    (first, second) =>
+      sharedPieces(second.core, currentIds) - sharedPieces(first.core, currentIds) ||
+      sharedPieces(second.core, swappedIds) - sharedPieces(first.core, swappedIds)
+  )
+  const choices = new Map<string, string>()
+
+  for (const category of SAMPLE_GARMENT_CATEGORIES) {
+    const current = result.garments.find((piece) => piece.category === category)
+    if (current && result.look) choices.set(current.id, result.look.id)
+
+    const canUseSlot = eligibleLooks.filter((look) =>
+      look.core.some((id) => garments.get(id)?.category === category)
+    )
+    for (const garment of sampleSwapCandidates(
+      SAMPLE_CATALOG,
+      category,
+      result.input,
+      result.context
+    )) {
+      const lookId = current
+        ? result.look?.id
+        : (canUseSlot.find((look) => look.core.includes(garment.id)) ?? canUseSlot[0])?.id
+      if (lookId) choices.set(garment.id, lookId)
+    }
+  }
+  return choices
+}
+
+export function applyMemberSampleGarment(
+  result: SampleOutfitResult,
+  garment: SampleGarment,
+  lookId: string
+) {
+  const target =
+    lookId === result.look?.id
+      ? result
+      : selectSampleOutfit({ ...result.input, selectedLookId: lookId }, SAMPLE_CATALOG)
+  return target.look?.id === lookId
+    ? (resolveMemberSampleSwap(target, garment.category, garment.id) ?? result)
+    : result
 }
 
 export function undoMemberSampleSwaps(
