@@ -193,7 +193,7 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       SEEDED_SPOTLIGHT_AREA
     )
     try {
-      await page.goto('/')
+      await page.goto('/community')
       await settledSpotlight(page)
 
       await log.step('The sponsored spotlight card carries the disclosure and the CTA')
@@ -244,7 +244,7 @@ test.describe('Story 6.7b sponsored community highlights', () => {
     )
     try {
       const shownEvents = await recordShownEvents(page)
-      await page.goto('/')
+      await page.goto('/community')
       await settledSpotlight(page)
       await expect(
         page.getByTestId(`spotlight-sponsored-cta-${SPONSORED_POST_ID}`)
@@ -287,7 +287,7 @@ test.describe('Story 6.7b sponsored community highlights', () => {
     )
     try {
       const referers = await stubPartnerSite(context)
-      await page.goto('/')
+      await page.goto('/community')
       await settledSpotlight(page)
 
       await log.step('Activation records the click and opens the partner')

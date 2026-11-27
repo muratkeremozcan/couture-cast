@@ -249,7 +249,7 @@ test.beforeEach(({}, testInfo) => {
 
 const QUEUE_URL = '/moderation'
 const caseUrl = (caseId: string) => `/moderation/cases/${encodeURIComponent(caseId)}`
-const COMMUNITY_URL = '/'
+const COMMUNITY_URL = '/community'
 
 /** Next adds its own route announcer with role alert, so the console alert is everything else. */
 const alertOf = (page: Page) =>
@@ -1476,11 +1476,12 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
     const browserView = await openAs(viewer.id, 'guardian', {
       viewport: { width: 390, height: 844 },
     })
-    await browserView.goto(COMMUNITY_URL)
+    await browserView.goto('/')
     await expect(browserView.getByTestId('home-spotlight-teaser-link')).toBeVisible()
     await expect(browserView.getByTestId('home-spotlight-teaser-link')).not.toContainText(
       plan.posts[0]!.caption!
     )
+    await browserView.goto(COMMUNITY_URL)
     await expect(
       browserView.getByTestId(`community-spotlight-item-${plan.expectedOrder[1]!}`)
     ).toBeVisible()

@@ -61,15 +61,8 @@ const test = communityTest.extend<{ ownLook: { postId: string; caption: string }
   },
 })
 
-/*
- * The community grid renders in two places: the Lookbook Prism home page, inside
- * its "Community Section" region, and the bottom-nav `/community` page (since the
- * 2026-11-19 production follow-up; it was an `h1`-only placeholder before). These
- * specs stay on Home, the denser page, where the grid shares the screen with the
- * hero chips and the planner rail. `chip-navigation-bottom-nav.spec.ts` 3.6-E2E-007
- * covers `/community` itself.
- */
-const COMMUNITY_ROUTE = '/'
+// CC-7.13: the feed and its controls live on the Community tab.
+const COMMUNITY_ROUTE = '/community'
 
 test.describe('6.1 community feed by climate band', () => {
   /*
@@ -110,9 +103,7 @@ test.describe('6.1 community feed by climate band', () => {
      * chip-navigation bar has its own legitimate one and a page-wide count would
      * assert something this story never claimed.
      */
-    const communitySection = page.getByRole('complementary', {
-      name: /community lookbook/i,
-    })
+    const communitySection = page.getByTestId('community-page')
     await expect(communitySection.getByRole('status')).toHaveCount(1)
     await expect(page.getByTestId('community-live-region')).toBeAttached()
   })

@@ -36,7 +36,7 @@ import {
   type LocationSession,
 } from '../support/helpers/location-session'
 
-const COMMUNITY_ROUTE = '/'
+const COMMUNITY_ROUTE = '/community'
 const FEED_URL = '**/api/v1/community/feed*'
 const SEARCH_UNAVAILABLE = 'City search is temporarily unavailable. Try again.'
 const SAVE_UNAVAILABLE = 'This city could not be saved right now. Try again.'
@@ -151,7 +151,7 @@ test.describe('1.2b client location capture @local-lane', () => {
       await label.press('Enter')
 
       await log.step('the save returns to Community, which reloads with a resolved band')
-      await expect(page).toHaveURL(/\/$/)
+      await expect(page).toHaveURL(COMMUNITY_ROUTE)
       const returnedBody = (await returnedFeed).responseJson as FeedBody
       expect(returnedBody.data.bandResolved).toBe(true)
       await expect(page.getByTestId('community-band-unresolved')).toHaveCount(0)
