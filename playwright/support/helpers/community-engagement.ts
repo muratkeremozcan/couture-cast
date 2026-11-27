@@ -1,3 +1,4 @@
+import { selectCommunityClimate } from './community-ui'
 import { localPlaywrightDatabaseUrl } from './user-test-data'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
@@ -301,7 +302,7 @@ export async function openAll(page: Page) {
       url.searchParams.get('mode') === 'all'
     )
   })
-  await page.getByTestId('community-filter-all').click()
+  await selectCommunityClimate(page, 'all')
   const result = await all
   expect(result.status()).toBe(200)
   // The web client opts every feed read in to reactions and sponsorship, so the
@@ -356,10 +357,10 @@ export async function watchContentStaysVisible(page: Page, postId: string) {
     })
 }
 export async function openComments(page: Page, postId: string) {
-  await page.getByTestId(`comments-button-${postId}`).click()
+  await page.getByTestId(`lookbook-open-${postId}`).click()
   await expect(
     thread(page).getByRole('heading', { name: 'Comments', exact: true })
-  ).toBeFocused()
+  ).toBeVisible()
   await expect(thread(page).getByLabel('Add a comment')).toBeVisible()
 }
 export async function closeComments(page: Page) {

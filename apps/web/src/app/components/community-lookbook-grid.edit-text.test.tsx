@@ -704,7 +704,7 @@ describe('Community look text editing', () => {
     })
 
     // Trigger image error -> starts Spotlight refreshItem (GET /posts/post-1).
-    const card = screen.getByTestId(`community-spotlight-item-${viewerPost.id}`)
+    const card = screen.getByTestId(`spotlight-lookbook-card-${viewerPost.id}`)
     fireEvent.error(within(card).getByRole('img'))
     await refreshStarted.promise
 

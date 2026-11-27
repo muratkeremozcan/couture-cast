@@ -6,13 +6,10 @@ const COMMUNITY = '[data-share-card-focus-fallback="community"]'
 
 describe('detail opener', () => {
   it('names the control and surface that opened a post', () => {
-    expect(detailOpenerSelector('community_feed', false, 'p1')).toBe(
+    expect(detailOpenerSelector('community_feed', 'p1')).toBe(
       '[data-testid="lookbook-open-p1"]'
     )
-    expect(detailOpenerSelector('community_feed', true, 'p1')).toBe(
-      '[data-testid="comments-button-p1"]'
-    )
-    expect(detailOpenerSelector('community_spotlight', false, 'p1')).toBe(
+    expect(detailOpenerSelector('community_spotlight', 'p1')).toBe(
       '[data-testid="spotlight-lookbook-open-p1"]'
     )
   })
@@ -25,7 +22,7 @@ describe('detail opener', () => {
       }
     )
     expect(result.current.restoreFocus).toEqual({ opener: undefined, final: COMMUNITY })
-    act(() => result.current.record('community_feed', false, 'p1'))
+    act(() => result.current.record('community_feed', 'p1'))
     rerender({ id: 'p1' })
     expect(result.current.restoreFocus).toEqual({
       opener: '[data-testid="lookbook-open-p1"]',
@@ -43,7 +40,7 @@ describe('detail opener', () => {
         initialProps: { id: null as string | null },
       }
     )
-    act(() => result.current.record('community_spotlight', false, 'p1'))
+    act(() => result.current.record('community_spotlight', 'p1'))
     rerender({ id: 'p1' })
     rerender({ id: null })
     rerender({ id: 'p1' })
@@ -57,7 +54,7 @@ describe('detail opener', () => {
         initialProps: { id: null as string | null },
       }
     )
-    act(() => result.current.record('community_feed', false, 'p1'))
+    act(() => result.current.record('community_feed', 'p1'))
     rerender({ id: 'p1' })
     rerender({ id: 'p2' })
     // The community section stays as the fallback; the other post's control does not.
@@ -71,7 +68,7 @@ describe('detail opener', () => {
         initialProps: { id: null as string | null },
       }
     )
-    act(() => result.current.record('community_feed', false, 'p1'))
+    act(() => result.current.record('community_feed', 'p1'))
     rerender({ id: 'p1' })
     act(() => result.current.clear())
     expect(result.current.restoreFocus).toEqual({ opener: undefined, final: COMMUNITY })

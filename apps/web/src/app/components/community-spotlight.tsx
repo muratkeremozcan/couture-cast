@@ -75,6 +75,11 @@ export interface UseCommunitySpotlightOptions<Token = number> {
     items: readonly CommunitySpotlightItem[],
     token: Token
   ) => CommunitySpotlightItem[]
+  /** Visible candidates for paging feedback. The ranked read and cursor remain intact. */
+  visiblePage?: (
+    items: CommunitySpotlightItem[],
+    append: boolean
+  ) => CommunitySpotlightItem[]
   announce: (message: SpotlightAnnouncement) => void
   /**
    * Story CC-7.7 D5: the state a return to the tab starts from (its last settled spotlight for
@@ -114,6 +119,7 @@ export function useCommunitySpotlight<Token = number>({
   onBanned,
   beginRead,
   reconcile,
+  visiblePage,
   announce,
   initial,
 }: UseCommunitySpotlightOptions<Token>) {
@@ -124,6 +130,8 @@ export function useCommunitySpotlight<Token = number>({
   beginReadRef.current = beginRead
   const reconcileRef = useRef(reconcile)
   reconcileRef.current = reconcile
+  const visiblePageRef = useRef(visiblePage)
+  visiblePageRef.current = visiblePage
   const announceRef = useRef(announce)
   announceRef.current = announce
   const onBannedRef = useRef(onBanned)
@@ -236,7 +244,9 @@ export function useCommunitySpotlight<Token = number>({
             nextCursor: page.nextCursor,
             loadingMore: false,
             moreFailed: false,
-            focusTargetId: restarted ? (merged[0]?.id ?? null) : null,
+            focusTargetId: restarted
+              ? ((visiblePageRef.current?.(merged, false) ?? merged)[0]?.id ?? null)
+              : null,
           }
         })
         if (restarted)
@@ -270,6 +280,7 @@ export function useCommunitySpotlight<Token = number>({
         stateRef.current.items,
         reconcileRef.current(page.items, ticket)
       )
+      const visible = visiblePageRef.current?.(added, true) ?? added
       setState((current) => {
         const currentById = new Map(current.items.map((item) => [item.id, item]))
         const incoming = newEntries(current.items, added).map((item) =>
@@ -283,16 +294,16 @@ export function useCommunitySpotlight<Token = number>({
           items: [...current.items, ...incoming],
           nextCursor: page.nextCursor,
           loadingMore: false,
-          focusTargetId: incoming[0]?.id ?? null,
+          focusTargetId: visible[0]?.id ?? null,
         }
       })
       // A page whose posts were all filtered or already shown changes nothing
       // the reader can hear, so it stays silent and View more stays for the
       // cursor it returned.
-      if (added.length > 0)
+      if (visible.length > 0)
         announceRef.current({
           key: 'community.spotlight.announceLoadedMore',
-          params: { count: added.length },
+          params: { count: visible.length },
         })
     } catch (error: unknown) {
       if (!request.current()) return

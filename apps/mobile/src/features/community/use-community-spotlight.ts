@@ -115,6 +115,7 @@ export function useCommunitySpotlight({
   postTextLedger,
   onBanned,
   onRefreshFailed,
+  visiblePage,
 }: {
   /** Story 6.11: a read refused for a ban closes the whole community screen, on any page. */
   onBanned?: (sanction: CommunityBannedError['sanction']) => void
@@ -123,6 +124,11 @@ export function useCommunitySpotlight({
    * in a slot that moves no content; the row itself never inserts an error above the feed.
    */
   onRefreshFailed?: (retry: () => void) => void
+  /** Selects visible paging feedback without dropping ranked reads or their cursor. */
+  visiblePage?: (
+    items: CommunityReactionSpotlightItem[],
+    append: boolean
+  ) => CommunityReactionSpotlightItem[]
   /** Undefined until the screen first resolves the member; null when signed out. */
   sessionScope: string | null | undefined
   reactionState: CommunityReactionState
@@ -146,6 +152,8 @@ export function useCommunitySpotlight({
   onBannedRef.current = onBanned
   const onRefreshFailedRef = useRef(onRefreshFailed)
   onRefreshFailedRef.current = onRefreshFailed
+  const visiblePageRef = useRef(visiblePage)
+  visiblePageRef.current = visiblePage
   const [focusRequest, setFocusRequest] = useState<SpotlightFocusRequest | null>(null)
   // A page settles after later renders, so it compares against the cards shown now.
   const itemsRef = useRef(items)
@@ -232,10 +240,11 @@ export function useCommunitySpotlight({
         })
         setNextCursor(page.nextCursor)
         if (restarted) {
+          const visible = visiblePageRef.current?.(shown, false) ?? shown
           focusSerialRef.current += 1
           setFocusRequest({
             kind: 'refreshed',
-            firstId: shown[0]?.id ?? null,
+            firstId: visible[0]?.id ?? null,
             serial: focusSerialRef.current,
           })
         } else {
@@ -310,13 +319,14 @@ export function useCommunitySpotlight({
         setNextCursor(page.nextCursor)
         // A page whose posts were all filtered or already shown changes nothing
         // the reader can hear, so it moves no focus and stays silent.
-        const first = added[0]
+        const visible = visiblePageRef.current?.(added, true) ?? added
+        const first = visible[0]
         if (first) {
           focusSerialRef.current += 1
           setFocusRequest({
             kind: 'appended',
             firstId: first.id,
-            count: added.length,
+            count: visible.length,
             serial: focusSerialRef.current,
           })
         }

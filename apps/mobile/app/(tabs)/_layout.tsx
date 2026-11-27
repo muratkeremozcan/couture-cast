@@ -133,7 +133,9 @@ export default function TabLayout() {
     // The Closet's Add and More live in its top bar; the hub sets them (D4), since Add opens
     // the hub's own capture flow.
     community: {
-      headerTitle: (props) => <ShareCardTabHeading {...props} scope="community" />,
+      headerTitle: (props) => (
+        <ShareCardTabHeading {...props} scope="community" wrapTitle />
+      ),
     },
   }
 

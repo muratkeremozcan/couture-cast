@@ -1484,11 +1484,9 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
     )
     await browserView.goto(COMMUNITY_URL)
     await expect(
-      browserView.getByTestId(`community-spotlight-item-${plan.expectedOrder[1]!}`)
+      browserView.getByTestId(`spotlight-lookbook-card-${plan.expectedOrder[1]!}`)
     ).toBeVisible()
-    await expect(browserView.getByTestId(`community-spotlight-item-${top}`)).toHaveCount(
-      0
-    )
+    await expect(browserView.getByTestId(`spotlight-lookbook-card-${top}`)).toHaveCount(0)
   })
 
   // Programmatic focus never shows a focus-visible ring, so every control is reached with real key presses.

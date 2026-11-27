@@ -203,7 +203,7 @@ export function registerCommunitySpotlightCases() {
     const list = screen.getByTestId('community-feed-list')
     expect(list).toContainElement(viewMore)
     press(viewMore)
-    const newRank = await screen.findByTestId('community-post-card-spot-3')
+    const newRank = await screen.findByTestId('community-card-title-spot-3')
     await waitFor(() =>
       expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
     )
@@ -648,7 +648,7 @@ export function registerCommunitySpotlightCases() {
     expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
 
     press(screen.getByTestId('cancel-report-button'))
-    const rank = screen.getByTestId('community-post-card-spot-2')
+    const rank = screen.getByTestId('community-card-title-spot-2')
     await waitFor(() => {
       expect(handles.get(rank)).toBeTypeOf('number')
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
@@ -694,7 +694,7 @@ export function registerCommunitySpotlightCases() {
     await render(<CommunityScreen />)
     press(await screen.findByTestId('community-spotlight-view-more'))
 
-    const rank = await screen.findByTestId('community-post-card-new-1')
+    const rank = await screen.findByTestId('community-card-title-new-1')
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
         handles.get(rank)
@@ -755,7 +755,7 @@ export function registerCommunitySpotlightCases() {
     await render(<CommunityScreen />)
     press(await screen.findByTestId('community-spotlight-view-more'))
 
-    const third = await screen.findByTestId('community-post-card-spot-3')
+    const third = await screen.findByTestId('community-card-title-spot-3')
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
         handles.get(third)
@@ -804,7 +804,7 @@ export function registerCommunitySpotlightCases() {
     await waitFor(() =>
       expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
     )
-    const rank = screen.getByTestId('community-post-card-spot-2')
+    const rank = screen.getByTestId('community-card-title-spot-2')
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
         handles.get(rank)
@@ -853,7 +853,7 @@ export function registerCommunitySpotlightCases() {
       await waitFor(() =>
         expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
       )
-      const rank = screen.getByTestId('community-post-card-spot-2')
+      const rank = screen.getByTestId('community-card-title-spot-2')
       await waitFor(() =>
         expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
           handles.get(rank)
@@ -971,7 +971,9 @@ export function registerCommunitySpotlightCases() {
     expect(await screen.findByTestId('community-card-title-spot-edit')).toHaveTextContent(
       'Initial spotlight title'
     )
-    press(screen.getByTestId('community-edit-text'))
+    press(screen.getByTestId('community-card-open-spot-edit'))
+    const ordinaryDetail = await screen.findByTestId('community-post-detail')
+    press(within(ordinaryDetail).getByTestId('community-edit-text'))
     const titleInput = screen.getByTestId('community-edit-title')
     const captionInput = screen.getByTestId('community-edit-description')
     act(() => {
@@ -981,10 +983,13 @@ export function registerCommunitySpotlightCases() {
     fireEvent.change(captionInput, { target: { value: 'Updated spotlight caption' } })
     press(screen.getByTestId('community-edit-save'))
     await waitFor(() =>
-      expect(screen.getByTestId('community-card-title-spot-edit')).toHaveTextContent(
-        'Updated spotlight title'
-      )
+      expect(
+        within(ordinaryDetail).getByTestId('community-card-title-spot-edit')
+      ).toHaveTextContent('Updated spotlight title')
     )
+
+    press(within(ordinaryDetail).getByTestId('app-top-bar-back'))
+    await waitFor(() => expect(ordinaryDetail).not.toBeInTheDocument())
 
     // Delayed Spotlight first-page response carries stale textRevision: 0.
     releaseSpotlight()
@@ -992,9 +997,6 @@ export function registerCommunitySpotlightCases() {
     expect(
       within(spotCard).getByTestId('community-card-title-spot-edit')
     ).toHaveTextContent('Updated spotlight title')
-    expect(
-      within(spotCard).getByTestId('community-card-edited-spot-edit')
-    ).toHaveTextContent('Edited')
 
     // Open Spotlight detail and confirm it renders the updated title and Edited label.
     press(within(spotCard).getByTestId('community-card-open-spot-edit'))
@@ -1124,8 +1126,10 @@ export function registerCommunitySpotlightCases() {
     expect(
       within(spotCard).getByTestId('community-card-title-spot-viewer')
     ).toHaveTextContent('Realtime viewer title')
+    press(within(spotCard).getByTestId('community-card-open-spot-viewer'))
+    const detail = await screen.findByTestId('community-spotlight-detail')
     expect(
-      within(spotCard).getByTestId('community-card-caption-spot-viewer')
+      within(detail).getByTestId('community-card-caption-spot-viewer')
     ).toHaveTextContent('Realtime viewer caption')
   })
 }

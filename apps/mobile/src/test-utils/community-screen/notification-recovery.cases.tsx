@@ -361,7 +361,7 @@ export function registerCommunityNotificationRecoveryCases() {
     await waitFor(() =>
       expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
     )
-    expect(screen.getByTestId('community-card-comments-post-b')).not.toHaveAttribute(
+    expect(screen.getByTestId('community-card-title-post-b')).not.toHaveAttribute(
       'aria-disabled',
       'true'
     )
@@ -557,7 +557,7 @@ export function registerCommunityNotificationRecoveryCases() {
           return kind === 'missing-card'
             ? errorEnvelope(404, 'Community post not found.')
             : HttpResponse.json({
-                data: { ...post(), caption: 'Independent late card stays authoritative' },
+                data: { ...post(), title: 'Independent late card stays authoritative' },
               })
         })
       )
@@ -592,7 +592,7 @@ export function registerCommunityNotificationRecoveryCases() {
         } else {
           if (kind === 'card')
             await screen.findByText('Independent late card stays authoritative')
-          press(screen.getAllByTestId('community-card-comments-post-a')[0]!)
+          await openCommunityPostComments('post-a')
           await screen.findByText(rootComment.body)
           await f.catchUp()
           expect(

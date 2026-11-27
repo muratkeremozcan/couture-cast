@@ -250,7 +250,10 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(await screen.findByTestId('status-badge-post-1')).toHaveTextContent(
         STATUS_COPY.consent_suspended
       )
-      expect(screen.getByTestId('climate-badge-post-1')).toHaveTextContent('All weather')
+      await userEvent.click(screen.getByTestId('lookbook-open-post-1'))
+      expect(await screen.findByTestId('community-detail-band-post-1')).toHaveTextContent(
+        'All weather'
+      )
       expect(communityPostStatusSchema.options).toContain('consent_suspended')
     })
   })

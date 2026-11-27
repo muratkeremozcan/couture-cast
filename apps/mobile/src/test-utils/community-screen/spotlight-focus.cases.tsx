@@ -127,7 +127,7 @@ export function registerCommunitySpotlightFocusCases() {
     setMockParams(teaserIntent('spot-2', 'token-77-spotlight-first'))
     await render(<CommunityScreen />)
 
-    const rank = await screen.findByTestId('community-post-card-spot-2')
+    const rank = await screen.findByTestId('community-card-title-spot-2')
     await frames(3)
     // Ready behind the closed gate: nothing is focused, announced or reported yet.
     expect(rank).not.toBeVisible()
@@ -177,7 +177,7 @@ export function registerCommunitySpotlightFocusCases() {
 
     act(() => releaseSpotlight())
 
-    const rank = await screen.findByTestId('community-post-card-spot-2')
+    const rank = await screen.findByTestId('community-card-title-spot-2')
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
         handles.get(rank)
@@ -339,7 +339,7 @@ export function registerCommunitySpotlightFocusCases() {
     serveSpotlight(() => page())
     setMockParams(teaserIntent('spot-2', 'token-020'))
     await render(<CommunityScreen />)
-    const rank = await screen.findByTestId('community-post-card-spot-2')
+    const rank = await screen.findByTestId('community-card-title-spot-2')
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
         handles.get(rank)
@@ -431,7 +431,7 @@ export function registerCommunitySpotlightFocusCases() {
       // The module recovers later; the intent is consumed, so focus stays put.
       await waitFor(() => expect(release).toBeTypeOf('function'))
       release!()
-      const rank = await screen.findByTestId('community-post-card-spot-1')
+      const rank = await screen.findByTestId('community-card-title-spot-1')
       await act(async () => {
         await new Promise((resolve) => requestAnimationFrame(resolve))
       })
@@ -465,7 +465,7 @@ export function registerCommunitySpotlightFocusCases() {
     serveSpotlight(() => page())
     setMockParams(teaserIntent('spot-1', 'token-024-a'))
     const view = await render(<CommunityScreen />)
-    const rank = await screen.findByTestId('community-post-card-spot-1')
+    const rank = await screen.findByTestId('community-card-title-spot-1')
     await waitFor(() => expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(1))
     const focusCalls = () =>
       vi
@@ -506,7 +506,7 @@ export function registerCommunitySpotlightFocusCases() {
     setMockParams({})
     await view.rerender(<CommunityScreen />)
     release!()
-    const rank = await screen.findByTestId('community-post-card-spot-2')
+    const rank = await screen.findByTestId('community-card-title-spot-2')
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
         handles.get(rank)
@@ -527,7 +527,7 @@ export function registerCommunitySpotlightFocusCases() {
     serveSpotlight(() => page())
     setMockParams(teaserIntent('spot-1', 'token-026'))
     await render(<CommunityScreen />)
-    const rank = await screen.findByTestId('community-post-card-spot-1')
+    const rank = await screen.findByTestId('community-card-title-spot-1')
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledWith(
         handles.get(rank)
@@ -574,7 +574,7 @@ export function registerCommunitySpotlightFocusCases() {
     act(() => screenFocus.set(false))
 
     release!()
-    const rank = await screen.findByTestId('community-post-card-spot-1')
+    const rank = await screen.findByTestId('community-card-title-spot-1')
     for (let frame = 0; frame < 3; frame += 1)
       await act(async () => {
         await new Promise((resolve) => requestAnimationFrame(resolve))
@@ -639,7 +639,7 @@ export function registerCommunitySpotlightFocusCases() {
     serveSpotlight(() => page())
     setMockParams({})
     const view = await render(<CommunityScreen />)
-    const rank = await screen.findByTestId('community-post-card-spot-2')
+    const rank = await screen.findByTestId('community-card-title-spot-2')
     // The router delivers the params before it reports the screen focused.
     act(() => screenFocus.set(false))
     setMockParams(teaserIntent('spot-2', 'token-051'))
@@ -716,7 +716,7 @@ export function registerCommunitySpotlightFocusCases() {
       act(() => setMobileApplicationUserId('member-b'))
       await waitFor(() => expect(held.length).toBeGreaterThan(1))
       for (const release of held) release()
-      const rank = await screen.findByTestId('community-post-card-spot-1')
+      const rank = await screen.findByTestId('community-card-title-spot-1')
       await frames(5)
       expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
       expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalledWith(

@@ -737,8 +737,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
       await screen.findByTestId('spotlight-lookbook-card-spot-2')
       // Only now does the older feed read answer, about the same post.
       releaseFeed()
-      await screen.findByTestId('lookbook-card-spot-2')
-      expect(answered).toEqual(['spotlight', 'feed'])
+      await waitFor(() => expect(answered).toEqual(['spotlight', 'feed']))
       await waitFor(() =>
         expect(screen.getByTestId('community-card-grid')).toHaveAttribute(
           'aria-busy',
@@ -746,17 +745,13 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
         )
       )
 
-      for (const scope of ['', 'spotlight-']) {
-        const cta = screen.queryByTestId(`${scope}sponsored-cta-spot-2`)
-        const badge = screen.queryByTestId(`${scope}sponsored-badge-spot-2`)
-        if (newerHasBlock) {
-          expect(cta, `${scope || 'feed '}CTA`).toBeInTheDocument()
-          expect(badge, `${scope || 'feed '}badge`).toBeInTheDocument()
-        } else {
-          expect(cta, `${scope || 'feed '}CTA`).not.toBeInTheDocument()
-          expect(badge, `${scope || 'feed '}badge`).not.toBeInTheDocument()
-        }
-      }
+      expect(screen.queryByTestId('lookbook-card-spot-2')).toBeNull()
+      expect(Boolean(screen.queryByTestId('spotlight-sponsored-cta-spot-2'))).toBe(
+        newerHasBlock
+      )
+      expect(Boolean(screen.queryByTestId('spotlight-sponsored-badge-spot-2'))).toBe(
+        newerHasBlock
+      )
     }
   )
 
@@ -812,7 +807,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
         )
         if (
           newerHasBlock
-            ? badges.length < 2 &&
+            ? badges.length !== 1 &&
               document.querySelector('[data-testid="spotlight-lookbook-card-spot-2"]')
             : badges.length > 0
         )
@@ -821,20 +816,13 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
       observer.observe(document.body, { childList: true, subtree: true })
       releaseSpotlight()
       await screen.findByTestId('spotlight-lookbook-card-spot-2')
-      await waitFor(() =>
-        expect(screen.getByTestId('community-spotlight')).toHaveAttribute(
-          'aria-busy',
-          'false'
-        )
-      )
       observer.disconnect()
       expect(staleFrames).toEqual([])
 
-      for (const scope of ['', 'spotlight-']) {
-        const cta = screen.queryByTestId(`${scope}sponsored-cta-spot-2`)
-        if (newerHasBlock) expect(cta, `${scope || 'feed '}CTA`).toBeInTheDocument()
-        else expect(cta, `${scope || 'feed '}CTA`).not.toBeInTheDocument()
-      }
+      expect(screen.queryByTestId('lookbook-card-spot-2')).toBeNull()
+      expect(Boolean(screen.queryByTestId('spotlight-sponsored-cta-spot-2'))).toBe(
+        newerHasBlock
+      )
     }
   )
 

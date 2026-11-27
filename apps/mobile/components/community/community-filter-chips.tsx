@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, type ReactNode } from 'react'
+import React, { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import {
   AccessibilityInfo,
   Pressable,
@@ -31,6 +31,7 @@ export interface CommunityFilterChipsProps {
   onSelectMode: (mode: CommunityFeedMode) => void
   viewerBand?: ClimateBand | null
   active?: boolean
+  triggerRef?: RefObject<View | null>
   children?: ReactNode
 }
 
@@ -39,6 +40,7 @@ export function CommunityFilterChips({
   onSelectMode,
   viewerBand,
   active = true,
+  triggerRef,
   children,
 }: CommunityFilterChipsProps) {
   const { t } = useTranslation()
@@ -46,7 +48,8 @@ export function CommunityFilterChips({
   const { scrim } = useTokens()
   const insets = useModalInsets()
   const [open, setOpen] = useState(false)
-  const trigger = useRef<View>(null)
+  const localTrigger = useRef<View>(null)
+  const trigger = triggerRef ?? localTrigger
   const heading = useRef<Text>(null)
   const close = () => setOpen(false)
 
@@ -179,13 +182,13 @@ const styles = StyleSheet.create({
     minHeight: 44,
     maxWidth: '100%',
     borderWidth: 1,
-    borderRadius: 22,
+    borderRadius: 9999,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   triggerLabel: { flexShrink: 1, fontSize: 14, fontWeight: '600' },
   sheetPosition: { flex: 1, justifyContent: 'flex-end' },
-  sheet: { maxHeight: '100%', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  sheet: { maxHeight: '100%', borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   headingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -201,7 +204,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     justifyContent: 'center',
   },
 })

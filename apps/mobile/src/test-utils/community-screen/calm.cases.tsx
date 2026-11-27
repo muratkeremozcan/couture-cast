@@ -4,12 +4,14 @@ import {
   communityReactionSpotlightResponseSchema,
   type CommunityReactionSpotlight,
 } from '@couture/api-client/contracts/http'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
-import { expect, it } from 'vitest'
+import { AccessibilityInfo, Platform, findNodeHandle } from 'react-native'
+import { expect, it, vi } from 'vitest'
 import deDE from '@/assets/locales/de-DE.json'
 import enUS from '@/assets/locales/en-US.json'
+import { getCommunityPostFromMobile } from '@/src/lib/community'
 import i18n from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
 import { press } from '@/src/test-utils/press'
@@ -21,6 +23,7 @@ import {
   feedUrls,
   item,
   serveFeed,
+  setMockParams,
 } from './harness'
 
 const nearby = item({
@@ -124,6 +127,7 @@ export function registerCalmCommunityCases() {
     await render(<CommunityTab />)
     await communityGateOpen()
     const card = await screen.findByTestId('community-post-card-post-a')
+    expect(within(card).queryByTestId('community-reactions-post-a')).toBeNull()
     expect(screen.queryByTestId('community-card-report-post-a')).toBeNull()
     press(within(card).getByTestId('community-card-actions'))
     const report = await screen.findByTestId('community-card-report-post-a')
@@ -133,5 +137,73 @@ export function registerCalmCommunityCases() {
     await waitFor(() =>
       expect(screen.getByTestId('community-report-modal')).toBeVisible()
     )
+  })
+
+  it('7.15-COM-003 an own look withdraws immediately and leaves a visible notice', async () => {
+    const own = item({ id: 'calm-own', author: { displayName: 'You', isSelf: true } })
+    const withdrawnPosts: string[] = []
+    serveFeed(() => feedJson({ items: withdrawnPosts.length ? [] : [own] }))
+    server.use(
+      http.post('*/api/v1/community/posts/:postId/withdraw', ({ params }) => {
+        withdrawnPosts.push(String(params.postId))
+        return HttpResponse.json({ tracked: true })
+      })
+    )
+    await render(<CommunityTab />)
+    await communityGateOpen()
+    const card = await screen.findByTestId('community-post-card-calm-own')
+    press(within(card).getByTestId('community-card-actions'))
+    const withdraw = await screen.findByTestId('community-card-withdraw-calm-own')
+    expect(screen.queryByTestId('community-card-report-calm-own')).toBeNull()
+    press(withdraw)
+    await waitFor(() => expect(withdrawnPosts).toEqual(['calm-own']))
+    expect(await screen.findByTestId('deep-link-info-banner')).toHaveTextContent(
+      enUS.community.removed.withdrawn
+    )
+    await waitFor(() => expect(card).not.toBeInTheDocument())
+  })
+
+  it('focuses an early notification result once its card title mounts', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
+    const handles = new Map<unknown, number>()
+    vi.mocked(findNodeHandle).mockImplementation((node) => {
+      if (!handles.has(node)) handles.set(node, 700 + handles.size)
+      return handles.get(node) ?? null
+    })
+    let releaseFeed!: (response: Response) => void
+    const heldFeed = new Promise<Response>((resolve) => {
+      releaseFeed = resolve
+    })
+    let markDetailServed!: () => void
+    const detailServed = new Promise<void>((resolve) => {
+      markDetailServed = resolve
+    })
+    setMockParams({ source: 'notification', type: 'community', cardId: nearby.id })
+    serveFeed(() => heldFeed)
+    server.use(
+      http.get('*/api/v1/community/posts/' + nearby.id, () => {
+        markDetailServed()
+        return HttpResponse.json({ data: nearby })
+      })
+    )
+    try {
+      await render(<CommunityTab />)
+      await detailServed
+      const request = vi.mocked(getCommunityPostFromMobile).mock.results.at(-1)
+      expect(request?.type).toBe('return')
+      await act(async () => {
+        await request?.value
+      })
+      expect(screen.queryByTestId('community-card-title-' + nearby.id)).toBeNull()
+    } finally {
+      releaseFeed(feedJson({ items: [] }))
+    }
+    const title = await screen.findByTestId('community-card-title-' + nearby.id)
+    await waitFor(() => {
+      expect(handles.get(title)).toBeTypeOf('number')
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        handles.get(title)
+      )
+    })
   })
 }

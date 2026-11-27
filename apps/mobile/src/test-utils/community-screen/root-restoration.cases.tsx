@@ -124,6 +124,7 @@ export function registerCommunityRootRestorationCases() {
       feedJson({ items: [item({ author: { displayName: 'Own look', isSelf: true } })] })
     )
     render(<Harness />)
+    press(await screen.findByTestId('community-card-open-post-a'))
     const opener = await screen.findByTestId('community-share-card-open-post-a')
     press(opener)
     await waitFor(() => expect(screen.getByTestId('share-card-title')).toBeVisible())

@@ -430,7 +430,7 @@ describe('Story 6.3 screen request ownership', () => {
     await act(async () => {
       await journey.sync().catchUp()
     })
-    await user.click(screen.getByTestId('comments-button-post-1'))
+    await user.click(screen.getByTestId('lookbook-open-post-1'))
     await screen.findByText('First root page.')
     await user.click(screen.getByRole('button', { name: 'More comments' }))
     await screen.findByText('Second root page.')
@@ -949,7 +949,7 @@ describe('Story 6.3 screen request ownership', () => {
     await act(async () => {
       await journey.sync().catchUp()
     })
-    await user.click(screen.getByTestId('comments-button-post-1'))
+    await user.click(screen.getByTestId('lookbook-open-post-1'))
     await screen.findByText('Visible before resync.')
     refresh.mockClear()
     journey.state.hidden = true
@@ -969,7 +969,7 @@ describe('Story 6.3 screen request ownership', () => {
     await act(async () => {
       await journey.sync().catchUp()
     })
-    await user.click(screen.getByTestId('comments-button-post-1'))
+    await user.click(screen.getByTestId('lookbook-open-post-1'))
     await screen.findByText('Visible before resync.')
     await user.type(screen.getByLabelText('Add a comment'), 'Keep this draft')
     expect(screen.getByLabelText('Add a comment')).toHaveFocus()
@@ -1021,7 +1021,7 @@ describe('Story 6.3 screen request ownership', () => {
     try {
       const user = userEvent.setup()
       renderGrid({ highlightedCardId: 'post-1' })
-      await user.click(await screen.findByTestId('comments-button-post-1'))
+      await user.click(await screen.findByTestId('lookbook-open-post-1'))
       await user.type(
         await screen.findByLabelText('Add a comment'),
         'Preserved discussion draft'

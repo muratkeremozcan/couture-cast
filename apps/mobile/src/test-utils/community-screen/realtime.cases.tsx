@@ -616,7 +616,7 @@ export function registerCommunityRealtimeCases() {
       await waitFor(() => expect(rebuilding).toBe(true))
       expect(screen.getByTestId('comment-body')).toBe(composer)
       expect(document.activeElement).toBe(composer)
-      expect(screen.getByTestId('community-card-comments-post-a')).toBeTruthy()
+      expect(screen.getByTestId('community-card-title-post-a')).toBeTruthy()
     } finally {
       releaseRebuild()
     }

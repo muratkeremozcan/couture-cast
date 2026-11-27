@@ -13,6 +13,34 @@ import {
 
 const DEVICE = 'emulator-5554'
 
+test('Community text proof accepts only the two fixed device settings', () => {
+  assert.deepEqual(
+    appearanceCommands('/community-text', { device: DEVICE, enlarged: true }, [DEVICE]),
+    {
+      commands: [
+        ['-s', DEVICE, 'shell', 'wm', 'size', '640x1280'],
+        ['-s', DEVICE, 'shell', 'settings', 'put', 'system', 'font_scale', '2.0'],
+      ],
+    }
+  )
+  assert.deepEqual(
+    appearanceCommands('/community-text', { device: DEVICE, enlarged: false }, [DEVICE]),
+    {
+      commands: [
+        ['-s', DEVICE, 'shell', 'wm', 'size', '720x1280'],
+        ['-s', DEVICE, 'shell', 'settings', 'put', 'system', 'font_scale', '1.0'],
+      ],
+    }
+  )
+  assert.equal(
+    'status' in
+      appearanceCommands('/community-text', { device: DEVICE, enlarged: 'yes' }, [
+        DEVICE,
+      ]),
+    true
+  )
+})
+
 test('[7.9-NVIS-U01] night mode runs exactly cmd uimode night on the named device', () => {
   assert.deepEqual(nightModeCommands(DEVICE, 'yes'), [
     ['-s', DEVICE, 'shell', 'cmd', 'uimode', 'night', 'yes'],

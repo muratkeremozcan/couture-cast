@@ -146,10 +146,20 @@ test.describe('CC-7.15 Calm Community @local-lane', () => {
     page,
     interceptNetworkCall,
   }) => {
+    const scene = calmCommunityFixture(true)
+    const nearby = scene.feed('all').items.find(({ id }) => id === FIRST_POST)!
     const { router } = await openFixtureShell(page, interceptNetworkCall, {
       mode: 'populated',
       screen: 'community',
-      community: calmCommunityFixture(true),
+      community: {
+        ...scene,
+        spotlight: {
+          level: 'city',
+          label: 'Chicago',
+          items: [{ ...nearby, rank: 1 }],
+          nextCursor: 'next-ranked-page',
+        },
+      },
     })
     await page.goto('/community')
     await waitForShellSettled(page, router)
@@ -158,13 +168,41 @@ test.describe('CC-7.15 Calm Community @local-lane', () => {
     await expect(empty).toContainText('No looks in your climate yet')
     await expect(empty.getByRole('button')).toHaveCount(1)
     await expect(page.getByTestId(/^(spotlight-)?lookbook-card-/)).toHaveCount(0)
+    await expect(page.getByTestId('community-spotlight-view-more')).toHaveCount(0)
+    await expect(page.getByTestId('community-spotlight-error')).toHaveCount(0)
     await empty.getByRole('button', { name: 'See all climates', exact: true }).click()
-    await expect(page.getByTestId(`lookbook-card-${FIRST_POST}`)).toBeVisible()
+    await expect(page.getByTestId(`spotlight-lookbook-card-${FIRST_POST}`)).toBeVisible()
     await expect(page.getByTestId(`lookbook-card-${SECOND_POST}`)).toBeVisible()
     await expect(
       page.getByTestId(/^(spotlight-)?lookbook-card-calm-community-peer-/)
     ).toHaveCount(2)
     await expect(empty).toBeHidden()
+  })
+
+  test('[P0] [7.15-COM-004] unresolved auto uses the all-climate empty copy', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    const scene = calmCommunityFixture(true)
+    const { router } = await openFixtureShell(page, interceptNetworkCall, {
+      mode: 'populated',
+      screen: 'community',
+      community: {
+        ...scene,
+        feed: (mode) => ({
+          ...scene.feed(mode),
+          viewerBand: null,
+          bandResolved: false,
+          bandUnresolvedReason: 'weather_stale',
+        }),
+      },
+    })
+    await page.goto('/community')
+    await waitForShellSettled(page, router)
+    await expect(page.getByTestId('community-feed-empty')).toContainText(
+      'No looks shared here yet'
+    )
+    await expect(page.getByTestId('community-clear-filters')).toHaveCount(0)
   })
 
   test('[P0] [7.15-COM-003] the report action is reachable when reactions are unavailable', async ({

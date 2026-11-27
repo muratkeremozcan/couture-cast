@@ -29,6 +29,7 @@ async function expectLookbookVocabulary(page: Page) {
 
   await expect(page.getByText('Living Community Lookbook')).toHaveCount(0)
   await expect(community.getByTestId('community-feed-signed-out')).toBeVisible()
+  await expect(community.getByTestId('community-clear-filters')).toHaveCount(0)
   await expect(
     community.getByRole('link', { name: enUS.community.notifications.signin })
   ).toBeVisible()

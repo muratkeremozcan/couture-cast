@@ -359,8 +359,8 @@ describe('Mobile Deep Link Handling (Story 3.7)', () => {
     // Was the English literal "All-weather look from the community", assembled
     // from a notification payload; it is the card's own band pill now, and every
     // catalogue carries the string.
-    expect(screen.getByTestId('community-card-climate-pill-look-77').textContent).toBe(
-      enUS.community.band.unclassified
-    )
+    fireEvent.click(screen.getByTestId('community-card-open-look-77'))
+    const pill = await screen.findByTestId('community-card-climate-pill-look-77')
+    expect(pill.textContent).toBe(enUS.community.band.unclassified)
   })
 })

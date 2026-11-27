@@ -144,7 +144,7 @@ export function registerCommunitySponsoredCases() {
     await render(<CommunityScreen />)
 
     const sponsored = await screen.findByTestId('community-post-card-post-a')
-    const plain = await screen.findByTestId('community-card-caption-post-b')
+    const plain = await screen.findByTestId('community-card-title-post-b')
     expect(plain.textContent).toBe('Plain look')
     expect(
       within(sponsored).getByTestId('community-card-partnered-post-a').textContent
@@ -328,7 +328,7 @@ export function registerCommunitySponsoredCases() {
     await render(<CommunityScreen />)
 
     // The resolved copies landed: their captions replaced the live ones.
-    await screen.findByText('Resolved post-a')
+    await screen.findByTestId('community-card-title-post-a')
     await waitFor(() =>
       expect(screen.getAllByText('Resolved spot-1').length).toBeGreaterThan(0)
     )
@@ -369,7 +369,7 @@ export function registerCommunitySponsoredCases() {
     await within(moduleItem).findByTestId('community-card-shop-spot-1')
 
     // The rebuild and the resolve both landed.
-    await screen.findByText('Resolved post-a')
+    await screen.findByTestId('community-card-title-post-a')
     await waitFor(() => expect(sync.resolves()).toBeGreaterThan(0))
     await waitFor(() =>
       expect(screen.queryByTestId('community-card-shop-post-a')).toBeNull()
@@ -406,14 +406,14 @@ export function registerCommunitySponsoredCases() {
             return HttpResponse.json({
               data: item({
                 id: 'post-a',
-                caption: 'Older read',
+                title: 'Older read',
                 sponsorship: SPONSORSHIP,
               }),
             })
           }
           // The refresh's re-read of the highlighted post.
           return HttpResponse.json({
-            data: item({ id: 'post-a', caption: 'Newer read' }),
+            data: item({ id: 'post-a', title: 'Newer read' }),
           })
         })
       )
@@ -423,7 +423,7 @@ export function registerCommunitySponsoredCases() {
       serveFeed((_url, index) =>
         feedJson({
           items: [
-            item({ id: 'post-a', caption: index === 0 ? 'First read' : 'Newer read' }),
+            item({ id: 'post-a', title: index === 0 ? 'First read' : 'Newer read' }),
           ],
         })
       )
@@ -433,7 +433,7 @@ export function registerCommunitySponsoredCases() {
         const read = vi.mocked(getCommunityPostFromMobile).mock.results[0]!
           .value as Promise<unknown>
         await expect(read).resolves.toMatchObject({
-          caption: 'Older read',
+          title: 'Older read',
           sponsorship: SPONSORSHIP,
         })
       }
@@ -502,7 +502,7 @@ export function registerCommunitySponsoredCases() {
     press(reveal)
 
     // The revealed card is the resolved copy, with the rebuild's live answer.
-    await screen.findByText('Resolved post-new')
+    await screen.findByTestId('community-card-title-post-new')
     const card = screen.getByTestId('community-post-card-post-new')
     expect(
       within(card).getByTestId('community-card-partnered-post-new').textContent

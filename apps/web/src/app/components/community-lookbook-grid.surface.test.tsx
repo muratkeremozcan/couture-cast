@@ -107,6 +107,32 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
   describe('weekly challenge', () => {
     let restoreObjectUrl = () => undefined as void
 
+    it('7.15-COM-001 scopes dismissal to the shown challenge', async () => {
+      signIn()
+      const next = { ...CHALLENGE, id: 'challenge-next-week', title: 'Rain layers' }
+      useMswHandlers(
+        http.get(FEED_PATH, ({ request }) => {
+          const all = new URL(request.url).searchParams.get('mode') === 'all'
+          return feedBody({
+            mode: all ? 'all' : 'auto',
+            activeChallenge: all ? next : CHALLENGE,
+          })
+        })
+      )
+      const user = userEvent.setup()
+      renderGrid()
+
+      const first = await screen.findByTestId('weekly-challenge-banner')
+      expect(first).toHaveTextContent(CHALLENGE.title)
+      await user.click(within(first).getByTestId('community-challenge-dismiss'))
+      expect(screen.queryByTestId('weekly-challenge-banner')).toBeNull()
+
+      await selectCommunityClimate(user, 'all')
+      expect(await screen.findByTestId('weekly-challenge-banner')).toHaveTextContent(
+        next.title
+      )
+    })
+
     afterEach(() => {
       restoreObjectUrl()
       restoreObjectUrl = () => undefined
@@ -129,14 +155,13 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid()
 
       const banner = await screen.findByTestId('weekly-challenge-banner')
-      expect(banner).toHaveTextContent('Weekly style challenge')
       expect(banner).toHaveTextContent(CHALLENGE.title)
-      expect(banner).toHaveTextContent(CHALLENGE.body)
-      expect(screen.getByTestId('challenge-climate-band')).toHaveTextContent(
-        'Temperate and wet'
-      )
+      expect(banner).not.toHaveTextContent(CHALLENGE.body)
 
       await user.click(screen.getByTestId('challenge-participate-button'))
+      expect(await screen.findByTestId('post-challenge-instructions')).toHaveTextContent(
+        CHALLENGE.body
+      )
       await choosePhoto(user)
       await screen.findByDisplayValue(SUGGESTED_ALT_TEXT)
       expect(screen.getByTestId('post-challenge-select')).toHaveValue(CHALLENGE.id)
@@ -184,8 +209,9 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       )
       renderGrid()
 
-      expect(await screen.findByTestId('challenge-climate-band')).toHaveTextContent(
-        'Every climate'
+      await userEvent.click(await screen.findByTestId('challenge-participate-button'))
+      expect(await screen.findByTestId('post-challenge-instructions')).toHaveTextContent(
+        CHALLENGE.body
       )
     })
 

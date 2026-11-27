@@ -9,12 +9,10 @@ const COMMUNITY_FALLBACK = '[data-share-card-focus-fallback="community"]'
 /** The card control, on the surface it came from, that opened a post's detail. */
 export function detailOpenerSelector(
   surface: AffiliateCommunitySurface,
-  commentsFocus: boolean,
   postId: string
 ): string {
   const scope = surface === 'community_spotlight' ? SPOTLIGHT_CARD_SCOPE : ''
-  const control = commentsFocus ? 'comments-button' : 'lookbook-open'
-  return `[data-testid="${scope}${control}-${postId}"]`
+  return `[data-testid="${scope}lookbook-open-${postId}"]`
 }
 
 /**
@@ -30,20 +28,17 @@ export function useDetailOpener(opened: { id: string } | null) {
   useEffect(() => {
     if (openedId === null) setOpener(null)
   }, [openedId])
-  const record = useCallback(
-    (surface: AffiliateCommunitySurface, commentsFocus: boolean, postId: string) => {
-      const scope = surface === 'community_spotlight' ? SPOTLIGHT_CARD_SCOPE : ''
-      const title = `${scope}title-${postId}`
-      const invokedByTitle = document.activeElement?.getAttribute('data-testid') === title
-      setOpener({
-        postId,
-        selector: invokedByTitle
-          ? `[data-testid="${title}"]`
-          : detailOpenerSelector(surface, commentsFocus, postId),
-      })
-    },
-    []
-  )
+  const record = useCallback((surface: AffiliateCommunitySurface, postId: string) => {
+    const scope = surface === 'community_spotlight' ? SPOTLIGHT_CARD_SCOPE : ''
+    const title = `${scope}title-${postId}`
+    const invokedByTitle = document.activeElement?.getAttribute('data-testid') === title
+    setOpener({
+      postId,
+      selector: invokedByTitle
+        ? `[data-testid="${title}"]`
+        : detailOpenerSelector(surface, postId),
+    })
+  }, [])
   const clear = useCallback(() => setOpener(null), [])
   // The recorded control leads only while it belongs to the open post. The community
   // section is the final target, after the element that was focused when the detail

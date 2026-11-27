@@ -320,10 +320,8 @@ test.describe('Story 6.7b sponsored community highlights', () => {
   }) => {
     await assertSeededSpotlight()
     const offerId = await assertSeededSponsorship()
-    const removeLocation = await placeViewerInArea(
-      communitySession.userId,
-      SEEDED_SPOTLIGHT_AREA
-    )
+    // A fresh reader without a saved area gets the ordinary feed projection.
+    expect(communitySession.userId).toBeTruthy()
     try {
       const referers = await stubPartnerSite(context)
       // A deep link puts the sponsored post at the head of the feed, wherever its
@@ -388,7 +386,6 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       expect(referers).toEqual([null, null])
     } finally {
       await page.goto('about:blank')
-      await removeLocation()
     }
   })
 

@@ -44,7 +44,7 @@ describe('share-card public source actions', () => {
       )
       renderGrid({ highlightedCardId: own.id })
       const card = await screen.findByTestId(`lookbook-card-${own.id}`)
-      expect(within(card).queryByTestId('share-card-open') !== null).toBe(eligible)
+      expect(within(card).queryByTestId('share-card-open')).toBeNull()
       await userEvent.click(within(card).getByTestId(`lookbook-open-${own.id}`))
       const detail = await screen.findByTestId('community-detail')
       expect(within(detail).queryByTestId('share-card-open') !== null).toBe(eligible)

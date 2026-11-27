@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-26.
-Added Steps 40 to 71:
+Updated: 2026-11-27.
+Added Steps 40 to 72:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -35,7 +35,8 @@ Added Steps 40 to 71:
 - Step 68: Story 7.11, five-tab navigation and back pattern, `a8863b05` (PR #295), merged on 2026-11-26.
 - Step 69: Story 7.12, Looks tab for saved looks, ideas and plans, `0d3b82a3` (PR #296), merged on 2026-11-26.
 - Step 70: Story 7.13, Calm Today with one primary job, `a519243d` (PR #297), merged on 2026-11-26.
-- Step 71: Story 7.14, Today's outfit as a picture, on `feat/epic7-story-7-14-todays-outfit-as-picture`.
+- Step 71: Story 7.14, Today's outfit as a picture, `53adbe2f` (PR #298), merged on 2026-11-27.
+- Step 72: Story 7.15, Calm Community with an empty state.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -43,6 +44,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 72 for Story CC-7.15 (Calm Community with an empty state) and moved Step 71 to merged (`53adbe2f`, PR #298).
 Added Step 71 for Story CC-7.14 (Today's outfit as a picture) and moved Step 70 to merged (`a519243d`, PR #297).
 Added Step 70 for Story CC-7.13 (Calm Today with one primary job) and moved Step 69 to merged (`0d3b82a3`, PR #296).
 Added Step 69 for Story CC-7.12 (Looks tab for saved looks, ideas and plans) while its PR was in review, and moved Step 68 to merged (`a8863b05`, PR #295).
@@ -168,10 +170,10 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest step: Step 71, Story CC-7.14, Today's outfit as a picture, on `feat/epic7-story-7-14-todays-outfit-as-picture`.
-  Its plan is `_bmad-output/implementation-artifacts/spec-7-14-todays-outfit-as-picture.md`.
+- Latest step: Step 72, Story CC-7.15, Calm Community with an empty state.
+  Its plan is `_bmad-output/implementation-artifacts/spec-7-15-calm-community-empty-state.md`.
   `epic-7` is `in-progress` in `sprint-status.yaml`; CC-7.8 is `done` as dropped by owner decision.
-- Previous completed steps: Steps 59 to 70, Stories CC-7.1 to CC-7.7 and CC-7.9 to CC-7.13, merged on `main` (the last, Step 70, as `a519243d`, PR #297).
+- Previous completed steps: Steps 59 to 71, Stories CC-7.1 to CC-7.7 and CC-7.9 to CC-7.14, merged on `main` (the last, Step 71, as `53adbe2f`, PR #298).
 - Previous completed step: Step 58, production status and nightly health, the project close on 2026-11-19, merged on `main` (including its production follow-ups: image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week races, and production profile/location checks).
   It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
   Delivery for Epic 6 stays `in-progress` while `6-15b-expo-sdk-55-58-upgrade` stays `backlog`.

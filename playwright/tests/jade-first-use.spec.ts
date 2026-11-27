@@ -323,7 +323,8 @@ test.describe('Jade first use on a phone', () => {
       await expect(card).toHaveCount(0)
       await expect(rows).toHaveCount(0)
       await expect(page.getByTestId('community-feed-empty')).toBeVisible()
-      await expect(examples.getByText('Sample weather · Cool and rainy')).toHaveCount(3)
+      await expect(examples).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'See all climates' })).toBeVisible()
 
       await selectCommunityClimate(page, 'all')
       await expect(card).toBeVisible()

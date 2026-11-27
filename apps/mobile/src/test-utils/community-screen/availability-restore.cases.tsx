@@ -266,7 +266,7 @@ export function registerCommunityAvailabilityRestoreCases() {
     expect(screen.queryByTestId('community-banned-notice')).toBeNull()
     expect(screen.queryByTestId('community-feed-unavailable')).toBeNull()
     await waitFor(() =>
-      expect(screen.getByTestId('community-card-comments-post-a')).toBeVisible()
+      expect(screen.getByTestId('community-card-title-post-a')).toBeVisible()
     )
     await waitFor(() =>
       expect(screen.getByTestId('community-new-post-button')).toBeVisible()

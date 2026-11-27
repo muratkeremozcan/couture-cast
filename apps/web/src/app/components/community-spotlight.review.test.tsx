@@ -93,7 +93,7 @@ describe('CommunitySpotlightSection review round 2 (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-1')
-    await screen.findByTestId('lookbook-card-spot-1')
+    expect(screen.queryByTestId('lookbook-card-spot-1')).toBeNull()
     failImage('spotlight-lookbook-image-spot-1')
 
     expect(
@@ -123,7 +123,7 @@ describe('CommunitySpotlightSection review round 2 (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-1')
-    await screen.findByTestId('lookbook-card-spot-1')
+    expect(screen.queryByTestId('lookbook-card-spot-1')).toBeNull()
     const readsBefore = feedReads
     failImage('lookbook-image-spot-1')
 
@@ -168,7 +168,7 @@ describe('CommunitySpotlightSection review round 2 (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-2')
-    await screen.findByTestId('lookbook-card-spot-1')
+    expect(screen.queryByTestId('lookbook-card-spot-1')).toBeNull()
     await user.click(screen.getByTestId('community-spotlight-view-more'))
     await screen.findByTestId('spotlight-lookbook-card-spot-3')
     failImage('spotlight-lookbook-image-spot-1')

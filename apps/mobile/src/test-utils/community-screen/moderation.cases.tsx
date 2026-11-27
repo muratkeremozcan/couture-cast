@@ -66,6 +66,7 @@ export function registerCommunityModerationCases() {
     expect(notice.textContent).toContain(copy.appeal.not_requested)
     expect(notice.textContent).not.toContain(COMMUNITY_BANNED_MESSAGE)
     expect(screen.queryByTestId('community-feed-unavailable')).toBeNull()
+    expect(screen.queryByTestId('community-clear-filters')).toBeNull()
     expect(screen.queryByRole('button', { name: /try again|retry/i })).toBeNull()
     expect(reads).toBe(1)
   })

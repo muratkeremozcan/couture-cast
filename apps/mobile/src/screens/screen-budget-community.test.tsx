@@ -186,10 +186,6 @@ async function communitySettled(fixture: ScreenBudgetMode) {
       )
     ).toBeVisible()
   )
-  if (!hasSavedLocation(fixture))
-    await waitFor(() =>
-      expect(screen.getByTestId('community-band-unresolved')).toBeVisible()
-    )
 }
 
 describe('Screen budget: native Community', () => {
@@ -228,7 +224,8 @@ describe('Screen budget: native Community', () => {
       expectNativeMeasureFloors(measurement, 'community')
       // Production's no_location panel (community.service.ts) carries the guided Add location
       // action; a member with a city has neither.
-      const notice = screen.queryByTestId('community-band-unresolved')
+      const sheet = await openCommunityClimate()
+      const notice = sheet.queryByTestId('community-band-unresolved')
       if (hasSavedLocation(fixture)) {
         expect(notice).toBeNull()
       } else {

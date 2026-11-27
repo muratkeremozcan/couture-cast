@@ -49,16 +49,10 @@ const own = () => ({
   reactions: ZERO,
 })
 type Surface = 'feed' | 'spotlight' | 'detail' | 'spotlight-detail'
-const opener = (surface: Surface) =>
-  within(
-    screen.getByTestId(
-      surface.endsWith('detail')
-        ? 'community-detail'
-        : `${surface === 'spotlight' ? 'spotlight-' : ''}lookbook-card-spot-self`
-    )
-  ).getByTestId('share-card-open')
+const opener = () =>
+  within(screen.getByTestId('community-detail')).getByTestId('share-card-open')
 
-function useTransport(duplicate = false) {
+function useTransport(source: 'feed' | 'spotlight' | 'both' = 'spotlight') {
   const syncs: CommunitySyncState[] = []
   vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
     this: CommunitySyncState
@@ -73,8 +67,10 @@ function useTransport(duplicate = false) {
   let removed = false
   const post = () => ({ ...own(), author: { displayName: 'Member', isSelf: self } })
   useMswHandlers(
-    http.get(FEED_PATH, () => reactionFeedBody(duplicate ? [post()] : [])),
-    http.get(SPOTLIGHT_PATH, () => spotlightBody({ items: [ranked(1, post())] })),
+    http.get(FEED_PATH, () => reactionFeedBody(source === 'spotlight' ? [] : [post()])),
+    http.get(SPOTLIGHT_PATH, () =>
+      spotlightBody({ items: source === 'feed' ? [] : [ranked(1, post())] })
+    ),
     http.post('/api/v1/community/posts/:postId/opened', () =>
       HttpResponse.json({ tracked: true })
     ),
@@ -133,18 +129,10 @@ async function open(surface: Surface = 'spotlight') {
   // A feed or spotlight read that lands after the share dialog opens remounts the cards under
   // it, so wait until neither surface is busy before interacting.
   await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeNull())
-  await screen.findByTestId(
-    `${surface.startsWith('spotlight') ? 'spotlight-' : ''}lookbook-card-spot-self`
-  )
-  if (surface.endsWith('detail')) {
-    await userEvent.click(
-      screen.getByTestId(
-        `${surface === 'spotlight-detail' ? 'spotlight-' : ''}lookbook-open-spot-self`
-      )
-    )
-    await screen.findByTestId('community-detail')
-  }
-  const button = opener(surface)
+  const scope = surface.startsWith('spotlight') ? 'spotlight-' : ''
+  await userEvent.click(await screen.findByTestId(scope + 'lookbook-open-spot-self'))
+  await screen.findByTestId('community-detail')
+  const button = opener()
   await userEvent.click(button)
   await screen.findByRole('dialog', { name: 'Your share card' })
   const image = await screen.findByTestId('share-card-preview')
@@ -181,26 +169,22 @@ describe('community share host across card surfaces', () => {
     expect(screen.getByTestId('share-card-save')).toBeEnabled()
   })
 
-  it.each(['spotlight', 'feed', 'detail'] as const)(
-    'returns focus to the invoking %s copy when a post appears twice',
-    async (surface) => {
-      useTransport(true)
-      renderGrid()
-      await screen.findByTestId('lookbook-card-spot-self')
-      await screen.findByTestId('spotlight-lookbook-card-spot-self')
-      const { button } = await open(surface)
-      await userEvent.click(screen.getByRole('checkbox', { name: 'Show watermark' }))
-      await cancel()
-      expect(button).toHaveFocus()
-    }
-  )
+  it('returns to the detail share control when feed and Spotlight project one post', async () => {
+    useTransport('both')
+    renderGrid()
+    await screen.findByTestId('spotlight-lookbook-card-spot-self')
+    expect(screen.queryByTestId('lookbook-card-spot-self')).toBeNull()
+    const { button } = await open('spotlight')
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Show watermark' }))
+    await cancel()
+    expect(button).toHaveFocus()
+  })
 
   it.each(['spotlight', 'feed'] as const)(
     'retains composition through re-verification and restores the remounted %s invoker',
     async (surface) => {
-      const view = useTransport(true)
+      const view = useTransport(surface)
       renderGrid()
-      await screen.findByTestId('spotlight-lookbook-card-spot-self')
       await act(() => view.sync().catchUp())
       const { button } = await open(surface)
       await userEvent.click(screen.getByRole('checkbox', { name: 'Show watermark' }))
@@ -233,7 +217,7 @@ describe('community share host across card surfaces', () => {
         before
       )
       expect(view.requests).toHaveLength(2)
-      const restored = opener(surface)
+      const restored = opener()
       expect(restored).not.toBe(button)
       await cancel()
       expect(restored).toHaveFocus()
@@ -327,7 +311,7 @@ describe('community share host above an open detail dialog', () => {
   }
 
   it('resumes with the share dialog reachable and the detail covered, then unwinds on Escape', async () => {
-    const view = useTransport(true)
+    const view = useTransport('feed')
     renderGrid()
     await open('detail')
     expect(reachable(shareDialog())).toBe(true)
@@ -349,7 +333,7 @@ describe('community share host above an open detail dialog', () => {
   })
 
   it('keeps Cancel working after resuming', async () => {
-    const view = useTransport(true)
+    const view = useTransport('feed')
     renderGrid()
     await open('detail')
     await reverify(view)
@@ -373,7 +357,7 @@ describe('community share host above an open detail dialog', () => {
   ] as const)(
     'restores focus to the remounted %s card control after the detail closes',
     async (_origin, surface, testId) => {
-      const view = useTransport(true)
+      const view = useTransport(surface === 'spotlight-detail' ? 'spotlight' : 'feed')
       renderGrid()
       await open(surface)
       const before = screen.getByTestId(testId)
@@ -388,7 +372,7 @@ describe('community share host above an open detail dialog', () => {
   )
 
   it('falls back to the community section only when the card is gone', async () => {
-    const view = useTransport(true)
+    const view = useTransport('feed')
     renderGrid()
     await open('detail')
     await reverify(view, view.removePost)
@@ -403,7 +387,7 @@ describe('community share host above an open detail dialog', () => {
   })
 
   it('returns focus to the share control, then to the card control that opened the detail', async () => {
-    useTransport(true)
+    useTransport('feed')
     renderGrid()
     await open('detail')
     await cancel()
@@ -424,7 +408,7 @@ describe('community share host above an open detail dialog', () => {
   })
 
   it('releases the page when access is denied during re-verification', async () => {
-    const view = useTransport(true)
+    const view = useTransport('feed')
     renderGrid()
     await open('detail')
     const release = view.hold()
@@ -447,7 +431,7 @@ describe('community share host above an open detail dialog', () => {
   })
 
   it('releases the page when the owned post is removed during re-verification', async () => {
-    const view = useTransport(true)
+    const view = useTransport('feed')
     renderGrid()
     await open('detail')
     await reverify(view, view.removePost)

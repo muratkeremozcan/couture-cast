@@ -1007,15 +1007,7 @@ interface LookbookDetailDialogProps {
   onClose: () => void
 }
 
-/**
- * What a card opens into. The grid crops each look to a 256px `object-cover`
- * band and clamps its caption to three lines, so this is the only place the
- * whole photograph and the whole caption are readable.
- *
- * `object-contain` rather than the grid's `object-cover`: cropping is a grid
- * affordance, and a look the reader deliberately opened must not lose its hem
- * or its hat to the frame.
- */
+/** Shows the whole photograph, caption and secondary actions for the opened look. */
 function LookbookDetailDialog({
   suspended = false,
   focusComments,
@@ -1986,14 +1978,19 @@ function CommunityNotices({
   )
 }
 
-function clearClimateFilters(
+function climateEmptyAction(
   mode: ClimateBand | null,
+  itemCount: number,
+  loading: boolean,
+  error: Message | null,
   onModeChange: (mode: FilterCategory) => void
 ) {
-  return mode === null ? undefined : () => onModeChange('all')
+  if (mode === null || itemCount > 0 || loading || error) return undefined
+  return () => onModeChange('all')
 }
 
 interface CommunityFeedStatesProps {
+  settled: boolean
   isLoading: boolean
   errorText: string | null
   /**
@@ -2013,6 +2010,7 @@ interface CommunityFeedStatesProps {
 }
 
 function CommunityFeedStates({
+  settled,
   isLoading,
   errorText,
   retryable,
@@ -2073,7 +2071,7 @@ function CommunityFeedStates({
         </div>
       )}
 
-      {!isLoading && errorText === null && itemCount === 0 && (
+      {settled && errorText === null && itemCount === 0 && (
         <div
           data-testid="community-feed-empty"
           data-surface="card"
@@ -2603,6 +2601,7 @@ export function CommunityLookbookGrid({
   const feedScopeRef = useRef(0)
   const [isInsertingLooks, setIsInsertingLooks] = useState(false)
   const gridRef = useRef<HTMLDivElement>(null)
+  const withdrawnFocus = useRef<{ postId: string; opener: Element } | null>(null)
   // The cards the grid rendered last, so a D3 hide can capture where the reader was.
   const renderedItemsRef = useRef<CommunityFeedItem[]>([])
   const { capture: captureScroll, restore: restoreScroll } = useCommunityScrollRestore({
@@ -2900,6 +2899,7 @@ export function CommunityLookbookGrid({
   // sponsorship stamp, both taken as the read starts, in the token the hook
   // hands back with the page. Nothing is stored per read, so a failed, aborted
   // or superseded read leaves nothing behind.
+  const climate = communityFeedClimate(servedMode, viewerBand, bandResolved)
   const spotlight = useCommunitySpotlight<{
     ticket: number
     stamp: LiveReadStamp
@@ -2929,6 +2929,13 @@ export function CommunityLookbookGrid({
             ]
           : []
       })
+    },
+    visiblePage: (page, append) => {
+      if (!communityAvailable || bannedSanction || rowsMode !== currentMode) return []
+      const matching = mergeCommunityLooks(page, [], climate, teaserTarget)
+      if (!append) return matching
+      const shown = new Set(renderedItemsRef.current.map((item) => item.id))
+      return matching.filter((item) => !shown.has(item.id))
     },
     announce: (message) => {
       setAnnouncement({ ...message, announcementId: ++reactionAnnouncementId.current })
@@ -3013,6 +3020,7 @@ export function CommunityLookbookGrid({
     if (syncedTabRef.current === activeTab) return
     syncedTabRef.current = activeTab
     restoringRowsRef.current = false
+    setRestoring(false)
     setCurrentMode(activeTab)
   }, [activeTab])
 
@@ -3334,6 +3342,7 @@ export function CommunityLookbookGrid({
       setPendingFocus(null)
       setTeaserTarget(null)
       setDismissedChallenges(new Set())
+      withdrawnFocus.current = null
       setActiveChallenge(null)
       setSpotlightNotice(null)
       // A sanction names one member's ban, its expiry and appeal, so it leaves with that member.
@@ -4045,6 +4054,21 @@ export function CommunityLookbookGrid({
     [deepLinkedItem, items]
   )
 
+  const spotlightItems = spotlight.state.items
+  const visibleRows = useMemo(() => {
+    if (rowsMode !== currentMode && isLoading) return []
+    return mergeCommunityLooks(spotlightItems, displayedItems, climate, teaserTarget)
+  }, [
+    climate,
+    currentMode,
+    displayedItems,
+    isLoading,
+    rowsMode,
+    spotlightItems,
+    teaserTarget,
+  ])
+
+  const available = feedVisible(communityAvailable, bannedSanction)
   const focusedTargetRef = useRef<string | null>(null)
   // Codex review P2-8: the deep-link focus is spent only once the screen gate shows the body and
   // the card took focus; a card still hidden under the placeholder would drop it.
@@ -4054,7 +4078,7 @@ export function CommunityLookbookGrid({
       focusedTargetRef.current = null
       return
     }
-    if (focusedTargetRef.current === highlightedCardId || !gateOpen) return
+    if (focusedTargetRef.current === highlightedCardId || !gateOpen || !available) return
     const cardElement =
       document.getElementById(spotlightCardElementId(highlightedCardId)) ??
       document.getElementById(`lookbook-card-${highlightedCardId}`)
@@ -4065,12 +4089,13 @@ export function CommunityLookbookGrid({
       focusedTargetRef.current = highlightedCardId
       setAnnouncement({ key: 'community.feed.announceFocused' })
     }
-  }, [highlightedCardId, displayedItems, setAnnouncement, gateOpen])
+  }, [available, gateOpen, highlightedCardId, setAnnouncement, visibleRows])
 
   const handleModeChange = (mode: FilterCategory) => {
     // Another filter's first page replaces the restored rows.
     if (mode !== currentMode) {
       restoringRowsRef.current = false
+      setRestoring(false)
       setIsLoading(true)
     }
     setTeaserTarget(null)
@@ -4112,27 +4137,19 @@ export function CommunityLookbookGrid({
    * seeing a photograph. The event's `isSelf` is decided server-side from the
    * stored author id, so nothing here compares ids.
    */
-  const showDetail = (
-    item: CommunityFeedItem,
-    commentsFocus: boolean,
-    surface: AffiliateCommunitySurface
-  ) => {
+  const showDetail = (item: CommunityFeedItem, surface: AffiliateCommunitySurface) => {
     notificationIntentRef.current++
     setDetailSurface(surface)
-    detailOpener.record(surface, commentsFocus, item.id)
-    setFocusComments(commentsFocus)
+    detailOpener.record(surface, item.id)
+    setFocusComments(false)
     setAnnouncement(null)
     setReactionFeedback(null)
     setOpenedItem(reactionState.current(item))
   }
 
-  const handleOpenCard = (
-    item: CommunityFeedItem,
-    commentsFocus = false,
-    surface: AffiliateCommunitySurface = 'community_feed'
-  ) => {
-    showDetail(item, commentsFocus, surface)
-    if (commentsFocus || experimentVariant === null) {
+  const handleOpenCard = (item: CommunityFeedItem) => {
+    showDetail(item, 'community_feed')
+    if (experimentVariant === null) {
       return
     }
     void openCommunityPostFromWeb(item.id, experimentVariant).catch(() => undefined)
@@ -4146,7 +4163,7 @@ export function CommunityLookbookGrid({
    */
   const handleOpenSpotlightCard = (item: CommunitySpotlightItem) => {
     const { rank, ...post } = item
-    showDetail(post, false, 'community_spotlight')
+    showDetail(post, 'community_spotlight')
     const { level } = spotlight.state
     if (level === 'none') return
     void openCommunitySpotlightPostFromWeb(item.id, rank, level).catch(() => undefined)
@@ -4261,9 +4278,13 @@ export function CommunityLookbookGrid({
   const handleWithdrawPost = async (postId: string): Promise<void> => {
     if (!communityAvailable) return
     const action = beginAction()
+    const opener = document.activeElement
     try {
       await withdrawCommunityPostFromWeb(postId, action.signal)
       if (action.signal.aborted) return
+      if (opener?.getAttribute('data-testid') === 'community-card-actions') {
+        withdrawnFocus.current = { postId, opener }
+      }
       // No optimistic removal: `items` is published rows only, and a withdrawn
       // post moves to `authorStates` on the next read. Filtering it out locally
       // is what made it reappear on the following refresh.
@@ -4417,7 +4438,6 @@ export function CommunityLookbookGrid({
 
   const spotlightStatus = spotlight.state.status
   const spotlightLevel = spotlight.state.level
-  const spotlightItems = spotlight.state.items
   const focusSpotlightEntry = spotlight.focusEntry
   useEffect(() => {
     if (!gateOpen || !pendingFocus) return
@@ -4528,20 +4548,6 @@ export function CommunityLookbookGrid({
     viewerBand,
   ])
 
-  const available = feedVisible(communityAvailable, bannedSanction)
-  const climate = communityFeedClimate(servedMode, viewerBand, bandResolved)
-  const visibleRows = useMemo(() => {
-    if (rowsMode !== currentMode && isLoading) return []
-    return mergeCommunityLooks(spotlightItems, displayedItems, climate, teaserTarget)
-  }, [
-    climate,
-    currentMode,
-    displayedItems,
-    isLoading,
-    rowsMode,
-    spotlightItems,
-    teaserTarget,
-  ])
   const presentation = communityPresentation(
     available,
     memberSession,
@@ -4557,6 +4563,18 @@ export function CommunityLookbookGrid({
     renderedItemsRef.current = presentation.items
     restoreScroll(presentation.items)
   }, [communityAvailable, presentation.items, restoreScroll])
+
+  useLayoutEffect(() => {
+    const withdrawn = withdrawnFocus.current
+    if (!available || !withdrawn || withdrawn.opener.isConnected) return
+    if (presentation.items.some((item) => item.id === withdrawn.postId)) return
+    withdrawnFocus.current = null
+    if (document.activeElement === document.body) {
+      document
+        .querySelector<HTMLElement>('[data-testid="community-climate-filter"]')
+        ?.focus()
+    }
+  }, [available, presentation.items])
 
   const { shareHost, shareDialog } = useCommunityShareHost(
     presentation.items,
@@ -4588,7 +4606,14 @@ export function CommunityLookbookGrid({
     (spotlightStatus === 'loading' && visibleRows.length === 0)
   const settledClimate =
     available && memberSession && !isLoading && feedSettled ? climate : null
-  const handleShowAllClimates = clearClimateFilters(settledClimate, handleModeChange)
+  const handleShowAllClimates = climateEmptyAction(
+    settledClimate,
+    presentation.items.length,
+    waitingForLooks,
+    feedError,
+    handleModeChange
+  )
+  const climateEmpty = Boolean(handleShowAllClimates)
 
   const renderHeader = () => (
     <>
@@ -4651,11 +4676,9 @@ export function CommunityLookbookGrid({
         <CommunityBannedNotice sanction={bannedSanction} language={i18n.language} t={t} />
       ) : (
         <CommunityFeedStates
+          settled={available && !waitingForLooks}
           isLoading={available && waitingForLooks}
-          errorText={
-            renderMessage(feedError, t, viewerBand) ??
-            (available ? null : t('community.realtime.unavailable'))
-          }
+          errorText={renderMessage(feedError, t, viewerBand)}
           retryable={feedError?.key !== FAILURE_KEYS.signed_out}
           itemCount={presentation.items.length}
           gridColumns={gridColumns}
@@ -4731,7 +4754,7 @@ export function CommunityLookbookGrid({
         </div>
       </div>
 
-      {available && (
+      {available && !climateEmpty && (
         <CommunitySpotlightPaging
           state={spotlightState}
           t={t}
@@ -4745,7 +4768,7 @@ export function CommunityLookbookGrid({
         />
       )}
       <AuthorStatesSection states={presentation.authorStates} t={t} />
-      {!(settledClimate && presentation.items.length === 0) && (
+      {!climateEmpty && (
         <CommunityExampleInspiration
           available={feedVisible(communityAvailable, bannedSanction)}
           loading={isLoading}
@@ -4758,7 +4781,7 @@ export function CommunityLookbookGrid({
       )}
 
       <LoadMoreControl
-        nextCursor={presentation.nextCursor}
+        nextCursor={climateEmpty ? null : presentation.nextCursor}
         isLoading={firstLoadShowing(isLoading, restoring)}
         isRefreshing={isLoading}
         isLoadingMore={isLoadingMore}

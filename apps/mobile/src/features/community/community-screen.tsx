@@ -296,6 +296,13 @@ export function CommunityScreen() {
     useLocalSearchParams()
   const router = useRouter()
   const targetRef = useRef<View>(null)
+  const climateTriggerRef = useRef<View>(null)
+  const pendingNotificationFocus = useRef<{
+    postId: string
+    intent: number
+    scope: string
+  } | null>(null)
+  const visibleFeedRows = useRef<readonly CommunityFeedItem[]>([])
   const newPostButtonRef = useRef<View>(null)
   const cardRefs = useRef(new Map<string, View>())
   const [deepLinkPost, setDeepLinkPost] = useState<CommunityFeedItem | null>(null)
@@ -456,6 +463,13 @@ export function CommunityScreen() {
     sponsorships,
     postTextLedger,
     onBanned: setBannedSanction,
+    visiblePage: (page, append) => {
+      if (!communityAvailable || (append && feedState !== 'ready')) return []
+      const matching = mergeCommunityLooks(page, [], climate, teaserTarget)
+      if (!append) return matching
+      const shown = new Set(visibleFeedRows.current.map((item) => item.id))
+      return matching.filter((item) => !shown.has(item.id))
+    },
     onRefreshFailed: (retry) => {
       statusBar.showNotice({
         id: 'community-spotlight-refresh-failed',
@@ -611,6 +625,7 @@ export function CommunityScreen() {
 
   useEffect(() => {
     highlightedTargetRef.current = null
+    pendingNotificationFocus.current = null
     if (!sessionScope) return
     // Story 6.7: an in-app spotlight focus intent is resolved by its own effect
     // and never reaches the notification path or its invalid-link banner.
@@ -786,16 +801,23 @@ export function CommunityScreen() {
         setNoticeKey((previous) =>
           previous === 'community.realtime.unavailable' ? null : previous
         )
+        if (intent !== notificationIntentRef.current) return
         const focus = target.comment ?? target.parent
-        if (focus && intent === notificationIntentRef.current) {
-          setCommentTarget({
-            commentId: focus.id,
-            parentId: target.comment?.parentId ?? null,
-            pageCursor: target.comment ? target.pageCursor : target.parentPageCursor,
-            parentPageCursor: target.parentPageCursor,
-          })
-          setCommentsPostId(target.post.id)
+        if (!focus) {
+          pendingNotificationFocus.current = {
+            postId: post.id,
+            intent,
+            scope: sessionScope,
+          }
+          return
         }
+        setCommentTarget({
+          commentId: focus.id,
+          parentId: target.comment?.parentId ?? null,
+          pageCursor: target.comment ? target.pageCursor : target.parentPageCursor,
+          parentPageCursor: target.parentPageCursor,
+        })
+        setCommentsPostId(target.post.id)
       })
       .catch((error: unknown) => {
         if (!active || detailGeneration !== detailGenerationRef.current) {
@@ -876,41 +898,18 @@ export function CommunityScreen() {
     })
   }, [source, type, cardId, focus, focusToken, router])
 
-  const focusNode = useCallback((node: View | null) => {
+  const focusNode = useCallback((node: View | null, isCurrent?: () => boolean) => {
     if (Platform.OS === 'web' || !node) {
       return
     }
     requestAnimationFrame(() => {
+      if (isCurrent && !isCurrent()) return
       const handle = safeFindNodeHandle(node)
       if (handle) {
         AccessibilityInfo.setAccessibilityFocus(handle)
       }
     })
   }, [])
-
-  /**
-   * Mirrors web's own deep-link focus effect: focus lands on the card itself
-   * (web calls `cardElement.focus()`), and `community.feed.announceFocused` is
-   * the same key web already announces through its own live region. Reusing it
-   * means the two surfaces need no new locale key for this, and no separate
-   * visible badge either -- web's highlighted card carries no such badge, only a
-   * border treatment, which is what `CommunityCard`'s `isHighlighted` prop gives
-   * mobile already.
-   */
-  const focusedTargetRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (!deepLinkPost || commentTarget) {
-      return
-    }
-    if (focusedTargetRef.current === deepLinkPost.id) return
-    focusedTargetRef.current = deepLinkPost.id
-    // A reader who opened comments before the linked post arrived has moved on. Focus
-    // stays in the open sheet, and closing it restores focus to its own invoker, so a
-    // card focus here would pull focus out of the sheet or take it back after the close.
-    if (commentsPostId !== null) return
-    AccessibilityInfo.announceForAccessibility(t('community.feed.announceFocused'))
-    focusNode(targetRef.current)
-  }, [focusNode, deepLinkPost, commentTarget, commentsPostId, t])
 
   /**
    * One in-flight feed request at a time, guarded twice: the `AbortController`
@@ -1827,6 +1826,7 @@ export function CommunityScreen() {
     spotlightItems,
     teaserTarget,
   ])
+  visibleFeedRows.current = feedRows
   const climateEmpty = climate !== null && feedRows.length === 0 && Boolean(sessionScope)
   // Story CC-7.7 D3: the Community gate waits for the first feed page and the City Spotlight,
   // so the Spotlight never arrives above a feed the member is already reading. A Spotlight
@@ -1901,6 +1901,47 @@ export function CommunityScreen() {
   // only once the gate actually shows it, the gate's deadline opening included, so an intent
   // that timed out behind the placeholder still focuses its notice when the body appears.
   const [communityGateOpen, setCommunityGateOpen] = useState(false)
+
+  // The direct read can beat the feed and the gate. Keep focus pending until its title mounts.
+  const focusNotificationTitle = useCallback(() => {
+    const pending = pendingNotificationFocus.current
+    if (!pending) return
+    const stillCurrent = () =>
+      pending.intent === notificationIntentRef.current &&
+      pending.scope === sessionScopeRef.current
+    if (!stillCurrent() || commentsPostId !== null) {
+      pendingNotificationFocus.current = null
+      return
+    }
+    if (
+      !communityAvailable ||
+      !communityGateOpen ||
+      !screenFocused ||
+      deepLinkPost?.id !== pending.postId ||
+      !targetRef.current
+    )
+      return
+    pendingNotificationFocus.current = null
+    AccessibilityInfo.announceForAccessibility(t('community.feed.announceFocused'))
+    const title = targetRef.current
+    focusNode(
+      title,
+      () => screenFocusedRef.current && stillCurrent() && targetRef.current === title
+    )
+  }, [
+    commentsPostId,
+    communityAvailable,
+    communityGateOpen,
+    deepLinkPost?.id,
+    focusNode,
+    screenFocused,
+    t,
+  ])
+
+  useEffect(() => {
+    focusNotificationTitle()
+  }, [feedRows, focusNotificationTitle])
+
   // Focusing the notice is its single announcement: the list returns to its
   // top, then focus moves to the message. No live region repeats it.
   useEffect(() => {
@@ -1986,6 +2027,7 @@ export function CommunityScreen() {
     const index = feedRows.findIndex((item) => item.id === firstId && isRankedLook(item))
     focusedSpotlightSerial.current = serial
     acknowledgeSpotlightFocus(serial)
+    if (kind !== 'refreshed' && index === -1) return
     const message =
       kind === 'appended'
         ? t('community.spotlight.announceLoadedMore', {
@@ -2233,15 +2275,15 @@ export function CommunityScreen() {
   const renderFeedDetailCard = (post: CommunityFeedItem) => (
     <CommunityCard
       onExport={(postId, opener) => closeFeedDetail(() => openShareCard(postId, opener))}
-      onComments={(target) =>
+      onComments={(target) => {
+        notificationIntentRef.current++
         closeFeedDetail(() => {
-          notificationIntentRef.current++
           commentsInvokerRef.current =
             cardRefs.current.get(target.id) ??
             (deepLinkPost?.id === target.id ? targetRef.current : null)
           setCommentsPostId(target.id)
         })
-      }
+      }}
       reactionControls={reactionState.controls(post.id)}
       item={post}
       onTextSaved={updateSavedText}
@@ -2269,7 +2311,10 @@ export function CommunityScreen() {
             ? undefined
             : (node) => {
                 registerSpotlightTitle(post.id, node)
-                if (highlighted) targetRef.current = node
+                if (highlighted) {
+                  targetRef.current = node
+                  focusNotificationTitle()
+                }
               }
         }
         onExport={
@@ -2279,13 +2324,14 @@ export function CommunityScreen() {
         }
         onComments={
           inDetail
-            ? (target) =>
+            ? (target) => {
+                notificationIntentRef.current++
                 viaDetail(() => {
-                  notificationIntentRef.current++
                   commentsInvokerRef.current =
                     spotlightRankRefs.current.get(target.id) ?? null
                   setCommentsPostId(target.id)
                 })
+              }
             : undefined
         }
         reactionControls={reactionState.controls(post.id)}
@@ -2377,11 +2423,12 @@ export function CommunityScreen() {
           <CommunityChallengeBanner
             challenge={activeChallenge}
             onParticipate={(opener) => openPostSheet(true, opener)}
-            onDismiss={() =>
+            onDismiss={() => {
               setDismissedChallenges((previous) =>
                 new Set(previous).add(activeChallenge.id)
               )
-            }
+              focusNode(climateTriggerRef.current)
+            }}
           />
         )}
       {spotlightNotice && renderLeadNotices()}
@@ -2412,7 +2459,10 @@ export function CommunityScreen() {
                 feedTitleRef={(node) => {
                   if (node) cardRefs.current.set(item.id, node)
                   else cardRefs.current.delete(item.id)
-                  if (highlighted) targetRef.current = node
+                  if (highlighted) {
+                    targetRef.current = node
+                    focusNotificationTitle()
+                  }
                 }}
                 onReport={handleReportPost}
                 onWithdraw={handleWithdrawPost}
@@ -2522,6 +2572,7 @@ export function CommunityScreen() {
       {!bannedSanction && (
         <CommunityFilterChips
           selectedMode={servedMode}
+          triggerRef={climateTriggerRef}
           onSelectMode={handleSelectMode}
           viewerBand={bandResolved ? viewerBand : null}
           active={screenFocused}
@@ -2559,7 +2610,7 @@ export function CommunityScreen() {
               tintColor={palette.ink}
             />
           }
-          onEndReached={handleLoadMore}
+          onEndReached={climateEmpty ? undefined : handleLoadMore}
           onEndReachedThreshold={0.5}
           ListHeaderComponent={renderHeaderComponent()}
           // Elements keep the empty state and the load-more control mounted across
@@ -2573,9 +2624,12 @@ export function CommunityScreen() {
           }
           ListFooterComponent={
             <>
-              {communityAvailable && renderSpotlightPaging()}
+              {communityAvailable &&
+                feedState === 'ready' &&
+                !climateEmpty &&
+                renderSpotlightPaging()}
               {renderExampleInspiration()}
-              {renderPagingFooter()}
+              {!climateEmpty && renderPagingFooter()}
             </>
           }
           contentContainerStyle={styles.listContent}

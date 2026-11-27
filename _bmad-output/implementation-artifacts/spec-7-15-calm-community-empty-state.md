@@ -3,14 +3,14 @@ title: 'Story CC-7.15: Calm Community with an empty state'
 type: feature
 ticket: '7-15-calm-community-empty-state'
 created: '2026-11-27'
-status: in-review
+status: built
 baseline_revision: '53adbe2fa05067b2da2294b40611b19684371d6b'
 route: full
 route_source: auto
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
+lenses_ran: [independent-full-review, codex-security-diff]
 review_loop_iteration: 0
 context: []
 ---
@@ -94,6 +94,29 @@ Post grow when text is enlarged.
 ## Plan Change Log
 
 ## Review Triage Log
+
+The full review covered `53adbe2fa05067b2da2294b40611b19684371d6b` through
+`32423cbc83443223a719a60f6354492709ca4299`. Codex Security completed 79 static
+worklist receipts with 23 inventory exclusions and zero reportable findings.
+The review recorded 6 high, 6 medium and 3 low items.
+
+| Finding | Verdict | Resolution                                                                                             |
+| ------- | ------- | ------------------------------------------------------------------------------------------------------ |
+| P1-1    | High    | Keep one confirmed outage notice and suppress empty content during re-verification.                    |
+| P1-2    | High    | Use design-token values for native spacing and radii.                                                  |
+| P1-3    | High    | Cover both shared feed functions and their climate and deduplication paths.                            |
+| P1-4    | High    | Audit the closed filter and retire the three resolved explainer budget entries.                        |
+| P1-5    | High    | Suppress Spotlight paging in climate empty and focus only visible results.                             |
+| P1-6    | High    | Migrate test actions and selectors to the sheet, inline feed and detail.                               |
+| P2-1    | Medium  | Permit the native navigator's Community heading to wrap.                                               |
+| P2-2    | Medium  | Leave snapshot restore mode when a member selects a climate.                                           |
+| P2-3    | Medium  | Wait for the highlighted web row to appear before moving focus.                                        |
+| P2-4    | Medium  | Return native focus to the filter after challenge dismissal.                                           |
+| P2-5    | Medium  | Cover withdrawal, unavailable and restricted states, challenge and teaser behavior, and enlarged text. |
+| P2-6    | Medium  | Wait for the native notification target to mount before retiring focus.                                |
+| P3-1    | Low     | Remove the obsolete web comments opener selector and describe the current card.                        |
+| P3-2    | Low     | Bring the learning-path overview through Step 72.                                                      |
+| P3-3    | Low     | Restore web focus after the member withdraws the focused look.                                         |
 
 ## Verification
 

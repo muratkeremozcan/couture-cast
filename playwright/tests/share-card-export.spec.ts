@@ -38,6 +38,7 @@ import {
   modal,
   nextDownload,
   ownPhoto,
+  openOwnCommunityDetail,
   previewBytes,
   proxy,
   sha256,
@@ -1129,10 +1130,8 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
   })
   await page.goto('/community')
   const sameDocument = await markDocument(page)
-  const opener = page
-    .locator(`[data-testid$="lookbook-card-${fixture.postId}"]`)
-    .first()
-    .getByTestId('share-card-open')
+  const detail = await openOwnCommunityDetail(page)
+  const opener = detail.getByTestId('share-card-open')
   await expect(opener).toBeVisible()
   const downloads: string[] = []
   page.on('download', (d) => downloads.push(d.suggestedFilename()))
@@ -1150,10 +1149,7 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
     await control.getByRole('button', { name: 'Sign out', exact: true }).click()
     await control.waitForURL('/')
     await expect(
-      page
-        .locator(`[data-testid$="lookbook-card-${fixture.postId}"]`)
-        .first()
-        .getByTestId('share-card-open')
+      page.getByTestId('community-detail').getByTestId('share-card-open')
     ).toHaveCount(0)
     await sameDocument()
     gate.release()
@@ -1218,10 +1214,7 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
     await sameDocument()
     await expect(page.getByTestId('share-card-preview')).toHaveCount(0)
     await expect(
-      page
-        .locator(`[data-testid$="lookbook-card-${fixture.postId}"]`)
-        .first()
-        .getByTestId('share-card-open')
+      page.getByTestId('community-detail').getByTestId('share-card-open')
     ).toHaveCount(0)
     expect(downloads).toEqual([])
   } finally {

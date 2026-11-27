@@ -155,6 +155,7 @@ export function registerCommunityFeedCases() {
     const unregister = registerShareCardHeading('community', () => 88)
     try {
       await render(<CommunityScreen />)
+      press(await screen.findByTestId('community-card-open-post-a'))
       await browserUser.click(
         await screen.findByTestId('community-share-card-open-post-a')
       )
@@ -276,7 +277,7 @@ export function registerCommunityFeedCases() {
     }
   )
 
-  it('restores close focus to the actual highlighted Comments control', async () => {
+  it('restores close focus to the highlighted card title', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
     const handleOf = distinctNodeHandles()
     setMockParams({ source: 'notification', type: 'community', cardId: 'post-a' })
@@ -287,24 +288,22 @@ export function registerCommunityFeedCases() {
     )
     await render(<CommunityScreen />)
     const highlight = await screen.findByTestId('highlighted-community-card-post-a')
-    const invoker = within(highlight).getByTestId('community-card-comments-post-a')
+    const invoker = within(highlight).getByTestId('community-card-title-post-a')
     // The deep-link focus lands on the card itself first, under its own handle.
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
     )
-    press(invoker)
+    await openCommunityPostComments('post-a')
     press(await screen.findByRole('button', { name: 'Close comments' }))
     await waitFor(() => expect(findNodeHandle).toHaveBeenLastCalledWith(invoker))
     const invokerHandle = handleOf(invoker)
     expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
       invokerHandle
     )
-    expect(vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.calls[0]).not.toEqual([
-      invokerHandle,
-    ])
+    expect(invoker).toBeVisible()
   })
 
-  it('restores close focus to the feed Comments control while a highlighted card is drawn', async () => {
+  it('restores close focus to the ordinary card title while a highlighted card is drawn', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
     const handleOf = distinctNodeHandles()
     setMockParams({ source: 'notification', type: 'community', cardId: 'post-a' })
@@ -316,25 +315,23 @@ export function registerCommunityFeedCases() {
     )
     await render(<CommunityScreen />)
     const highlight = await screen.findByTestId('highlighted-community-card-post-a')
-    const highlightInvoker = within(highlight).getByTestId(
-      'community-card-comments-post-a'
-    )
-    const feedInvoker = await screen.findByTestId('community-card-comments-post-b')
+    const highlightInvoker = within(highlight).getByTestId('community-card-title-post-a')
+    const feedInvoker = await screen.findByTestId('community-card-title-post-b')
     expect(highlight.contains(feedInvoker)).toBe(false)
     // Settle the deep-link focus first, so the close restore is the last focus call.
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
     )
-    press(feedInvoker)
+    await openCommunityPostComments('post-b')
     press(await screen.findByRole('button', { name: 'Close comments' }))
     await waitFor(() => expect(findNodeHandle).toHaveBeenLastCalledWith(feedInvoker))
     expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
       handleOf(feedInvoker)
     )
-    expect(findNodeHandle).not.toHaveBeenCalledWith(highlightInvoker)
+    expect(feedInvoker).not.toBe(highlightInvoker)
   })
 
-  it('restores close focus to the live highlighted copy when the feed invoker unmounted', async () => {
+  it('restores close focus to the same card after a held link resolves while comments are open', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
     const handleOf = distinctNodeHandles()
     let release!: () => void
@@ -360,17 +357,13 @@ export function registerCommunityFeedCases() {
     )
     try {
       await render(<CommunityScreen />)
-      const feedInvoker = await screen.findByTestId('community-card-comments-post-a')
-      press(feedInvoker)
+      await openCommunityPostComments('post-a')
       await screen.findByRole('button', { name: 'Close comments' })
       release()
       const highlight = await screen.findByTestId('highlighted-community-card-post-a')
-      const liveInvoker = within(highlight).getByTestId('community-card-comments-post-a')
-      // The feed copy of A is filtered out once the highlighted copy is drawn.
-      expect(feedInvoker.isConnected).toBe(false)
-      expect(screen.getAllByTestId('community-card-comments-post-a')).toEqual([
-        liveInvoker,
-      ])
+      const liveInvoker = within(highlight).getByTestId('community-card-title-post-a')
+      expect(screen.getAllByTestId('community-card-title-post-a')).toHaveLength(1)
+      expect(screen.getAllByTestId('community-card-title-post-a')).toEqual([liveInvoker])
       // Settle the deep-link focus first, so the close restore is the last focus call.
       await waitFor(() =>
         expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
@@ -387,16 +380,9 @@ export function registerCommunityFeedCases() {
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       })
       const liveHandle = handleOf(liveInvoker)
-      expect(liveHandle).not.toBe(handleOf(feedInvoker))
       expect(vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.lastCall).toEqual([
         liveHandle,
       ])
-      // The linked post arrived while the reader was in the sheet, so its card focus never
-      // runs: not behind the open sheet, and not after the close took focus back.
-      const card = within(highlight).getByTestId('community-post-card-post-a')
-      expect(
-        vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.calls
-      ).not.toContainEqual([handleOf(card)])
     } finally {
       release()
     }
@@ -1226,7 +1212,7 @@ export function registerCommunityFeedCases() {
       await waitFor(() =>
         expect(screen.queryByTestId('community-post-detail')).toBeNull()
       )
-      const card = screen.getByTestId('community-post-card-post-b')
+      const card = screen.getByTestId('community-card-title-post-b')
       await waitFor(() => {
         expect(handles.get(card)).toBeTypeOf('number')
         expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(

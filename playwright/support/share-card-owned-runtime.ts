@@ -179,6 +179,13 @@ export async function loadOwnFeed(
   expect(verified.status).toBe(200)
   return new URL(verified.request!.url()).origin
 }
+export async function openOwnCommunityDetail(page: Page) {
+  await page
+    .getByTestId(new RegExp('^(spotlight-)?lookbook-open-' + fixture.postId + '$'))
+    .click()
+  return page.getByTestId('community-detail')
+}
+
 export async function ownPhoto(
   page: Page,
   interceptNetworkCall: InterceptNetworkCallFn | null,
@@ -187,10 +194,8 @@ export async function ownPhoto(
   const apiOrigin = interceptNetworkCall
     ? await loadOwnFeed(page, interceptNetworkCall)
     : ''
-  const opener = page
-    .locator(`[data-testid$="lookbook-card-${fixture.postId}"]`)
-    .first()
-    .getByTestId('share-card-open')
+  const detail = await openOwnCommunityDetail(page)
+  const opener = detail.getByTestId('share-card-open')
   await expect(opener).toBeVisible()
   if (preparationJourney) await preparationJourney(() => opener.click(), apiOrigin)
   else await opener.click()
