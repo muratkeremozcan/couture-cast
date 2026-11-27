@@ -271,6 +271,7 @@ export function StylePiecePanel({
               selection.id,
               piece.category,
               piece.comfortRange,
+              piece.subtype ?? null,
               initialSavedLook?.id ?? null,
             ])}
             anchor={inWardrobe ? anchor : null}

@@ -22474,4 +22474,13 @@ Use subtype tags to find a specific piece in Closet and choose which piece goes 
 - [Catalog invariants](../../packages/utils/src/sample-wardrobe/catalog.spec.ts),
   [sample browse](../../packages/utils/src/sample-wardrobe/display.spec.ts), and
   [weather ranking](../../packages/utils/src/sample-wardrobe/selector.spec.ts).
+- [Web client](../../apps/web/src/lib/wardrobe.test.ts),
+  [native client](../../apps/mobile/src/lib/wardrobe.test.ts), and
+  [wardrobe wire contract](../../packages/api-client/testing/wardrobe-contract.spec.ts).
+- [Web tag confirmation](../../apps/web/src/app/components/garment-tagging-modal.test.tsx)
+  and [native tag confirmation](../../apps/mobile/components/wardrobe/garment-tagging-modal.test.tsx).
+- [Web swap picture](../../apps/web/src/app/components/today-outfit-picture.test.tsx),
+  [native swap picture](../../apps/mobile/components/home/today-outfit-picture.test.tsx),
+  and [shared Today selection](../../packages/utils/src/sample-wardrobe/today-outfit.spec.ts).
+- [Preserving sample selections](../../packages/utils/src/sample-wardrobe/member-outfit.spec.ts).
 - [Step 75](#step-75-find-mini-skirts-tights-and-socks) covers the sample closet.

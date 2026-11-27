@@ -42,6 +42,7 @@ import {
 import {
   getGuestPreviewStrings,
   filterCloset,
+  resetUnavailableClosetSubtype,
   type ClosetGarmentFilter,
 } from '@couture/utils'
 
@@ -320,6 +321,12 @@ function MemberWardrobeHub({
     category: 'all',
     subtype: 'all',
   })
+  // The accepted inventory retains pieces during an in-flight read or delete Undo window.
+  useEffect(() => {
+    if (hasLoaded) {
+      setClosetFilter((filter) => resetUnavailableClosetSubtype(filter, garments))
+    }
+  }, [garments, hasLoaded])
   const { filterChips, filteredGarments } = filterCloset(
     visibleGarments,
     closetFilter,
@@ -615,14 +622,18 @@ function MemberWardrobeHub({
                 contentContainerStyle={styles.categoryFilters}
                 style={styles.categoryScroll}
               >
-                {filterChips.map(({ id, selected, label, filter }) => (
+                {filterChips.map(({ id, kind, selected, label, filter }) => (
                   <Pressable
                     key={id}
                     accessibilityRole="button"
-                    accessibilityState={{ selected: selected }}
+                    accessibilityState={{ selected }}
                     testID={id}
                     style={[
                       styles.categoryChip,
+                      kind === 'subtype' && styles.subtypeChip,
+                      kind === 'subtype' &&
+                        filter.subtype === 'all' &&
+                        styles.subtypeStart,
                       {
                         backgroundColor: selected ? colors.inverse : colors.page,
                         borderColor: colors.lineStrong,
@@ -872,6 +883,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 9999,
   },
+  subtypeChip: { borderRadius: 8 },
+  subtypeStart: { marginStart: 8 },
   secondaryButton: {
     alignItems: 'center',
     borderRadius: 8,

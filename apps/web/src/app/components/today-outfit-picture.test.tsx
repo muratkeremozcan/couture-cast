@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
 // Learning path Step 75: Find mini skirts, tights and socks.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-75-find-mini-skirts-tights-and-socks
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import {
   getGuestPreviewStrings,
   SAMPLE_CATALOG,
@@ -49,6 +51,28 @@ function mount(
 }
 
 afterEach(() => vi.useRealTimers())
+
+it('[7.19-SWAP] names an owned slot and its current option with the localized subtype', async () => {
+  const slot: TodaySlot = {
+    ...top,
+    category: 'shoes',
+    subtype: 'ankle-boots',
+    imageAccess: undefined,
+  }
+  render(
+    <TodayOutfitPicture
+      slots={[slot]}
+      strings={getGuestPreviewStrings('fr-FR')}
+      locale="fr-FR"
+      getOptions={() => [slot]}
+      onChoose={vi.fn()}
+    />
+  )
+  const opener = screen.getByTestId('today-outfit-slot-0')
+  expect(opener).toHaveAccessibleName(/Bottines/)
+  await userEvent.setup().click(opener)
+  expect(screen.getByRole('radio', { checked: true })).toHaveAccessibleName(/Bottines/)
+})
 
 it('exchanges only a loaded photo, then restores catalog art when its access expires', () => {
   vi.useFakeTimers()

@@ -7,6 +7,8 @@
 // Story CC-7.11 test owner (TEA): [Codex 7.11 #3], 7.11-NAT-032: the tagging header is the
 // layer's swipe handle, through the same close as its X.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
@@ -668,7 +670,7 @@ describe('MobileGarmentTaggingModal manual mode', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('preselects nothing and saves exactly what the member chose', async () => {
+  it('[7.19-CLOSET] starts unset, resets the subtype on category change, and saves the new subtype', async () => {
     const updateTagsFn = vi
       .fn()
       .mockResolvedValue(createReadyGarmentFixture({ id: 'g_123' }))
@@ -678,7 +680,18 @@ describe('MobileGarmentTaggingModal manual mode', () => {
     const save = screen.getByRole('button', { name: 'wardrobe.tagging.save' })
     expect(save.getAttribute('aria-disabled')).toBe('true')
 
+    expect(screen.queryByTestId('garment-tagging-subtype-picker')).toBeNull()
+    fireEvent.click(screen.getByTestId('garment-tag-category-top'))
+    const camisole = screen.getByTestId('garment-tagging-subtype-camisole')
+    fireEvent.click(camisole)
+    expect(camisole).toHaveAttribute('aria-checked', 'true')
     fireEvent.click(screen.getByTestId('garment-tag-category-outerwear'))
+    expect(screen.getByTestId('garment-tagging-subtype-none')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    expect(screen.queryByTestId('garment-tagging-subtype-camisole')).toBeNull()
+    fireEvent.click(screen.getByTestId('garment-tagging-subtype-blazer'))
     fireEvent.click(screen.getByTestId('garment-tag-comfort-cool'))
     await waitFor(() => {
       expect(save.getAttribute('aria-disabled')).not.toBe('true')
@@ -689,7 +702,12 @@ describe('MobileGarmentTaggingModal manual mode', () => {
       expect(updateTagsFn).toHaveBeenCalledWith(
         'test_token',
         'g_123',
-        { category: 'outerwear', material: null, comfortRange: 'cool' },
+        {
+          category: 'outerwear',
+          material: null,
+          comfortRange: 'cool',
+          subtype: 'blazer',
+        },
         expect.any(AbortSignal)
       )
     })

@@ -414,6 +414,73 @@ describe('[7.19-GENERATE] generation uses subtype within the weather fit', () =>
       }
     }
   )
+
+  it.each([22, 28])(
+    'uses a warm top subtype and keeps the generic bottom at %s°C',
+    (feelsLike) => {
+      const range = feelsLike < 25 ? 'warm' : 'hot'
+      const result = generateRitualScenarios({
+        ...baseInput,
+        weather: availableWeather({ feelsLike }),
+        eligibleGarments: [
+          buildGarment({
+            id: 'plain-top',
+            category: 'top',
+            comfort_range: range,
+            subtype: null,
+          }),
+          buildGarment({
+            id: 'tank',
+            category: 'top',
+            comfort_range: range,
+            subtype: 'tank',
+          }),
+          buildGarment({
+            id: 'legacy-bottom',
+            category: 'bottom',
+            comfort_range: range,
+            subtype: null,
+          }),
+          buildGarment({ id: 'shoes', category: 'shoes', comfort_range: range }),
+        ],
+      })
+      for (const scenario of result.scenarios) {
+        expect(scenario.garmentIds).toEqual(['tank', 'legacy-bottom', 'shoes'])
+      }
+    }
+  )
+
+  it('prefers cool-weather layers and bottoms within the same temperature tier', () => {
+    const result = generateRitualScenarios({
+      ...baseInput,
+      weather: availableWeather({ feelsLike: 12 }),
+      eligibleGarments: [
+        ...baseInput.eligibleGarments.filter(({ category }) => category !== 'bottom'),
+        buildGarment({
+          id: 'generic-layer',
+          category: 'outerwear',
+          comfort_range: 'cool',
+        }),
+        buildGarment({
+          id: 'moto-layer',
+          category: 'outerwear',
+          comfort_range: 'cool',
+          subtype: 'moto-jacket',
+        }),
+        buildGarment({ id: 'generic-bottom', category: 'bottom', comfort_range: 'cool' }),
+        buildGarment({
+          id: 'leggings',
+          category: 'bottom',
+          comfort_range: 'cool',
+          subtype: 'leggings',
+        }),
+      ],
+    })
+
+    for (const scenario of result.scenarios) {
+      expect(scenario.garmentIds).toEqual(['moto-layer', 'top-1', 'leggings', 'shoes-1'])
+    }
+  })
 })
 
 describe('generateRitualScenarios: exclusions', () => {

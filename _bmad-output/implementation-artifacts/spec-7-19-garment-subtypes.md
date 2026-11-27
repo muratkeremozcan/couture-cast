@@ -3,14 +3,14 @@ title: 'Story CC-7.19: Garment subtypes'
 type: feature
 ticket: '7-19-garment-subtypes'
 created: '2026-11-27'
-status: in-review
+status: done
 baseline_revision: '213cc386512a243d90ecd849ee81ce8a6b4dd25c'
 route: full
 route_source: pinned
 risk: medium
 review: thorough
 review_source: pinned
-lenses_ran: []
+lenses_ran: [independent-full-review, codex-security-diff]
 review_loop_iteration: 0
 context:
   - '_bmad-output/planning-artifacts/epics.md'
@@ -97,6 +97,22 @@ Let a member name a piece precisely and use that subtype when finding garments a
 ## Plan change log
 
 ## Review triage log
+
+The combined review used base `213cc386512a243d90ecd849ee81ce8a6b4dd25c` and head
+`ad4c2f23061b239647dbef055e572b6f23f353c5`.
+Codex Security found zero issues across 55 source worklist paths and eight supporting paths.
+It accounted for 23 documentation and version-comment exclusions.
+
+| Finding | Verdict   | Action                                                                                                                                         |
+| ------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1-1    | Confirmed | Update client header assertions and verify older responses.                                                                                    |
+| P1-2    | Confirmed | Preserve the member's explicit swaps when opening a look for a different slot. Cover the direct and fallback sock paths.                       |
+| P2-1    | Confirmed | Validate subtype and category at the HTTP input. Align optimistic comparison with the normalized read and preserve the published 400 response. |
+| P2-2    | Confirmed | Refresh the Style this piece editor when the anchor subtype changes.                                                                           |
+| P2-3    | Confirmed | Cover the client contract, tagging choices, Closet filters, swap state and generator weather choices.                                          |
+| P3-1    | Confirmed | Announce the localized subtype on mobile swaps.                                                                                                |
+| P3-2    | Confirmed | Distinguish subtype filters and clear a filter when the member removes its last matching garment.                                              |
+| P3-3    | Confirmed | Link Step 76 to the acceptance tests and close the spec and sprint entry before publishing.                                                    |
 
 ## Verification
 

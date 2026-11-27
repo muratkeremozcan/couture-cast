@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   GARMENT_SUBTYPES,
+  filterCloset,
   garmentSubtypesForCategory,
   garmentSubtypeStrings,
 } from '../index'
@@ -91,6 +92,50 @@ describe('[7.19-CATALOG] sample garment subtypes', () => {
       renderedGarments.flatMap(({ subtype }) => (subtype ? [subtype] : []))
     )
     expect([...renderedSubtypes].sort()).toEqual([...GARMENT_SUBTYPES].sort())
+  })
+})
+
+describe('[7.19-CLOSET] subtype filters', () => {
+  const legacy = { id: 'legacy', category: 'bottom', subtype: null } as const
+  const midi = { id: 'midi', category: 'bottom', subtype: 'midi-skirt' } as const
+
+  it('shows localized subtype chips only when the category has typed pieces', () => {
+    const filter = { category: 'bottom', subtype: 'all' } as const
+    const locale = 'fr-FR'
+    const withoutSubtypes = filterCloset([legacy], filter, locale, 'Tout')
+    expect(withoutSubtypes.filterChips.map(({ id }) => id)).toEqual([
+      'closet-category-all',
+      'closet-category-bottom',
+    ])
+    expect(withoutSubtypes.filteredGarments).toEqual([legacy])
+
+    const withSubtype = filterCloset(
+      [legacy, midi],
+      { ...filter, subtype: midi.subtype },
+      locale,
+      'Tout'
+    )
+    expect(withSubtype.filterChips).toContainEqual(
+      expect.objectContaining({
+        id: 'closet-subtype-midi-skirt',
+        label: 'Jupe midi',
+        selected: true,
+      })
+    )
+    expect(withSubtype.filteredGarments).toEqual([midi])
+  })
+
+  it('falls back to all items in the category when a subtype disappears', () => {
+    const result = filterCloset(
+      [legacy, midi],
+      { category: 'bottom', subtype: 'mini-skirt' },
+      'en-US',
+      'All'
+    )
+    expect(result.filterChips).toContainEqual(
+      expect.objectContaining({ id: 'closet-subtype-all', selected: true })
+    )
+    expect(result.filteredGarments).toEqual([legacy, midi])
   })
 })
 

@@ -8,6 +8,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 // Learning path Step 64: Garment delete (7.6-NAT-001, usage read and DELETE wrappers).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -445,11 +447,13 @@ describe('7.5 garment colorFamily opt-in', () => {
   }
 
   it('[P0] [7.5-NAT-001] sends the header on the list and reads colorFamily', async () => {
-    const headers: (string | null)[] = []
+    const headers: Headers[] = []
     server.use(
       http.get('*/api/v1/wardrobe/garments', ({ request }) => {
-        headers.push(request.headers.get('x-couture-garment-color'))
-        return HttpResponse.json({ data: [{ ...ready, colorFamily: 'blue' }] })
+        headers.push(request.headers)
+        return HttpResponse.json({
+          data: [{ ...ready, colorFamily: 'blue', subtype: 'tank' }],
+        })
       })
     )
 
@@ -457,8 +461,11 @@ describe('7.5 garment colorFamily opt-in', () => {
 
     // Every list read opts in to colorFamily.
     expect(headers.length).toBeGreaterThan(0)
-    expect(headers.every((header) => header === '1')).toBe(true)
-    expect(garments).toEqual([{ ...ready, colorFamily: 'blue' }])
+    for (const header of headers) {
+      expect(header.get('x-couture-garment-color')).toBe('1')
+      expect(header.get('x-couture-garment-subtype')).toBe('1')
+    }
+    expect(garments).toEqual([{ ...ready, colorFamily: 'blue', subtype: 'tank' }])
   })
 
   it('[P0] [7.5-NAT-001] reads a legacy list answer as colorFamily null', async () => {
@@ -472,11 +479,12 @@ describe('7.5 garment colorFamily opt-in', () => {
   })
 
   it('[P0] [7.5-NAT-001] sends the header and the exact tags on the update', async () => {
-    const seen: { header: string | null; body: unknown }[] = []
+    const seen: { color: string | null; subtype: string | null; body: unknown }[] = []
     server.use(
       http.patch('*/api/v1/wardrobe/garments/garment-1/tags', async ({ request }) => {
         seen.push({
-          header: request.headers.get('x-couture-garment-color'),
+          color: request.headers.get('x-couture-garment-color'),
+          subtype: request.headers.get('x-couture-garment-subtype'),
           body: await request.json(),
         })
         return HttpResponse.json({
@@ -499,7 +507,8 @@ describe('7.5 garment colorFamily opt-in', () => {
 
     expect(seen).toEqual([
       {
-        header: '1',
+        color: '1',
+        subtype: '1',
         body: { category: 'outerwear', material: null, comfortRange: 'cold' },
       },
     ])

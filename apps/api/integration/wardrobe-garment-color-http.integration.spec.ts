@@ -17,6 +17,7 @@ import {
   GARMENT_TAGS_CHANGED_MESSAGE,
   garmentItemSchema,
   garmentItemWithColorSchema,
+  garmentTagsBadRequestErrorSchema,
   WARDROBE_GARMENT_COLOR_HEADER,
 } from '@couture/api-client/contracts/http'
 import { buildGarmentObjectPath, colorFamilyFromHex } from '@couture/utils'
@@ -315,8 +316,16 @@ describe('7.19 garment subtype tags over HTTP (pg17)', () => {
     expect(set.status).toBe(200)
     expect(itemOf(set.body)).toMatchObject({ subtype: 'camisole' })
 
-    const mismatch = await patchTags({ ...tags, material: 'wool', subtype: 'socks' })
+    const mismatch = await patchTags({
+      ...tags,
+      material: 'wool',
+      subtype: 'socks',
+      expected: { ...tags, subtype: null },
+    })
     expect(mismatch.status).toBe(400)
+    expect(garmentTagsBadRequestErrorSchema.parse(mismatch.body).message).toMatch(
+      /^Invalid garment tags/
+    )
     const afterMismatch = await api
       .get('/api/v1/wardrobe/garments')
       .set('Authorization', owner.auth)
@@ -370,6 +379,33 @@ describe('7.19 garment subtype tags over HTTP (pg17)', () => {
     expect(listOf(fresh.body)).toEqual([
       expect.objectContaining({ id: garmentId, subtype: 'tank' }),
     ])
+  })
+
+  it('[P1] [7.19-HTTP] compares a legacy mismatched subtype against the null returned to the member', async () => {
+    vi.stubEnv('TEST_ENV', 'local')
+    const owner = await member()
+    const garmentId = await readyGarment(owner.userId, null)
+    await prisma.garmentItem.update({
+      where: { id: garmentId },
+      data: { subtype: 'socks' },
+    })
+
+    const read = await api
+      .get('/api/v1/wardrobe/garments')
+      .set('Authorization', owner.auth)
+      .set(subtypeHeader, '1')
+    expect(read.status).toBe(200)
+    expect(listOf(read.body)).toEqual([
+      expect.objectContaining({ id: garmentId, category: 'top', subtype: null }),
+    ])
+
+    const saved = await api
+      .patch(`/api/v1/wardrobe/garments/${garmentId}/tags`)
+      .set('Authorization', owner.auth)
+      .set(subtypeHeader, '1')
+      .send({ ...tags, subtype: 'tank', expected: { ...tags, subtype: null } })
+    expect(saved.status).toBe(200)
+    expect(itemOf(saved.body)).toMatchObject({ id: garmentId, subtype: 'tank' })
   })
 })
 

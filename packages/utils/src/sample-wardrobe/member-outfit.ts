@@ -143,6 +143,16 @@ export function memberSampleWardrobeChoices(result: SampleOutfitResult) {
     const canUseSlot = eligibleLooks.filter((look) =>
       look.core.some((id) => garments.get(id)?.category === category)
     )
+    const mostPreserved = Math.max(
+      0,
+      ...canUseSlot.map((look) => sharedPieces(look.core, swappedIds))
+    )
+    const preferredLooks =
+      mostPreserved === 0
+        ? canUseSlot
+        : canUseSlot.filter(
+            (look) => sharedPieces(look.core, swappedIds) === mostPreserved
+          )
     for (const garment of sampleSwapCandidates(
       SAMPLE_CATALOG,
       category,
@@ -151,7 +161,10 @@ export function memberSampleWardrobeChoices(result: SampleOutfitResult) {
     )) {
       const lookId = current
         ? result.look?.id
-        : (canUseSlot.find((look) => look.core.includes(garment.id)) ?? canUseSlot[0])?.id
+        : (
+            preferredLooks.find((look) => look.core.includes(garment.id)) ??
+            preferredLooks[0]
+          )?.id
       if (lookId) choices.set(garment.id, lookId)
     }
   }

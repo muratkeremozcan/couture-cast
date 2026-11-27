@@ -54,6 +54,7 @@ import {
   formatGarmentTagLabels,
   getGuestPreviewStrings,
   filterCloset,
+  resetUnavailableClosetSubtype,
   type ClosetGarmentFilter,
   nextStylePiecePhotoExpiry,
   scheduleStylePiecePhotoExpiry,
@@ -751,6 +752,12 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     category: 'all',
     subtype: 'all',
   })
+  // The accepted inventory retains pieces during an in-flight read or delete Undo window.
+  useEffect(() => {
+    if (hasLoaded) {
+      setClosetFilter((filter) => resetUnavailableClosetSubtype(filter, garments))
+    }
+  }, [garments, hasLoaded])
   const { filterChips, filteredGarments } = filterCloset(
     visibleGarments,
     closetFilter,
@@ -1155,13 +1162,13 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                     data-testid="closet-category-filters"
                     className="mb-2 flex w-full gap-2 overflow-x-auto py-1"
                   >
-                    {filterChips.map(({ id, selected, label, filter }) => (
+                    {filterChips.map(({ id, kind, selected, label, filter }) => (
                       <button
                         key={id}
                         type="button"
                         aria-pressed={selected}
                         data-testid={id}
-                        className={`min-h-touch min-w-touch max-w-full shrink-0 rounded-full border border-line-strong px-2 py-1 text-sm font-medium [overflow-wrap:anywhere] ${selected ? 'bg-inverse text-on-inverse' : 'bg-page text-ink'}`}
+                        className={`min-h-touch min-w-touch max-w-full shrink-0 border border-line-strong px-2 py-1 text-sm font-medium [overflow-wrap:anywhere] ${kind === 'category' ? 'rounded-full' : 'rounded-lg'} ${kind === 'subtype' && filter.subtype === 'all' ? 'ms-2' : ''} ${selected ? 'bg-inverse text-on-inverse' : 'bg-page text-ink'}`}
                         onClick={() => setClosetFilter(filter)}
                       >
                         {label}

@@ -11,9 +11,26 @@ export type ClosetGarmentFilter = {
 
 type ClosetFilterChip = {
   id: string
+  kind: 'category' | 'subtype'
   selected: boolean
   label: string
   filter: ClosetGarmentFilter
+}
+
+export function resetUnavailableClosetSubtype(
+  filter: ClosetGarmentFilter,
+  garments: readonly Pick<GarmentTagSource, 'category' | 'subtype'>[]
+): ClosetGarmentFilter {
+  const { category, subtype } = filter
+  if (
+    subtype === 'all' ||
+    garments.some(
+      (garment) => garment.category === category && garment.subtype === subtype
+    )
+  ) {
+    return filter
+  }
+  return { category, subtype: 'all' }
 }
 
 export function filterCloset<T extends Pick<GarmentTagSource, 'category' | 'subtype'>>(
@@ -45,6 +62,7 @@ export function filterCloset<T extends Pick<GarmentTagSource, 'category' | 'subt
       const selected = category === activeCategory
       const categoryChip = {
         id: `closet-category-${category}`,
+        kind: 'category' as const,
         selected,
         label:
           category === 'all' ? allCategories : formatGarmentCategory(locale, category),
@@ -55,6 +73,7 @@ export function filterCloset<T extends Pick<GarmentTagSource, 'category' | 'subt
         categoryChip,
         ...(['all', ...subtypes] as const).map((subtype) => ({
           id: `closet-subtype-${subtype}`,
+          kind: 'subtype' as const,
           selected: activeSubtype === subtype,
           label: subtype === 'all' ? subtypeStrings.all : subtypeStrings.values[subtype],
           filter: { category, subtype },

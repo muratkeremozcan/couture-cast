@@ -267,15 +267,24 @@ function resolveTargetMaterial(
     : input.material
 }
 
+function normalizedStoredSubtype({
+  category,
+  subtype,
+}: Pick<GarmentItem, 'category' | 'subtype'>): GarmentSubtype | null {
+  return garmentSubtypeMatchesCategory(category, subtype) ? subtype : null
+}
+
 function resolveTargetSubtype(
-  storedSubtype: string | null,
+  storedSubtype: GarmentSubtype | null,
   { category, subtype }: UpdateGarmentTagsInput
 ): GarmentSubtype | null {
   if (subtype === undefined) {
     return garmentSubtypeMatchesCategory(category, storedSubtype) ? storedSubtype : null
   }
   if (subtype !== null && !garmentSubtypeMatchesCategory(category, subtype)) {
-    throw new BadRequestException('Subtype must match the garment category')
+    throw new BadRequestException(
+      'Invalid garment tags: subtype: Subtype must match the garment category'
+    )
   }
   return subtype
 }
@@ -289,7 +298,7 @@ function isUnchangedTagConfirmation(
   return (
     garment.upload_status === 'ready' &&
     garment.category === input.category &&
-    (garment.subtype ?? null) === targetSubtype &&
+    normalizedStoredSubtype(garment) === targetSubtype &&
     garment.material === targetMaterial &&
     garment.comfort_range === input.comfortRange
   )
@@ -456,7 +465,8 @@ function storedTagsMatch(
 ): boolean {
   return (
     (expected.category === undefined || expected.category === garment.category) &&
-    (expected.subtype === undefined || expected.subtype === (garment.subtype ?? null)) &&
+    (expected.subtype === undefined ||
+      expected.subtype === normalizedStoredSubtype(garment)) &&
     (expected.material === undefined || expected.material === garment.material) &&
     (expected.comfortRange === undefined ||
       expected.comfortRange === garment.comfort_range)
@@ -489,13 +499,10 @@ function withGarmentMetadata(
   data: GarmentItemResponse['data'],
   options: GarmentReadOptions
 ): GarmentResponseData {
-  const subtype = garmentSubtypeMatchesCategory(garment.category, garment.subtype)
-    ? garment.subtype
-    : null
   return {
     ...data,
     ...(options.includeColor && { colorFamily: garmentColorFamily(garment) }),
-    ...(options.includeSubtype && { subtype }),
+    ...(options.includeSubtype && { subtype: normalizedStoredSubtype(garment) }),
   }
 }
 
@@ -869,6 +876,7 @@ export class WardrobeService {
       where: { id: garmentId, user_id: userId },
     })
     assertTaggableGarment(garment)
+    const targetSubtype = resolveTargetSubtype(normalizedStoredSubtype(garment), input)
 
     // Story CC-7.5: an editor that says which tags it saw is refused when another edit landed
     // first, so Done or Undo never overwrites a newer edit. Checked on the row this
@@ -879,7 +887,6 @@ export class WardrobeService {
     }
 
     const targetMaterial = resolveTargetMaterial(garment, input)
-    const targetSubtype = resolveTargetSubtype(garment.subtype, input)
     if (isUnchangedTagConfirmation(garment, input, targetMaterial, targetSubtype)) {
       return {
         updated: garment,

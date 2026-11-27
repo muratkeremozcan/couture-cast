@@ -13,6 +13,7 @@ import {
   buildTodaySaveAttempt,
   buildTodaySlots,
   formatPreviewString,
+  garmentSubtypeStrings,
   getGuestPreviewStrings,
   getTodayOutfitStrings,
   sampleGarmentText,
@@ -184,7 +185,9 @@ export function TodayLiveOutfit({
             'swap',
             catalog
               ? sampleGarmentText(catalog, strings).name
-              : strings.values.category[slot.category]
+              : slot.subtype
+                ? garmentSubtypeStrings(locale).values[slot.subtype]
+                : strings.values.category[slot.category]
           )
         }}
       />

@@ -8,6 +8,7 @@ import { z } from 'zod'
 import {
   GARMENT_COLOR_FAMILIES,
   GARMENT_SUBTYPES,
+  garmentSubtypeMatchesCategory,
   SAMPLE_GARMENT_CATEGORIES,
 } from '@couture/utils'
 import {
@@ -324,6 +325,11 @@ export const updateGarmentTagsInputSchema = z
     }),
   })
   .strict()
+  .refine(
+    ({ category, subtype }) =>
+      subtype == null || garmentSubtypeMatchesCategory(category, subtype),
+    { path: ['subtype'], message: 'Subtype must match the garment category' }
+  )
 
 export const updateGarmentTagsResponseSchema = z
   .object({
@@ -459,7 +465,7 @@ const garmentIdBadRequestErrorSchema = z
   })
   .strict()
 
-const garmentTagsBadRequestErrorSchema = z
+export const garmentTagsBadRequestErrorSchema = z
   .object({
     statusCode: z.literal(400),
     message: z.union([

@@ -13,6 +13,8 @@
 // Learning path Step 63: Garment detail and tag edit (7.5-CMP-001, opt-in colorFamily).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 // Learning path Step 64: Garment delete (7.6-CMP-001, usage read and DELETE wrappers).
+// Learning path Step 76: Garment subtypes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 // @vitest-environment jsdom
 import { Blob as NodeBlob } from 'node:buffer'
@@ -182,11 +184,13 @@ describe('uploadGarmentImageFromWeb & listGarmentsFromWeb', () => {
         headers: {
           Authorization: 'Bearer test-access-token',
           'x-couture-garment-color': '1',
+          'x-couture-garment-subtype': '1',
         },
       })
     )
     // The legacy answer of an API from before the header reads as colorFamily null.
     expect(result[0]?.colorFamily).toBeNull()
+    expect(result[0]?.subtype).toBeUndefined()
   })
 
   it('handles HTTP error response when listing garments', async () => {
@@ -1326,7 +1330,10 @@ describe('garment tagging wrappers', () => {
       colorFamily: 'blue',
     })
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(init.headers).toMatchObject({ 'x-couture-garment-color': '1' })
+    expect(init.headers).toMatchObject({
+      'x-couture-garment-color': '1',
+      'x-couture-garment-subtype': '1',
+    })
   })
 
   it('[P0] [7.5-CMP-001] lists garments with their colorFamily', async () => {
