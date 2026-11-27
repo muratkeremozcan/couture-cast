@@ -20,7 +20,7 @@
 // the editor could reopen no longer surfaces a Reopen here (the saved look screen owns it).
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 import React, { useEffect, useRef } from 'react'
-import { userEvent as browserUser } from 'vitest/browser'
+import { page, userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import {
@@ -1142,12 +1142,15 @@ describe('WardrobeHubScreen', () => {
     let garment: typeof ready = unsigned
     const verification = deferred()
     const unsignedRetry = deferred()
+    const renewalReply = deferred()
+    const requestedRenewal = vi.fn<(result: typeof ready) => void>()
     let heldRead: ReturnType<typeof deferred> | undefined
     server.use(
       http.get('*/api/v1/wardrobe/garments', async () => {
         const current = garment
         const pending = heldRead
         heldRead = undefined
+        if (pending === renewalReply) requestedRenewal(current)
         await pending?.promise
         return HttpResponse.json({ data: [current] })
       })
@@ -1184,15 +1187,23 @@ describe('WardrobeHubScreen', () => {
       expect(await within(panel).findByTestId('style-piece-unavailable')).toBeVisible()
       await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(83))
       const retry = within(panel).getByTestId('style-piece-refresh')
+      const retryControl = page
+        .getByTestId('style-piece-panel')
+        .getByTestId('style-piece-refresh')
       garment = unsigned
       heldRead = unsignedRetry
-      press(retry)
+      await retryControl.click()
       await waitFor(() => expect(retry).toBeDisabled())
       unsignedRetry.resolve()
       await waitFor(() => expect(retry).toBeEnabled())
       expect(within(panel).queryByTestId('style-piece-save')).toBeNull()
 
       garment = renewal
+      heldRead = renewalReply
+      await retryControl.click()
+      await waitFor(() =>
+        expect(requestedRenewal).toHaveBeenCalledExactlyOnceWith(renewal)
+      )
       const earlyFrame = frameBeforeCommit
         ? vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
             queueMicrotask(() => callback(performance.now()))
@@ -1201,7 +1212,7 @@ describe('WardrobeHubScreen', () => {
         : undefined
       let anchors: HTMLElement[]
       try {
-        press(retry)
+        renewalReply.resolve()
         anchors = await within(panel).findAllByTestId('style-piece-anchor')
       } finally {
         earlyFrame?.mockRestore()
@@ -1218,6 +1229,7 @@ describe('WardrobeHubScreen', () => {
     } finally {
       verification.resolve()
       unsignedRetry.resolve()
+      renewalReply.resolve()
     }
   }
 

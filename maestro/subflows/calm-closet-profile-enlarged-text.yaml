@@ -30,8 +30,15 @@ appId: ${MAESTRO_APP_ID}
     direction: DOWN
     visibilityPercentage: 100
     timeout: 15000
+# Maestro counts the button under the fixed tab bar as visible. Pin the scroll at the end.
+- scroll
+- waitForAnimationToEnd
 - assertVisible:
     id: 'profile-about-row'
+- assertVisible:
+    id: 'profile-sign-out'
+    above:
+      id: 'tab-settings'
 - assertVisible: 'Abmelden'
 - takeScreenshot:
     path: maestro/artifacts/closet-profile-accessibility/${SCHEME}-profile-end-de-large
