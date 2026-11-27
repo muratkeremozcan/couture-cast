@@ -604,39 +604,38 @@ test('the runner schedules the in-flow sample for every iOS flow before Maestro 
 })
 
 // Node shape and bounds format as Maestro stores them. The opener and tab-home frames are the
-// values of run 27 (points); the chip bar frame is the layout arithmetic (header bottom 106 pt,
-// 56 pt bar), because no stored hierarchy holds it yet.
+// values of run 27 (points). The header fixture overlaps the opener to exercise diagnostics.
 const node = (id, bounds, children = []) => ({
   attributes: { 'resource-id': id, bounds },
   children,
 })
 const screen = (...nodes) => ({ children: [node('root', '[0,0][402,874]', nodes)] })
-const CHIPS = node('mobile-chip-navigation', '[0,106][402,162]')
+const HEADER = node('app-top-bar', '[0,106][402,162]')
 const TAB = node('tab-home', '[0,784][33,802]')
 
 test('the opener geometry names the bar a tap centre would land on', () => {
   const covered = openerGeometry(
-    screen(node('outfit-share-card-open', '[16,117][386,165]'), CHIPS, TAB)
+    screen(node('outfit-share-card-open', '[16,117][386,165]'), HEADER, TAB)
   )
   assert.deepEqual(covered, {
-    chips: [0, 106, 402, 162],
+    header: [0, 106, 402, 162],
     opener: [16, 117, 386, 165],
     tab: [0, 784, 33, 802],
-    centreCoveredBy: 'chips',
+    centreCoveredBy: 'header',
   })
   const clear = openerGeometry(
-    screen(node('outfit-share-card-open', '[16,351][386,399]'), CHIPS, TAB)
+    screen(node('outfit-share-card-open', '[16,351][386,399]'), HEADER, TAB)
   )
   assert.equal(clear.centreCoveredBy, null)
   const lowered = openerGeometry(
     screen(
       node('outfit-share-card-open', '[16,770][386,818]'),
-      CHIPS,
+      HEADER,
       node('tab-home', '[0,784][33,802]')
     )
   )
   assert.equal(lowered.centreCoveredBy, 'tab')
-  assert.equal(openerGeometry(screen(CHIPS, TAB)), null)
+  assert.equal(openerGeometry(screen(HEADER, TAB)), null)
   assert.equal(openerGeometry(null), null)
   assert.equal(openerGeometry(screen(node('outfit-share-card-open', 'not bounds'))), null)
 })

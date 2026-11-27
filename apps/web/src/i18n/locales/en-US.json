@@ -1038,6 +1038,30 @@
     }
   },
   "home": {
+    "today": {
+      "planWeek": "Plan your week",
+      "outfit": "Today’s outfit",
+      "starterOutfit": "Starter outfit",
+      "outfitDetails": "Outfit details",
+      "sampleLook": "Sample look",
+      "editSample": "Edit sample",
+      "addFirstPiece": "Add your first piece",
+      "weatherUnavailable": "Weather unavailable",
+      "recentPieces": "Recent pieces",
+      "conditions": {
+        "clear": "Clear Sky",
+        "partly_cloudy": "Partly Cloudy",
+        "cloudy": "Cloudy",
+        "fog": "Foggy",
+        "drizzle": "Drizzle",
+        "rain": "Rainy",
+        "sleet": "Sleet",
+        "snow": "Snowy",
+        "thunderstorm": "Thunderstorm",
+        "wind": "Windy",
+        "unknown": "Unknown"
+      }
+    },
     "spotlightTeaser": {
       "heading": "Standout look in {{label}}",
       "reactions": "{{count}} reactions",

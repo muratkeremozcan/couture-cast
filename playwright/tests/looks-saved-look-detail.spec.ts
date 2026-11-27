@@ -171,6 +171,7 @@ test.describe('CC-7.12 View opens the saved look @local-lane', () => {
     await page.goto('/')
     await waitForShellSettled(page, fixture.router)
 
+    await page.getByTestId('home-edit-sample').click()
     const save = page.getByTestId('sample-save-look')
     await save.click()
     await expect(save).toHaveAttribute('data-save-state', 'saved')

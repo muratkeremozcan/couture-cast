@@ -613,7 +613,7 @@ test.describe('Story 6.5 real engagement transport', () => {
         (count) => count >= 2,
         { timeout: 10_000 }
       )
-      await closeComments(page)
+      await expect(thread(page)).toHaveCount(0)
       await page.getByTestId('community-filter-all').click()
       await openComments(page, other.postId)
       await thread(page).getByLabel('Add a comment').fill('New owner draft')

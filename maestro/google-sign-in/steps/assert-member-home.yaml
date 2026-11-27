@@ -5,7 +5,7 @@ appId: ${MAESTRO_APP_ID}
 ---
 - extendedWaitUntil:
     visible:
-      id: 'hero-no-location-state'
+      id: 'home-set-city'
     timeout: 45000
     label: 'Home shows the member surface'
 - assertNotVisible:

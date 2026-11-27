@@ -1,6 +1,6 @@
 // Learning path Step 46: Home spotlight teaser.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
-// Story 6.7: the Home spotlight teaser in the Hero Ritual Canvas on stacked layouts.
+// Story 6.7: the Today Spotlight row and its handoff to Community.
 import type { Page, Request } from '@playwright/test'
 import { checkA11y } from '../support/helpers/accessibility'
 import { communityTest as test, expect } from '../support/helpers/community-session'
@@ -16,8 +16,6 @@ import { SEEDED_SPOTLIGHT_AREA } from '@couture/testing'
 const NARROW = { width: 390, height: 844 }
 const WIDE = { width: 1440, height: 900 }
 
-const heroCanvas = (page: Page) =>
-  page.getByRole('region', { name: 'Hero Ritual Canvas' })
 const teaserLink = (page: Page) => page.getByTestId('home-spotlight-teaser-link')
 
 function isTeaserRead(request: Request): boolean {
@@ -27,13 +25,6 @@ function isTeaserRead(request: Request): boolean {
     url.pathname.endsWith('/api/v1/community/spotlight') &&
     url.searchParams.get('surface') === 'home_teaser'
   )
-}
-
-/** Waits for the Community module to settle, so a read it never made cannot still arrive. */
-async function settledModule(page: Page) {
-  const module = page.getByTestId('community-spotlight')
-  await expect(module).toHaveAttribute('aria-busy', 'false')
-  await expect(module).toHaveAttribute('data-level', /^(city|region|country|none)$/)
 }
 
 test.describe('Story 6.7 Home spotlight teaser', () => {
@@ -47,7 +38,7 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
     })
   })
 
-  test('[P1] a narrow layout shows the top entry in the hero and focuses it in the City Spotlight from the keyboard', async ({
+  test('[P1] a narrow layout shows one eligible row and focuses it in the City Spotlight from the keyboard', async ({
     page,
     communitySession,
   }) => {
@@ -70,13 +61,10 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
       })
       await page.setViewportSize(NARROW)
       await page.goto('/')
-      await settledModule(page)
 
       const link = teaserLink(page)
       await expect(link).toBeVisible()
-      await expect(
-        heroCanvas(page).getByTestId('home-spotlight-teaser-link')
-      ).toHaveCount(1)
+      await expect(link).toHaveCount(1)
       const top = SEEDED_SPOTLIGHT_POST_IDS[0]!
       await expect(page.getByTestId('home-spotlight-teaser-heading')).toHaveText(
         `Standout look in ${SEEDED_SPOTLIGHT_AREA.city}`
@@ -92,7 +80,15 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
       await expect
         .poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth))
         .toBeGreaterThan(0)
-      await expect(link).toHaveAttribute('href', `#spotlight-lookbook-card-${top}`)
+      const href = new URL((await link.getAttribute('href'))!, 'http://local.test')
+      expect(href.pathname).toBe('/community')
+      expect(Object.fromEntries(href.searchParams)).toMatchObject({
+        source: 'app',
+        type: 'community',
+        cardId: top,
+        focus: 'spotlight',
+        focusToken: expect.stringMatching(/.+/),
+      })
       await expect(link).toHaveAccessibleName(
         new RegExp(
           `^Standout look in ${SEEDED_SPOTLIGHT_AREA.city} by ${author}, ${SEEDED_SPOTLIGHT_REACTION_COUNTS[0]} reactions\\.`
@@ -103,30 +99,19 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
       expect(teaserReads.map((url) => url.searchParams.get('limit'))).toEqual(['1'])
       await checkA11y(page)
 
-      // Every text the one live region takes, so a repeated announcement shows.
-      await page.getByTestId('community-live-region').evaluate((region) => {
-        const seen: string[] = []
-        Object.assign(window, { __teaserAnnouncements: seen })
-        new MutationObserver(() => seen.push(region.textContent ?? '')).observe(region, {
-          childList: true,
-          subtree: true,
-          characterData: true,
-        })
-      })
       await link.focus()
       await page.keyboard.press('Enter')
+      await expect(page).toHaveURL(
+        (url) =>
+          url.pathname === '/community' &&
+          url.searchParams.get('cardId') === top &&
+          url.searchParams.get('focus') === 'spotlight' &&
+          url.searchParams.get('focusToken')?.startsWith('today-') === true
+      )
       await expect(page.getByTestId(`spotlight-lookbook-card-${top}`)).toBeFocused()
       await expect(page.getByTestId('community-live-region')).toHaveText(
         'Focused on the highlighted look.'
       )
-      expect(
-        await page.evaluate(() =>
-          (
-            (window as unknown as { __teaserAnnouncements: string[] })
-              .__teaserAnnouncements ?? []
-          ).filter((text) => text === 'Focused on the highlighted look.')
-        )
-      ).toHaveLength(1)
       await expect
         .poll(() => opens)
         .toEqual([{ surface: 'home_teaser', rank: 1, level: 'city' }])
@@ -138,7 +123,7 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
     }
   })
 
-  test('[P1] a side-by-side layout issues no home_teaser read and shows no teaser', async ({
+  test('[P1] desktop also shows exactly one Spotlight row without embedding the feed', async ({
     page,
     communitySession,
   }) => {
@@ -154,23 +139,10 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
       })
       await page.setViewportSize(WIDE)
       await page.goto('/')
-      await settledModule(page)
-      await expect(page.getByTestId('community-spotlight')).toHaveAttribute(
-        'data-level',
-        'city'
-      )
-      // The teaser resolves its member and visibility on mount, before the
-      // module's own read settles, so any read it made would be out by now.
-      await expect(page.getByTestId('community-spotlight-list')).toBeVisible()
-      await expect(page.locator('[data-testid^="home-spotlight-teaser"]')).toHaveCount(0)
-
-      // Positive control: the same page stacked reads and shows the teaser. The
-      // read must be caused by the resize, so none may have happened before it.
-      expect(teaserReads).toEqual([])
-      const stackedRead = page.waitForRequest(isTeaserRead)
-      await page.setViewportSize(NARROW)
-      await stackedRead
+      await expect(teaserLink(page)).toHaveCount(1)
       await expect(teaserLink(page)).toBeVisible()
+      await expect(page.getByTestId('community-spotlight')).toHaveCount(0)
+      await expect(page.getByTestId('community-card-grid')).toHaveCount(0)
       expect(teaserReads).toHaveLength(1)
     } finally {
       await page.goto('about:blank')
@@ -178,44 +150,24 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
     }
   })
 
-  test('[P2] a viewer with no spotlight renders no teaser and reserves no space', async ({
+  test('[P2] a viewer with no eligible Spotlight sees the sample and no Community row', async ({
     page,
     communitySession,
+    interceptNetworkCall,
   }) => {
     expect(communitySession.userId).toBeTruthy()
-    const teaserRead = page.waitForResponse((response) =>
-      isTeaserRead(response.request())
-    )
+    const read = interceptNetworkCall({
+      method: 'GET',
+      url: '**/api/v1/community/spotlight?**surface=home_teaser**',
+    })
     await page.setViewportSize(NARROW)
     await page.goto('/')
-    await settledModule(page)
-    await expect(page.getByTestId('community-spotlight')).toHaveAttribute(
-      'data-level',
-      'none'
-    )
-    // The teaser's own read answered none, and React had frames to render
-    // whatever it would render for it, before absence is asserted.
-    const answered: unknown = await (await teaserRead).json()
-    expect(answered).toMatchObject({ data: { level: 'none', items: [] } })
-    await page.evaluate(
-      () =>
-        new Promise((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(resolve))
-        )
-    )
-    await expect(page.locator('[data-testid^="home-spotlight-teaser"]')).toHaveCount(0)
-    const sample = heroCanvas(page).getByTestId('member-sample-outfit')
-    await expect(sample).toBeVisible()
-    // The hero ends with the member's example outfit.
-    const gap = await heroCanvas(page).evaluate((canvas) => {
-      const last = canvas.lastElementChild!.getBoundingClientRect()
-      const bottom = canvas.getBoundingClientRect().bottom
-      return Math.round(bottom - last.bottom)
-    })
-    expect(gap).toBeLessThanOrEqual(48)
-    await expect(
-      heroCanvas(page).locator(':scope > [data-testid="member-sample-outfit"]:last-child')
-    ).toBeVisible()
+    const response = await read
+    expect(response.responseJson).toMatchObject({ data: { level: 'none', items: [] } })
+    await expect(page.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    await expect(page.getByTestId('home-spotlight-teaser')).toHaveCount(0)
+    await expect(page.getByTestId('home-spotlight-teaser-reserved')).toHaveCount(0)
+    await expect(page.getByTestId('member-sample-outfit')).toBeVisible()
     await checkA11y(page)
   })
 })

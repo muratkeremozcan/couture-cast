@@ -445,6 +445,9 @@ describe('6.7 mobile Home teaser native focus', () => {
       now += SPOTLIGHT_TEASER_READ_FLOOR_MS + 1_000
       act(() => screenFocus.set(true))
       await waitFor(() => expect(reads).toHaveLength(2))
+      await waitFor(() =>
+        expect(screen.getByTestId('home-spotlight-teaser-shop')).toBeVisible()
+      )
       return { answer }
     }
 

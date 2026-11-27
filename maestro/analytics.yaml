@@ -33,16 +33,26 @@ env:
     retryTapIfNoChange: true
     label: 'Open home'
 
-# Story CC-7.11 D16: the scenario toggles follow the outfit card, below the first screen.
+# Story CC-7.13: open the period picker below the outfit card, then switch periods.
 - scrollUntilVisible:
-    element: 'Morning commute'
+    element:
+      id: 'scenario-picker'
     direction: DOWN
     visibilityPercentage: 100
 - assertVisible: 'Morning commute'
 - tapOn:
-    text: 'Evening plans'
+    id: 'scenario-picker'
+- scrollUntilVisible:
+    element:
+      id: 'scenario-toggle-evening'
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: 'scenario-toggle-evening'
     retryTapIfNoChange: true
-- assertVisible: 'Evening plans'
+- assertVisible:
+    id: 'scenario-toggle-evening'
+    selected: true
 
 - runFlow: subflows/open-settings.yaml
 - assertVisible: ${SETTINGS_TITLE}

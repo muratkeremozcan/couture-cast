@@ -1,5 +1,5 @@
 import React from 'react'
-import { StyleSheet } from 'react-native'
+import { Pressable, StyleSheet } from 'react-native'
 import { Text, View } from '@/components/themed'
 import {
   defaultSupportedLocale,
@@ -15,10 +15,14 @@ import {
 } from '@/src/lib/formatters'
 import i18n from '@/src/lib/i18n'
 import { formatWeatherAltText } from '@couture/utils'
+import { TAB_BODY_INSET } from '@/src/theme/tokens'
 
 type WeatherHeaderProps = {
   current?: WeatherCurrent
   isLoading?: boolean
+  unavailable?: boolean
+  hourlyOpen?: boolean
+  onHourlyToggle?: () => void
 }
 
 export function formatTemperature(celsius: number, forceFahrenheit?: boolean) {
@@ -45,7 +49,13 @@ const conditionNames: Record<string, string> = {
   unknown: 'Unknown',
 }
 
-export function WeatherHeader({ current, isLoading }: WeatherHeaderProps) {
+export function WeatherHeader({
+  current,
+  isLoading,
+  unavailable,
+  hourlyOpen,
+  onHourlyToggle,
+}: WeatherHeaderProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
 
@@ -59,7 +69,13 @@ export function WeatherHeader({ current, isLoading }: WeatherHeaderProps) {
   }
 
   if (!current) {
-    return null
+    return unavailable ? (
+      <View style={styles.container} testID="weather-header">
+        <Text style={[styles.conditionText, { color: palette.inkMuted }]}>
+          {t('home.today.weatherUnavailable')}
+        </Text>
+      </View>
+    ) : null
   }
 
   const glyph = weatherConditionGlyphs[current.condition] || '❓'
@@ -79,25 +95,18 @@ export function WeatherHeader({ current, isLoading }: WeatherHeaderProps) {
     locale,
   })
 
-  return (
-    <View
-      style={styles.container}
-      testID="weather-header"
-      accessible
-      accessibilityLabel={accessibilityLabel}
-    >
-      <View style={styles.row}>
-        <Text
-          style={[styles.temperature, { color: palette.ink }]}
-          testID="current-temperature"
-          accessible={false}
-        >
-          {formatTemperature(current.temperature)}
-        </Text>
-        <Text style={styles.glyph} accessible={false} aria-hidden>
-          {glyph}
-        </Text>
-      </View>
+  const contents = (
+    <>
+      <Text style={styles.glyph} accessible={false} aria-hidden>
+        {glyph}
+      </Text>
+      <Text
+        style={[styles.temperature, { color: palette.ink }]}
+        testID="current-temperature"
+        accessible={false}
+      >
+        {formatTemperature(current.temperature)}
+      </Text>
       <Text
         style={[styles.conditionText, { color: palette.inkMuted }]}
         testID="current-condition"
@@ -105,34 +114,55 @@ export function WeatherHeader({ current, isLoading }: WeatherHeaderProps) {
       >
         {text}
       </Text>
+    </>
+  )
+
+  if (onHourlyToggle) {
+    return (
+      <Pressable
+        style={styles.container}
+        testID="weather-header"
+        accessibilityRole="button"
+        accessibilityState={{ expanded: hourlyOpen }}
+        aria-expanded={hourlyOpen}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={t('hero.hourly_forecast')}
+        onPress={onHourlyToggle}
+      >
+        {contents}
+        <Text accessible={false} aria-hidden style={{ color: palette.inkMuted }}>
+          {hourlyOpen ? '⌃' : '⌄'}
+        </Text>
+      </Pressable>
+    )
+  }
+
+  return (
+    <View
+      style={styles.container}
+      testID="weather-header"
+      accessible
+      accessibilityLabel={accessibilityLabel}
+    >
+      {contents}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    alignItems: 'flex-start',
-    backgroundColor: 'transparent',
-  },
-  row: {
+    minHeight: 44,
+    paddingHorizontal: TAB_BODY_INSET,
+    paddingVertical: 8,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    gap: 8,
     backgroundColor: 'transparent',
   },
-  temperature: {
-    fontSize: 30,
-    fontWeight: '700',
-  },
-  glyph: {
-    fontSize: 30,
-    marginLeft: 12,
-  },
-  conditionText: {
-    fontSize: 14,
-    marginTop: 4,
-  },
+  temperature: { fontSize: 18, fontWeight: '700' },
+  glyph: { fontSize: 18 },
+  conditionText: { fontSize: 14, flexShrink: 1 },
   skeletonContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,

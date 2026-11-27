@@ -121,6 +121,7 @@ describe('TabOneScreen affiliate CTA', () => {
 
   it('5.1-MOB-HERO-01 renders the CTA from a network payload and emits one impression', async () => {
     await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
 
     await screen.findByTestId('shop-this-look-block')
 
@@ -141,11 +142,13 @@ describe('TabOneScreen affiliate CTA', () => {
 
   it('5.1-MOB-HERO-02 emits nothing more when the user toggles scenario away and back', async () => {
     await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await screen.findByTestId('shop-this-look-block')
     await waitFor(() => {
       expect(affiliateImpressions()).toHaveLength(1)
     })
 
+    fireEvent.click(screen.getByTestId('scenario-picker'))
     fireEvent.click(screen.getByTestId('scenario-toggle-evening'))
     await waitFor(() => {
       expect(screen.queryByTestId('shop-this-look-block')).toBeNull()
@@ -190,11 +193,13 @@ describe('TabOneScreen affiliate CTA', () => {
     )
 
     await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await screen.findByTestId('shop-this-look-block')
     await waitFor(() => {
       expect(affiliateImpressions()).toHaveLength(1)
     })
 
+    fireEvent.click(screen.getByTestId('scenario-picker'))
     fireEvent.click(screen.getByTestId('scenario-toggle-evening'))
 
     await waitFor(() => {
@@ -219,8 +224,10 @@ describe('TabOneScreen affiliate CTA', () => {
 
   it('5.1-MOB-HERO-03 renders no CTA and emits no impression on a scenario with no offer', async () => {
     await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await screen.findByTestId('shop-this-look-block')
 
+    fireEvent.click(screen.getByTestId('scenario-picker'))
     fireEvent.click(screen.getByTestId('scenario-toggle-midday'))
 
     await waitFor(() => {
@@ -233,6 +240,7 @@ describe('TabOneScreen affiliate CTA', () => {
 
   it('5.1-MOB-HERO-04 strips the affiliate block out of every device cache write', async () => {
     await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await screen.findByTestId('shop-this-look-block')
 
     await waitFor(() => {
@@ -243,6 +251,7 @@ describe('TabOneScreen affiliate CTA', () => {
 
   it('5.1-MOB-HERO-05 keeps stripping on the garment-swap cache write', async () => {
     await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await screen.findByTestId('shop-this-look-block')
     saveRitualCacheMock.mockClear()
 
@@ -265,9 +274,10 @@ describe('TabOneScreen affiliate CTA', () => {
     await seedRitualCache({ data: eligibleRitual, timestamp: Date.now() })
 
     await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
 
     await waitFor(() => {
-      expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeTruthy()
     })
     expect(screen.queryByTestId('shop-this-look-block')).toBeNull()
     expect(affiliateImpressions()).toHaveLength(0)
@@ -281,6 +291,7 @@ describe('TabOneScreen affiliate CTA', () => {
     server.use(http.get('*/api/v1/ritual', () => new HttpResponse(null, { status: 503 })))
 
     await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
 
     await waitFor(() => {
       expect(screen.getByTestId('stale-cache-banner')).toBeTruthy()
@@ -293,6 +304,7 @@ describe('TabOneScreen affiliate CTA', () => {
 
   it('5.1-MOB-HERO-08 drops the CTA on the next load once the user opts out', async () => {
     await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await screen.findByTestId('shop-this-look-block')
 
     // What the server sends after `affiliate_ctas_enabled` flips to false: the
@@ -311,6 +323,7 @@ describe('TabOneScreen affiliate CTA', () => {
       )
     )
 
+    fireEvent.click(screen.getByTestId('scenario-picker'))
     fireEvent.click(screen.getByTestId('scenario-toggle-evening'))
     fireEvent.click(screen.getByTestId('scenario-toggle-morning'))
     await i18n.changeLanguage('tr-TR')
@@ -324,6 +337,7 @@ describe('TabOneScreen affiliate CTA', () => {
     await i18n.changeLanguage('es-419')
 
     await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await screen.findByTestId('shop-this-look-block')
 
     await waitFor(() => {

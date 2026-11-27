@@ -1,6 +1,6 @@
 // Learning path Step 44: Community city spotlight.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
-// Story 6.6: the City Spotlight module that heads the community section on `/`.
+// Story 6.6: the City Spotlight module that heads the Community tab.
 import type { Page } from '@playwright/test'
 import { COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT } from '@couture/api-client/contracts/http'
 import { checkA11y } from '../support/helpers/accessibility'
@@ -16,7 +16,7 @@ import { SEEDED_SPOTLIGHT_AREA } from '@couture/testing'
 const spotlight = (page: Page) => page.getByTestId('community-spotlight')
 
 async function loadedSpotlight(page: Page) {
-  await page.goto('/')
+  await page.goto('/community')
   await expect(spotlight(page)).toHaveAttribute('aria-busy', 'false')
   await expect(spotlight(page)).toHaveAttribute(
     'data-level',
@@ -64,11 +64,8 @@ test.describe('Story 6.6 City Spotlight', () => {
       )
       // The module is the first thing in the community section. Story CC-7.11 P5: it sits in
       // the section's first-content block, the anchor the fold checks measure.
-      const firstBlock = page
-        .getByRole('complementary', { name: 'Community lookbook' })
-        .locator(':scope > *')
-        .first()
-      await expect(firstBlock).toHaveAttribute('data-testid', 'community-first-content')
+      const firstBlock = page.getByTestId('community-first-content')
+      await expect(firstBlock).toBeVisible()
       await expect(firstBlock.locator(':scope > *').first()).toHaveAttribute(
         'data-testid',
         'community-spotlight'

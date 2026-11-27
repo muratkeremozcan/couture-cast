@@ -506,7 +506,7 @@ export function expoGoScreenSummary(hierarchy) {
 }
 
 const GEOMETRY_IDS = {
-  chips: 'mobile-chip-navigation',
+  header: 'app-top-bar',
   opener: 'outfit-share-card-open',
   tab: 'tab-home',
 }
@@ -519,7 +519,7 @@ const nodeBounds = (node) => {
 }
 
 /**
- * Where the outfit opener sat against the sticky chip bar and the tab bar when the step failed,
+ * Where the outfit opener sat against the app header and the tab bar when the step failed,
  * in points. `centreCoveredBy` names what the tap centre (the centre of the opener) lay inside:
  * a tap there reaches that bar, never the opener. Null when the opener is not on the screen.
  */
@@ -539,10 +539,10 @@ export function openerGeometry(hierarchy) {
   const centre = (opener[1] + opener[3]) / 2
   const inside = (box) => !!box && centre >= box[1] && centre <= box[3]
   return {
-    chips: found.chips ?? null,
+    header: found.header ?? null,
     opener,
     tab: found.tab ?? null,
-    centreCoveredBy: inside(found.chips) ? 'chips' : inside(found.tab) ? 'tab' : null,
+    centreCoveredBy: inside(found.header) ? 'header' : inside(found.tab) ? 'tab' : null,
   }
 }
 

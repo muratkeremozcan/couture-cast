@@ -1098,6 +1098,17 @@
     }
   },
   "home": {
+    "today": {
+      "planWeek": "Planejar a semana",
+      "outfit": "Look de hoje",
+      "starterOutfit": "Look inicial",
+      "outfitDetails": "Detalhes do look",
+      "sampleLook": "Look de exemplo",
+      "editSample": "Editar o exemplo",
+      "addFirstPiece": "Adicione sua primeira peça",
+      "weatherUnavailable": "Previsão do tempo indisponível",
+      "recentPieces": "Peças recentes"
+    },
     "spotlightTeaser": {
       "heading": "Look em destaque em {{label}}",
       "reactions": "{{count}} reações",
@@ -1202,6 +1213,11 @@
     "hideList": "Ocultar looks salvos"
   },
   "shell": {
+    "legal": {
+      "label": "Informações legais",
+      "privacy": "Política de Privacidade",
+      "terms": "Termos de Serviço"
+    },
     "back": "Voltar",
     "notFound": {
       "title": "Tela não encontrada",

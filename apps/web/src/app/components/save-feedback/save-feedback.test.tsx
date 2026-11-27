@@ -945,6 +945,7 @@ describe('web save-feedback components', () => {
         </SaveFeedbackProvider>
       )
 
+      await user.click(await screen.findByTestId('home-edit-sample'))
       const saveBtn = await screen.findByTestId('sample-save-look')
       await user.click(saveBtn)
       const savedRegion = await screen.findByTestId('sample-saved-looks')

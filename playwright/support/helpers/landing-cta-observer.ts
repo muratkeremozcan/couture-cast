@@ -15,8 +15,8 @@ export const GUEST_LANDING_ACTIONS = [
 
 /** The landing's member actions. */
 export const MEMBER_LANDING_ACTIONS = [
-  '[data-testid="landing-open-wardrobe"]',
-  '[data-testid="landing-sign-out"]',
+  '[data-testid="home-set-city"]',
+  '[data-testid="today-primary-action"]',
 ] as const
 
 export type LandingActionsSeen = { guest: string[]; member: string[]; states: string[] }

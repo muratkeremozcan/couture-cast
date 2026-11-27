@@ -423,6 +423,7 @@ describe('Home screen gate (native)', () => {
     const ritual = heldRitualAnswers()
     await renderHome()
     await ritual.release(0, HttpResponse.json(mockRitualResponse))
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await waitFor(() =>
       expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
     )
@@ -459,6 +460,7 @@ describe('Home screen gate (native)', () => {
     const ritual = heldRitualAnswers()
     await renderHome()
     await ritual.release(0, HttpResponse.json(mockRitualResponse))
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await waitFor(() =>
       expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
     )
@@ -491,6 +493,7 @@ describe('Home screen gate (native)', () => {
     const ritual = heldRitualAnswers()
     await renderHome()
     await ritual.release(0, HttpResponse.json(mockRitualResponse))
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await waitFor(() =>
       expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
     )

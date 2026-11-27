@@ -1098,6 +1098,17 @@
     }
   },
   "home": {
+    "today": {
+      "planWeek": "Plan your week",
+      "outfit": "Today’s outfit",
+      "starterOutfit": "Starter outfit",
+      "outfitDetails": "Outfit details",
+      "sampleLook": "Sample look",
+      "editSample": "Edit sample",
+      "addFirstPiece": "Add your first piece",
+      "weatherUnavailable": "Weather unavailable",
+      "recentPieces": "Recent pieces"
+    },
     "spotlightTeaser": {
       "heading": "Standout look in {{label}}",
       "reactions": "{{count}} reactions",
@@ -1202,6 +1213,11 @@
     "hideList": "Hide saved looks"
   },
   "shell": {
+    "legal": {
+      "label": "Legal",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service"
+    },
     "back": "Back",
     "notFound": {
       "title": "Screen not found",

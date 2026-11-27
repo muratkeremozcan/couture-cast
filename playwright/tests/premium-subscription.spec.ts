@@ -101,7 +101,7 @@ async function openLookbookUltrawide(
   })
   await page.setViewportSize(ULTRAWIDE_VIEWPORT)
   await page.goto('/')
-  await page.getByTestId('planner-open-control').click()
+  await page.getByTestId('home-plan-week').click()
   // Story CC-7.12 D11: Plan week links to the Looks Plan segment, where the rail renders inline.
   await expect(page).toHaveURL('/looks?segment=plan')
 }
@@ -416,14 +416,15 @@ anonymousTest.describe('Story 5.2 web settings and planner rail signed out', () 
 
   anonymousTest(
     '[P0] 5.2-E2E-011 [7.12-E2E-033] shows the free week signed out without an entitlement read',
-    async ({ page, interceptNetworkCall }) => {
+    async ({ page }) => {
       let plannerRequests = 0
       await page.route(PLANNER_URL, async (route) => {
         plannerRequests += 1
         await route.fallback()
       })
 
-      await openLookbookUltrawide(page, interceptNetworkCall)
+      await page.setViewportSize(ULTRAWIDE_VIEWPORT)
+      await page.goto('/looks?segment=plan')
 
       await expect(plannerRail(page)).toBeVisible()
       // Story CC-7.12 P5: a visitor's Upgrade opens sign-in.

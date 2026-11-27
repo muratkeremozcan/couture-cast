@@ -1038,6 +1038,30 @@
     }
   },
   "home": {
+    "today": {
+      "planWeek": "Planifier la semaine",
+      "outfit": "Tenue du jour",
+      "starterOutfit": "Tenue de base",
+      "outfitDetails": "Détails de la tenue",
+      "sampleLook": "Tenue d’exemple",
+      "editSample": "Modifier l’exemple",
+      "addFirstPiece": "Ajouter un premier vêtement",
+      "weatherUnavailable": "Prévisions indisponibles",
+      "recentPieces": "Vêtements récents",
+      "conditions": {
+        "clear": "Ciel dégagé",
+        "partly_cloudy": "Partiellement nuageux",
+        "cloudy": "Nuageux",
+        "fog": "Brouillard",
+        "drizzle": "Bruine",
+        "rain": "Pluie",
+        "sleet": "Grésil",
+        "snow": "Neige",
+        "thunderstorm": "Orage",
+        "wind": "Venteux",
+        "unknown": "Inconnu"
+      }
+    },
     "spotlightTeaser": {
       "heading": "Look vedette à {{label}}",
       "reactions": "{{count}} réactions",

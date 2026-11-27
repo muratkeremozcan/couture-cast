@@ -70,39 +70,23 @@ async function signInWithCode(page: Page, account: RealCommunityAccount) {
 }
 
 async function expectMemberLanding(page: Page) {
-  await expect(page.getByTestId('landing-open-wardrobe')).toBeVisible()
-  await expect(page.getByTestId('landing-sign-out')).toBeVisible()
+  await expect(page.getByTestId('member-sample-outfit')).toBeVisible()
+  await expect(page.getByTestId('home-set-city')).toBeVisible()
   for (const selector of GUEST_LANDING_ACTIONS)
     await expect(page.locator(selector)).toBeHidden()
-  // TEA H-4: hidden means gone from the accessibility tree too, not only from the screen.
   await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toHaveCount(0)
   await expect(
     page.getByRole('link', { name: 'Create account', exact: true })
   ).toHaveCount(0)
-  // TEA F2: the signed-out set is removed from layout, not only hidden, so the member actions
-  // start where the hero text starts, with no empty space before Open your wardrobe.
-  for (const selector of GUEST_LANDING_ACTIONS)
-    await expect(page.locator(selector)).toHaveCSS('display', 'none')
-  const left = async (testId: string) => (await page.getByTestId(testId).boundingBox())!.x
-  expect(
-    Math.abs((await left('landing-open-wardrobe')) - (await left('hero-headline')))
-  ).toBeLessThanOrEqual(1)
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0)
 }
 
-/**
- * TEA H-7: a stored session this page has not verified yet shows the hero and its three
- * analytics actions, and neither landing set, on screen or in the accessibility tree.
- */
 async function expectPendingLanding(page: Page) {
   await expect(page.locator('html')).toHaveAttribute('data-session', 'pending')
-  await expect(page.getByTestId('hero-headline')).toBeVisible()
-  await expect(page.getByTestId('cta-primary')).toBeVisible()
-  await expect(page.getByTestId('cta-secondary')).toBeVisible()
-  await expect(page.getByTestId('track-wardrobe-upload-started')).toBeVisible()
-  for (const name of ['Sign in', 'Create account', 'Try a sample look', 'Sign out'])
+  await expect(page.getByTestId('screen-placeholder')).toBeVisible()
+  for (const name of ['Sign in', 'Create account', 'Try a sample look'])
     await expect(page.getByRole('link', { name, exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0)
-  await expect(page.getByTestId('landing-open-wardrobe')).toBeHidden()
+  await expect(page.getByTestId('home-set-city')).toBeHidden()
 }
 
 /** The stored session and this tab's verified bearer, as they stand now. */
@@ -185,8 +169,8 @@ function collectPageErrors(page: Page, options: { strict: boolean }) {
 async function expectGuestLanding(page: Page) {
   for (const selector of GUEST_LANDING_ACTIONS)
     await expect(page.locator(selector)).toBeVisible()
-  await expect(page.getByTestId('landing-open-wardrobe')).toBeHidden()
-  await expect(page.getByTestId('landing-sign-out')).toBeHidden()
+  await expect(page.getByTestId('home-set-city')).toBeHidden()
+  await expect(page.getByTestId('profile-sign-out')).toBeHidden()
 }
 
 test('L-1: a member who signs in with Google lands on the member landing, never on a signed-out action', async ({
@@ -205,10 +189,12 @@ test('L-1: a member who signs in with Google lands on the member landing, never 
   await page.getByTestId('google-sign-in').click()
   await expect(page).toHaveURL(`${WEB}/`)
   await expectMemberLanding(page)
-  expect(await landingActionsSeen(page)).toMatchObject({
-    guest: [],
-    member: ['[data-testid="landing-open-wardrobe"]', '[data-testid="landing-sign-out"]'],
-  })
+  await expect
+    .poll(() => landingActionsSeen(page))
+    .toMatchObject({
+      guest: [],
+      member: ['[data-testid="home-set-city"]'],
+    })
 
   // A reload and a new tab are the same member: still no signed-out action from first paint.
   await page.reload()
@@ -226,9 +212,8 @@ test('L-1: a member who signs in with Google lands on the member landing, never 
   expect(html).not.toContain(session!.access_token)
   expect(html).not.toContain(session!.refresh_token)
 
-  // The member action goes where it says.
-  await page.getByTestId('landing-open-wardrobe').click()
-  await expect(page).toHaveURL(`${WEB}/wardrobe`)
+  await page.getByTestId('home-set-city').click()
+  await expect(page).toHaveURL(`${WEB}/settings?addLocation=1&returnTo=%2F#locations`)
 })
 
 test('L-2: a signed-out visitor sees Create account, Try a sample look and Sign in', async ({
@@ -312,7 +297,7 @@ async function traceLandingSession(page: Page) {
         'click',
         (event) => {
           const button = (event.target as Element | null)?.closest?.(
-            '[data-testid="landing-sign-out"]'
+            '[data-testid="profile-sign-out"]'
           )
           if (button)
             record(
@@ -381,7 +366,9 @@ test('L-4: after Sign out, going back to the landing shows the signed-out action
   await expectMemberLanding(page)
 
   await withLandingSessionTrace(page, async () => {
-    await page.getByTestId('landing-sign-out').click()
+    await page.goto('/settings')
+    await page.getByTestId('profile-sign-out').click()
+    await page.goto('/')
     await expectGuestLanding(page)
     // The landing turns over at the sign-out event; the stored session goes once the SDK finishes.
     await expect
@@ -419,15 +406,15 @@ test('L-4b: Sign out while the session check is still out shows the signed-out a
     await held
     await route.continue().catch(() => undefined)
   })
-  await page.goto('/')
-  await expectMemberLanding(page)
+  await page.goto('/settings')
   await expect.poll(() => profileHeld).toBe(true)
 
   await withLandingSessionTrace(page, async () => {
-    await page.getByTestId('landing-sign-out').click()
+    await page.getByTestId('profile-sign-out').click()
     await expect(page.locator('html')).toHaveAttribute('data-session', 'none', {
       timeout: 2_000,
     })
+    await page.goto('/')
     await expectGuestLanding(page)
   })
   releaseProfile()
@@ -445,9 +432,9 @@ test(
     await expectMemberLanding(page)
 
     const other = await page.context().newPage()
+    await other.goto('/settings')
+    await other.getByTestId('profile-sign-out').click()
     await other.goto('/')
-    await expectMemberLanding(other)
-    await other.getByTestId('landing-sign-out').click()
     await expectGuestLanding(other)
 
     // Without a reload: the storage change reaches the first tab.
@@ -621,29 +608,14 @@ test('L-10: the landing hydrates cleanly for a member, a pending session and a v
   })
   await tab.goto('/')
   await expectPendingLanding(tab)
-  // TEA R3: pending holds the member layout, so nothing below the actions moves when the
-  // member actions appear. Measured from the hero's own top: the community feed above it loads
-  // on its own schedule. Both boxes are read in one script run, so the feed cannot grow between
-  // the two reads (two boundingBox calls once read -5374 when it landed in between).
-  // The row's height is compared too, so the content below it cannot move either (PR 250
-  // review L2).
-  const rowBox = () =>
-    tab.evaluate(() => {
-      const box = (testId: string) => {
-        const nodes = document.querySelectorAll(`[data-testid="${testId}"]`)
-        if (nodes.length !== 1)
-          throw new Error(`${testId}: ${nodes.length} matches, expected 1`)
-        return nodes[0]!.getBoundingClientRect()
-      }
-      const row = box('hero-cta-group')
-      return { top: row.top - box('hero-section').top, height: row.height }
-    })
-  // A late font swap would re-wrap the hero copy between the two reads.
+  // Today holds the shell in place while its account-specific content is pending.
+  const header = tab.getByTestId('app-header')
   await tab.evaluate(() => document.fonts.ready.then(() => undefined))
-  const pendingBox = await rowBox()
+  const pendingHeader = await header.boundingBox()
+  expect(pendingHeader).not.toBeNull()
   release()
   await expectMemberLanding(tab)
-  expect(await rowBox()).toEqual(pendingBox)
+  expect(await header.boundingBox()).toEqual(pendingHeader)
 
   expect([...errors, ...tabErrors]).toEqual([])
 })

@@ -20,20 +20,19 @@
 // drops A's outfit and teaser in the first commit (7.7-E2E-009 swap-while-reading). CI pw-e2e on
 // b25999ca: 7.7-CMP-058 the chips stay hidden in place until the first feed answer (E2E-005).
 import type { RitualResponse, SavedLocation } from '@couture/api-client/contracts/http'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
 import { http, HttpResponse } from 'msw'
 import { useLayoutEffect } from 'react'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
+import * as webSession from '../../lib/web-session'
 import { currentWebSessionScope, useWebSessionScope } from '../../lib/use-web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { settle } from '../../test-utils/request-barrier'
 import { signInFixtureMember } from '../../test-utils/member-session'
 import {
-  SPOTLIGHT_PATH,
   cityPage,
-  respond,
   setupHomeTeaserSuite,
   useServedSpotlight,
 } from '../../test-utils/home-spotlight-teaser'
@@ -45,10 +44,10 @@ import { ScreenGate } from './screen-gate'
 
 vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
 vi.mock('../../lib/community', { spy: true })
-vi.mock('next/navigation', () => ({
-  usePathname: () => '/',
-  useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }),
-}))
+vi.mock('next/navigation', () => {
+  const router = { back: vi.fn(), replace: vi.fn(), push: vi.fn() }
+  return { usePathname: () => '/', useRouter: () => router }
+})
 
 const date = '2026-11-25T12:00:00.000Z'
 
@@ -116,7 +115,7 @@ const chicagoHome: SavedLocation = {
 }
 
 /** Home's gate reads, as `app/page.tsx` lists them (the deep link is answered at once here). */
-const HOME_READS = ['ritual', 'teaser', 'spotlight', 'deeplink']
+const HOME_READS = ['ritual', 'closet', 'teaser', 'deeplink']
 
 /** What the first commit of a mount holds, read in a layout effect before any paint. */
 function FirstCommitProbe({ seen }: { seen: string[] }) {
@@ -176,41 +175,6 @@ describe('7.7 Home screen gate', () => {
     expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
   })
 
-  it('7.7-CMP-005 stays closed while the City Spotlight above the feed is unanswered, then opens', async () => {
-    document.documentElement.setAttribute('data-session', 'member')
-    signInFixtureMember()
-    useAnsweredRitual()
-    // The teaser read answers at once; the community section's own Spotlight read is held.
-    const moduleRead = Promise.withResolvers<void>()
-    const moduleReads: URL[] = []
-    useMswHandlers(
-      http.get(SPOTLIGHT_PATH, async ({ request }) => {
-        const url = new URL(request.url)
-        if (url.searchParams.get('surface') === 'home_teaser')
-          return respond({ status: 200, body: { data: cityPage() } })
-        moduleReads.push(url)
-        await moduleRead.promise
-        return respond({ status: 200, body: { data: cityPage() } })
-      })
-    )
-
-    renderHomeGate()
-    const gate = screen.getByTestId('screen-gate')
-
-    // Ritual and teaser are in (hidden under the placeholder); the module read is still out.
-    expect(await screen.findByTestId('home-live-outfit')).not.toBeVisible()
-    expect(await screen.findByTestId('home-spotlight-teaser-link')).not.toBeVisible()
-    await waitFor(() => expect(moduleReads).toHaveLength(1))
-    expect(gate).not.toHaveAttribute('data-ready')
-    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
-
-    moduleRead.resolve()
-    await waitFor(() => expect(gate).toHaveAttribute('data-ready', 'true'))
-    expect(screen.getByTestId('community-spotlight-heading')).toBeVisible()
-    expect(screen.getByTestId('home-live-outfit')).toBeVisible()
-    expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
-  })
-
   it('7.7-CMP-016 waits for the city line, so the outfit header is complete when the body appears', async () => {
     document.documentElement.setAttribute('data-session', 'member')
     signInFixtureMember()
@@ -234,7 +198,7 @@ describe('7.7 Home screen gate', () => {
     locations.resolve()
     await waitFor(() => expect(gate).toHaveAttribute('data-ready', 'true'))
     expect(
-      within(screen.getByTestId('home-live-outfit')).getByText('Chicago home')
+      within(screen.getByTestId('weather-header')).getByText('Chicago home')
     ).toBeVisible()
   })
 
@@ -270,7 +234,9 @@ describe('7.7 Home screen gate', () => {
     expect(
       outfit.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
-    expect(within(outfit).getByText('Chicago home')).toBeVisible()
+    expect(
+      within(screen.getByTestId('weather-header')).getByText('Chicago home')
+    ).toBeVisible()
   })
 
   it('7.7-CMP-017 a return to Home has the remembered teaser in its first frame', async () => {
@@ -532,11 +498,15 @@ describe('7.7 Home screen gate', () => {
     const firstVisit = renderHomeGate()
     await answer(0, cityPage())
     await waitFor(() => expect(keptRitual()?.city).toBe('Chicago home'))
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
     firstVisit.unmount()
 
     // The return's outfit answers for Denver while its city line is still out.
     returning = true
     renderHomeGate()
+    expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
     await waitFor(() => expect(ritualReads).toBe(2))
     await settle()
     expect(keptRitual()).toMatchObject({
@@ -545,7 +515,7 @@ describe('7.7 Home screen gate', () => {
     })
     // The Chicago line never sits over the Denver outfit.
     expect(
-      within(screen.getByTestId('home-live-outfit')).queryByText('Chicago home')
+      within(screen.getByTestId('weather-header')).queryByText('Chicago home')
     ).toBeNull()
 
     await act(async () => {
@@ -559,8 +529,9 @@ describe('7.7 Home screen gate', () => {
       })
     )
     expect(
-      within(screen.getByTestId('home-live-outfit')).getByText('Denver home')
+      within(screen.getByTestId('weather-header')).getByText('Denver home')
     ).toBeVisible()
+    await answer(1, cityPage())
   })
 
   it("7.7-CMP-054 a fixture bearer switch on a mounted Home drops member A's outfit and teaser in the first commit, with A's refresh still out (CI 7.7-E2E-009 swap-while-reading)", async () => {
@@ -584,7 +555,10 @@ describe('7.7 Home screen gate', () => {
     const { answer } = useServedSpotlight()
     const firstVisit = renderHomeGate()
     await answer(0, cityPage())
-    expect(await screen.findByText('morning fixture A')).toBeVisible()
+    const primary = await screen.findByTestId('today-primary-action')
+    await waitFor(() => expect(primary).toBeVisible())
+    fireEvent.click(primary)
+    expect(screen.getByText('morning fixture A')).toBeVisible()
     firstVisit.unmount()
 
     // Back on Home from A's snapshot: A's teaser refresh answers, A's ritual refresh is held.
@@ -610,6 +584,7 @@ describe('7.7 Home screen gate', () => {
     )
     await answer(1, cityPage())
     await waitFor(() => expect(ritualBearers).toHaveLength(2))
+    fireEvent.click(screen.getByTestId('today-primary-action'))
     expect(screen.getByText('morning fixture A')).toBeVisible()
     expect(screen.getByTestId('home-spotlight-teaser-link')).toBeVisible()
 
@@ -624,92 +599,22 @@ describe('7.7 Home screen gate', () => {
     expect(firstForB).toMatchObject({ outfitA: false, teaser: false })
   })
 
-  it('7.7-CMP-058 the community chips hold their row hidden until the first feed read answers, so the active chip never widens on screen (CI 7.7-E2E-005 member Home late)', async () => {
-    document.documentElement.setAttribute('data-session', 'member')
-    signInFixtureMember()
-    useAnsweredRitual()
-    const feedHeld = Promise.withResolvers<void>()
-    onTestFinished(() => feedHeld.resolve())
-    useMswHandlers(
-      http.get('/api/v1/community/feed', async () => {
-        await feedHeld.promise
-        return HttpResponse.json({
-          data: {
-            items: [],
-            authorStates: [],
-            nextCursor: null,
-            mode: 'auto',
-            viewerBand: 'temperate_dry',
-            bandResolved: true,
-            bandUnresolvedReason: null,
-            experimentVariant: 'auto',
-            activeChallenge: null,
-          },
-        })
-      })
-    )
-    const { answer } = useServedSpotlight()
-    renderHomeGate()
-    await answer(0, cityPage())
-    await waitFor(() =>
-      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
-    )
-
-    // Home is shown and the feed is still out: the row keeps its place, hidden and unfocusable.
-    const row = screen.getByTestId('community-chip-row')
-    const chips = within(row).getAllByRole('button', { hidden: true })
-    expect(row).toHaveClass('invisible')
-    expect(row).toHaveAttribute('aria-hidden', 'true')
-    expect(chips.every((chip) => chip.tabIndex === -1)).toBe(true)
-    expect(screen.getByTestId('community-filter-auto')).toHaveTextContent(
-      /^Your climate$/
-    )
-
-    // The feed answers with the band: the row shows, the active chip already names it.
-    await act(async () => {
-      feedHeld.resolve()
-      await feedHeld.promise
+  it('7.7-CMP-044 a pending account keeps both Today entry states out of view', () => {
+    const verification = Promise.withResolvers<string | undefined>()
+    const stored = vi.spyOn(webSession, 'hasStoredWebSession').mockReturnValue(true)
+    const resolve = vi
+      .spyOn(webSession, 'resolveWebSessionToken')
+      .mockReturnValue(verification.promise)
+    onTestFinished(() => {
+      stored.mockRestore()
+      resolve.mockRestore()
+      verification.resolve(undefined)
     })
-    await waitFor(() => expect(row).not.toHaveClass('invisible'))
-    expect(row).not.toHaveAttribute('aria-hidden')
-    expect(screen.getByTestId('community-filter-auto')).toHaveTextContent(
-      'Your climate: Temperate and dry'
-    )
-    expect(screen.getByTestId('community-chip-row')).toBe(row)
-    expect(within(row).getAllByRole('button')).toEqual(chips)
-  })
-
-  it('7.7-CMP-044 the hero stays outside the Home gate, so a session being verified shows it while the body waits (real-session L-10)', () => {
     document.documentElement.setAttribute('data-session', 'pending')
-    signInFixtureMember()
-    const ritual = Promise.withResolvers<void>()
-    onTestFinished(() => ritual.resolve())
-    useMswHandlers(
-      http.get('/api/v1/ritual', async () => {
-        await ritual.promise
-        return HttpResponse.json(memberRitual())
-      }),
-      http.get('/api/v1/locations', () => HttpResponse.json({ data: [] }))
-    )
-    useServedSpotlight()
     render(<Home />)
-
-    const gate = screen.getByTestId('screen-gate')
-    expect(gate).not.toHaveAttribute('data-ready')
+    expect(screen.getByTestId('app-header')).toBeVisible()
     expect(screen.getByTestId('screen-placeholder')).toBeVisible()
-    expect(screen.getByTestId('lookbook-prism-container')).not.toBeVisible()
-    // The hero reads nothing: it is there at once, so the page never waits on a verification
-    // that could time out into the signed-out landing.
-    const hero = screen.getByTestId('hero-section')
-    expect(gate.contains(hero)).toBe(false)
-    expect(screen.getByTestId('hero-headline')).toBeVisible()
-    expect(screen.getByTestId('cta-primary')).toBeVisible()
-    // The hero follows the placeholder, which holds the viewport, so the body appearing above it
-    // moves nothing on screen.
-    expect(
-      screen.getByTestId('screen-placeholder').compareDocumentPosition(hero) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
-    expect(screen.getByTestId('screen-placeholder')).toHaveClass('min-h-screen')
+    expect(screen.queryByTestId('guest-preview-entry')).toBeNull()
+    expect(screen.queryByTestId('home-set-city')).toBeNull()
   })
 })

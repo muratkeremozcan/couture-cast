@@ -5,6 +5,7 @@ import {
   type WeatherAlertDeepLinkTarget,
 } from '@couture/api-client'
 import {
+  createIdempotencyKey,
   hasDeepLinkIntent,
   parseDeepLink,
   resolveDeepLinkScenario,
@@ -15,20 +16,64 @@ import {
 import posthog from 'posthog-js'
 import { pollWebEvents } from '../../lib/events-client'
 import { isCommunityPostVisibleFromWeb } from '../../lib/community'
+import { isLiveScope } from '../../lib/use-web-session'
 import type { ChipCategory } from '../components/chip-navigation'
 import type { FilterCategory } from '../components/community-lookbook-grid'
+
+// The next Community navigation belongs to the account that opened it.
+let communityHandoff: { query: string; scope: string } | undefined
+
+export function rememberWebCommunityHandoff(query: string, scope: string) {
+  communityHandoff = { query, scope }
+}
+
+export function takeWebCommunityHandoff(query: string) {
+  if (communityHandoff?.query !== query) return undefined
+  const { scope } = communityHandoff
+  communityHandoff = undefined
+  return scope
+}
+
+let spotlightActivation:
+  | {
+      token: string
+      scope: string
+      cardId: string
+    }
+  | undefined
+
+export function createWebSpotlightActivation(cardId: string, scope: string): string {
+  const token = `today-${createIdempotencyKey()}`
+  spotlightActivation = { token, scope, cardId }
+  return token
+}
+
+export function takeWebSpotlightActivation(token: string, scope: string, cardId: string) {
+  // A saved or new-tab link resolves under that tab's own session and live Spotlight.
+  if (token === `link-${cardId}`) return true
+  if (
+    spotlightActivation?.token !== token ||
+    spotlightActivation.scope !== scope ||
+    spotlightActivation.cardId !== cardId
+  )
+    return false
+  spotlightActivation = undefined
+  return true
+}
 
 export interface ApplyDeepLinkOptions {
   rawParams: Record<string, unknown>
   scenarioContext: DeepLinkScenarioContext
   setChipCategory: (category: ChipCategory) => void
   setActiveTab: (tab: FilterCategory) => void
+  setScenario?: (scenario: ReturnType<typeof resolveDeepLinkScenario>) => void
   setFocusedWeatherAlert: (alert: WeatherAlertDeepLinkTarget | null) => void
   setHighlightedCardId: (id: string | undefined) => void
   setLiveAnnouncement: (announcement: string | null) => void
   setIsInvalidDeepLink: (invalid: boolean) => void
   /** Cancels the community visibility probe when the caller unmounts. */
   signal?: AbortSignal
+  communityScope?: string | null
 }
 
 /**
@@ -50,8 +95,9 @@ const SCENARIO_DESTINATIONS: Record<
 }
 
 function handleWidgetDeepLink(slot: DeepLinkSlot, options: ApplyDeepLinkOptions) {
-  const destination =
-    SCENARIO_DESTINATIONS[resolveDeepLinkScenario(slot, options.scenarioContext)]
+  const scenario = resolveDeepLinkScenario(slot, options.scenarioContext)
+  const destination = SCENARIO_DESTINATIONS[scenario]
+  options.setScenario?.(scenario)
   options.setChipCategory(destination.chip)
   options.setActiveTab(destination.filter)
 }
@@ -88,12 +134,14 @@ async function handleWeatherNotification(
 ) {
   let alert: WeatherAlertDeepLinkTarget | undefined
   try {
-    const response = await pollWebEvents()
+    const response = await pollWebEvents(undefined, undefined, options.signal)
     alert = resolveWeatherAlertDeepLinkTarget(response.events, payload.alertId)
   } catch {
+    if (options.signal?.aborted) return
     invalidDeepLink(options, 'Weather alert target could not be loaded')
     return
   }
+  if (options.signal?.aborted) return
   if (!alert) {
     invalidDeepLink(options, 'Weather alert target was not found')
     return
@@ -101,6 +149,36 @@ async function handleWeatherNotification(
   options.setFocusedWeatherAlert(alert)
   captureHandled(payload, alert.id)
   options.setLiveAnnouncement(`Weather alert for ${alert.event.data.location} focused.`)
+}
+
+async function handleCommunityNotification(
+  options: ApplyDeepLinkOptions,
+  payload: DeepLinkPayload
+) {
+  const scope = options.communityScope
+  if (!payload.cardId || scope === null) {
+    invalidDeepLink(options, 'Community card target was not found')
+    return
+  }
+
+  // The referenced card can sit outside the first feed page or have been
+  // removed. The server checks the post for the account that opened the link.
+  if (scope !== undefined && !isLiveScope(scope)) return
+  const isVisible = await isCommunityPostVisibleFromWeb(payload.cardId, options.signal)
+  if (options.signal?.aborted || (scope !== undefined && !isLiveScope(scope))) return
+  if (!isVisible) {
+    invalidDeepLink(options, 'Community card target was not found')
+    return
+  }
+  options.setChipCategory('Community')
+  options.setActiveTab('auto')
+  options.setHighlightedCardId(payload.cardId)
+  announceHandled(options, payload)
+}
+
+function announceHandled(options: ApplyDeepLinkOptions, payload: DeepLinkPayload) {
+  captureHandled(payload)
+  options.setLiveAnnouncement(`Navigated from ${payload.source}. Guidance updated.`)
 }
 
 export async function processWebDeepLink(options: ApplyDeepLinkOptions) {
@@ -127,29 +205,12 @@ export async function processWebDeepLink(options: ApplyDeepLinkOptions) {
     await handleWeatherNotification(options, payload)
     return
   } else if (payload.type === 'community') {
-    if (!payload.cardId) {
-      invalidDeepLink(options, 'Community card target was not found')
-      return
-    }
-    // Asking the server is the only honest way to know whether the target is
-    // visible: the referenced card can sit far outside the first feed page, and
-    // it may have been withdrawn or removed since the notification was sent.
-    // The predecessor here answered `'auto'` for every unknown id, which landed
-    // the reader on an unrelated filter with nothing highlighted and made the
-    // invalid-link branch below unreachable.
-    const isVisible = await isCommunityPostVisibleFromWeb(payload.cardId, options.signal)
-    if (!isVisible) {
-      invalidDeepLink(options, 'Community card target was not found')
-      return
-    }
-    options.setChipCategory('Community')
-    options.setActiveTab('auto')
-    options.setHighlightedCardId(payload.cardId)
+    await handleCommunityNotification(options, payload)
+    return
   } else {
     invalidDeepLink(options, 'Deep link target was not found')
     return
   }
 
-  captureHandled(payload)
-  options.setLiveAnnouncement(`Navigated from ${payload.source}. Guidance updated.`)
+  announceHandled(options, payload)
 }

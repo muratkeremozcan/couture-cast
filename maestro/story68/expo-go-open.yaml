@@ -40,7 +40,7 @@ appId: ${MAESTRO_APP_ID}
 # The Home chip row sits above the sheet, so it shows once the project has loaded.
 - extendedWaitUntil:
     visible:
-      id: 'mobile-chip-navigation'
+      id: 'today-first-content'
     timeout: 180000
     label: 'expo_go_project_not_loaded'
 - waitForAnimationToEnd

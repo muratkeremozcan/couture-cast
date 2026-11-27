@@ -10,11 +10,7 @@ import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
-import {
-  GUEST_PREVIEW_LOCALES,
-  GUEST_PREVIEW_STRINGS,
-  getGuestPreviewStrings,
-} from '@couture/utils'
+import { GUEST_PREVIEW_LOCALES, GUEST_PREVIEW_STRINGS } from '@couture/utils'
 import TabOneScreen from '@/app/(tabs)/index'
 import {
   deleteLocationFromMobile,
@@ -97,14 +93,10 @@ describe('TabOneScreen without a saved location', () => {
 
       await render(<TabOneScreen />)
 
-      const sample = await screen.findByTestId('member-sample-outfit')
-      const state = await within(sample).findByTestId('hero-no-location-state')
-      expect(
-        within(sample).getByText(getGuestPreviewStrings(locale).chrome.sampleLabel)
-      ).toBeVisible()
-      expect(within(state).getByTestId('hero-add-location')).toHaveAccessibleName(
-        cityAction
-      )
+      const city = await screen.findByRole('button', { name: cityAction })
+      const sample = screen.getByTestId('member-sample-outfit')
+      expect(within(sample).getByTestId('member-sample-label')).toBeVisible()
+      expect(within(sample).getByTestId('home-set-city')).toBe(city)
       expect(screen.queryByTestId('hero-error-state')).toBeNull()
       expect(screen.queryByTestId('hero-retry')).toBeNull()
     }
@@ -115,13 +107,10 @@ describe('TabOneScreen without a saved location', () => {
 
     await render(<TabOneScreen />)
 
-    await waitFor(() => {
-      expect(screen.getByTestId('hero-error-state')).toBeTruthy()
-    })
-    const sample = screen.getByTestId('member-sample-outfit')
-    expect(within(sample).getByText("Unable to load today's outfit.")).toBeVisible()
-    expect(within(sample).getByTestId('hero-retry')).toHaveAccessibleName('Try again')
-    expect(screen.queryByTestId('hero-no-location-state')).toBeNull()
+    const sample = await screen.findByTestId('member-sample-outfit')
+    const retry = await within(sample).findByRole('button', { name: 'Try again' })
+    expect(retry).toHaveAttribute('data-testid', 'hero-retry')
+    expect(within(sample).getByTestId('home-set-city')).toBeVisible()
   })
 
   it('6.5-MOB-POLISH-06 defines the sample disclosure and city action in all 10 catalogs', () => {
@@ -137,12 +126,12 @@ describe('TabOneScreen without a saved location', () => {
     }
   })
 
-  it('1.2b-MOB-HERO-01 opens the guided add-location screen from the no-location state', async () => {
+  it('1.2b-MOB-HERO-01 opens Locations from the no-location state', async () => {
     answerRitualWithNoLocation()
 
     await render(<TabOneScreen />)
 
-    const action = await screen.findByTestId('hero-add-location')
+    const action = await screen.findByTestId('home-set-city')
     expect(action).toHaveAccessibleName('Set your city')
     // WCAG 2.5.8 and the platform guidance: a 44pt minimum touch target.
     expect(action.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)
@@ -163,14 +152,12 @@ describe('TabOneScreen without a saved location', () => {
     )
 
     await render(<TabOneScreen />)
-    await screen.findByTestId('hero-no-location-state')
+    await screen.findByTestId('member-sample-outfit')
 
     await saveLocationFromSearchFromMobile('candidate.signature', 'Home')
 
-    await waitFor(() => {
-      expect(screen.getByTestId('outfit-recommendation-card')).toBeTruthy()
-    })
-    expect(screen.queryByTestId('hero-no-location-state')).toBeNull()
+    await screen.findByTestId('today-primary-action')
+    expect(screen.queryByTestId('member-sample-outfit')).toBeNull()
   })
 
   it.each([
@@ -178,7 +165,7 @@ describe('TabOneScreen without a saved location', () => {
       'deleting the last location answers no-location',
       () => deleteLocationFromMobile('loc-1'),
       noLocationResponse,
-      'hero-no-location-state',
+      'home-set-city',
     ],
     [
       'switching to a primary without weather answers unavailable',
@@ -192,7 +179,7 @@ describe('TabOneScreen without a saved location', () => {
           },
           { status: 503 }
         ),
-      'hero-error-state',
+      'hero-retry',
     ],
   ])(
     '1.2b-MOB-HERO-03 never restores the previous primary ritual after %s',

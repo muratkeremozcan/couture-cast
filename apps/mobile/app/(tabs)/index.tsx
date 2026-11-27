@@ -16,6 +16,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -37,6 +38,7 @@ import { onLocationsChanged } from '@/src/lib/locations'
 import { onWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import {
   mobileApplicationUserId,
+  mobileIdentityEpoch,
   resolveMobileAccessToken,
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
@@ -59,6 +61,7 @@ import {
   ritualResponseSchema,
   type GarmentCategory,
   type RitualResponse,
+  type WeatherHourlyEntry,
   type AlertPreferences,
 } from '@couture/api-client/contracts/http'
 import {
@@ -86,38 +89,27 @@ import {
 } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { TAB_BODY_INSET, useTokens, withAlpha } from '@/src/theme/tokens'
-import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 import { ScreenGate } from '@/src/components/screen-gate'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { HomeCloset, useRecentHomePieces } from '@/components/home/home-closet'
 import { HomeSpotlightTeaserSlot } from '@/components/home/home-spotlight-teaser'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { useMemberSessionState } from '@/src/lib/member-session'
 import { useStatusBar } from '@/components/save-feedback'
 import { SignedOutWelcome } from '@/src/features/preview/signed-out-welcome'
 import {
-  HomeAddGarment,
   HomePlannerLink,
   MemberSampleOutfit,
 } from '@/src/features/preview/member-sample-outfit'
 import { getGuestPreviewStrings } from '@couture/utils'
+import { PreviewButton } from '@/src/features/preview/guest-preview-parts'
+import { formatTemperature } from '@/src/lib/formatters'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
 type SwapFocusTarget = number | { focus?: () => void }
-
-const CHIP_SCENARIOS: Record<ChipCategory, ScenarioType> = {
-  Personal: 'morning',
-  Community: 'midday',
-  Sponsored: 'evening',
-}
-
-const SCENARIO_CHIPS: Record<ScenarioType, ChipCategory> = {
-  morning: 'Personal',
-  midday: 'Community',
-  evening: 'Sponsored',
-}
 
 const ritualRequestTimeoutMs = 15_000
 // The API's 400 message for a user with no saved location (RitualService).
@@ -170,6 +162,25 @@ function focusAccessibilityTarget(
   if (node) {
     AccessibilityInfo.setAccessibilityFocus(node)
   }
+}
+
+function CachedWeatherNotice({ visible }: { visible: boolean }) {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  if (!visible) return null
+  return (
+    <View
+      style={[
+        styles.staleBanner,
+        { backgroundColor: palette.noticeSurface, borderBottomColor: palette.noticeLine },
+      ]}
+      testID="stale-cache-banner"
+    >
+      <Text style={[styles.staleText, { color: palette.noticeInk }]}>
+        {t('hero.offline_toast', { defaultValue: 'Using recently cached weather data' })}
+      </Text>
+    </View>
+  )
 }
 
 function InvalidDeepLinkBanner({
@@ -242,18 +253,6 @@ function activeHomeLocale(i18n: { resolvedLanguage?: string; language: string })
 }
 
 /**
- * Story CC-7.7 D2: the member sample appears only after the ritual read settled without a
- * usable outfit. Before that the member sees the gate's placeholder, never the sample first.
- */
-function showSampleOutfit(
-  session: ReturnType<typeof useMemberSessionState>[0],
-  settled: boolean,
-  outfit: RitualResponse['data']['outfits'][number] | undefined
-) {
-  return session === 'member' && settled && !outfit?.garmentIds.length
-}
-
-/**
  * Story CC-7.7 D3: Home's gate reads are the ritual and its weather (one request). A signed-out
  * or unverifiable session has nothing to wait for.
  */
@@ -271,7 +270,7 @@ type OwnedRitual = { owner: string | null; data: RitualResponse; readAt: number 
 const ritualRolloverHour = 8
 const dayMs = 24 * 60 * 60 * 1000
 
-function localDateAndHour(at: number, timeZone: string) {
+function localDateAndHourIn(timeZone: string) {
   const format = (zone: string) =>
     new Intl.DateTimeFormat('en-US', {
       timeZone: zone,
@@ -280,20 +279,62 @@ function localDateAndHour(at: number, timeZone: string) {
       day: '2-digit',
       hour: '2-digit',
       hourCycle: 'h23',
-    }).formatToParts(new Date(at))
-  let parts: Intl.DateTimeFormatPart[]
+    })
+  let formatter: Intl.DateTimeFormat
   try {
-    parts = format(timeZone)
+    formatter = format(timeZone)
   } catch {
-    // An unknown zone name: UTC still separates one day from the next.
-    parts = format('UTC')
+    formatter = format('UTC')
   }
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((entry) => entry.type === type)?.value ?? ''
-  return {
-    date: `${part('year')}-${part('month')}-${part('day')}`,
-    hour: Number(part('hour')),
+  return (at: number) => {
+    const parts = formatter.formatToParts(new Date(at))
+    const part = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((entry) => entry.type === type)?.value ?? ''
+    return {
+      date: `${part('year')}-${part('month')}-${part('day')}`,
+      hour: Number(part('hour')),
+    }
   }
+}
+
+function hasDistinctForecastPeriods(
+  weather: RitualResponse['data']['weather'],
+  locale: ReturnType<typeof activeHomeLocale>,
+  readAt: number,
+  availableScenarios: readonly ScenarioType[]
+): boolean {
+  const { timezone, hourly } = weather
+  const localDateAndHour = localDateAndHourIn(timezone)
+  const { hour, date } = localDateAndHour(readAt)
+  const anchor = hour < ritualRolloverHour ? date : localDateAndHour(readAt + dayMs).date
+  // These are the same representative hours used to generate the recommendations.
+  const byDay = new Map<string, Map<number, WeatherHourlyEntry>>()
+  for (const entry of hourly) {
+    const local = localDateAndHour(Date.parse(entry.forecastAt))
+    if (local.hour !== 8 && local.hour !== 13 && local.hour !== 19) continue
+    const periods = byDay.get(local.date) ?? new Map<number, WeatherHourlyEntry>()
+    if (!periods.has(local.hour)) periods.set(local.hour, entry)
+    byDay.set(local.date, periods)
+  }
+  const anchorPeriods = byDay.get(anchor)
+  const periods =
+    anchorPeriods?.size === 3
+      ? anchorPeriods
+      : [...byDay.values()].reverse().find((day) => day.size === 3)
+  if (!periods) return false
+  const periodHour = { morning: 8, midday: 13, evening: 19 } as const
+  return (
+    new Set(
+      availableScenarios.map((scenario) => {
+        const entry = periods.get(periodHour[scenario])!
+        return JSON.stringify([
+          entry.condition,
+          formatTemperature(entry.temperature, locale),
+          Math.round(entry.precipitationProbability * 100),
+        ])
+      })
+    ).size > 1
+  )
 }
 
 /**
@@ -303,9 +344,10 @@ function localDateAndHour(at: number, timeZone: string) {
  */
 function ritualIdentity(ritual: RitualResponse, readAt: number): string {
   const { locationKey, timezone } = ritual.data.weather
-  const { hour } = localDateAndHour(readAt, timezone)
+  const localDateAndHour = localDateAndHourIn(timezone)
+  const { hour } = localDateAndHour(readAt)
   const anchorAt = hour >= ritualRolloverHour ? readAt + dayMs : readAt
-  return `${locationKey}|${localDateAndHour(anchorAt, timezone).date}`
+  return `${locationKey}|${localDateAndHour(anchorAt).date}`
 }
 
 /** The garments a member swapped on one ritual, per scenario, as the swap left them. */
@@ -359,6 +401,7 @@ export default function TabOneScreen() {
   // Story 6.16 D1: the ritual is a member request. A signed-out launch shows the
   // welcome card and sends nothing; an unverifiable session keeps its retry state.
   const [sessionState, retrySession] = useMemberSessionState()
+  const recentPieces = useRecentHomePieces(applicationUserId, sessionState === 'member')
   // Story 6.17 D3: a Google identity that left the finish step returns to it. On focus only,
   // so a screen pushed above Home is never hijacked (6.16 stacked-screen rule).
   useFocusEffect(
@@ -387,6 +430,7 @@ export default function TabOneScreen() {
   const reduceMotion = useReducedMotion()
   const swapModalAnimation = useModalAnimation('slide')
   const latestLoadId = useRef(0)
+  const deepLinkIdentity = useRef<{ key: string; epoch: number } | null>(null)
   const hasTrackedTabView = useRef(false)
   // Keyed on recommendation id, not on mount: the impression effect re-runs
   // whenever the locale or the analytics identity changes, and a scenario
@@ -417,8 +461,14 @@ export default function TabOneScreen() {
   const ritualSettled = settledOwner === applicationUserId
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<HeroLoadError | null>(null)
-  const [activeScenario, setActiveScenario] = useState<ScenarioType>('morning')
-  const [activeChipCategory, setActiveChipCategory] = useState<ChipCategory>('Personal')
+  const [selectedScenario, setActiveScenario] = useState<ScenarioType>('morning')
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [hourlyOpen, setHourlyOpen] = useState(false)
+  const activeOutfit =
+    ritual?.data.outfits.find(
+      (outfit) => outfit.scenario === selectedScenario && outfit.garmentIds.length > 0
+    ) ?? ritual?.data.outfits.find((outfit) => outfit.garmentIds.length > 0)
+  const activeScenario = activeOutfit?.scenario ?? selectedScenario
   const [pendingWidgetSlot, setPendingWidgetSlot] = useState<WidgetSlot | null>(null)
   const [isStale, setIsStale] = useState(false)
   // Distinct from `isStale`, which only covers the offline fallback. This also
@@ -453,6 +503,12 @@ export default function TabOneScreen() {
     setIsStale(false)
     setIsSwapModalVisible(false)
     setSwappingGarmentId(null)
+    setDetailsOpen(false)
+    setHourlyOpen(false)
+    setActiveScenario('morning')
+    setPendingWidgetSlot(null)
+    setFocusedWeatherAlert(null)
+    setIsInvalidDeepLink(false)
     // The next member's own first load starts from the initial loading state.
     setIsLoading(true)
   }, [applicationUserId])
@@ -721,23 +777,32 @@ export default function TabOneScreen() {
   }, [activeLocale, analyticsUserId, applicationUserId, sessionState])
 
   useEffect(() => {
+    if (sessionState === 'restoring') return
     const rawParams = { source, size, slot, type, alertId, cardId, expiresAt }
     if (
       ![source, size, slot, type, alertId, cardId, expiresAt].some(
         (value) => value !== undefined
       )
     ) {
+      deepLinkIdentity.current = null
       return
     }
 
+    const key = JSON.stringify(rawParams)
+    const epoch = mobileIdentityEpoch()
+    if (deepLinkIdentity.current?.key === key && deepLinkIdentity.current.epoch !== epoch)
+      return
+    deepLinkIdentity.current = { key, epoch }
+
     let active = true
+    const isCurrent = () => active && mobileIdentityEpoch() === epoch
     let routed = false
     void processMobileDeepLink({
       params: rawParams,
       locale: activeLocale,
       analytics: {
         capture: (event, properties) => {
-          if (active) {
+          if (isCurrent()) {
             analytics.capture(event, properties)
           }
         },
@@ -745,37 +810,36 @@ export default function TabOneScreen() {
         getDistinctId: () => analytics.getDistinctId(),
       },
       setWidgetScenario: (scenario) => {
-        if (!active) {
+        if (!isCurrent()) {
           return
         }
         setPendingWidgetSlot(null)
         setActiveScenario(scenario)
-        setActiveChipCategory(SCENARIO_CHIPS[scenario])
       },
       setForecastSlot: (forecastSlot) => {
-        if (active) {
+        if (isCurrent()) {
           setPendingWidgetSlot(forecastSlot)
         }
       },
       setFocusedWeatherAlert: (alert) => {
-        if (active) {
+        if (isCurrent()) {
           setFocusedWeatherAlert(alert)
         }
       },
       setIsInvalidDeepLink: (invalid) => {
-        if (active) {
+        if (isCurrent()) {
           setIsInvalidDeepLink(invalid)
         }
       },
       pushToCommunity: (communityParams) => {
-        if (!active) {
+        if (!isCurrent()) {
           return
         }
         routed = true
         router.push({ pathname: '/community', params: communityParams })
       },
     }).finally(() => {
-      if (active && !routed) {
+      if (isCurrent() && !routed) {
         router.setParams({
           source: undefined,
           size: undefined,
@@ -800,6 +864,8 @@ export default function TabOneScreen() {
     cardId,
     expiresAt,
     activeLocale,
+    applicationUserId,
+    sessionState,
     analytics,
     router,
   ])
@@ -858,20 +924,20 @@ export default function TabOneScreen() {
 
     const scenario = resolveWidgetScenario(ritual, pendingWidgetSlot)
     setActiveScenario(scenario)
-    setActiveChipCategory(SCENARIO_CHIPS[scenario])
     setPendingWidgetSlot(null)
   }, [ritual, pendingWidgetSlot])
 
   const handleScenarioChange = (scenario: ScenarioType) => {
     setActiveScenario(scenario)
-    setActiveChipCategory(SCENARIO_CHIPS[scenario])
     analytics.capture('hero_interaction', {
       interactionType: 'scenario_toggle',
       scenario,
     })
   }
 
-  const handleRibbonToggle = (isExpanded: boolean) => {
+  const handleRibbonToggle = () => {
+    const isExpanded = !hourlyOpen
+    setHourlyOpen(isExpanded)
     analytics.capture('hero_interaction', {
       interactionType: 'ribbon_toggle',
       isExpanded,
@@ -994,11 +1060,10 @@ export default function TabOneScreen() {
     setGarmentFocusTarget(newGarmentId)
   }
 
-  const activeOutfit = ritual?.data.outfits.find((o) => o.scenario === activeScenario)
   const activeShopThisLook = resolveRenderableShopThisLook(activeOutfit, isCacheServed)
 
   useEffect(() => {
-    if (!activeOutfit || !activeShopThisLook) {
+    if (!detailsOpen || !activeOutfit || !activeShopThisLook) {
       return
     }
     if (trackedCtaImpressions.current.has(activeOutfit.id)) {
@@ -1013,16 +1078,37 @@ export default function TabOneScreen() {
       localeRegion: resolveAffiliateLocaleRegion(activeLocale),
       recommendationId: activeOutfit.id,
     })
-  }, [activeOutfit, activeShopThisLook, activeLocale, analyticsUserId, analytics])
+  }, [
+    activeOutfit,
+    activeShopThisLook,
+    activeLocale,
+    analyticsUserId,
+    analytics,
+    detailsOpen,
+  ])
 
   const handleRetry = () => {
     void loadData(true)
   }
 
-  const handleChipCategoryChange = (category: ChipCategory) => {
-    setActiveChipCategory(category)
-    setActiveScenario(CHIP_SCENARIOS[category])
-  }
+  const weather = ritual?.data.weather
+  const hasHourly = Boolean(weather?.hourly.length)
+  const readAt = ownedRitual?.readAt
+  const availableScenarios = useMemo(
+    () =>
+      ritual?.data.outfits
+        .filter(({ garmentIds }) => garmentIds.length > 0)
+        .map(({ scenario }) => scenario) ?? [],
+    [ritual]
+  )
+  const showPeriods = useMemo(
+    () =>
+      weather &&
+      readAt !== undefined &&
+      availableScenarios.length > 1 &&
+      hasDistinctForecastPeriods(weather, activeLocale, readAt, availableScenarios),
+    [activeLocale, availableScenarios, readAt, weather]
+  )
 
   const { category: swapCategory, options: swapOptions } = resolveGarmentSwap(
     swappingGarmentId,
@@ -1034,7 +1120,9 @@ export default function TabOneScreen() {
   // readable. Story CC-7.7 D2: a member's slot stays empty until the ritual read settles.
   const renderHero = () =>
     sessionState === 'signed-out' ? (
-      <SignedOutWelcome />
+      <NativeView testID="today-first-content">
+        <SignedOutWelcome />
+      </NativeView>
     ) : sessionState === 'unavailable' ? (
       <View
         style={[
@@ -1057,86 +1145,128 @@ export default function TabOneScreen() {
           </Text>
         </Pressable>
       </View>
-    ) : sessionState !== 'member' || !ritualSettled ? null : showSampleOutfit(
-        sessionState,
-        ritualSettled,
-        activeOutfit
-      ) ? (
+    ) : sessionState === 'member' ? (
       <>
-        {/* Story CC-7.11 P5: Today's first own content; the Plan link follows it (D16). */}
-        <NativeView testID="today-first-content">
-          <MemberSampleOutfit
-            key={applicationUserId}
-            owner={applicationUserId}
-            error={error}
-            busy={isLoading}
-            onRetry={handleRetry}
-          />
-        </NativeView>
+        {ritualSettled && (ritual || !isLoading) && (
+          <>
+            <WeatherHeader
+              current={weather?.current}
+              unavailable={!weather}
+              hourlyOpen={hourlyOpen}
+              onHourlyToggle={hasHourly ? handleRibbonToggle : undefined}
+            />
+            {hourlyOpen && (
+              <HourlyForecastRibbon
+                hourly={weather?.hourly}
+                timeZone={weather?.timezone}
+                showAll
+              />
+            )}
+            <NativeView testID="today-first-content">
+              {activeOutfit ? (
+                <View
+                  testID="outfit-recommendation-card"
+                  style={[
+                    styles.todayCard,
+                    { backgroundColor: palette.card, borderColor: palette.line },
+                  ]}
+                >
+                  <Text
+                    accessibilityRole="header"
+                    style={[styles.todayTitle, { color: palette.ink }]}
+                  >
+                    {t(
+                      activeOutfit.garmentIds.every((id) => id.startsWith('default-'))
+                        ? 'home.today.starterOutfit'
+                        : 'home.today.outfit'
+                    )}
+                  </Text>
+                  <View style={styles.todayGarments}>
+                    {activeOutfit.garmentIds.map((id) => (
+                      <Text
+                        key={id}
+                        style={[
+                          styles.todayGarment,
+                          { color: palette.ink, backgroundColor: palette.page },
+                        ]}
+                      >
+                        {garmentTitle(
+                          parseGarmentId(
+                            id,
+                            activeOutfit.displayGarments?.find(
+                              (garment) => garment.id === id
+                            )?.category
+                          ),
+                          t,
+                          activeLocale
+                        )}
+                      </Text>
+                    ))}
+                  </View>
+                  <PreviewButton
+                    label={t('home.today.outfitDetails')}
+                    palette={palette}
+                    testID="today-primary-action"
+                    expanded={detailsOpen}
+                    onPress={() => setDetailsOpen((open) => !open)}
+                    primary
+                    todayPrimary
+                  />
+                  {detailsOpen && (
+                    <OutfitRecommendationCard
+                      outfit={activeOutfit}
+                      onExport={(recommendationId, opener) => {
+                        if (
+                          openAndroidShareCard(
+                            { kind: 'outfit', recommendationId },
+                            'outfit',
+                            opener
+                          )
+                        )
+                          return
+                        shareCardInvoker.current = {
+                          node: opener,
+                          member: mobileApplicationUserId(),
+                        }
+                        setShareCardSource({ kind: 'outfit', recommendationId })
+                        setShareCardOpen(true)
+                        traceShareCardOpener('state-open')
+                      }}
+                      onSwapGarment={handleSwapGarment}
+                      onGarmentRef={(garmentId, element) => {
+                        garmentRefs.current.set(garmentId, element)
+                      }}
+                      isCacheServed={isCacheServed}
+                      nested
+                    />
+                  )}
+                </View>
+              ) : (
+                <MemberSampleOutfit
+                  key={applicationUserId}
+                  owner={applicationUserId}
+                  error={error}
+                  busy={isLoading}
+                  onRetry={handleRetry}
+                  weatherAvailable={Boolean(weather)}
+                />
+              )}
+            </NativeView>
+            <CachedWeatherNotice visible={isStale} />
+            {activeOutfit && showPeriods && (
+              <ScenarioToggles
+                activeScenario={activeScenario}
+                availableScenarios={availableScenarios}
+                onScenarioChange={handleScenarioChange}
+              />
+            )}
+            {weather && <WeatherAlertBanner alerts={weather.alerts} />}
+          </>
+        )}
+        <HomeCloset pieces={recentPieces} />
         <HomePlannerLink />
       </>
-    ) : (
-      <>
-        {/* Weather Header. Story CC-7.11 AC2, D16: the weather line and the outfit card come
-            first; the ribbon, scenario toggles, add prompt and Plan link follow the card. */}
-        <WeatherHeader current={ritual?.data.weather.current} isLoading={isLoading} />
-
-        {/* Primary Outfit Card; Story CC-7.11 P5: Today's first own content. */}
-        <NativeView testID="today-first-content">
-          <OutfitRecommendationCard
-            outfit={activeOutfit}
-            onExport={(recommendationId, opener) => {
-              if (
-                openAndroidShareCard(
-                  { kind: 'outfit', recommendationId },
-                  'outfit',
-                  opener
-                )
-              )
-                return
-              shareCardInvoker.current = {
-                node: opener,
-                member: mobileApplicationUserId(),
-              }
-              setShareCardSource({ kind: 'outfit', recommendationId })
-              setShareCardOpen(true)
-              traceShareCardOpener('state-open')
-            }}
-            onSwapGarment={handleSwapGarment}
-            onGarmentRef={(garmentId, element) => {
-              garmentRefs.current.set(garmentId, element)
-            }}
-            isLoading={isLoading}
-            isCacheServed={isCacheServed}
-          />
-        </NativeView>
-
-        {/* Story CC-7.11 D4, AC2: the weather alert banner follows the outfit, so no banner
-            comes before Today's first own content. */}
-        {ritual?.data.weather.alerts && (
-          <WeatherAlertBanner alerts={ritual.data.weather.alerts} />
-        )}
-
-        {activeOutfit && !activeOutfit.displayGarments?.length && <HomeAddGarment />}
-
-        {/* Scenario Quick Toggles */}
-        {!isLoading && ritual && (
-          <ScenarioToggles
-            activeScenario={activeScenario}
-            onScenarioChange={handleScenarioChange}
-          />
-        )}
-
-        {/* Hourly Forecast Ribbon */}
-        <HourlyForecastRibbon
-          hourly={ritual?.data.weather.hourly}
-          isLoading={isLoading}
-          onToggleExpand={handleRibbonToggle}
-        />
-
-        {sessionState === 'member' && <HomePlannerLink />}
-      </>
-    )
+    ) : null
 
   return (
     // Side insets only: the native header and the tab bar already cover top and bottom,
@@ -1152,17 +1282,11 @@ export default function TabOneScreen() {
         innerViewRef={scrollContentRef as RefObject<NativeView>}
         style={[styles.container, { backgroundColor: palette.page }]}
         contentContainerStyle={styles.contentContainer}
-        stickyHeaderIndices={[0]}
         testID="hero-experience-scrollview"
         // Focusable from code on web without becoming a tab stop, so focus can
         // land here when the teaser leaves.
         {...(Platform.OS === 'web' ? { tabIndex: -1 as const } : {})}
       >
-        <MobileChipNavigation
-          activeCategory={activeChipCategory}
-          onCategoryChange={handleChipCategoryChange}
-        />
-
         <InvalidDeepLinkBanner
           visible={isInvalidDeepLink}
           message={invalidDeepLinkMessage}
@@ -1207,29 +1331,9 @@ export default function TabOneScreen() {
         <ScreenGate
           screen="home"
           session={sessionState}
-          ready={homeGateReady(sessionState, ritualSettled)}
+          ready={homeGateReady(sessionState, ritualSettled && recentPieces !== undefined)}
         >
           {renderHero()}
-
-          {/* Story CC-7.11 D4, AC2: the cached-data notice follows the outfit. */}
-          {isStale && (
-            <View
-              style={[
-                styles.staleBanner,
-                {
-                  backgroundColor: palette.noticeSurface,
-                  borderBottomColor: palette.noticeLine,
-                },
-              ]}
-              testID="stale-cache-banner"
-            >
-              <Text style={[styles.staleText, { color: palette.noticeInk }]}>
-                {t('hero.offline_toast', {
-                  defaultValue: 'Using recently cached weather data',
-                })}
-              </Text>
-            </View>
-          )}
 
           {/*
           Story 6.7: after the whole hero conditional, so it follows in focus
@@ -1380,6 +1484,22 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingBottom: 24,
+  },
+  todayCard: {
+    marginHorizontal: TAB_BODY_INSET,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  todayTitle: { fontSize: 20, fontWeight: '700' },
+  todayGarments: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  todayGarment: {
+    flexShrink: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    fontSize: 14,
   },
   staleBanner: {
     borderBottomWidth: 1,

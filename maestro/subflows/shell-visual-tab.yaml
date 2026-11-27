@@ -14,6 +14,18 @@ appId: ${MAESTRO_APP_ID}
     notVisible:
       id: 'screen-placeholder'
     timeout: 15000
+- runFlow:
+    when:
+      true: ${NAME === 'home'}
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: 'today-primary-action'
+          timeout: 15000
+      - assertVisible:
+          id: 'weather-header'
+      - assertNotVisible:
+          id: 'hourly-forecast-ribbon'
 - waitForAnimationToEnd:
     timeout: 5000
 # Capture only. scripts/visual-baselines/compare-native.mjs compares all eight screens after the

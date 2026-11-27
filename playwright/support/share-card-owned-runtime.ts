@@ -160,7 +160,7 @@ export async function identify(context: BrowserContext, account = 0) {
   return member
 }
 export const modal = (page: Page) => page.locator('[aria-labelledby="share-card-title"]')
-// Loads the home feed once the owned post is verified, and returns the API origin.
+// Loads the Community feed once the owned post is verified, and returns the API origin.
 export async function loadOwnFeed(
   page: Page,
   interceptNetworkCall: InterceptNetworkCallFn
@@ -172,7 +172,7 @@ export async function loadOwnFeed(
   await afterInitialCommunityVerification({
     page,
     postId: fixture.postId,
-    navigate: () => page.goto('/').then(() => undefined),
+    navigate: () => page.goto('/community').then(() => undefined),
   })
   await expect(page.getByTestId('community-spotlight-loading')).toHaveCount(0)
   const verified = await profile

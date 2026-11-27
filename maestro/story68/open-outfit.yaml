@@ -2,6 +2,7 @@ appId: ${MAESTRO_APP_ID}
 ---
 - tapOn:
     id: tab-home
+- runFlow: ../subflows/open-today-outfit-details.yaml
 - runFlow:
     when:
       platform: iOS

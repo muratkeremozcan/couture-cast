@@ -174,18 +174,16 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
     server.use(http.get('*/api/v1/ritual', () => new HttpResponse(null, { status: 500 })))
 
     await renderScreen()
-    await waitFor(() => {
-      expect(screen.getByTestId('hero-error-state')).toBeTruthy()
-    })
+    const retry = await screen.findByRole('button', { name: 'Try again' })
 
     server.use(countingRitualHandler())
     const retriedAt = Date.now() - 1
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    fireEvent.click(retry)
 
     await waitFor(() => {
       expect(screen.getByTestId('weather-header')).toBeTruthy()
     })
-    expect(screen.queryByTestId('hero-error-state')).toBeNull()
+    expect(screen.queryByTestId('hero-retry')).toBeNull()
     // Only a user-initiated refresh announces; the initial load must stay
     // silent or every app open would interrupt a screen reader.
     await waitFor(() => {
@@ -235,6 +233,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     })
 
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     const tile = screen.getByTestId('garment-tile-classic-trench-coat')
     tile.focus()
     fireEvent.click(tile)
@@ -259,7 +258,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
       expect(screen.getByTestId('garment-tile-classic-trench-coat')).toHaveFocus()
     })
     // Cancelling must not mutate the outfit.
-    expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+    expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
     expect(mockCapture).not.toHaveBeenCalledWith(
       'hero_interaction',
       expect.objectContaining({ interactionType: 'garment_swap' })

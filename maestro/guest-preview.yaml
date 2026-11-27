@@ -37,12 +37,13 @@ env:
     timeout: 30000
     label: 'Signed-out Home shows the welcome card'
 - assertNotVisible:
-    id: 'hero-error-state'
+    id: 'hero-retry'
     label: 'No ritual error on a signed-out launch'
 - assertNotVisible:
     id: 'home-session-unavailable'
 - assertNotVisible:
-    id: 'hero-no-location-state'
+    id: 'member-sample-outfit'
+    label: 'A signed-out launch does not show the member sample'
 
 - tapOn:
     id: 'home-try-sample'

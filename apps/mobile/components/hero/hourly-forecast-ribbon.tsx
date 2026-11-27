@@ -18,15 +18,17 @@ import { getTemperatureUnit } from '@/src/lib/formatters'
 type HourlyForecastRibbonProps = {
   hourly?: WeatherHourlyEntry[]
   isLoading?: boolean
+  timeZone?: string
+  showAll?: boolean
   onToggleExpand?: (isExpanded: boolean) => void
 }
 
-function formatHour(isoString: string) {
+function formatHour(isoString: string, timeZone: string) {
   try {
     const date = new Date(isoString)
     return new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
       hour: 'numeric',
-      timeZone: 'UTC', // contract specifies UTC timestamps
+      timeZone,
     }).format(date)
   } catch {
     return ''
@@ -37,6 +39,8 @@ export function HourlyForecastRibbon({
   hourly,
   isLoading,
   onToggleExpand,
+  timeZone = 'UTC',
+  showAll = false,
 }: HourlyForecastRibbonProps) {
   const { t } = useTranslation()
   const [isExpanded, setIsExpanded] = useState(false)
@@ -70,7 +74,7 @@ export function HourlyForecastRibbon({
   }
 
   // If collapsed, show 8 items, otherwise show all 48
-  const visibleEntries = isExpanded ? hourly : hourly.slice(0, 8)
+  const visibleEntries = showAll || isExpanded ? hourly : hourly.slice(0, 8)
 
   return (
     <View style={styles.container} testID="hourly-forecast-ribbon">
@@ -78,22 +82,24 @@ export function HourlyForecastRibbon({
         <Text style={[styles.title, { color: palette.ink }]}>
           {t('hero.hourly_forecast', { defaultValue: 'Hourly Forecast' })}
         </Text>
-        <Pressable
-          onPress={handleToggle}
-          accessibilityRole="button"
-          aria-expanded={isExpanded}
-          style={[styles.toggleButton, { backgroundColor: palette.card }]}
-          testID="ribbon-expand-toggle"
-        >
-          <Text style={[styles.toggleText, { color: palette.ink }]}>
-            {isExpanded
-              ? t('hero.collapse', { defaultValue: 'Collapse' })
-              : t('hero.expand_hours', {
-                  hours: hourly.length,
-                  defaultValue: `Expand (${hourly.length}h)`,
-                })}
-          </Text>
-        </Pressable>
+        {!showAll && (
+          <Pressable
+            onPress={handleToggle}
+            accessibilityRole="button"
+            aria-expanded={isExpanded}
+            style={[styles.toggleButton, { backgroundColor: palette.card }]}
+            testID="ribbon-expand-toggle"
+          >
+            <Text style={[styles.toggleText, { color: palette.ink }]}>
+              {isExpanded
+                ? t('hero.collapse', { defaultValue: 'Collapse' })
+                : t('hero.expand_hours', {
+                    hours: hourly.length,
+                    defaultValue: `Expand (${hourly.length}h)`,
+                  })}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       <ScrollView
@@ -118,7 +124,7 @@ export function HourlyForecastRibbon({
             temperature,
             unit,
             locale,
-            descriptor: `${formatHour(item.forecastAt)}, ${t('hero.precipitation')}: ${precipPercent}%`,
+            descriptor: `${formatHour(item.forecastAt, timeZone)}, ${t('hero.precipitation')}: ${precipPercent}%`,
           })
 
           return (
@@ -136,7 +142,7 @@ export function HourlyForecastRibbon({
                 style={[styles.hourText, { color: palette.inkMuted }]}
                 accessible={false}
               >
-                {formatHour(item.forecastAt)}
+                {formatHour(item.forecastAt, timeZone)}
               </Text>
               <Text style={styles.glyph} accessible={false} aria-hidden>
                 {glyph}

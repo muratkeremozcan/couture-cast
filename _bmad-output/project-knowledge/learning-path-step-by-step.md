@@ -33,7 +33,8 @@ Added Steps 40 to 67:
 - Step 66: Story 7.9, one app shell and visual system, `6d8b1db3` (PR #293), merged on 2026-11-26.
 - Step 67: Story 7.10, screen budget guard, `4e5702c3` (PR #294), merged on 2026-11-26.
 - Step 68: Story 7.11, five-tab navigation and back pattern, `a8863b05` (PR #295), merged on 2026-11-26.
-- Step 69: Story 7.12, Looks tab for saved looks, ideas and plans, in review on `feat/epic7-story-7-12-looks-tab-saved-looks-ideas-plans`.
+- Step 69: Story 7.12, Looks tab for saved looks, ideas and plans, `0d3b82a3` (PR #296), merged on 2026-11-26.
+- Step 70: Story 7.13, Calm Today with one primary job, on `feat/epic7-story-7-13-calm-today-one-primary-job`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -41,7 +42,8 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
-Added Step 69 for Story CC-7.12 (Looks tab for saved looks, ideas and plans) while its PR is in review, and moved Step 68 to merged (`a8863b05`, PR #295).
+Added Step 70 for Story CC-7.13 (Calm Today with one primary job) and moved Step 69 to merged (`0d3b82a3`, PR #296).
+Added Step 69 for Story CC-7.12 (Looks tab for saved looks, ideas and plans) while its PR was in review, and moved Step 68 to merged (`a8863b05`, PR #295).
 Added Step 68 for Story CC-7.11 (five-tab navigation and back pattern) while its PR is in review, and moved Step 67 to merged (`4e5702c3`, PR #294).
 Added Step 67 for Story CC-7.10 (screen budget guard) while its PR is in review, and moved Step 66 to merged (`6d8b1db3`, PR #293).
 Added Step 66 for Story CC-7.9 (one app shell and visual system) while its PR is in review, and moved Step 65 to merged (`812cadce`, PR #292).
@@ -164,11 +166,10 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest step: Step 69, Story CC-7.12, Looks tab for saved looks, ideas and plans, status `in-progress` on `feat/epic7-story-7-12-looks-tab-saved-looks-ideas-plans`.
-  Its plan is `_bmad-output/implementation-artifacts/spec-7-12-looks-tab-saved-looks-ideas-plans.md`.
-  Step 69 was written before merge, and its `Evidence boundaries` section says what ran and what did not.
+- Latest step: Step 70, Story CC-7.13, Calm Today with one primary job, on `feat/epic7-story-7-13-calm-today-one-primary-job`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-7-13-calm-today-one-primary-job.md`.
   `epic-7` is `in-progress` in `sprint-status.yaml`; CC-7.8 is `done` as dropped by owner decision.
-- Previous completed steps: Steps 59 to 68, Stories CC-7.1 to CC-7.7 and CC-7.9 to CC-7.11, merged on `main` (the last, Step 68, as `a8863b05`, PR #295).
+- Previous completed steps: Steps 59 to 69, Stories CC-7.1 to CC-7.7 and CC-7.9 to CC-7.12, merged on `main` (the last, Step 69, as `0d3b82a3`, PR #296).
 - Previous completed step: Step 58, production status and nightly health, the project close on 2026-11-19, merged on `main` (including its production follow-ups: image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week races, and production profile/location checks).
   It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
   Delivery for Epic 6 stays `in-progress` while `6-15b-expo-sdk-55-58-upgrade` stays `backlog`.
@@ -22253,3 +22254,35 @@ Evidence boundaries:
 - Locally: `tsc --noEmit` in packages/utils, apps/api, apps/web and apps/mobile (product code
   clean) and ESLint on touched files.
 - Unit, integration, pact, Playwright, native and Maestro suites run in CI on the PR.
+
+## Step 70: Calm Today with one primary job
+
+A teen opening Today can see the weather, one outfit and its next action in the first view.
+The closet, Plan and an eligible Community teaser follow in that order.
+When the forecast is unavailable, Today shows a sample look and links to saved weather settings.
+Sign out is in Profile.
+
+### Sequence to follow
+
+1. Start at `apps/web/src/app/page.tsx` and `apps/mobile/app/(tabs)/index.tsx` to see how the
+   tab shell loads Today for a member, a guest, or an unavailable session.
+2. Read `apps/web/src/app/components/home-ritual.tsx` and the native hero components for the
+   current forecast, outfit details and fallback. On native the weather line opens the hourly
+   forecast, and the period selector appears when the representative forecasts differ.
+3. Follow the wardrobe list to see how Today distinguishes recent items, a verified empty
+   closet and failed reads. Follow Plan into Looks and the single Spotlight row into Community.
+4. Check how the teaser carries the existing Community eligibility and sponsorship disclosure.
+   Follow the account action to Profile.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-13-calm-today-one-primary-job.md) and
+  [acceptance plan](../test-artifacts/test-design-7-13-calm-today-one-primary-job.md).
+- [Web acceptance](../../playwright/tests/calm-today.spec.ts),
+  [native screen budget](../../apps/mobile/src/screens/screen-budget-home.test.tsx), and
+  [small-phone capture](../../maestro/shell-visual-snapshots.yaml).
+- CI measures the three default-size states against 1,688 CSS px on web, checks reachability
+  at 320 px with 200% text, and captures Today on the 360 x 640 dp Android profile.
+- [Step 65](#step-65-signed-in-shell-without-flashes) covers owner-scoped rendering.
+  [Step 67](#step-67-screen-budget-guard) covers the budget harness.
+  [Step 69](#step-69-looks-tab-for-saved-looks-ideas-and-plans) covers the Plan destination.

@@ -78,6 +78,7 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
         2
       )
     )
+  await page.goto('/community')
   await expectCommunityFeedLoaded(page)
 
   const readIdentity = () =>
@@ -141,6 +142,7 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
   await signInRealCommunityWeb(page, second, () =>
     Promise.resolve(readGeneratedCommunityCode(second))
   )
+  await page.goto('/community')
   await expectCommunityFeedLoaded(page)
   // The switched session's own bearer replaces the first one once its verification completes.
   await expect

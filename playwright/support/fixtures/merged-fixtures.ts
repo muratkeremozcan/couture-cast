@@ -116,7 +116,16 @@ const networkErrorMonitor = base
         if (testInfo.annotations.some(({ type }) => type === 'skipNetworkMonitoring'))
           return
         // Navigation can abort the JSON body after the HTTP status arrives.
-        const unexpected = unexpectedRitualErrors(await guard.settle())
+        const failures = unexpectedRitualErrors(await guard.settle())
+        const expectsForecastOutage = testInfo.annotations.some(
+          ({ type }) => type === 'expectTodayForecastUnavailable'
+        )
+        const unexpected = expectsForecastOutage
+          ? failures.filter(
+              ({ method, status, code }) =>
+                method !== 'GET' || status !== 503 || code !== 'Unavailable'
+            )
+          : failures
         expect(unexpected, 'unexpected ritual HTTP errors').toEqual([])
       },
       { auto: true },

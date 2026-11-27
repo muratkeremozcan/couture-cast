@@ -7,7 +7,7 @@
 // Story 3.3 Task 5 step 1 owner: verify the production now/next widget link contract.
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import {
   afterAll,
@@ -119,6 +119,7 @@ describe('Widget Deep Link Hydration', () => {
     mockParams = params
 
     await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
 
     await waitFor(() => {
       expect(screen.getByText(expectedCopy)).toBeTruthy()
@@ -141,6 +142,7 @@ describe('Widget Deep Link Hydration', () => {
   it('tracks a later widget link while the tab remains mounted', async () => {
     mockParams = { source: 'widget', size: 'small', slot: 'now' }
     const view = await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
 
     await waitFor(() => {
       expect(mockCapture).toHaveBeenCalledWith(
@@ -175,6 +177,7 @@ describe('Widget Deep Link Hydration', () => {
     mockParams = params
 
     await render(<TabOneScreen />)
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
 
     await waitFor(() => {
       expect(screen.getByTestId('weather-header')).toBeTruthy()

@@ -71,7 +71,7 @@ test.describe('Story 6.3 curated reactions', () => {
   }) => {
     expect(communitySession.userId).toBeTruthy()
     const firstFeed = completedCommunityFeed(page)
-    await page.goto('/')
+    await page.goto('/community')
     expect((await firstFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'aria-busy',
@@ -122,7 +122,7 @@ test.describe('Story 6.3 curated reactions', () => {
     expect(communitySession.userId).toBeTruthy()
     await log.step('Load the community feed through the real API')
     const initialFeed = completedCommunityFeed(page)
-    await page.goto('/')
+    await page.goto('/community')
     expect((await initialFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'aria-busy',
@@ -199,7 +199,7 @@ test.describe('Story 6.3 curated reactions', () => {
     expect(communitySession.userId).toBeTruthy()
     await log.step('Load the community feed through the real API')
     const initialFeed = completedCommunityFeed(page)
-    await page.goto('/')
+    await page.goto('/community')
     expect((await initialFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'aria-busy',
@@ -335,38 +335,6 @@ test.describe('Story 6.3 curated reactions', () => {
     )
   })
 
-  test('[P2] keeps the ritual compact while the community feed scrolls independently', async ({
-    page,
-    communitySession,
-  }) => {
-    expect(communitySession.userId).toBeTruthy()
-    await log.step('Load the community feed through the real API')
-    const initialFeed = completedCommunityFeed(page)
-    await page.goto('/')
-    expect((await initialFeed).status).toBe(200)
-    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
-      'aria-busy',
-      'false'
-    )
-    const allFeed = completedCommunityFeed(page, 'all')
-    await page.getByTestId('community-filter-all').click()
-    expect((await allFeed).status).toBe(200)
-    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
-      'aria-busy',
-      'false'
-    )
-    await expect(page.getByTestId('lookbook-card-lookbook-5')).toBeVisible()
-    const ritual = await page
-      .getByRole('region', { name: 'Hero Ritual Canvas' })
-      .boundingBox()
-    const community = await page
-      .getByRole('region', { name: 'Community section' })
-      .boundingBox()
-    expect(ritual).not.toBeNull()
-    expect(community).not.toBeNull()
-    expect(ritual!.height).toBeLessThan(community!.height - 100)
-  })
-
   test('[P2] passes the default community feed accessibility audit', async ({
     page,
     communitySession,
@@ -374,7 +342,7 @@ test.describe('Story 6.3 curated reactions', () => {
     expect(communitySession.userId).toBeTruthy()
     await log.step('Load the community feed through the real API')
     const initialFeed = completedCommunityFeed(page)
-    await page.goto('/')
+    await page.goto('/community')
     expect((await initialFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'aria-busy',

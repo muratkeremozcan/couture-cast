@@ -13,7 +13,7 @@ import { router, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { formatLocalizedList } from '@couture/utils'
+import { formatLocalizedList, getGuestPreviewStrings } from '@couture/utils'
 import {
   defaultSupportedLocale,
   resolveSupportedLocale,
@@ -660,6 +660,8 @@ export default function SettingsScreen() {
 
             <PlannerLinkRow />
 
+            {signedIn === true && <ProfileSignOut />}
+
             {isMobileAnalyticsDiagnosticsEnabled ? (
               <>
                 <Text style={styles.infoText}>{apiHealthMessage}</Text>
@@ -697,6 +699,53 @@ export default function SettingsScreen() {
  * The Premium section's status line, one per render state. Kept outside the section so the
  * section's own branching stays readable.
  */
+function ProfileSignOut() {
+  const tone = useSettingsTone()
+  const { t, i18n } = useTranslation()
+  const [state, setState] = useState<'idle' | 'pending' | 'failed'>('idle')
+  const inFlight = useRef(false)
+
+  async function signOut() {
+    if (inFlight.current) return
+    inFlight.current = true
+    setState('pending')
+    try {
+      const { signOutNativeSession } = await import('../../src/lib/native-session.js')
+      await signOutNativeSession()
+      setState('idle')
+      router.navigate('/')
+    } catch {
+      setState('failed')
+    } finally {
+      inFlight.current = false
+    }
+  }
+
+  const pending = state === 'pending'
+  return (
+    <>
+      <Pressable
+        testID="profile-sign-out"
+        accessibilityRole="button"
+        accessibilityState={{ busy: pending, disabled: pending }}
+        aria-busy={pending}
+        disabled={pending}
+        style={[styles.actionButton, tone.actionButton]}
+        onPress={() => void signOut()}
+      >
+        <Text style={styles.actionText}>
+          {getGuestPreviewStrings(i18n.language).chrome.signOut}
+        </Text>
+      </Pressable>
+      {state === 'failed' && (
+        <Text accessibilityRole="alert" style={[styles.errorText, tone.errorText]}>
+          {t('feedback.failed')}
+        </Text>
+      )}
+    </>
+  )
+}
+
 function premiumStatusLine(
   t: TFunction,
   i18n: { resolvedLanguage?: string; language: string },

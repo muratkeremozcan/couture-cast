@@ -2,7 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the sponsored CTA on the web Home spotlight teaser, inside the real
 // Lookbook Prism layout and through the real web transport and MSW.
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
@@ -16,19 +16,19 @@ import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { stubPartnerTab, type PartnerTabStub } from '../../test-utils/partner-tab'
 import { signInFixtureMember } from '../../test-utils/member-session'
 import { CLICKS_PATH, SPONSORSHIP } from '../../test-utils/community-lookbook-grid'
-import { setViewport } from '../../test-utils/home-spotlight-teaser'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 
 vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
 // Story CC-7.12 D7: the Home sample outfit's View pushes the saved look through the app router.
+const router = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  back: vi.fn(),
+  prefetch: vi.fn(),
+}))
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-    back: vi.fn(),
-    prefetch: vi.fn(),
-  }),
+  useRouter: () => router,
   useSearchParams: () => new URLSearchParams(),
 }))
 
@@ -118,10 +118,6 @@ function shownEvents() {
   )
 }
 
-function teaserShownEvents() {
-  return shownEvents().filter((event) => event.properties.surface === 'home_teaser')
-}
-
 describe('6.7b web Home teaser sponsored CTA', () => {
   const scrollIntoView = Object.getOwnPropertyDescriptor(
     HTMLElement.prototype,
@@ -147,6 +143,7 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     partner = stubPartnerTab()
   })
   afterEach(() => {
+    cleanup()
     vi.unstubAllGlobals()
     delete window.__enableAnalyticsTestHook
     delete window.__capturedAnalyticsEvents
@@ -186,7 +183,6 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     render(<LookbookPrismLayout />)
 
     const link = await screen.findByTestId('home-spotlight-teaser-link')
-    await screen.findByTestId('spotlight-lookbook-card-look-1')
     expect(link).toHaveAccessibleName(LINK_NAME)
     expect(screen.queryByTestId('home-spotlight-teaser-sponsored')).toBeNull()
     expect(screen.queryAllByRole('button', { name: /Shop this look/ })).toEqual([])
@@ -267,57 +263,29 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     observer.disconnect()
 
     await user.keyboard('{Enter}')
-    await waitFor(() => expect(partner.navigations).toHaveLength(1))
+    await waitFor(() => {
+      expect(partner.navigations).toHaveLength(1)
+      expect(cta).not.toHaveAttribute('aria-busy')
+    })
     expect(clicks.bodies).toHaveLength(2)
   })
 
-  it('6.7b-WEB-034 reports the teaser block once with the strict community payload', async () => {
+  it('6.7b-WEB-034 reports one Today teaser impression with the strict payload', async () => {
     signIn()
     useSpotlight(spotlightItem({ sponsorship: SPONSORSHIP }))
     render(<LookbookPrismLayout />)
 
     await screen.findByTestId('home-spotlight-teaser-sponsored-cta-look-1')
-    await screen.findByTestId('spotlight-sponsored-cta-look-1')
-
-    const events = shownEvents()
-    // The teaser and the spotlight module are two blocks on two surfaces.
-    expect(events.map((event) => event.properties)).toEqual(
-      expect.arrayContaining([
+    await waitFor(() =>
+      expect(shownEvents().map((event) => event.properties)).toEqual([
         {
           partner_id: SPONSORSHIP.partnerId,
           offer_id: SPONSORSHIP.offerId,
           surface: 'home_teaser',
           locale_region: 'US',
         },
-        {
-          partner_id: SPONSORSHIP.partnerId,
-          offer_id: SPONSORSHIP.offerId,
-          surface: 'community_spotlight',
-          locale_region: 'US',
-        },
       ])
     )
-    expect(events).toHaveLength(2)
-  })
-
-  it('6.7b-WEB-035 a teaser that unmounts on a layout change and remounts with the same block reports it once', async () => {
-    signIn()
-    useSpotlight(spotlightItem({ sponsorship: SPONSORSHIP }))
-    render(<LookbookPrismLayout />)
-
-    await screen.findByTestId('home-spotlight-teaser-sponsored-cta-look-1')
-    await waitFor(() => expect(teaserShownEvents()).toHaveLength(1))
-
-    // Side by side, the teaser slot unmounts; the layout keeps the value.
-    act(() => setViewport(1440))
-    await waitFor(() =>
-      expect(screen.queryByTestId('home-spotlight-teaser')).not.toBeInTheDocument()
-    )
-    // Stacked again inside the read floor: the same block mounts again.
-    act(() => setViewport(1024))
-    await screen.findByTestId('home-spotlight-teaser-sponsored-cta-look-1')
-
-    expect(teaserShownEvents()).toHaveLength(1)
   })
 
   it('6.7b-WEB-036 the CTA is its own Tab stop after the teaser link, and Enter mints', async () => {
@@ -333,7 +301,10 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     expect(cta).toHaveFocus()
 
     await user.keyboard('{Enter}')
-    await waitFor(() => expect(partner.navigations).toHaveLength(1))
+    await waitFor(() => {
+      expect(partner.navigations).toHaveLength(1)
+      expect(cta).not.toHaveAttribute('aria-busy')
+    })
     expect(clicks.bodies).toEqual([
       {
         offerId: SPONSORSHIP.offerId,

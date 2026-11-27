@@ -41,7 +41,7 @@ tags:
 - assertNotVisible:
     id: 'home-signed-out-welcome'
 - assertNotVisible:
-    id: 'hero-no-location-state'
+    id: 'home-set-city'
 # No bounce: Sign in holds for five seconds, then is still the screen.
 - extendedWaitUntil:
     notVisible:

@@ -1098,6 +1098,17 @@
     }
   },
   "home": {
+    "today": {
+      "planWeek": "Planifier la semaine",
+      "outfit": "Tenue du jour",
+      "starterOutfit": "Tenue de base",
+      "outfitDetails": "Détails de la tenue",
+      "sampleLook": "Tenue d’exemple",
+      "editSample": "Modifier l’exemple",
+      "addFirstPiece": "Ajouter une première pièce",
+      "weatherUnavailable": "Météo indisponible",
+      "recentPieces": "Pièces récentes"
+    },
     "spotlightTeaser": {
       "heading": "Look à la une à {{label}}",
       "reactions": "{{count}} réactions",
@@ -1202,6 +1213,11 @@
     "hideList": "Masquer les looks enregistrés"
   },
   "shell": {
+    "legal": {
+      "label": "Mentions légales",
+      "privacy": "Politique de confidentialité",
+      "terms": "Conditions d'utilisation"
+    },
     "back": "Retour",
     "notFound": {
       "title": "Écran introuvable",

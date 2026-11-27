@@ -61,8 +61,7 @@ function firstDisplayGarmentId(day: PlannerReadyDay): string | null {
 async function openPlanner(
   page: Page,
   interceptNetworkCall: InterceptNetworkCallFn,
-  navigate: () => Promise<unknown> = () =>
-    page.getByTestId('planner-open-control').click()
+  navigate: () => Promise<unknown> = () => page.getByTestId('home-plan-week').click()
 ): Promise<{ status: number; data: PlannerResponse['data'] | undefined }> {
   const load = interceptNetworkCall({ method: 'GET', url: PLANNER_URL })
   await navigate()
@@ -414,7 +413,7 @@ premiumSeededTest.describe(
         )
         await page.goto('/')
         await waitForAccessibilityReady(page)
-        await page.getByTestId('planner-open-control').click()
+        await page.getByTestId('home-plan-week').click()
         // Story CC-7.12 D11: Plan week is a link to the Looks Plan segment.
         await expect(page).toHaveURL('/looks?segment=plan')
         await expect(page.getByTestId('planner-days')).toBeVisible()
@@ -470,7 +469,7 @@ premiumSeededTest.describe(
         await expect(back).toHaveCount(0)
         await page.goBack()
         await expect(page).toHaveURL('/')
-        await expect(page.getByTestId('planner-open-control')).toBeVisible()
+        await expect(page.getByTestId('home-plan-week')).toBeVisible()
         await expect(planner).toHaveCount(0)
 
         await log.step(

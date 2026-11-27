@@ -105,6 +105,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     const unregister = registerShareCardHeading('outfit', () => 77)
     try {
       await render(<TabOneScreen />)
+      await userEvent.click(await screen.findByTestId('today-primary-action'))
       await userEvent.click(await screen.findByTestId('outfit-share-card-open'))
       await waitFor(() => expect(screen.getByTestId('share-card-title')).toBeVisible())
       setFocus.mockClear()
@@ -149,6 +150,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
           <TabOneScreen />
         </AndroidShareCardPresentation>
       )
+      await userEvent.click(await screen.findByTestId('today-primary-action'))
       const opener = await screen.findByTestId('outfit-share-card-open')
       await userEvent.click(opener)
       await waitFor(() => expect(screen.getByTestId('share-card-title')).toBeVisible())
@@ -175,7 +177,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
   // Story CC-7.7 D2 (7.7-NAT-002): the member sample no longer shows while loading; the gate's
   // placeholder holds the body until the ritual read settles.
-  it('shows the placeholder while loading, then current weather, the 48-hour ribbon and a live outfit', async () => {
+  it('shows the placeholder while loading, then current weather and a live outfit with collapsed details', async () => {
     await render(<TabOneScreen />)
 
     expect(screen.getByTestId('screen-placeholder')).toBeVisible()
@@ -195,16 +197,13 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     expect(screen.getByTestId('current-temperature').textContent).toBe('70°F')
     expect(screen.getByText('Clear Sky')).toBeTruthy()
 
-    expect(screen.getByTestId('hourly-forecast-ribbon')).toBeTruthy()
-    const hourlyItems = screen.getAllByTestId('hourly-item')
-    expect(hourlyItems.length).toBe(8)
+    expect(screen.queryByTestId('hourly-forecast-ribbon')).toBeNull()
+    await userEvent.click(await screen.findByTestId('today-primary-action'))
 
     expect(
       screen.getByText('Mild morning with gentle winds. Trench coat recommended.')
     ).toBeTruthy()
 
-    expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
-    expect(screen.getByText('Navy Chinos')).toBeTruthy()
     expect(screen.getByTestId('garment-tile-classic-trench-coat')).toHaveAttribute(
       'aria-label',
       'Classic Trench Coat: outerwear'
@@ -223,11 +222,13 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       expect(screen.getByTestId('weather-header')).toBeTruthy()
     })
 
+    await userEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(screen.getByTestId('scenario-picker'))
     const eveningToggle = screen.getByTestId('scenario-toggle-evening')
     fireEvent.click(eveningToggle)
 
     expect(screen.getByText('Cool evening ahead. Sweater recommended.')).toBeTruthy()
-    expect(screen.getByText('Crewneck Sweater')).toBeTruthy()
+    expect(screen.getByTestId('garment-tile-crewneck-sweater')).toBeTruthy()
 
     // Asserted with `toHaveBeenCalledWith`: the morning card's affiliate impression
     // is emitted from a passive effect that can flush after this click, so the order
@@ -238,61 +239,17 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     })
   })
 
-  it('keeps mobile chip selection synchronized with the displayed recommendation', async () => {
+  it('toggling hourly weather records the open interaction', async () => {
     await render(<TabOneScreen />)
-
-    await waitFor(() => {
-      expect(
-        screen.getByText('Mild morning with gentle winds. Trench coat recommended.')
-      ).toBeTruthy()
-    })
-
-    fireEvent.click(screen.getByTestId('chip-sponsored'))
-
-    expect(screen.getByText('Cool evening ahead. Sweater recommended.')).toBeTruthy()
-    // Story CC-7.10: the chip is a toggle button, so its selection is aria-pressed.
-    expect(screen.getByTestId('chip-sponsored').getAttribute('aria-pressed')).toBe('true')
-    expect(mockCapture).toHaveBeenCalledWith('chip_changed', {
-      chipCategory: 'Sponsored',
-      previousCategory: 'Personal',
-      surface: 'mobile',
-    })
-  })
-
-  it('verifies hourly ribbon expands and collapses and triggers telemetry', async () => {
-    await render(<TabOneScreen />)
-
-    await waitFor(() => {
-      expect(screen.getByTestId('weather-header')).toBeTruthy()
-    })
-
-    const expandButton = screen.getByTestId('ribbon-expand-toggle')
-    expect(expandButton.textContent).toBe('Expand (48h)')
-
-    fireEvent.click(expandButton)
-
-    expect(screen.getAllByTestId('hourly-item').length).toBe(48)
-    expect(expandButton.textContent).toBe('Collapse')
-
+    const weather = await screen.findByTestId('weather-header')
+    await userEvent.click(weather)
+    expect(screen.getAllByTestId('hourly-item')).toHaveLength(48)
     expect(mockCapture).toHaveBeenCalledWith('hero_interaction', {
       interactionType: 'ribbon_toggle',
       isExpanded: true,
     })
-
-    fireEvent.click(expandButton)
-    expect(screen.getAllByTestId('hourly-item').length).toBe(8)
-  })
-
-  it('centers the hourly ribbon toggle label inside its 44-point target', async () => {
-    await render(<TabOneScreen />)
-    const toggle = await screen.findByTestId('ribbon-expand-toggle')
-    expect(toggle).toHaveAttribute('role', 'button')
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    const box = toggle.getBoundingClientRect()
-    const label = screen.getByText('Expand (48h)').getBoundingClientRect()
-    expect(box.height).toBeGreaterThanOrEqual(44)
-    expect(label.top - box.top).toBeCloseTo(box.bottom - label.bottom, 0)
-    expect(label.left - box.left).toBeCloseTo(box.right - label.right, 0)
+    await userEvent.click(weather)
+    expect(screen.queryByTestId('hourly-forecast-ribbon')).toBeNull()
   })
 
   it('verifies garment swap modal flows and updates garment state with telemetry', async () => {
@@ -302,6 +259,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     })
 
+    await userEvent.click(await screen.findByTestId('today-primary-action'))
     const swapButton = screen.getByTestId('garment-tile-classic-trench-coat')
     swapButton.focus()
     fireEvent.click(swapButton)
@@ -322,8 +280,8 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     try {
       fireEvent.click(leatherJacketOption)
 
-      expect(screen.queryByText('Classic Trench Coat')).toBeNull()
-      expect(screen.getByText('Leather Jacket')).toBeTruthy()
+      expect(screen.queryByTestId('garment-tile-classic-trench-coat')).toBeNull()
+      expect(screen.getByTestId('garment-tile-leather-jacket')).toBeVisible()
       // The modal leaves on its real exit animation; only the app's focus timer is faked.
       // expect.poll and vi.waitFor advance fake timers between retries, which would fire
       // that timer early, so the exit is awaited on real animation frames instead.
@@ -358,6 +316,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     await render(<TabOneScreen />)
     await screen.findByText('Classic Trench Coat')
 
+    await userEvent.click(await screen.findByTestId('today-primary-action'))
     const swapButton = screen.getByTestId('garment-tile-classic-trench-coat')
     swapButton.focus()
     fireEvent.click(swapButton)
@@ -374,8 +333,8 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     await dragFrom(title, { dy: LAYER_SWIPE_CLOSE_PX + 40 })
     await waitFor(() => expect(screen.queryByTestId('garment-swap-modal')).toBeNull())
     // Closed without a choice: the garment stays and no swap is recorded.
-    expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
-    expect(screen.queryByText('Leather Jacket')).toBeNull()
+    expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+    expect(screen.queryByTestId('garment-tile-leather-jacket')).toBeNull()
     expect(mockCapture).not.toHaveBeenCalledWith(
       'hero_interaction',
       expect.objectContaining({ interactionType: 'garment_swap' })
@@ -417,15 +376,11 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
     await render(<TabOneScreen />)
 
-    await waitFor(() => {
-      expect(screen.getByTestId('hero-error-state')).toBeTruthy()
-    })
-    await waitFor(() =>
-      expect(screen.getByText("Unable to load today's outfit.")).toBeVisible()
-    )
-    await waitFor(() => expect(screen.getByTestId('member-sample-outfit')).toBeVisible())
     // maestro/network-timeout/dev-client-timeout.yaml taps Retry by this id.
-    expect(screen.getByTestId('hero-retry')).toHaveAccessibleName('Try again')
+    const retry = await screen.findByRole('button', { name: 'Try again' })
+    expect(retry).toHaveAttribute('data-testid', 'hero-retry')
+    expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
+    expect(screen.getByTestId('home-set-city')).toBeVisible()
     expect(screen.queryByTestId('weather-header-skeleton')).toBeNull()
     expect(screen.queryByTestId('outfit-recommendation-card-skeleton')).toBeNull()
   })
@@ -447,8 +402,8 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     })
     expect(requestedLocale).toBe('tr-TR')
     expect(screen.getByText('Açık')).toBeTruthy()
+    await userEvent.click(screen.getByTestId('weather-header'))
     expect(screen.getByText('Saatlik tahmin')).toBeTruthy()
-    expect(screen.getByText('Genişlet (48 sa)')).toBeTruthy()
   })
 
   it('renders localized API fixtures selected by the locale query parameter', async () => {
@@ -456,6 +411,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
     await render(<TabOneScreen />)
 
+    await userEvent.click(await screen.findByTestId('today-primary-action'))
     await waitFor(() => {
       expect(
         screen.getByText('Hafif rüzgarlı serin sabah. Trençkot önerilir.')

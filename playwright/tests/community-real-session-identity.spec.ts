@@ -182,8 +182,9 @@ test('N1 a late profile response from the previous session cannot replace the sw
   await signInRealCommunityWeb(page, first, () =>
     Promise.resolve(readGeneratedCommunityCode(first))
   )
-  // The home document restores the session again; its bearer is stored once that
+  // The Community document restores the session again; its bearer is stored once that
   // canonical verification completes.
+  await page.goto('/community')
   await expectCommunityFeedLoaded(page)
   await expect
     .poll(() => page.evaluate((key) => sessionStorage.getItem(key), bearerKey))
@@ -247,7 +248,7 @@ test('N1 a late profile response from the previous session cannot replace the sw
   )
 
   await expect(page).toHaveURL(/\/signin$/)
-  await page.goto('/')
+  await page.goto('/community')
   await expectCommunityFeedLoaded(page)
   // The restored session stores its bearer once canonical verification completes.
   await expect

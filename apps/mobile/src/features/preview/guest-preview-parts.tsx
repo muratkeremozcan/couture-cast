@@ -108,6 +108,7 @@ export function PreviewButton({
   testID,
   palette,
   primary = false,
+  todayPrimary = false,
   disabled = false,
   expanded,
   selected,
@@ -119,6 +120,7 @@ export function PreviewButton({
   testID: string
   palette: PreviewPalette
   primary?: boolean
+  todayPrimary?: boolean
   disabled?: boolean
   expanded?: boolean
   selected?: boolean
@@ -135,7 +137,7 @@ export function PreviewButton({
       aria-expanded={expanded}
       // ARIA allows aria-selected only on option/tab/row/gridcell/treeitem,
       // so the web side uses aria-pressed.
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, expanded }}
       aria-pressed={selected}
       disabled={disabled}
       onPress={onPress}
@@ -143,13 +145,22 @@ export function PreviewButton({
         styles.button,
         // Story CC-7.9 D3: a filled button is ink; any other is the neutral outline.
         primary
-          ? { backgroundColor: palette.inverse }
+          ? { backgroundColor: todayPrimary ? palette.primary : palette.inverse }
           : { borderColor: palette.lineStrong, borderWidth: 1 },
         disabled ? styles.disabled : null,
       ]}
     >
       <Text
-        style={[styles.buttonText, { color: primary ? palette.onInverse : palette.ink }]}
+        style={[
+          styles.buttonText,
+          {
+            color: todayPrimary
+              ? palette.onPrimary
+              : primary
+                ? palette.onInverse
+                : palette.ink,
+          },
+        ]}
       >
         {label}
       </Text>

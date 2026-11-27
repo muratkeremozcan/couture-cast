@@ -8,14 +8,10 @@
 // Test design: _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
-// Story CC-7.11 test owner (TEA): 7.11-NAT-010 and 040 (Today's first content, the outfit card
-// or the labeled sample, inside the 360 x 640 fold with no alert or setup before it, every
-// fixture), under the same header the layout declares. D16 (spec Plan Change Log): with a city
-// Today opens on the weather header and then the outfit card; the alert, the add prompt, the
-// scenario toggles, the hourly ribbon and the Plan link all follow the first content.
-// With no city there is no forecast: the labeled sample is the first content, and its add-piece
-// and set-city prompts are its own continuation, inside it after the look name.
-// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+// Story CC-7.11: Today opens inside the 360 x 640 fold with no setup above the outfit.
+// Learning path Step 70: Calm Today with one primary job.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-70-calm-today-with-one-primary-job
+// Test design: _bmad-output/test-artifacts/test-design-7-13-calm-today-one-primary-job.md.
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
 import {
   type CapturedTabLayout,
@@ -30,7 +26,7 @@ import {
   tabHeader,
 } from '@/src/test-utils/screen-budget'
 import React, { type ReactElement, type ReactNode } from 'react'
-import { configure, render, screen, waitFor, within } from '@testing-library/react'
+import { act, configure, render, screen, waitFor, within } from '@testing-library/react'
 import {
   afterEach,
   beforeAll,
@@ -138,6 +134,8 @@ import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
 import { server } from '@/src/test-utils/msw/server'
 import { http, HttpResponse } from 'msw'
 import { screenFocus } from '@/src/test-utils/focus-effect'
+import { press } from '@/src/test-utils/press'
+import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import {
   hasSavedLocation,
   serveScreenBudgetFixture,
@@ -177,84 +175,51 @@ const FOLD_CASES: readonly (readonly [string, ScreenBudgetMode])[] = [
   ['7.11-NAT-040', 'guardian-pending'],
 ]
 
-/**
- * D16: the blocks that follow Today's first content when they show. `required` are the ones the
- * fixture always draws, so the order check can never pass on an absent block.
- */
-const AFTER_FIRST = [
-  'weather-alert-banner',
-  'home-add-garment-container',
-  'scenario-toggles',
-  'hourly-forecast-ribbon',
-  'home-plan-week',
-] as const
-
-/**
- * D16 with no city: no forecast, so no weather header; the labeled sample is the first content
- * and its own prompts (add a first piece, set a city) are its continuation, inside the sample
- * after the look it names. They are never above the sample, and never outside it.
- */
-const SAMPLE_OWN_PROMPTS = [
-  'home-add-garment-container',
-  'hero-no-location-state',
-] as const
-
-function expectSampleOrder(first: HTMLElement) {
+function expectBelow(upper: HTMLElement, lower: HTMLElement) {
   expect(
-    screen.queryByTestId('weather-header'),
-    'a weather header with no city'
-  ).toBeNull()
-  const firstBox = first.getBoundingClientRect()
-  const look = within(first).getByTestId('guest-preview-look-name')
-  const lookBox = look.getBoundingClientRect()
-  expect(lookBox.top, 'the sample opens on the look it names').toBeGreaterThanOrEqual(
-    firstBox.top - 1
-  )
-  for (const id of SAMPLE_OWN_PROMPTS) {
-    const prompt = within(first).getByTestId(id)
-    expect(prompt, id).toBeVisible()
-    expect(
-      prompt.getBoundingClientRect().top,
-      `${id} follows the sample's look (bottom ${lookBox.bottom})`
-    ).toBeGreaterThanOrEqual(lookBox.bottom - 1)
-  }
+    lower.getBoundingClientRect().top,
+    `${lower.dataset.testid} follows ${upper.dataset.testid}`
+  ).toBeGreaterThanOrEqual(upper.getBoundingClientRect().bottom - 1)
 }
 
-function expectTodayD16Order(
-  first: HTMLElement,
-  fixture: ScreenBudgetMode,
-  required: readonly (typeof AFTER_FIRST)[number][]
-) {
-  const band = foldBand()
-  const firstBox = first.getBoundingClientRect()
-  const located = hasSavedLocation(fixture)
-  if (located) {
-    // The weather header leads, wholly inside the band, right above the outfit card.
-    const header = screen.getByTestId('weather-header')
-    expect(first.contains(header), 'the weather header sits outside the card').toBe(false)
-    const box = header.getBoundingClientRect()
-    expect(box.top, 'weather header below the top bar').toBeGreaterThanOrEqual(
-      band.top - 1
+function serveTodayForecast(differs: boolean, usableOutfitCount = 3) {
+  const firstHour = Date.parse('2026-07-25T07:00:00.000Z')
+  vi.setSystemTime(new Date(firstHour + 9 * 3_600_000))
+  const basis = mockRitualResponse.data.weather.hourly[0]!
+  server.use(
+    http.get('*/api/v1/ritual', () =>
+      HttpResponse.json({
+        data: {
+          ...mockRitualResponse.data,
+          outfits: mockRitualResponse.data.outfits.map((outfit, index) =>
+            index < usableOutfitCount
+              ? outfit
+              : { ...outfit, garmentIds: [], displayGarments: [] }
+          ),
+          weather: {
+            ...mockRitualResponse.data.weather,
+            fetchedAt: new Date(firstHour).toISOString(),
+            hourly: Array.from({ length: 48 }, (_, hour) => {
+              const localHour = hour % 24
+              const temperature = differs
+                ? localHour < 11
+                  ? 11
+                  : localHour < 17
+                    ? 25
+                    : 16
+                : 21
+              return {
+                ...basis,
+                forecastAt: new Date(firstHour + hour * 3_600_000).toISOString(),
+                temperature,
+                feelsLike: temperature,
+              }
+            }),
+          },
+        },
+      })
     )
-    expect(box.bottom, 'weather header inside the band').toBeLessThanOrEqual(
-      band.bottom + 1
-    )
-    expect(box.bottom, 'weather header above the outfit card').toBeLessThanOrEqual(
-      firstBox.top + 1
-    )
-  } else expectSampleOrder(first)
-  for (const id of required) expect(screen.getByTestId(id), id).toBeVisible()
-  for (const id of AFTER_FIRST) {
-    // The sample's own prompts are checked inside it, above; every other block follows it.
-    if (!located && (SAMPLE_OWN_PROMPTS as readonly string[]).includes(id)) continue
-    for (const block of screen.queryAllByTestId(id)) {
-      expect(first.contains(block), `${id} outside the first content`).toBe(false)
-      expect(
-        block.getBoundingClientRect().top,
-        `${id} follows the first content (bottom ${firstBox.bottom})`
-      ).toBeGreaterThanOrEqual(firstBox.bottom - 1)
-    }
-  }
+  )
 }
 
 /** Today as the tab layout draws it: under the Home tab header, inside the root providers. */
@@ -278,15 +243,23 @@ function renderToday(Frame: typeof WithTabHeader | typeof WithFoldScene = WithTa
  * member with a saved location waits for its image too; without one the Spotlight serves no
  * level, as production does, and the teaser renders nothing.
  */
-async function todaySettled(fixture: ScreenBudgetMode) {
+async function todaySettled(
+  fixture: ScreenBudgetMode,
+  hasForecast = hasSavedLocation(fixture)
+) {
   await waitFor(() =>
     expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
   )
   expect(screen.queryByTestId('screen-placeholder')).toBeNull()
   await waitFor(() =>
     expect(
+      screen.getByTestId(hasForecast ? 'today-primary-action' : 'home-set-city')
+    ).toBeVisible()
+  )
+  await waitFor(() =>
+    expect(
       screen.getByTestId(
-        fixture === 'populated' ? 'weather-header' : 'member-sample-outfit'
+        hasSavedLocation(fixture) ? 'home-closet-strip' : 'home-add-garment'
       )
     ).toBeVisible()
   )
@@ -323,6 +296,7 @@ describe('Screen budget: native Today', () => {
     restoreToken = undefined
     setMobileApplicationUserId(null)
     screenFocus.reset()
+    vi.useRealTimers()
   })
 
   for (const [id, fixture] of AUDITS) {
@@ -339,85 +313,161 @@ describe('Screen budget: native Today', () => {
         measurement.targetsAboveFold.map((target) => target.key),
         'targets counted above the fold'
       ).toContain(ABOUT)
+      expect(measurement.todayHeight).toBeLessThanOrEqual(1688)
       expectNativeWithinBudget('today', fixture, measurement)
     }, 30_000)
   }
 
   for (const [id, fixture] of FOLD_CASES) {
-    it(`[P0] [${id}] [D16] native today (${fixture}) opens on weather and its own content inside the 360 x 640 fold`, async () => {
+    it(`[P0] [${id}] [7.13-NAT-001] ${fixture}: Today opens on its outfit at 360 x 640`, async () => {
       await setFoldViewport()
       serveScreenBudgetFixture(fixture, MEMBER)
       renderToday(WithFoldScene)
       await todaySettled(fixture)
 
-      // The header reads Today (D1) from the layout's own options.
       expect(screen.getByTestId('app-top-bar')).toHaveTextContent(i18n.t('tabs.today'))
-      const anchors = screen.getAllByTestId('today-first-content')
-      expect(anchors, 'one Today first content').toHaveLength(1)
-      const first = anchors[0]!
-      await waitFor(() =>
-        expect(
-          within(first).getByTestId(
-            hasSavedLocation(fixture)
-              ? 'outfit-recommendation-card'
-              : 'member-sample-outfit'
-          )
-        ).toBeVisible()
+      const first = screen.getByTestId('today-first-content')
+      const located = hasSavedLocation(fixture)
+      const card = within(first).getByTestId(
+        located ? 'outfit-recommendation-card' : 'member-sample-outfit'
       )
+      expect(card).toBeVisible()
       expectFirstContentInFold(first, 'Today first content')
       expect(chromeBefore(first), 'alerts or setup before Today').toEqual([])
-      // D16: with a city, weather then the outfit; the ribbon, toggles and Plan link follow.
-      // With none, the sample leads with its own prompts inside it; the Plan link follows.
-      expectTodayD16Order(
-        first,
-        fixture,
-        hasSavedLocation(fixture)
-          ? ['scenario-toggles', 'hourly-forecast-ribbon', 'home-plan-week']
-          : ['home-plan-week']
+      const action = screen.getByTestId(
+        located ? 'today-primary-action' : 'home-set-city'
       )
+      expect(action).toBeVisible()
+      expect(action.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+        foldBand().bottom + 1
+      )
+      expect(screen.queryByRole('button', { name: /sign out/i })).toBeNull()
+      expect(screen.queryByTestId('hourly-forecast-ribbon')).toBeNull()
+
+      if (located) {
+        expectBelow(screen.getByTestId('weather-header'), first)
+      } else {
+        expect(within(card).getByTestId('member-sample-label')).toHaveTextContent(
+          'Sample look'
+        )
+      }
+      const closet = screen.getByTestId(
+        located ? 'home-closet-strip' : 'home-add-garment'
+      )
+      const plan = screen.getByTestId('home-plan-week')
+      expectBelow(first, closet)
+      expectBelow(closet, plan)
+      if (located) expectBelow(plan, screen.getByTestId('home-spotlight-teaser-link'))
+      else expect(screen.queryByTestId('home-spotlight-teaser-link')).toBeNull()
     }, 30_000)
   }
 
-  it('[P0] [7.11-NAT-010] [D16] a weather alert follows the outfit card, so no alert comes before Today', async () => {
-    await setFoldViewport()
+  it('[P0] [7.13-NAT-001/003] a failed forecast with a saved city offers the sample and Locations within the height budget', async () => {
     serveScreenBudgetFixture('populated', MEMBER)
     server.use(
       http.get('*/api/v1/ritual', () =>
-        HttpResponse.json({
-          ...mockRitualResponse,
-          data: {
-            ...mockRitualResponse.data,
-            weather: {
-              ...mockRitualResponse.data.weather,
-              alerts: [
-                {
-                  event: 'Severe Wind Advisory',
-                  description: 'High winds expected up to 50mph.',
-                  start: '2026-07-22T00:00:00.000Z',
-                  end: '2026-07-22T06:00:00.000Z',
-                  severity: 'high',
-                },
-              ],
-            },
-          },
-        })
+        HttpResponse.json({ message: 'Unavailable' }, { status: 503 })
       )
     )
-    renderToday(WithFoldScene)
+    renderToday()
+    await todaySettled('populated', false)
+
+    expect(screen.getByTestId('member-sample-label')).toHaveTextContent('Sample look')
+    expect(screen.queryByTestId('today-primary-action')).toBeNull()
+    expect(screen.getByTestId('home-closet-strip')).toBeVisible()
+    const measurement = await measureNativeScreen('today')
+    expectNativeMeasureFloors(measurement, 'today')
+    expect(measurement.todayHeight).toBeLessThanOrEqual(1688)
+    press(screen.getByTestId('home-set-city'))
+    expect(routerMock.push).toHaveBeenCalledWith('/locations?guided=1')
+  }, 30_000)
+
+  it('[P0] [7.13-NAT-001/002] identical periods hide the selector and the weather line toggles the hourly ribbon', async () => {
+    serveScreenBudgetFixture('populated', MEMBER)
+    serveTodayForecast(false)
+    renderToday()
     await todaySettled('populated')
 
-    const first = screen.getByTestId('today-first-content')
-    await waitFor(() =>
-      expect(within(first).getByTestId('outfit-recommendation-card')).toBeVisible()
+    const weather = screen.getByTestId('weather-header')
+    expect(screen.queryByTestId('scenario-toggles')).toBeNull()
+    expect(weather).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('hourly-forecast-ribbon')).toBeNull()
+    press(weather)
+    expect(weather).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('hourly-forecast-ribbon')).toBeVisible()
+    press(weather)
+    expect(weather).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('hourly-forecast-ribbon')).toBeNull()
+  }, 30_000)
+
+  it('[P0] [7.13-NAT-002] differing periods show one selector and changing period picks that outfit', async () => {
+    serveScreenBudgetFixture('populated', MEMBER)
+    serveTodayForecast(true)
+    renderToday()
+    await todaySettled('populated')
+
+    const periods = screen.getByTestId('scenario-toggles')
+    const picker = within(periods).getByTestId('scenario-picker')
+    expect(picker).toHaveAttribute('aria-expanded', 'false')
+    expect(within(periods).queryByRole('tablist')).toBeNull()
+    press(picker)
+    expect(within(periods).getAllByRole('tab')).toHaveLength(3)
+    press(screen.getByTestId('today-primary-action'))
+    expect(screen.getByTestId('outfit-comfort-notes').textContent).toMatch(/trench coat/i)
+    press(within(periods).getByTestId('scenario-toggle-midday'))
+    expect(within(periods).getByTestId('scenario-toggle-midday')).toHaveAttribute(
+      'aria-selected',
+      'true'
     )
-    expectFirstContentInFold(first, 'Today first content')
-    expect(chromeBefore(first), 'alerts or setup before Today').toEqual([])
-    expectTodayD16Order(first, 'populated', [
-      'weather-alert-banner',
-      'scenario-toggles',
-      'hourly-forecast-ribbon',
-      'home-plan-week',
-    ])
+    expect(screen.getByTestId('outfit-comfort-notes').textContent).toMatch(/light tee/i)
+    expect(picker).toHaveAttribute('aria-expanded', 'true')
+    press(picker)
+    expect(within(periods).queryByRole('tablist')).toBeNull()
+  }, 30_000)
+
+  it('[P0] [7.13-NAT-002] varying weather does not offer a period selector with one outfit', async () => {
+    serveScreenBudgetFixture('populated', MEMBER)
+    serveTodayForecast(true, 1)
+    renderToday()
+    await todaySettled('populated')
+    expect(screen.queryByTestId('scenario-toggles')).toBeNull()
+    expect(screen.getByTestId('today-primary-action')).toBeVisible()
+  }, 30_000)
+
+  it('[P0] [7.13-NAT-004] a wardrobe change removes old categories until the current closet is verified', async () => {
+    serveScreenBudgetFixture('populated', MEMBER)
+    renderToday()
+    await todaySettled('populated')
+    const recent = screen.getByTestId('home-closet-strip')
+    expect(recent).toHaveAccessibleName('Recent pieces. Top, Bottom, and Outer layer')
+    expect(recent.querySelectorAll('img')).toHaveLength(0)
+
+    let markRequested: () => void = () => undefined
+    const requested = new Promise<void>((resolve) => {
+      markRequested = resolve
+    })
+    let releaseGarments: () => void = () => undefined
+    const heldGarments = new Promise<void>((resolve) => {
+      releaseGarments = resolve
+    })
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        markRequested()
+        await heldGarments
+        return HttpResponse.json({ data: [] })
+      })
+    )
+    try {
+      act(() => notifyWardrobeChanged())
+      await requested
+      expect(screen.queryByTestId('home-closet-strip')).toBeNull()
+      expect(screen.queryByTestId('home-add-garment')).toBeNull()
+    } finally {
+      releaseGarments()
+    }
+    expect(await screen.findByTestId('home-add-garment')).toHaveAccessibleName(
+      'Add your first piece'
+    )
   }, 30_000)
 
   for (const [id, fixture] of PROBES) {

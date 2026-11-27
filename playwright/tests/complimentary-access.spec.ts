@@ -294,9 +294,9 @@ test.describe('6.14 complimentary full access, member flags off globally', () =>
       await page.getByTestId('premium-theme-option-default').click()
       expect((await reset).status).toBe(200)
 
-      await log.step('The community feed loads on the home page')
+      await log.step('The community feed loads on the Community tab')
       const feed = interceptNetworkCall({ method: 'GET', url: `**${FEED_PATH}*` })
-      await page.goto('/')
+      await page.goto('/community')
       expect((await feed).status).toBe(200)
       await expect(page.getByTestId('community-card-grid')).toBeAttached()
       await expect(
@@ -384,7 +384,7 @@ test.describe('6.14 complimentary full access, member flags off globally', () =>
       }
 
       const feedReads = watchFeedReads(page)
-      await page.goto('/')
+      await page.goto('/community')
       // The grid container renders for every signed-in reader; the denial is the status copy.
       await expect(
         page.getByRole('status').filter({ hasText: COPY.feedDisabled })
@@ -454,7 +454,7 @@ test.describe('6.14 complimentary full access, member flags off globally', () =>
       await expect(page.getByTestId('premium-theme-gallery')).toHaveCount(0)
 
       const feedReads = watchFeedReads(page)
-      await page.goto('/')
+      await page.goto('/community')
       await expect(
         page.getByRole('status').filter({ hasText: COPY.feedDisabled })
       ).toBeVisible()

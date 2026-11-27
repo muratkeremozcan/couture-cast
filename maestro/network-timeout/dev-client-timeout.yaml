@@ -3,7 +3,7 @@
 # meets a check that already passed on SDK 54.
 #
 # Home aborts its ritual request after 15 s (`ritualRequestTimeoutMs` in app/(tabs)/index.tsx)
-# and, with no cached ritual, shows `hero-error-state`. Story 6.16 sends that request only for a
+# and, with no cached ritual, offers Retry in the labeled sample. Story 6.16 sends that request only for a
 # member, so the bundle carries a placeholder member token (EXPO_PUBLIC_E2E_ACCESS_TOKEN, which
 # src/lib/mobile-auth.ts returns in __DEV__); a signed-out Home shows its welcome card instead. The API stand-in is
 # scripts/lib/network-tarpit.mjs: it accepts every connection and never answers, so only the
@@ -48,10 +48,11 @@ tags:
 # is asserted here.
 - extendedWaitUntil:
     visible:
-      id: 'hero-error-state'
+      id: 'hero-retry'
     timeout: 45000
     label: 'The first ritual request ended in the error state'
-- assertVisible: 'Unable to load daily recommendations'
+- assertVisible:
+    id: 'member-sample-outfit'
 - assertNotVisible:
     id: 'stale-cache-banner'
 - assertNotVisible:
@@ -61,8 +62,8 @@ tags:
 - tapOn:
     id: 'hero-retry'
     label: 'Retry the ritual request against the API that never answers'
-- assertVisible:
-    id: 'weather-header-skeleton'
+- assertNotVisible:
+    id: 'member-sample-outfit'
     label: 'The retried request is pending'
 
 # Nothing ever shows this id; the wait is an 8 s pause.
@@ -72,20 +73,19 @@ tags:
     timeout: 8000
     optional: true
     label: 'Let 8 s of the 15 s timeout pass'
-- assertVisible:
-    id: 'weather-header-skeleton'
-    label: 'Still pending 8 s after Retry: the request hangs and has not failed fast'
 - assertNotVisible:
-    id: 'hero-error-state'
+    id: 'hero-retry'
+    label: 'Still pending 8 s after Retry: the request hangs and has not failed fast'
 
 # The abort fires 15 s after the tap, about 7 s from here. If the abort signal stopped reaching
 # the request (the `expo/fetch` regression this guards), the skeleton would stay forever.
 - extendedWaitUntil:
     visible:
-      id: 'hero-error-state'
+      id: 'hero-retry'
     timeout: 20000
     label: 'The 15 s timeout aborted the request and the error state shows'
-- assertVisible: 'Unable to load daily recommendations'
+- assertVisible:
+    id: 'member-sample-outfit'
 - assertVisible:
     id: 'hero-retry'
 - assertNotVisible:

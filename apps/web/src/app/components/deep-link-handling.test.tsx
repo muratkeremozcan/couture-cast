@@ -1,47 +1,41 @@
-import type { CommunityFeedItem } from '@couture/api-client/contracts/http'
 import { CommunitySyncState } from '@couture/api-client'
 // Learning path Step 27: Widget and notification deep-link handling.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 // Story 3.7 Task 5 step 1 owner: unit-test web deep-link hydration, severe weather focus, and invalid banner
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
 import { http, HttpResponse } from 'msw'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { mockCommunityFeedItem } from '../../test-utils/msw/handlers'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import CommunityPage from '../community/page'
+import { createWebSpotlightActivation } from '../lib/deep-link-handler'
+import { currentWebSessionScope } from '../../lib/use-web-session'
+import {
+  ranked,
+  sponsoredSpotlightBody,
+  SPOTLIGHT_PATH,
+} from '../../test-utils/community-spotlight'
+import { signInFixtureMember } from '../../test-utils/member-session'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 
 const captureMock = vi.fn()
+const FIXTURE_BEARER = 'test-token-deep-link'
 
 function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  signInFixtureMember(FIXTURE_BEARER)
 }
 
-/**
- * Story 6.1: a community deep link now resolves against the server. Its target
- * has to exist on both sides: `GET /api/v1/community/posts/{postId}`, which
- * the default handler answers for `mockCommunityFeedItem.id` and 404s for every
- * other id, and the feed the grid renders the highlighted card from. The
- * default feed is empty, so a test that wants a card serves one.
- */
-function communityFeedHandler() {
-  return http.get('/api/v1/community/feed', () =>
-    HttpResponse.json({
-      data: {
-        items: [mockCommunityFeedItem],
-        authorStates: [],
-        nextCursor: null,
-        mode: 'auto',
-        viewerBand: 'temperate_wet',
-        bandResolved: true,
-        bandUnresolvedReason: null,
-        experimentVariant: 'auto',
-        activeChallenge: null,
-      },
-    })
-  )
+const originalUrl = window.location.href
+
+function setLocationSearch(search: string, pathname = '/') {
+  window.history.replaceState(null, '', `${pathname}${search}`)
 }
+
+afterEach(() => {
+  window.sessionStorage.clear()
+  window.history.replaceState(null, '', originalUrl)
+})
 
 vi.mock('posthog-js', () => ({
   default: {
@@ -51,89 +45,26 @@ vi.mock('posthog-js', () => ({
   },
 }))
 
+const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/',
+  usePathname: () => window.location.pathname,
+  useRouter: () => router,
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }))
 
 describe('Web Deep-Link Handling (Story 3.7)', () => {
-  const originalLocation = window.location
-
   beforeEach(() => {
     // Story6.5 transport is covered independently; these legacy presentation cases own static HTTP.
     vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
-    useMswHandlers(
-      http.post('*/api/v1/community/targets/resolve', async ({ request }) => {
-        const input = (await request.json()) as {
-          targets: { key: string; postId: string }[]
-        }
-        const targets = []
-        for (const target of input.targets) {
-          const response = await fetch(
-            new URL(
-              `/api/v1/community/posts/${encodeURIComponent(target.postId)}`,
-              request.url
-            )
-          )
-          if (response.status === 404) {
-            targets.push({ key: target.key, status: 'unavailable' })
-            continue
-          }
-          if (!response.ok) return new HttpResponse(null, { status: response.status })
-          const body = (await response.json()) as { data: CommunityFeedItem }
-          targets.push({
-            key: target.key,
-            status: 'available',
-            communityRevision: '0',
-            post: {
-              ...body.data,
-              reactions: {
-                counts: { applause: 0, love: 0, inspiration: 0 },
-                total: 0,
-                viewerReaction: null,
-                revision: 0,
-                generation: 0,
-              },
-            },
-            comment: null,
-            parent: null,
-            pageCursor: null,
-            parentPageCursor: null,
-            threadPosition: null,
-          })
-        }
-        return HttpResponse.json({ data: { targets } })
-      })
-    )
     captureMock.mockClear()
     vi.clearAllMocks()
   })
 
-  afterEach(() => {
-    window.sessionStorage.clear()
-    Object.defineProperty(window, 'location', {
-      writable: true,
-      value: originalLocation,
-    })
-  })
-
-  const setLocationSearch = (search: string) => {
-    Object.defineProperty(window, 'location', {
-      writable: true,
-      value: {
-        ...originalLocation,
-        search,
-        href: `http://localhost${search}`,
-      },
-    })
-  }
-
-  it('3.7-UNIT-001: Hydrates Personal/Morning recommendation on widget tap deep-link', () => {
+  it('3.7-UNIT-001: keeps the guest sample available on a widget link', async () => {
     setLocationSearch('?source=widget&size=small&slot=am')
     render(<LookbookPrismLayout />)
 
-    expect(screen.getByTestId('hero-recommendation-title')).toHaveTextContent(
-      'Double-Breasted Blazer & Silk Knit'
-    )
+    expect(await screen.findByTestId('guest-preview-entry')).toBeVisible()
     expect(captureMock).toHaveBeenCalledWith('deep_link_handled', {
       source: 'widget',
       slot: 'am',
@@ -174,43 +105,23 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
         surface: 'web',
       })
     })
-    expect(authorizations).toEqual(['Bearer test-access-token'])
+    expect(authorizations).toEqual([`Bearer ${FIXTURE_BEARER}`])
   })
 
-  it('3.7-UNIT-003: Selects, scrolls to, and focuses the community card', async () => {
-    // Resolution is a server read now, so the card can only be found after the
-    // `GET /community/posts/{postId}` probe answers.
+  it('3.7-UNIT-003: forwards a legacy Community notification to the Community tab', async () => {
     signIn()
-    useMswHandlers(communityFeedHandler())
-    setLocationSearch(
-      `?source=notification&type=community&cardId=${mockCommunityFeedItem.id}`
-    )
+    const query = `?source=notification&type=community&cardId=${mockCommunityFeedItem.id}`
+    setLocationSearch(query)
     render(<LookbookPrismLayout />)
-
-    const highlightedCard = await screen.findByTestId(
-      `lookbook-card-${mockCommunityFeedItem.id}`
-    )
-    // The feed can show the card before the probe marks it as the deep link target.
-    await waitFor(() =>
-      expect(highlightedCard).toHaveAttribute('data-highlighted', 'true')
-    )
-    expect(screen.queryByTestId('deep-link-info-banner')).not.toBeInTheDocument()
-    await waitFor(() => expect(highlightedCard).toHaveFocus())
-    expect(captureMock).toHaveBeenCalledWith('deep_link_handled', {
-      source: 'notification',
-      slot: undefined,
-      type: 'community',
-      alertId: undefined,
-      cardId: mockCommunityFeedItem.id,
-      surface: 'web',
-    })
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/community${query}`))
+    expect(screen.queryByTestId('community-card-grid')).toBeNull()
   })
 
-  it('3.7-UNIT-004: Displays InfoBanner and logs deep_link_invalid event on invalid deep link parameters', () => {
+  it('3.7-UNIT-004: Displays InfoBanner and logs deep_link_invalid event on invalid deep link parameters', async () => {
     setLocationSearch('?source=invalid_source&slot=bad_slot')
     render(<LookbookPrismLayout />)
 
-    const infoBanner = screen.getByTestId('deep-link-info-banner')
+    const infoBanner = await screen.findByTestId('deep-link-info-banner')
     expect(infoBanner).toBeInTheDocument()
     expect(
       within(infoBanner).getByText(
@@ -227,11 +138,11 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
     )
   })
 
-  it('treats a valid payload without a supported target as invalid', () => {
+  it('treats a valid payload without a supported target as invalid', async () => {
     setLocationSearch('?source=app')
     render(<LookbookPrismLayout />)
 
-    expect(screen.getByTestId('deep-link-info-banner')).toBeInTheDocument()
+    expect(await screen.findByTestId('deep-link-info-banner')).toBeInTheDocument()
     expect(captureMock).toHaveBeenCalledWith(
       'deep_link_invalid',
       expect.objectContaining({
@@ -244,31 +155,11 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
 })
 
 describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
-  const originalLocation = window.location
-
   beforeEach(() => {
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
     captureMock.mockClear()
     vi.clearAllMocks()
   })
-
-  afterEach(() => {
-    window.sessionStorage.clear()
-    Object.defineProperty(window, 'location', {
-      writable: true,
-      value: originalLocation,
-    })
-  })
-
-  const setLocationSearch = (search: string) => {
-    Object.defineProperty(window, 'location', {
-      writable: true,
-      value: {
-        ...originalLocation,
-        search,
-        href: `http://localhost${search}`,
-      },
-    })
-  }
 
   it('hydrates a watch deep link through the same slot mapping as a widget', () => {
     setLocationSearch('?source=watch&slot=pm')
@@ -285,22 +176,86 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
     })
   })
 
-  it('treats a community card that no longer exists as an invalid link', async () => {
-    // Signed in, so the 404 from `GET /community/posts/{postId}` is the reason
-    // the target is unreachable rather than the missing bearer token.
-    signIn()
-    setLocationSearch('?source=notification&type=community&cardId=look-does-not-exist')
-    render(<LookbookPrismLayout />)
+  it.each([404, 403])(
+    'the Community destination reports an unavailable card (%i) after an authenticated target read',
+    async (status) => {
+      signIn()
+      const authorizations: (string | null)[] = []
+      useMswHandlers(
+        http.get('/api/v1/community/posts/unavailable-look', ({ request }) => {
+          authorizations.push(request.headers.get('authorization'))
+          return new HttpResponse(null, { status })
+        })
+      )
+      setLocationSearch(
+        '?source=notification&type=community&cardId=unavailable-look',
+        '/community'
+      )
+      render(<CommunityPage />)
 
-    // A card that was removed since the notification was sent must not silently
-    // land the user on an unrelated filter. The probe is asynchronous, so the
-    // banner arrives with the server's answer.
-    expect(await screen.findByTestId('deep-link-info-banner')).toBeInTheDocument()
-    expect(captureMock).toHaveBeenCalledWith(
-      'deep_link_invalid',
-      expect.objectContaining({ reason: 'Community card target was not found' })
-    )
-  })
+      expect(await screen.findByTestId('deep-link-info-banner')).toHaveTextContent(
+        'This link is invalid, expired, or no longer available.'
+      )
+      expect(authorizations).toEqual([`Bearer ${FIXTURE_BEARER}`])
+      expect(screen.queryByTestId('lookbook-card-unavailable-look')).toBeNull()
+      expect(router.replace).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([
+    ['/', LookbookPrismLayout],
+    ['/community', CommunityPage],
+  ] as const)(
+    'reports a signed-out notification on %s without a member probe',
+    async (entry, Entry) => {
+      const probe = vi.fn(() => new HttpResponse(null, { status: 403 }))
+      useMswHandlers(http.get('/api/v1/community/posts/unavailable-look', probe))
+      setLocationSearch(
+        '?source=notification&type=community&cardId=unavailable-look',
+        entry
+      )
+      render(<Entry />)
+
+      const banner = await screen.findByTestId('deep-link-info-banner')
+      expect(banner).toHaveTextContent(
+        'This link is invalid, expired, or no longer available.'
+      )
+      expect(captureMock).toHaveBeenCalledWith('deep_link_invalid', expect.anything())
+      expect(probe).not.toHaveBeenCalled()
+      expect(router.replace).not.toHaveBeenCalled()
+      expect(window.location.pathname).toBe(entry)
+      fireEvent.click(within(banner).getByRole('button'))
+      expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+    }
+  )
+
+  it.each([true, false])(
+    'only the account that opened the Spotlight gets programmatic focus (same owner: %s)',
+    async (sameOwner) => {
+      signIn()
+      const scope = currentWebSessionScope()!
+      const look = ranked(1)
+      const token = createWebSpotlightActivation(
+        look.id,
+        sameOwner ? scope : `${scope}-previous`
+      )
+      useMswHandlers(http.get(SPOTLIGHT_PATH, () => sponsoredSpotlightBody([look])))
+      setLocationSearch(
+        `?source=app&type=community&cardId=${look.id}&focus=spotlight&focusToken=${token}`,
+        '/community'
+      )
+      render(<CommunityPage />)
+
+      const card = await screen.findByTestId(`spotlight-lookbook-card-${look.id}`)
+      if (sameOwner) await waitFor(() => expect(card).toHaveFocus())
+      else {
+        await waitFor(() =>
+          expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+        )
+        expect(card).not.toHaveFocus()
+      }
+    }
+  )
 
   it('reports a weather alert link opened while signed out without reading the feed', async () => {
     let polls = 0
@@ -334,7 +289,7 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
         expect.objectContaining({ reason: 'Weather alert target could not be loaded' })
       )
     )
-    expect(screen.getByTestId('deep-link-info-banner')).toBeInTheDocument()
+    expect(await screen.findByTestId('deep-link-info-banner')).toBeInTheDocument()
   })
 
   it('reports a weather alert that is no longer in the polled feed', async () => {

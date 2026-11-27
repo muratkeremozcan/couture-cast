@@ -7,6 +7,7 @@ import {
   type SupabaseClient,
 } from '@supabase/supabase-js'
 import Constants from 'expo-constants'
+import type * as SecureStore from 'expo-secure-store'
 import { AppState } from 'react-native'
 import {
   userProfileResponseSchema,
@@ -46,6 +47,7 @@ type VerificationFlight = {
 let verification: VerificationFlight | undefined
 let localSignedOut = false
 const authStorageKey = 'couturecast.auth-session'
+const logoutMarkerKey = `${authStorageKey}-logout-pending`
 type SessionLifecycle = {
   owners: Set<object>
   ready: Promise<void>
@@ -74,9 +76,18 @@ export const beforeNativeLogout = (hook: (token?: string) => Promise<void>) => {
   }
 }
 
+async function clearStoredNativeSession(secure: typeof SecureStore) {
+  const storage = secureSessionStorage(secure)
+  await storage.removeItem(authStorageKey)
+  await storage.removeItem(`${authStorageKey}-code-verifier`)
+  await secure.deleteItemAsync(logoutMarkerKey)
+}
+
 export function nativeSupabase(): Promise<SupabaseClient> {
   clientPromise ??= (async () => {
     const secure = await import('expo-secure-store')
+    // Finish an interrupted logout before the SDK has a chance to restore the session.
+    if (await secure.getItemAsync(logoutMarkerKey)) await clearStoredNativeSession(secure)
     const extra: unknown = Constants.expoConfig?.extra
     const config = extra && typeof extra === 'object' ? extra : {}
     const url =
@@ -370,6 +381,12 @@ export async function verifyNativeOtp(email: string, token: string) {
 }
 export async function signOutNativeSession() {
   const client = await nativeSupabase()
+  const secure = await import('expo-secure-store')
+  // The SDK uses the stored credential to sign out this device's session. A cold launch
+  // seeing this marker clears it locally before any credentials can be restored.
+  await secure.setItemAsync(logoutMarkerKey, '1', {
+    keychainAccessible: secure.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+  })
   const token = session?.access_token
   // Clear visible account state immediately; captured credentials serve only bounded unbinding.
   localSignedOut = true
@@ -389,9 +406,7 @@ export async function signOutNativeSession() {
   try {
     await client.auth.signOut({ scope: 'local' })
   } finally {
-    const storage = secureSessionStorage(await import('expo-secure-store'))
-    await storage.removeItem(authStorageKey)
-    await storage.removeItem(`${authStorageKey}-code-verifier`)
+    await clearStoredNativeSession(secure)
     let timer: ReturnType<typeof setTimeout> | undefined
     await Promise.race([
       hooks,

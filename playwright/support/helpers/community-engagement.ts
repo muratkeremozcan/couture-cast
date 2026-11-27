@@ -282,7 +282,7 @@ export async function openAll(page: Page) {
   page.on('pageerror', (error) => {
     void log.info(`Page error: ${error.message}`)
   })
-  await page.goto('/')
+  await page.goto('/community')
   await expect(
     page.getByTestId('community-card-grid').getByRole('article').first()
   ).toBeVisible()

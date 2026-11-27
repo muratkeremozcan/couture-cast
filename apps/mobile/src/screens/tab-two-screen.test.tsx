@@ -36,6 +36,11 @@ vi.mock('expo-router', async () => ({
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
 }))
 
+const signOutNativeSessionMock = vi.hoisted(() => vi.fn<() => Promise<void>>())
+vi.mock('../lib/native-session.js', () => ({
+  signOutNativeSession: signOutNativeSessionMock,
+}))
+
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
@@ -173,6 +178,7 @@ describe('SettingsScreen', () => {
 
   beforeEach(async () => {
     localStorage.clear()
+    signOutNativeSessionMock.mockReset()
     analyticsCaptureMock.mockReset()
     analyticsDistinctIdMock.mockReturnValue('test-user-id')
     loadMobileApiHealthMock.mockReset()
@@ -802,6 +808,7 @@ describe('SettingsScreen', () => {
     const signedOut = await render(<SettingsScreen />)
 
     await screen.findByTestId('commerce-settings-signed-out')
+    expect(screen.queryByTestId('profile-sign-out')).toBeNull()
     expect(getUserProfileMock).not.toHaveBeenCalled()
     expect(screen.queryByTestId('profile-account')).toBeNull()
     await signedOut.unmount()
@@ -814,6 +821,35 @@ describe('SettingsScreen', () => {
     await waitFor(() => expect(getUserProfileMock).toHaveBeenCalled())
     expect(await screen.findByTestId('commerce-opt-out-toggle')).toBeInTheDocument()
     expect(screen.queryByTestId('profile-account')).toBeNull()
+  })
+
+  it('7.13-NAT-005 guards Profile sign-out while pending and permits retry after an error', async () => {
+    signOutNativeSessionMock.mockRejectedValueOnce(new Error('Keychain unavailable'))
+    const signingOut = held<void>()
+    signOutNativeSessionMock.mockReturnValueOnce(signingOut.promise)
+    vi.mocked(router.navigate).mockClear()
+    await render(<SettingsScreen />)
+
+    const action = await screen.findByTestId('profile-sign-out')
+    expect(action).toHaveAccessibleName('Sign out')
+    fireEvent.click(action)
+    await waitFor(() => expect(signOutNativeSessionMock).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(action).not.toHaveAttribute('aria-busy', 'true'))
+    expect(await screen.findByRole('alert')).toBeVisible()
+    expect(router.navigate).not.toHaveBeenCalled()
+
+    fireEvent.click(action)
+    await waitFor(() => expect(signOutNativeSessionMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => {
+      expect(action).toHaveAttribute('aria-busy', 'true')
+      expect(action).toHaveAttribute('aria-disabled', 'true')
+    })
+    fireEvent.click(action)
+    expect(signOutNativeSessionMock).toHaveBeenCalledTimes(2)
+    expect(router.navigate).not.toHaveBeenCalled()
+    signingOut.release(undefined)
+    await waitFor(() => expect(router.navigate).toHaveBeenCalledWith('/'))
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('6.5-MOB-POLISH-11 never tells a member they are signed out when the session read fails transiently', async () => {

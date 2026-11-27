@@ -36,7 +36,7 @@ import {
   COMMUNITY_PUBLISH_PATH,
 } from '../support/helpers/community-session'
 
-const COMMUNITY_ROUTE = '/'
+const COMMUNITY_ROUTE = '/community'
 
 /**
  * The stable code `reasonCodes.text` in `policy-v2.json` gives a matched term,

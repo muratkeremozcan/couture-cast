@@ -24,6 +24,7 @@ type OutfitRecommendationCardProps = {
     element: ComponentRef<typeof Pressable> | null
   ) => void
   isLoading?: boolean
+  nested?: boolean
   /**
    * True when `outfit` came out of the device ritual cache instead of the
    * network. A cache-served payload never renders an affiliate CTA, because the
@@ -38,6 +39,7 @@ export function OutfitRecommendationCard({
   onSwapGarment,
   onGarmentRef,
   isLoading,
+  nested = false,
   isCacheServed = false,
 }: OutfitRecommendationCardProps) {
   const [selectedBadgeKey, setSelectedBadgeKey] = useState<string | null>(null)
@@ -125,7 +127,10 @@ export function OutfitRecommendationCard({
   }
 
   return (
-    <View style={styles.container} testID="outfit-recommendation-card">
+    <View
+      style={nested ? styles.nested : styles.container}
+      testID={nested ? 'outfit-recommendation-details' : 'outfit-recommendation-card'}
+    >
       {onExport && (
         <Pressable
           accessibilityRole="button"
@@ -310,6 +315,7 @@ export function OutfitRecommendationCard({
 }
 
 const styles = StyleSheet.create({
+  nested: { gap: 12 },
   container: {
     paddingHorizontal: 16,
     paddingVertical: 12,

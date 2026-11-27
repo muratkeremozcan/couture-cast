@@ -37,6 +37,7 @@ type VerificationFlight = {
 let verification: VerificationFlight | undefined
 let localSignedOut = false
 const authStorageKey = 'couturecast.auth-session'
+const WEB_BEARER_MIN_REMAINING_MS = 5_000
 /**
  * Stored in sessionStorage beside the bearer, and written and removed with it: the Supabase
  * user (`session.user.id`) the stored bearer was verified for, and the app member that
@@ -95,23 +96,25 @@ function parseStored(raw: string | null): unknown {
  * that same user; verification then re-runs as for a token refresh. When another account signed
  * in from another tab (the auth session is shared, the bearer is per tab), or the session is
  * gone, the previous account's bearer and principal are removed here, before anything reads
- * them, and the next account's bearer is stored only once its own verification passes. A
- * bearer with no stored principal (the local E2E fixture token) is left as it is. On the server
- * every storage read answers null, so nothing happens there.
+ * them, and the next account's bearer is stored only once its own verification passes. An
+ * expired session waits for the SDK to refresh. Local E2E fixture bearers have no principal.
  */
 function restoreVerifiedPrincipal() {
   const raw = readStorage('session', WEB_SESSION_PRINCIPAL_STORAGE_KEY)
-  if (raw === null) return
+  const token = readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)
+  if (raw === null && (token === null || isE2EFixtureBearer(token))) return
   const stored = parseStored(raw) as { principal?: unknown; member?: unknown } | null
   const auth = parseStored(readStorage('local', authStorageKey)) as {
     user?: { id?: unknown }
+    expires_at?: unknown
   } | null
-  const token = readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)
   if (
     typeof stored?.principal === 'string' &&
     stored.principal === auth?.user?.id &&
     typeof stored.member === 'string' &&
     stored.member !== '' &&
+    typeof auth.expires_at === 'number' &&
+    auth.expires_at * 1000 - Date.now() > WEB_BEARER_MIN_REMAINING_MS &&
     token
   ) {
     principal = stored.principal
@@ -213,7 +216,10 @@ function publishIdentity() {
 function requireBearerLifetime(session: Session) {
   // The HTTP attempt can consume five seconds. SDK refresh failure may return a
   // still-valid stored JWT inside that window. Keep the session for retry.
-  if (session.expires_at !== undefined && session.expires_at * 1000 - Date.now() <= 5000)
+  if (
+    session.expires_at !== undefined &&
+    session.expires_at * 1000 - Date.now() <= WEB_BEARER_MIN_REMAINING_MS
+  )
     throw new Error('Session verification is unavailable.')
 }
 function accept(session: Session | null): Promise<void> {

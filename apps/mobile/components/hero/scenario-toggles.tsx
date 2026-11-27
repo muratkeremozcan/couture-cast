@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { StyleSheet, Pressable, ScrollView } from 'react-native'
 import { Text, View } from '@/components/themed'
 import { useHeroPalette } from './hero-theme'
@@ -9,6 +9,7 @@ type ScenarioType = 'morning' | 'midday' | 'evening'
 type ScenarioTogglesProps = {
   activeScenario: ScenarioType
   onScenarioChange: (scenario: ScenarioType) => void
+  availableScenarios?: readonly ScenarioType[]
 }
 
 const scenarios: { key: ScenarioType; labelKey: string; defaultLabel: string }[] = [
@@ -20,54 +21,79 @@ const scenarios: { key: ScenarioType; labelKey: string; defaultLabel: string }[]
 export function ScenarioToggles({
   activeScenario,
   onScenarioChange,
+  availableScenarios,
 }: ScenarioTogglesProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const [expanded, setExpanded] = useState(false)
+  const tabs = availableScenarios
+    ? scenarios.filter(({ key }) => availableScenarios.includes(key))
+    : scenarios
+  const active = tabs.find(({ key }) => key === activeScenario) ?? tabs[0]
+  if (!active) return null
 
   return (
-    <View style={styles.container} testID="scenario-toggles" accessibilityRole="tablist">
+    <View style={styles.container} testID="scenario-toggles">
+      <Pressable
+        testID="scenario-picker"
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        aria-expanded={expanded}
+        onPress={() => setExpanded((open) => !open)}
+        style={[styles.picker, { borderColor: palette.line }]}
+      >
+        <Text style={[styles.pickerLabel, { color: palette.ink }]}>
+          {t(active.labelKey, { defaultValue: active.defaultLabel })}
+        </Text>
+        <Text aria-hidden style={{ color: palette.inkMuted }}>
+          {expanded ? '⌃' : '⌄'}
+        </Text>
+      </Pressable>
       {/* Tabs size to their localized label on one line (it-IT and pt-PT outgrow a third
           of a 360-point phone) and scroll sideways only when the labels cannot all fit. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {scenarios.map((tab) => {
-          const isActive = activeScenario === tab.key
-          return (
-            <Pressable
-              key={tab.key}
-              onPress={() => onScenarioChange(tab.key)}
-              style={[
-                styles.tabButton,
-                { borderBottomColor: palette.line },
-                isActive && styles.activeTabButton,
-              ]}
-              testID={`scenario-toggle-${tab.key}`}
-              accessibilityRole="tab"
-              aria-selected={isActive}
-            >
-              <Text
-                numberOfLines={1}
+      {expanded && (
+        <ScrollView
+          horizontal
+          accessibilityRole="tablist"
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {tabs.map((tab) => {
+            const isActive = activeScenario === tab.key
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={() => onScenarioChange(tab.key)}
                 style={[
-                  styles.tabLabel,
-                  { color: palette.inkMuted },
-                  isActive && styles.activeTabLabel,
-                  isActive && { color: palette.ink },
+                  styles.tabButton,
+                  { borderBottomColor: palette.line },
+                  isActive && styles.activeTabButton,
                 ]}
+                testID={`scenario-toggle-${tab.key}`}
+                accessibilityRole="tab"
+                aria-selected={isActive}
               >
-                {t(tab.labelKey, { defaultValue: tab.defaultLabel })}
-              </Text>
-              {isActive && (
-                <View
-                  style={[styles.activeUnderline, { backgroundColor: palette.ink }]}
-                />
-              )}
-            </Pressable>
-          )
-        })}
-      </ScrollView>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.tabLabel,
+                    { color: palette.inkMuted },
+                    isActive && styles.activeTabLabel,
+                    isActive && { color: palette.ink },
+                  ]}
+                >
+                  {t(tab.labelKey, { defaultValue: tab.defaultLabel })}
+                </Text>
+                {isActive && (
+                  <View
+                    style={[styles.activeUnderline, { backgroundColor: palette.ink }]}
+                  />
+                )}
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+      )}
     </View>
   )
 }
@@ -78,6 +104,18 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginVertical: 12,
   },
+  picker: {
+    minHeight: 44,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+  },
+  pickerLabel: { flexShrink: 1, fontSize: 14, fontWeight: '600' },
   scrollContent: {
     flexGrow: 1,
   },

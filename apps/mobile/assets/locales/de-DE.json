@@ -1098,6 +1098,17 @@
     }
   },
   "home": {
+    "today": {
+      "planWeek": "Woche planen",
+      "outfit": "Heutiges Outfit",
+      "starterOutfit": "Basis-Outfit",
+      "outfitDetails": "Outfit-Details",
+      "sampleLook": "Beispieloutfit",
+      "editSample": "Beispiel bearbeiten",
+      "addFirstPiece": "Erstes Kleidungsstück hinzufügen",
+      "weatherUnavailable": "Wetter nicht verfügbar",
+      "recentPieces": "Neueste Kleidungsstücke"
+    },
     "spotlightTeaser": {
       "heading": "Herausragender Look in {{label}}",
       "reactions": "{{count}} Reaktionen",
@@ -1202,6 +1213,11 @@
     "hideList": "Gespeicherte Looks ausblenden"
   },
   "shell": {
+    "legal": {
+      "label": "Rechtliches",
+      "privacy": "Datenschutzerklärung",
+      "terms": "Nutzungsbedingungen"
+    },
     "back": "Zurück",
     "notFound": {
       "title": "Bildschirm nicht gefunden",

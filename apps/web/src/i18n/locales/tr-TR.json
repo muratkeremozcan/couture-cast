@@ -1038,6 +1038,30 @@
     }
   },
   "home": {
+    "today": {
+      "planWeek": "Haftayı planla",
+      "outfit": "Bugünün kombini",
+      "starterOutfit": "Başlangıç kombini",
+      "outfitDetails": "Kombin ayrıntıları",
+      "sampleLook": "Örnek kombin",
+      "editSample": "Örneği düzenle",
+      "addFirstPiece": "İlk parçanı ekle",
+      "weatherUnavailable": "Hava durumu bilgisi yok",
+      "recentPieces": "Son eklenen parçalar",
+      "conditions": {
+        "clear": "Açık",
+        "partly_cloudy": "Parçalı bulutlu",
+        "cloudy": "Bulutlu",
+        "fog": "Sisli",
+        "drizzle": "Çisenti",
+        "rain": "Yağmurlu",
+        "sleet": "Karla karışık yağmur",
+        "snow": "Karlı",
+        "thunderstorm": "Gök gürültülü fırtına",
+        "wind": "Rüzgarlı",
+        "unknown": "Bilinmiyor"
+      }
+    },
     "spotlightTeaser": {
       "heading": "{{label}} öne çıkan kombini",
       "reactions": "{{count}} tepki",

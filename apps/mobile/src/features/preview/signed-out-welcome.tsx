@@ -1,7 +1,7 @@
 // Story 6.16 D1: what a signed-out launch shows on Home in place of a failed ritual
 // request: the way into the sample preview, account creation and sign-in.
 import { router } from 'expo-router'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
   colorRoles,
@@ -12,7 +12,7 @@ import { SampleGarmentArt } from './guest-preview-parts'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 
 export function SignedOutWelcome() {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language)
   const palette = useHeroPalette()
   const actions = [
@@ -78,11 +78,36 @@ export function SignedOutWelcome() {
           </Pressable>
         )
       })}
+      <View
+        style={styles.legal}
+        role="navigation"
+        accessibilityLabel={t('shell.legal.label')}
+      >
+        {(['privacy', 'terms'] as const).map((page) => (
+          <Pressable
+            key={page}
+            accessibilityRole="link"
+            style={styles.legalLink}
+            onPress={() => {
+              void Linking.openURL(`https://couture-cast-web.vercel.app/${page}`).catch(
+                () => undefined
+              )
+            }}
+          >
+            <Text style={[styles.legalText, { color: palette.ink }]}>
+              {t(`shell.legal.${page}`)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  legal: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  legalLink: { minWidth: 44, minHeight: 44, justifyContent: 'center' },
+  legalText: { textDecorationLine: 'underline' },
   art: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   // The sample art is drawn for a light ground, so its tile is the light card in both schemes.
   tile: { backgroundColor: colorRoles.light.card, padding: 4, borderRadius: 8 },

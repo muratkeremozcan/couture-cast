@@ -31,7 +31,10 @@ vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
 // Passthrough spies: reads stay on the real HTTP boundary, and the wrapper's own
 // promises tell a test when a teaser read has settled.
 vi.mock('../../lib/community', { spy: true })
-vi.mock('next/navigation', () => ({ usePathname: () => '/' }))
+vi.mock('next/navigation', () => {
+  const router = { push: vi.fn(), replace: vi.fn() }
+  return { usePathname: () => '/', useRouter: () => router }
+})
 
 describe('6.7 web Home spotlight teaser timers', () => {
   setupHomeTeaserSuite()

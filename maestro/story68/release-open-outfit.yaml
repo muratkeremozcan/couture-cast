@@ -2,6 +2,7 @@ appId: ${MAESTRO_APP_ID}
 ---
 - tapOn:
     id: tab-home
+- runFlow: ../subflows/open-today-outfit-details.yaml
 # Home can keep an earlier scroll offset. Start every search from the top of Home.
 - scrollUntilVisible:
     element:

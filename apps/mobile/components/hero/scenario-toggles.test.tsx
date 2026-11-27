@@ -1,7 +1,7 @@
 // Scenario tabs with long localized labels: every label stays on one line inside its tab
 // on a 360-point-wide phone, and short labels still spread the tabs across the full row.
 import React from 'react'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ScenarioToggles } from './scenario-toggles'
 
@@ -45,8 +45,10 @@ describe('ScenarioToggles long localized labels', () => {
     setLabels(morning, midday, evening)
     renderOnPhone()
 
+    fireEvent.click(screen.getByRole('button', { name: morning }))
+    const options = screen.getByRole('tablist')
     for (const label of [morning, midday, evening]) {
-      const text = screen.getByText(label)
+      const text = within(options).getByText(label)
       const range = document.createRange()
       range.selectNodeContents(text)
       const lineTops = new Set(
@@ -71,6 +73,7 @@ describe('ScenarioToggles long localized labels', () => {
     setLabels('Morning commute', 'Midday', 'Evening plans')
     renderOnPhone()
 
+    fireEvent.click(screen.getByRole('button', { name: 'Morning commute' }))
     const row = screen.getByTestId('scenario-toggles').getBoundingClientRect()
     const first = screen.getByTestId('scenario-toggle-morning').getBoundingClientRect()
     const last = screen.getByTestId('scenario-toggle-evening').getBoundingClientRect()

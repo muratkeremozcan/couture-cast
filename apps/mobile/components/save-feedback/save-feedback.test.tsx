@@ -17,7 +17,6 @@ import { router } from 'expo-router'
 import { createReadyGarmentFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { SAVE_FEEDBACK_TIMINGS } from '@couture/utils'
 import { mobileIdentityEpoch, setMobileApplicationUserId } from '@/src/lib/mobile-auth'
-import { HomeAddGarment } from '@/src/features/preview/member-sample-outfit'
 import { StylePiecePanel } from '@/src/features/wardrobe/style-piece-panel'
 import {
   checkNetworkOnlineForAction,
@@ -984,24 +983,6 @@ describe('mobile save-feedback components', () => {
     expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
       'You are offline. Save when you reconnect.'
     )
-  })
-
-  it('HomeAddGarment onLayout updates StatusFeedbackBar primary action clearance automatically', async () => {
-    await render(
-      <SaveFeedbackProvider>
-        <HomeAddGarment />
-        <SaveActionButton testID="save-btn" onSave={() => true} />
-      </SaveFeedbackProvider>
-    )
-
-    fireEvent.click(screen.getByTestId('save-btn'))
-    const host = await screen.findByTestId('status-feedback-bar-host')
-    await waitFor(() => {
-      const bottom = Number.parseInt(host.style.bottom || '0', 10)
-      expect(bottom).toBeGreaterThan(
-        DEFAULT_MOBILE_TAB_BAR_HEIGHT + MOBILE_STATUS_BAR_GAP
-      )
-    })
   })
 
   it('covers network-status window events, probe aborts/timeouts/errors, unconfigured native fallback, and offline polling', async () => {

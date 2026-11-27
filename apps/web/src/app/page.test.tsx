@@ -2,16 +2,18 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Story CC-7.11 test owner (TEA): five desktop tabs in keyboard order (D1), Today title.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
-import { act, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, it, vi } from 'vitest'
 import { getI18n } from '../i18n'
 import Home from './page'
 
 // Story CC-7.11 D11: the top bar's back reads the router.
+const router = vi.hoisted(() => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }))
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
-  useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => router,
+  useSearchParams: () => new URLSearchParams(),
 }))
 
 it('puts the top-level destinations in keyboard order and offers a sample on Home', async () => {
@@ -43,16 +45,13 @@ it('puts the top-level destinations in keyboard order and offers a sample on Hom
 })
 
 afterEach(async () => {
-  await act(async () => {
-    await getI18n().changeLanguage('en-US')
-  })
+  cleanup()
+  await getI18n().changeLanguage('en-US')
 })
 
 // Story CC-7.9 P2-11: Home's legal navigation reads the catalogs; the documents stay English.
 it('7.9 P2-11 shows the legal links and their landmark in the reader language', async () => {
-  await act(async () => {
-    await getI18n().changeLanguage('de-DE')
-  })
+  await getI18n().changeLanguage('de-DE')
   render(<Home />)
 
   const legal = within(screen.getByRole('navigation', { name: 'Rechtliches' }))

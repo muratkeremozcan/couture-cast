@@ -254,21 +254,11 @@ describe('CC-7.10 evaluateScreenBudget', () => {
     expect(result.measures[0]?.limit).toBe(screenBudget.limits['primary-buttons'])
   })
 
-  it('[P1] [7.10-UNIT-008d] the checked-in known list holds web Today analytics-only; an empty known fails it', () => {
-    const entry = screenBudget.known.find(
-      (item) =>
-        item.platform === 'web' &&
-        item.screen === 'today' &&
-        item.fixture === 'populated' &&
-        item.rule === 'analytics-only'
-    )
-    expect(entry, 'checked-in web/today/populated analytics-only entry').toBeDefined()
-    const analyticsOnly = screenBudgetKnownKeys(entry!).map((key) => ({ key }))
-    expect(analyticsOnly.length).toBeGreaterThan(0)
-    const measured = audit({ analyticsOnly })
-    expect(evaluateScreenBudget(measured).failures).toEqual([])
-    const bare = evaluateScreenBudget(measured, screenBudget.limits, [])
-    expect(bare.failures.map((failure) => failure.rule)).toEqual(['analytics-only'])
+  it('[P1] [7.10-UNIT-008d] the checked-in known list rejects a returning Today analytics-only action', () => {
+    const measured = audit({ analyticsOnly: [{ key: 'cta-primary' }] })
+    expect(evaluateScreenBudget(measured).failures.map(({ rule }) => rule)).toEqual([
+      'analytics-only',
+    ])
   })
 })
 

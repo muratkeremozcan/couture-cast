@@ -143,7 +143,7 @@ test.describe('Story 6.5 hosted realtime on the protected preview', () => {
       socket.on('framereceived', ({ payload }) => frames.push(String(payload)))
     })
     await seedWebSession(page.context(), reader)
-    await page.goto('/')
+    await page.goto('/community')
     await expect
       .poll(() => frames.some((frame) => frame.startsWith('40/community')))
       .toBe(true)

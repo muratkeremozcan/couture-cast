@@ -3,6 +3,7 @@ appId: ${MAESTRO_APP_ID}
 # The harness opens a fresh app runtime first, so Home starts at its top here.
 - tapOn:
     id: tab-home
+- runFlow: ../subflows/open-today-outfit-details.yaml
 - runFlow:
     when:
       platform: iOS

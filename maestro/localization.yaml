@@ -39,8 +39,15 @@ tags:
     direction: DOWN
     visibilityPercentage: 100
 - assertVisible: 'Sabah gezisi'
+- scrollUntilVisible:
+    element:
+      id: 'weather-header'
+    direction: UP
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn:
+    id: 'weather-header'
 - assertVisible: 'Saatlik tahmin'
-- assertVisible: 'Genişlet (48 sa)'
 
 - takeScreenshot:
     path: maestro/artifacts/localization-tr-TR

@@ -89,6 +89,7 @@ test.describe('Member Home and Planner recovery', () => {
       await page.setViewportSize({ width: 390, height: 844 })
       await page.goto('/')
       const sample = page.getByTestId('member-sample-outfit')
+      await sample.getByText('Edit sample', { exact: true }).click()
       const outfit = sample.getByTestId('guest-preview-outfit')
       const name = sample.getByTestId('guest-preview-look-name')
       const first = await name.innerText()
@@ -119,7 +120,8 @@ test.describe('Member Home and Planner recovery', () => {
       await label.press('Enter')
       expect((await saved).status).toBe(201)
       const live = page.getByTestId('home-live-outfit')
-      await expect(live).toContainText('First use city')
+      await expect(live).toBeVisible()
+      await expect(page.getByTestId('weather-header')).toContainText('First use city')
       await expect(sample).toHaveCount(0)
     }
   )
@@ -140,7 +142,7 @@ test.describe('Member Home and Planner recovery', () => {
       await page.goto('/')
 
       const load = interceptNetworkCall({ method: 'GET', url: planner })
-      await page.getByTestId('planner-open-control').click()
+      await page.getByTestId('home-plan-week').click()
       // Story CC-7.12 D11: Plan week links to the Looks Plan segment.
       await expect(page).toHaveURL('/looks?segment=plan')
       const response = await load
@@ -188,7 +190,7 @@ test.describe('Member Home and Planner recovery', () => {
         url: planner,
         fulfillResponse: unavailable,
       })
-      await page.getByTestId('planner-open-control').click()
+      await page.getByTestId('home-plan-week').click()
       // Story CC-7.12 D11: Plan week links to the Looks Plan segment.
       await expect(page).toHaveURL('/looks?segment=plan')
       expect((await initial).status).toBe(503)
@@ -233,7 +235,8 @@ test.describe('Member Home and Planner recovery', () => {
       expect((await initial).status).toBe(503)
 
       const sample = page.getByTestId('member-sample-outfit')
-      await expect(sample).toContainText('Example weather and outfits')
+      await expect(sample.getByTestId('member-sample-label')).toHaveText('Sample look')
+      await sample.getByText('Edit sample', { exact: true }).click()
       const outfit = sample.getByTestId('guest-preview-outfit')
       const original = await outfit.getAttribute('data-look-id')
       expect(original).toBeTruthy()
@@ -250,6 +253,7 @@ test.describe('Member Home and Planner recovery', () => {
       const { outfits } = ritualResponseSchema.parse(response.responseJson).data
       expect(outfits.some((item) => item.garmentIds.length > 0)).toBe(true)
       const live = page.getByTestId('home-live-outfit')
+      await live.getByTestId('today-primary-action').click()
       await expect(live.getByTestId('share-card-open')).toBeVisible()
       await expect(sample).toHaveCount(0)
       await expect(page.getByTestId('home-outfit-retry')).toHaveCount(0)

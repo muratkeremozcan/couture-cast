@@ -13,71 +13,19 @@ tags:
 
 - runFlow: subflows/open-app.yaml
 
-# Story CC-7.11 D16: Today opens on the weather header and the outfit card; the morning,
-# midday and evening toggles follow the card, so scroll to them.
-- assertVisible:
-    id: 'outfit-recommendation-card'
-- scrollUntilVisible:
-    element:
-      id: 'scenario-toggles'
-    direction: DOWN
-    visibilityPercentage: 100
-- assertVisible:
-    id: 'scenario-toggles'
-- assertVisible: 'Morning commute'
-- assertVisible: 'Midday'
-- assertVisible: 'Evening plans'
-
-# The recommendation card and its comfort notes are asserted by testID, never by
-# their copy. The exact strings this flow used to assert ("Warm and sunny
-# midday. Light tee is perfect.") exist only in the mobile unit tests' MSW
-# handlers; the live API composes comfortNotes from the templates in
-# `ritual.service.ts`, so those assertions could never pass against a real
-# server and this flow could only ever have gone green against mocks.
-# (Scrolling to the toggles may have moved the card up; bring its notes back first.)
-- scrollUntilVisible:
-    element:
-      id: 'outfit-comfort-notes'
-    direction: UP
-- assertVisible:
-    id: 'outfit-recommendation-card'
-- assertVisible:
+# CC-7.13: Today's live details are collapsed until the primary action is pressed.
+- extendedWaitUntil:
+    visible:
+      id: 'today-primary-action'
+    timeout: 30000
+- assertNotVisible:
     id: 'outfit-comfort-notes'
-
-# Toggle Midday scenario
-- scrollUntilVisible:
-    element:
-      id: 'scenario-toggle-midday'
-    direction: DOWN
-    visibilityPercentage: 100
 - tapOn:
-    id: 'scenario-toggle-midday'
-    retryTapIfNoChange: true
-# The notes live in the card above the toggles (D16).
+    id: 'today-primary-action'
 - scrollUntilVisible:
     element:
       id: 'outfit-comfort-notes'
-    direction: UP
-- assertVisible:
-    id: 'outfit-comfort-notes'
-- takeScreenshot:
-    path: maestro/artifacts/hero-midday-scenario
-
-# Toggle Evening plans scenario
-- scrollUntilVisible:
-    element:
-      id: 'scenario-toggle-evening'
     direction: DOWN
-    visibilityPercentage: 100
-- tapOn:
-    id: 'scenario-toggle-evening'
-    retryTapIfNoChange: true
-# The notes live in the card above the toggles (D16).
-- scrollUntilVisible:
-    element:
-      id: 'outfit-comfort-notes'
-    direction: UP
-- assertVisible:
-    id: 'outfit-comfort-notes'
+    timeout: 15000
 - takeScreenshot:
-    path: maestro/artifacts/hero-evening-scenario
+    path: maestro/artifacts/hero-outfit-details

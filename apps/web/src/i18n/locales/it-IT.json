@@ -1038,6 +1038,30 @@
     }
   },
   "home": {
+    "today": {
+      "planWeek": "Pianifica la settimana",
+      "outfit": "Outfit di oggi",
+      "starterOutfit": "Outfit di base",
+      "outfitDetails": "Dettagli dell’outfit",
+      "sampleLook": "Outfit di esempio",
+      "editSample": "Modifica l’esempio",
+      "addFirstPiece": "Aggiungi il tuo primo capo",
+      "weatherUnavailable": "Meteo non disponibile",
+      "recentPieces": "Capi recenti",
+      "conditions": {
+        "clear": "Cielo sereno",
+        "partly_cloudy": "Parzialmente nuvoloso",
+        "cloudy": "Nuvoloso",
+        "fog": "Nebbia",
+        "drizzle": "Pioggerella",
+        "rain": "Pioggia",
+        "sleet": "Nevischio",
+        "snow": "Neve",
+        "thunderstorm": "Temporale",
+        "wind": "Ventoso",
+        "unknown": "Sconosciuto"
+      }
+    },
     "spotlightTeaser": {
       "heading": "Look in evidenza a {{label}}",
       "reactions": "{{count}} reazioni",

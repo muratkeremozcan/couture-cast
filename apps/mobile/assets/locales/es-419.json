@@ -1098,6 +1098,17 @@
     }
   },
   "home": {
+    "today": {
+      "planWeek": "Planificar la semana",
+      "outfit": "Conjunto de hoy",
+      "starterOutfit": "Conjunto inicial",
+      "outfitDetails": "Detalles del conjunto",
+      "sampleLook": "Conjunto de ejemplo",
+      "editSample": "Editar el ejemplo",
+      "addFirstPiece": "Agrega tu primera prenda",
+      "weatherUnavailable": "Pronóstico no disponible",
+      "recentPieces": "Prendas recientes"
+    },
     "spotlightTeaser": {
       "heading": "Look destacado en {{label}}",
       "reactions": "{{count}} reacciones",
@@ -1202,6 +1213,11 @@
     "hideList": "Ocultar looks guardados"
   },
   "shell": {
+    "legal": {
+      "label": "Información legal",
+      "privacy": "Política de privacidad",
+      "terms": "Términos del servicio"
+    },
     "back": "Atrás",
     "notFound": {
       "title": "Pantalla no encontrada",

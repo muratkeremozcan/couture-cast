@@ -119,7 +119,7 @@ describe('TabOneScreen identity change on a shared device', () => {
     {
       status: 400,
       message: 'No location preferences found for user',
-      action: 'hero-add-location',
+      action: 'home-set-city',
     },
     { status: 503, message: 'Unavailable', action: 'hero-retry' },
   ])(
@@ -140,7 +140,9 @@ describe('TabOneScreen identity change on a shared device', () => {
       await waitFor(() =>
         expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
       )
-      expect(screen.queryByTestId('weather-header')).toBeNull()
+      expect(screen.getByTestId('weather-header')).toBeVisible()
+      expect(screen.queryByTestId('current-temperature')).toBeNull()
+      expect(screen.queryByTestId('current-condition')).toBeNull()
     }
   )
 
@@ -150,6 +152,7 @@ describe('TabOneScreen identity change on a shared device', () => {
     const home = await render(<TabOneScreen />)
     const savedLookId = 'sample-open-sample:l:office-oxford'
 
+    await userEvent.click(await screen.findByTestId('home-edit-sample'))
     await userEvent.click(await screen.findByTestId('guest-preview-swap-shoes'))
     await userEvent.click(
       await screen.findByTestId('guest-preview-swap-option-white-sneakers')
@@ -161,6 +164,7 @@ describe('TabOneScreen identity change on a shared device', () => {
     await waitFor(() => expect(screen.getByTestId(savedLookId)).toBeVisible())
 
     act(() => setMobileApplicationUserId('member-b'))
+    await userEvent.click(await screen.findByTestId('home-edit-sample'))
     await waitFor(() => expect(screen.getByTestId('sample-save-look')).toBeVisible())
     expect(screen.queryByTestId('sample-saved-looks')).toBeNull()
     await waitFor(() =>
@@ -168,6 +172,7 @@ describe('TabOneScreen identity change on a shared device', () => {
     )
 
     act(() => setMobileApplicationUserId('member-a'))
+    await userEvent.click(await screen.findByTestId('home-edit-sample'))
     await waitFor(() =>
       expect(screen.getByTestId('guest-preview-garment-loafers')).toBeVisible()
     )
@@ -183,6 +188,7 @@ describe('TabOneScreen identity change on a shared device', () => {
     await waitFor(() => expect(screen.queryByTestId('sample-saved-looks')).toBeNull())
     await home.unmount()
     await render(<TabOneScreen />)
+    await userEvent.click(await screen.findByTestId('home-edit-sample'))
     await waitFor(() => expect(screen.getByTestId('sample-save-look')).toBeVisible())
     expect(screen.queryByTestId('sample-saved-looks')).toBeNull()
   })
@@ -196,6 +202,7 @@ describe('TabOneScreen identity change on a shared device', () => {
         <TabOneScreen />
       </SaveFeedbackProvider>
     )
+    await userEvent.click(await screen.findByTestId('home-edit-sample'))
     const save = await screen.findByTestId('sample-save-look')
     await userEvent.click(save)
     const remove = await screen.findByTestId('sample-remove-sample:l:office-oxford')
