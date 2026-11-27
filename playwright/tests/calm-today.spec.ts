@@ -48,7 +48,7 @@ test.describe('CC-7.13 Calm Today @local-lane', () => {
     await page.clock.setFixedTime(FIXED_NOW)
   })
 
-  test('[P0] [7.13-WEB-001/003/004] the outfit leads, one action opens details, and the rows follow in order', async ({
+  test('[P0] [7.13-WEB-001/003/004] the outfit leads with one primary action and the rows follow in order', async ({
     page,
     interceptNetworkCall,
   }) => {
@@ -102,11 +102,13 @@ test.describe('CC-7.13 Calm Today @local-lane', () => {
     expect(router.calls('community-feed')).toBe(0)
     expect(router.calls('community-spotlight')).toBe(0)
 
-    await expect(action).toHaveAttribute('aria-expanded', 'false')
-    await action.click()
-    await expect(action).toHaveAttribute('aria-expanded', 'true')
+    await expect(action).toHaveAccessibleName('Wear this')
+    const details = card.getByTestId('today-outfit-details')
+    await expect(details).toHaveAttribute('aria-expanded', 'false')
+    await details.click()
+    await expect(details).toHaveAttribute('aria-expanded', 'true')
     await expect(card.getByText(/comfort note for shell-visual-member/)).toBeVisible()
-    await action.click()
+    await details.click()
     await expect(card.getByText(/comfort note for shell-visual-member/)).toBeHidden()
 
     setScreen('looks')

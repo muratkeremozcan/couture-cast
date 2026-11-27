@@ -652,6 +652,7 @@ export interface SaveActionButtonProps
     UseSaveActionOptions {
   idleLabel?: string
   barPlacement?: 'floating' | 'inline'
+  primary?: boolean
 }
 
 export function SaveActionButton({
@@ -668,6 +669,7 @@ export function SaveActionButton({
   idleLabel,
   onAnnounce,
   barPlacement = 'floating',
+  primary = false,
   className = '',
   disabled,
   ...buttonProps
@@ -688,6 +690,10 @@ export function SaveActionButton({
   })
 
   const busy = isSaveFeedbackBusy(controller.state)
+  const visual =
+    primary && (controller.state === 'idle' || controller.state === 'offline')
+      ? 'border-primary bg-primary text-on-primary'
+      : STATE_BUTTON_STYLES[controller.state]
   const label = (() => {
     switch (controller.state) {
       case 'saving':
@@ -713,7 +719,7 @@ export function SaveActionButton({
         aria-busy={busy || undefined}
         aria-disabled={disabled || busy || undefined}
         data-save-state={controller.state}
-        className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors duration-150 motion-reduce:transition-none disabled:opacity-60 ${STATE_BUTTON_STYLES[controller.state]} ${className}`.trim()}
+        className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors duration-150 motion-reduce:transition-none disabled:opacity-60 ${visual} ${className}`.trim()}
         onClick={() => {
           if (disabled) return
           void controller.triggerSave()

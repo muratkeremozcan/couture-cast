@@ -1,0 +1,36 @@
+# Learning path Step 71: Today's outfit as a picture.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
+appId: ${MAESTRO_APP_ID}
+---
+- runScript:
+    file: set-today-visual-fixture.js
+- launchApp:
+    clearState: true
+    stopApp: true
+- runFlow: open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'today-primary-action'
+    timeout: 15000
+- runFlow:
+    when:
+      true: ${TODAY_VARIANT === 'missing'}
+    commands:
+      - runScript: verify-today-visual-photo-failure.js
+- assertVisible:
+    id: 'today-outfit-catalog-0'
+- assertVisible:
+    id: 'today-outfit-catalog-1'
+- assertVisible:
+    id: 'today-outfit-catalog-2'
+- assertNotVisible:
+    id: 'today-outfit-photo-0'
+- runFlow:
+    when:
+      true: ${TODAY_VARIANT === 'empty'}
+    commands:
+      - assertVisible:
+          id: 'home-add-garment'
+- runFlow:
+    file: shell-visual-tab.yaml
+    env: { TAB_ID: 'tab-home', TITLE: 'Today', SCHEME: 'light' }

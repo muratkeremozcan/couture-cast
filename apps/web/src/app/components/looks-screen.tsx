@@ -95,6 +95,26 @@ type FeedState = Sources & { error: string | null; settled: boolean }
 /** Snapshot part per filter (P9): both sources, under the session scope. */
 const snapshotPart = (filter: LooksFilter) => `feed:${filter}`
 
+function withoutTodayPhotoAccess(sources: Sources): Sources {
+  return {
+    ...sources,
+    looks: {
+      ...sources.looks,
+      items: sources.looks.items.map((look) =>
+        look.wornOn
+          ? {
+              ...look,
+              composition: look.composition.map((slot) => ({
+                ...slot,
+                imageAccess: null,
+              })),
+            }
+          : look
+      ),
+    },
+  }
+}
+
 function appendUnique<T extends { id: string }>(items: readonly T[], page: readonly T[]) {
   const seen = new Set(items.map((item) => item.id))
   return [...items, ...page.filter((item) => !seen.has(item.id))]
@@ -169,6 +189,7 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
           owner: owner === UNVERIFIED_BEARER_OWNER ? await profileId() : owner,
           sort: 'created_desc',
           source: filter === 'today' ? 'home_sample' : undefined,
+          includeToday: true,
           limit: PAGE_SIZE,
           offset,
           signal,
@@ -226,7 +247,12 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
         }
         const sources = { looks, capsules } as Sources
         setState({ ...sources, error: null, settled: true })
-        screenSnapshot.remember(scope, 'looks', snapshotPart(filter), sources)
+        screenSnapshot.remember(
+          scope,
+          'looks',
+          snapshotPart(filter),
+          withoutTodayPhotoAccess(sources)
+        )
       })
       .catch((error: unknown) => {
         if (!current()) return
@@ -291,10 +317,15 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
               loaded: true,
             },
           } as FeedState
-          screenSnapshot.remember(scope, 'looks', snapshotPart(filter), {
-            looks: updated.looks,
-            capsules: updated.capsules,
-          } satisfies Sources)
+          screenSnapshot.remember(
+            scope,
+            'looks',
+            snapshotPart(filter),
+            withoutTodayPhotoAccess({
+              looks: updated.looks,
+              capsules: updated.capsules,
+            })
+          )
           return updated
         })
       })

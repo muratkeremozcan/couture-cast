@@ -4,7 +4,11 @@ import { z } from 'zod'
 import { nonEmptyStringSchema, type RegisteredCommonHttpSchemas } from './common'
 import { supportedLocaleSchema } from './localization'
 import { weatherSnapshotSchema } from './weather'
-import { capsuleOccasionEnum, garmentCategoryEnum } from './wardrobe'
+import {
+  capsuleOccasionEnum,
+  garmentCategoryEnum,
+  garmentImageAccessSchema,
+} from './wardrobe'
 import { shopThisLookSchema } from './commerce'
 
 export const scenarioNameSchema = z.enum(['morning', 'midday', 'evening'])
@@ -29,6 +33,9 @@ export const scenarioOutfitSchema = z.object({
         category: garmentCategoryEnum
           .nullable()
           .describe('Garment category, or null when the garment is untagged.'),
+        imageAccess: garmentImageAccessSchema
+          .optional()
+          .describe('Ephemeral photo access scoped to the requesting wardrobe owner.'),
       })
     )
     .optional()
@@ -51,6 +58,12 @@ export const scenarioOutfitSchema = z.object({
   comfortNotes: z
     .string()
     .describe('Explanation string based on weather and comfort thresholds.'),
+  recommendationActionsAvailable: z
+    .boolean()
+    .optional()
+    .describe(
+      'False when the requesting member receives a catalog projection of a private recommendation.'
+    ),
   capsuleId: z
     .string()
     .nullable()

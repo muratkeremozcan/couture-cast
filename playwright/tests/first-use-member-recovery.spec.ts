@@ -253,7 +253,7 @@ test.describe('Member Home and Planner recovery', () => {
       const { outfits } = ritualResponseSchema.parse(response.responseJson).data
       expect(outfits.some((item) => item.garmentIds.length > 0)).toBe(true)
       const live = page.getByTestId('home-live-outfit')
-      await live.getByTestId('today-primary-action').click()
+      await live.getByTestId('today-outfit-details').click()
       await expect(live.getByTestId('share-card-open')).toBeVisible()
       await expect(sample).toHaveCount(0)
       await expect(page.getByTestId('home-outfit-retry')).toHaveCount(0)

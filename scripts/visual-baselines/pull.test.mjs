@@ -82,9 +82,9 @@ test('[7.9-VIS-U02b] native captures come from Maestro debug output, never the b
   assert.equal(fs.readFileSync(plan[0].source, 'utf8'), capture)
 })
 
-test('[7.9-VIS-U04] a short set is reported by name (Codex P1-1): ten per platform (five tabs, Story CC-7.11)', () => {
-  assert.equal(WEB_BASELINES.length, 10)
-  assert.equal(NATIVE_BASELINES.length, 10)
+test('[7.9-VIS-U04] a short set is reported by name, including Today variants', () => {
+  assert.equal(WEB_BASELINES.length, 12)
+  assert.equal(NATIVE_BASELINES.length, 12)
   const plan = NATIVE_BASELINES.slice(0, 3).map((name) => ({ name, source: name }))
   assert.deepEqual(missingBaselines(plan, NATIVE_BASELINES), NATIVE_BASELINES.slice(3))
   assert.deepEqual(missingBaselines(plan, []), [])
@@ -101,6 +101,14 @@ test('[7.9-VIS-U04] a short set is reported by name (Codex P1-1): ten per platfo
   )
   for (const tab of ['home', 'wardrobe', 'looks', 'community', 'profile'])
     assert.match(tabs, new RegExp(`NAME: '${tab}'`), tab)
+  const visualFlow = fs.readFileSync(
+    path.join(root, 'maestro/shell-visual-snapshots.yaml'),
+    'utf8'
+  )
+  for (const tab of ['home-missing-photo', 'home-empty-closet']) {
+    assert.match(visualFlow, new RegExp(`NAME: '${tab}'`), tab)
+    assert.ok(NATIVE_BASELINES.includes(`light-${tab}.png`))
+  }
 })
 
 test('[7.9-VIS-U03] the workflows export what the script reads', () => {

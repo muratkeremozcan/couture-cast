@@ -158,7 +158,7 @@ function parseCacheEntry(value: string | null): RitualCacheEntry | null {
     const alertPreferences = alertPreferencesSchema.safeParse(parsed.alertPreferences)
     return {
       timestamp: parsed.timestamp,
-      data: ritualResponseSchema.parse(parsed.data),
+      data: withoutShopThisLook(ritualResponseSchema.parse(parsed.data)),
       alertPreferences: alertPreferences.success ? alertPreferences.data : undefined,
     }
   } catch {
@@ -167,7 +167,7 @@ function parseCacheEntry(value: string | null): RitualCacheEntry | null {
 }
 
 /**
- * Story 5.1 decision 6: the affiliate block never enters the device cache.
+ * Affiliate offers and signed garment photo access stay out of the device cache.
  *
  * The screen serves this cache for fifteen minutes before it will touch the
  * network, and with no age bound at all when the network fails, so a persisted
@@ -188,6 +188,10 @@ export function withoutShopThisLook(response: RitualResponse): RitualResponse {
       outfits: response.data.outfits.map((outfit) => ({
         ...outfit,
         shopThisLook: null,
+        displayGarments: outfit.displayGarments?.map(({ id, category }) => ({
+          id,
+          category,
+        })),
       })),
     },
   }

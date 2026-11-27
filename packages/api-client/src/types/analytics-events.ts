@@ -592,7 +592,7 @@ const affiliateConversionStatusAnalyticsEnum = z.enum([
 export const affiliateCtaShownRecommendationEventSchema = z.object({
   partnerId: nonEmptyString.max(128),
   scenario: affiliateScenarioAnalyticsEnum,
-  surface: z.enum(['mobile_hero']),
+  surface: z.enum(['mobile_hero', 'web_hero']),
   localeRegion: affiliateLocaleRegionSchema,
   /**
    * The ScenarioOutfit.id. This is the once-per-payload dedupe key the client
@@ -2083,7 +2083,7 @@ const affiliateCtaShownRecommendationPropertiesSchema = z
   .object({
     partner_id: nonEmptyString.max(128),
     scenario: affiliateScenarioAnalyticsEnum,
-    surface: z.enum(['mobile_hero']),
+    surface: z.enum(['mobile_hero', 'web_hero']),
     locale_region: affiliateLocaleRegionSchema,
     recommendation_id: nonEmptyString.max(128),
   })
@@ -2163,7 +2163,7 @@ export function trackAffiliateCtaShown(
     distinctId,
     event: 'affiliate_cta_shown',
     properties: affiliateCtaShownPropertiesSchema.parse(
-      parsed.surface === 'mobile_hero'
+      'scenario' in parsed
         ? {
             partner_id: parsed.partnerId,
             scenario: parsed.scenario,

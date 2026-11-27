@@ -137,6 +137,16 @@ export class GuardianConsentStateService {
     return allowed
   }
 
+  async canTeenViewPrivateGarmentPhotos(userId: string): Promise<boolean> {
+    const profile = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { profile: { select: { preferences: true } } },
+    })
+    return (
+      extractComplianceState(profile?.profile?.preferences).accountStatus === 'active'
+    )
+  }
+
   markTeenAccessGranted(userId: string) {
     const expiresAt = Date.now() + TEEN_ACCESS_CACHE_TTL_MS
     this.teenAccessCache.set(userId, {

@@ -237,8 +237,9 @@ export async function mockStyleWardrobe(
     const created: SavedLookContract = {
       id: `saved-look-mock-${savedLookSeq++}`,
       ownerUserId: owner,
-      source: input.source,
+      source: input.source === 'today' ? 'home_sample' : input.source,
       lookId: input.lookId,
+      ...(input.wornOn ? { wornOn: input.wornOn } : {}),
       weather: input.weather,
       title: input.title ?? null,
       anchorGarmentId: input.anchorGarmentId ?? null,

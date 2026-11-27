@@ -665,15 +665,19 @@ it('retries a failed recommendation, shows the verified city, and keeps the chos
     await within(screen.getByTestId('weather-header')).findByText(homeCity.label)
   ).toBeVisible()
   expect(within(screen.getByTestId('weather-header')).getByText('70°F')).toBeVisible()
-  await user.click(within(live).getByTestId('today-primary-action'))
+  await user.click(within(live).getByTestId('today-outfit-details'))
   expect(within(live).queryByRole('button', { name: 'Morning' })).toBeNull()
   expect(within(live).getByRole('button', { name: 'Midday' })).toHaveAttribute(
     'aria-pressed',
     'true'
   )
-  expect(within(live).getByText('Outerwear')).toBeVisible()
-  expect(within(live).getByText('Outfit')).toBeVisible()
-  expect(within(live).queryByText('uncategorized-id')).toBeNull()
+  expect(within(live).getByRole('button', { name: /swap.*outer layer/i })).toBeVisible()
+  expect(within(live).getByTestId('today-outfit-slot-1')).toHaveAccessibleName(
+    /swap.*top/i
+  )
+  expect(within(live).getByTestId('today-outfit-slot-1')).not.toHaveAccessibleName(
+    /uncategorized-id/i
+  )
   expect(screen.getByText('Wind advisory')).toBeVisible()
   await user.click(within(live).getByRole('button', { name: 'Evening' }))
   expect(within(live).getByText('evening comfort note')).toBeVisible()
@@ -706,13 +710,12 @@ it('shows the starter wardrobe entry even when saved-city lookup fails', async (
   publishMember('starter-member')
   renderHome()
 
-  await userEvent.setup().click(await screen.findByTestId('today-primary-action'))
-  expect(await screen.findByText('Starter wardrobe pick')).toBeVisible()
+  expect(await screen.findByTestId('today-outfit-catalog-0')).toBeVisible()
   expect(await screen.findByTestId('home-add-garment')).toHaveAttribute(
     'href',
     '/wardrobe?entry=add'
   )
-  expect(screen.getByText('Top')).toBeVisible()
+  expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(/swap.*top/i)
   expect(screen.queryByTestId('home-outfit-retry')).toBeNull()
   await waitFor(() =>
     expect(reads).toHaveBeenCalledExactlyOnceWith('Bearer bearer-starter-member')

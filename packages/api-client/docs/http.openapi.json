@@ -3713,6 +3713,25 @@
                     null
                   ],
                   "description": "Garment category, or null when the garment is untagged."
+                },
+                "imageAccess": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Ephemeral photo access scoped to the requesting wardrobe owner."
                 }
               },
               "required": [
@@ -3757,6 +3776,10 @@
           "comfortNotes": {
             "type": "string",
             "description": "Explanation string based on weather and comfort thresholds."
+          },
+          "recommendationActionsAvailable": {
+            "type": "boolean",
+            "description": "False when the requesting member receives a catalog projection of a private recommendation."
           },
           "capsuleId": {
             "type": [
@@ -4082,6 +4105,25 @@
                               null
                             ],
                             "description": "Garment category, or null when the garment is untagged."
+                          },
+                          "imageAccess": {
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "expiresAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "expiresAt"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Ephemeral photo access scoped to the requesting wardrobe owner."
                           }
                         },
                         "required": [
@@ -4126,6 +4168,10 @@
                     "comfortNotes": {
                       "type": "string",
                       "description": "Explanation string based on weather and comfort thresholds."
+                    },
+                    "recommendationActionsAvailable": {
+                      "type": "boolean",
+                      "description": "False when the requesting member receives a catalog projection of a private recommendation."
                     },
                     "capsuleId": {
                       "type": [
@@ -7186,7 +7232,8 @@
             "type": "string",
             "enum": [
               "style_piece",
-              "home_sample"
+              "home_sample",
+              "today"
             ]
           },
           "lookId": {
@@ -7198,6 +7245,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 32
+          },
+          "wornOn": {
+            "type": "string",
+            "format": "date",
+            "description": "Today date in the forecast timezone."
           },
           "title": {
             "type": [
@@ -7396,7 +7448,7 @@
           "composition"
         ],
         "additionalProperties": false,
-        "description": "Composition slotIndex values must be unique and sequential starting from 0. style_piece requires anchorGarmentId and a matching anchorSnapshot; home_sample omits both anchors and cannot reference wardrobe garment slots."
+        "description": "Composition slotIndex values must be unique and sequential starting from 0. style_piece requires anchorGarmentId and a matching anchorSnapshot. home_sample uses catalog slots. today requires wornOn and a dated lookId."
       },
       "SavedLookResponse": {
         "type": "object",
@@ -7428,6 +7480,11 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 32
+              },
+              "wornOn": {
+                "type": "string",
+                "format": "date",
+                "description": "Present on Today snapshots, which use the home_sample response source for compatibility."
               },
               "title": {
                 "type": [
@@ -7742,6 +7799,11 @@
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 32
+                },
+                "wornOn": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Present on Today snapshots, which use the home_sample response source for compatibility."
                 },
                 "title": {
                   "type": [
@@ -8190,6 +8252,7 @@
         "type": "string",
         "enum": [
           "mobile_hero",
+          "web_hero",
           "palette_advisor",
           "community_feed",
           "community_spotlight",
@@ -8336,6 +8399,7 @@
             "type": "string",
             "enum": [
               "mobile_hero",
+              "web_hero",
               "palette_advisor",
               "community_feed",
               "community_spotlight",
@@ -12514,6 +12578,10 @@
                       "type": "string",
                       "description": "Explanation string based on weather and comfort thresholds."
                     },
+                    "recommendationActionsAvailable": {
+                      "type": "boolean",
+                      "description": "False when the requesting member receives a catalog projection of a private recommendation."
+                    },
                     "capsuleId": {
                       "type": [
                         "string",
@@ -12835,6 +12903,10 @@
                               "comfortNotes": {
                                 "type": "string",
                                 "description": "Explanation string based on weather and comfort thresholds."
+                              },
+                              "recommendationActionsAvailable": {
+                                "type": "boolean",
+                                "description": "False when the requesting member receives a catalog projection of a private recommendation."
                               },
                               "capsuleId": {
                                 "type": [
@@ -13224,6 +13296,10 @@
                         "comfortNotes": {
                           "type": "string",
                           "description": "Explanation string based on weather and comfort thresholds."
+                        },
+                        "recommendationActionsAvailable": {
+                          "type": "boolean",
+                          "description": "False when the requesting member receives a catalog projection of a private recommendation."
                         },
                         "capsuleId": {
                           "type": [
@@ -24159,6 +24235,19 @@
             "description": "Opt in to colorFamily on each garment. Omission, or any other value, preserves the strict legacy response.",
             "name": "x-couture-garment-color",
             "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ],
+              "description": "Today wardrobe read with private photos gated on active guardian consent."
+            },
+            "required": false,
+            "description": "Today wardrobe read with private photos gated on active guardian consent.",
+            "name": "x-couture-today-wardrobe",
+            "in": "header"
           }
         ],
         "responses": {
@@ -26088,11 +26177,25 @@
               "type": "string",
               "enum": [
                 "style_piece",
-                "home_sample"
+                "home_sample",
+                "today"
               ]
             },
             "required": false,
             "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ],
+              "description": "Opt into Today snapshots in an unfiltered list or alongside home_sample rows."
+            },
+            "required": false,
+            "description": "Opt into Today snapshots in an unfiltered list or alongside home_sample rows.",
+            "name": "includeToday",
             "in": "query"
           },
           {

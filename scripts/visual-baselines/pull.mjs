@@ -21,6 +21,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { NATIVE_SCREENS } from './compare-native.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -41,9 +42,8 @@ export function webBaselineName(actualName) {
   return match ? `${match[1]}-chromium-linux.png` : null
 }
 
-/** `dark-home.png` from the flow's takeScreenshot; anything else is not a snapshot. */
 export function nativeBaselineName(name) {
-  return /^(light|dark)-[a-z]+\.png$/.test(name) ? name : null
+  return name.endsWith('.png') && NATIVE_SCREENS.includes(name.slice(0, -4)) ? name : null
 }
 
 const filesUnder = (dir) =>
@@ -55,17 +55,16 @@ const filesUnder = (dir) =>
     : []
 
 /** Every web baseline the snapshot spec takes (7.9-VIS-001..008, Story CC-7.11 Looks). */
-export const WEB_BASELINES = ['light', 'dark'].flatMap((scheme) =>
-  ['home', 'closet', 'looks', 'community', 'profile'].map(
-    (tab) => `${tab}-${scheme}-chromium-linux.png`
-  )
-)
-/** Every native capture of the visual flow (7.9-NVIS-001..008, Story CC-7.11 Looks). */
-export const NATIVE_BASELINES = ['light', 'dark'].flatMap((scheme) =>
-  ['home', 'wardrobe', 'looks', 'community', 'profile'].map(
-    (tab) => `${scheme}-${tab}.png`
-  )
-)
+export const WEB_BASELINES = [
+  ...['light', 'dark'].flatMap((scheme) =>
+    ['home', 'closet', 'looks', 'community', 'profile'].map(
+      (tab) => `${tab}-${scheme}-chromium-linux.png`
+    )
+  ),
+  'home-empty-closet-light-chromium-linux.png',
+  'home-missing-photo-light-chromium-linux.png',
+]
+export const NATIVE_BASELINES = NATIVE_SCREENS.map((name) => `${name}.png`)
 
 /**
  * The copies to make: every captured snapshot under `downloaded`, from folders called `folder`,

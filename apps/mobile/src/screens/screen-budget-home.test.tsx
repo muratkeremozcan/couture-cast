@@ -12,6 +12,8 @@
 // Learning path Step 70: Calm Today with one primary job.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-70-calm-today-with-one-primary-job
 // Test design: _bmad-output/test-artifacts/test-design-7-13-calm-today-one-primary-job.md.
+// Learning path Step 71: Today's outfit as a picture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
 import {
   type CapturedTabLayout,
@@ -299,6 +301,84 @@ describe('Screen budget: native Today', () => {
     vi.useRealTimers()
   })
 
+  it('[P0] [7.14-PIC-001/004/005] native reserves the mixed outfit and counts its 44 dp slots as tiles', async () => {
+    await setFoldViewport()
+    serveScreenBudgetFixture('populated', MEMBER)
+    const url = `${window.location.origin}/__today-test/private-top.png`
+    let release = () => undefined as void
+    const imageGate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let requested = false
+    const photo = Uint8Array.from(
+      atob(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+      ),
+      (byte) => byte.charCodeAt(0)
+    )
+    server.use(
+      http.get(url, async () => {
+        requested = true
+        await imageGate
+        return HttpResponse.arrayBuffer(photo.buffer, {
+          headers: { 'content-type': 'image/png' },
+        })
+      }),
+      http.get('*/api/v1/ritual', () =>
+        HttpResponse.json({
+          data: {
+            ...mockRitualResponse.data,
+            outfits: mockRitualResponse.data.outfits.map((outfit) => ({
+              ...outfit,
+              garmentIds: ['member-top', 'default-bottom', 'default-shoes'],
+              displayGarments: [
+                {
+                  id: 'member-top',
+                  category: 'top',
+                  imageAccess: {
+                    url,
+                    expiresAt: new Date(Date.now() + 900_000).toISOString(),
+                  },
+                },
+              ],
+            })),
+          },
+        })
+      )
+    )
+
+    const bounds = (elements: HTMLElement[]) =>
+      elements.map((element) => {
+        const { x, y, width, height } = element.getBoundingClientRect()
+        return { x, y, width, height }
+      })
+    let before: ReturnType<typeof bounds>
+    let tracked: HTMLElement[]
+    try {
+      renderToday(WithFoldScene)
+      await todaySettled('populated')
+      const picture = await screen.findByTestId('today-outfit-picture')
+      const slots = within(picture).getAllByRole('button')
+      expect(slots).toHaveLength(3)
+      await waitFor(() => expect(requested).toBe(true))
+      expect(screen.getByTestId('today-outfit-catalog-0')).toBeVisible()
+      expect(screen.getByTestId('today-outfit-catalog-1')).toBeVisible()
+      expect(screen.getByTestId('today-outfit-catalog-2')).toBeVisible()
+      for (const { width, height } of bounds(slots)) {
+        expect(width).toBeGreaterThanOrEqual(44)
+        expect(height).toBeGreaterThanOrEqual(44)
+      }
+      tracked = [picture, ...slots, screen.getByTestId('today-primary-action')]
+      before = bounds(tracked)
+      expect((await measureNativeScreen('today')).stats.tileTargets).toBe(3)
+    } finally {
+      release()
+    }
+    expect(await screen.findByTestId('today-outfit-photo-0')).toBeVisible()
+    expect(screen.queryByTestId('today-outfit-catalog-0')).toBeNull()
+    expect(bounds(tracked)).toEqual(before)
+  }, 30_000)
+
   for (const [id, fixture] of AUDITS) {
     it(`[P0] [${id}] native today (${fixture}) is within the screen budget`, async () => {
       serveScreenBudgetFixture(fixture, MEMBER)
@@ -412,7 +492,7 @@ describe('Screen budget: native Today', () => {
     expect(within(periods).queryByRole('tablist')).toBeNull()
     press(picker)
     expect(within(periods).getAllByRole('tab')).toHaveLength(3)
-    press(screen.getByTestId('today-primary-action'))
+    press(screen.getByTestId('today-outfit-details'))
     expect(screen.getByTestId('outfit-comfort-notes').textContent).toMatch(/trench coat/i)
     press(within(periods).getByTestId('scenario-toggle-midday'))
     expect(within(periods).getByTestId('scenario-toggle-midday')).toHaveAttribute(

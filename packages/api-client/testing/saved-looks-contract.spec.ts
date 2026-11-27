@@ -1,5 +1,7 @@
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
+// Learning path Step 71: Today's outfit as a picture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
 import { describe, expect, it } from 'vitest'
 import {
   createSavedLookInputSchema,
@@ -68,6 +70,55 @@ const VALID_STYLE_PIECE_INPUT = {
   ],
   swaps: {},
 }
+
+describe('Today saved look compatibility', () => {
+  const input = {
+    ...VALID_STYLE_PIECE_INPUT,
+    source: 'today',
+    lookId: 'today:2026-11-20:morning',
+    wornOn: '2026-11-20',
+    weather: 'clear',
+    anchorGarmentId: null,
+    anchorSnapshot: null,
+  }
+
+  it('accepts an ordered mixed composition with a matching local date', () => {
+    const parsed = createSavedLookInputSchema.parse(input)
+
+    expect(parsed.wornOn).toBe('2026-11-20')
+    expect(
+      parsed.composition.map(({ slotIndex, itemId }) => [slotIndex, itemId])
+    ).toEqual([
+      [0, 'garment-1'],
+      [1, 'sample:g:midi-skirt'],
+    ])
+  })
+
+  it.each([undefined, '2026-11-21', '2026-02-30'])(
+    'rejects invalid Today date %s',
+    (wornOn) => {
+      expect(createSavedLookInputSchema.safeParse({ ...input, wornOn }).success).toBe(
+        false
+      )
+    }
+  )
+
+  it('keeps existing list queries compatible and accepts the explicit Today opt-in', () => {
+    expect(listSavedLooksQuerySchema.parse({ source: 'home_sample' })).toEqual({
+      source: 'home_sample',
+      limit: 50,
+      offset: 0,
+    })
+    expect(listSavedLooksQuerySchema.parse({ includeToday: 'true' })).toEqual({
+      includeToday: 'true',
+      limit: 50,
+      offset: 0,
+    })
+    expect(listSavedLooksQuerySchema.safeParse({ includeToday: 'false' }).success).toBe(
+      false
+    )
+  })
+})
 
 describe('saved-looks HTTP contracts', () => {
   it('accepts valid home_sample and style_piece inputs and normalizes titles', () => {

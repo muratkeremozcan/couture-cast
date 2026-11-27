@@ -6,7 +6,10 @@ export function SampleGarmentArt({
   label,
   className = 'h-20 w-20',
 }: {
-  garment: Pick<SampleGarment, 'art' | 'category'>
+  garment: {
+    art: { key: string; primary: string; secondary: string }
+    category: SampleGarment['category']
+  }
   /** Accessible description; omit when adjacent text already names the garment. */
   label?: string
   className?: string

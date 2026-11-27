@@ -450,6 +450,7 @@ function storedTagsMatch(
  * Without it the garment keeps the strict legacy shape, key for key.
  */
 export interface GarmentReadOptions {
+  today?: boolean
   includeColor?: boolean
 }
 
@@ -667,6 +668,7 @@ export class WardrobeService {
         object_path: { not: null },
         retention_status: 'active',
         upload_status: { in: ['processing', 'awaiting_tags', 'ready', 'failed'] },
+        ...(options.today ? { deletion_requested_at: null } : {}),
       },
       orderBy: { created_at: 'desc' },
       take: 100,

@@ -3,7 +3,7 @@ appId: ${MAESTRO_APP_ID}
 ---
 - scrollUntilVisible:
     element:
-      id: 'today-primary-action'
+      id: 'today-outfit-details'
     direction: UP
     timeout: 30000
 - runFlow:
@@ -12,4 +12,4 @@ appId: ${MAESTRO_APP_ID}
         id: 'outfit-comfort-notes'
     commands:
       - tapOn:
-          id: 'today-primary-action'
+          id: 'today-outfit-details'

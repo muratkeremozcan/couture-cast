@@ -101,6 +101,7 @@ enum CapsuleOccasion {
 enum SavedLookSource {
   style_piece
   home_sample
+  today
 }
 
 enum GarmentUploadStatus {
@@ -2385,6 +2386,7 @@ model SavedLook {
   source                   SavedLookSource
   look_id                  String
   weather                  String
+  worn_on                  DateTime?       @db.Date
   title                    String?
   anchor_garment_id        String?
   anchor_snapshot          Json?

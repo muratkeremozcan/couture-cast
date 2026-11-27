@@ -144,7 +144,9 @@ describe('TabOneScreen degraded and native-only paths', () => {
     await renderScreen()
 
     await waitFor(() => {
-      expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     })
     expect(screen.queryByTestId('hero-error-state')).toBeNull()
     await waitFor(() => {
@@ -157,18 +159,21 @@ describe('TabOneScreen degraded and native-only paths', () => {
 
     await renderScreen()
     await waitFor(() => {
-      expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     })
 
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
-    fireEvent.click(screen.getByTestId('garment-tile-classic-trench-coat'))
+    fireEvent.click(screen.getByTestId('today-outfit-slot-0'))
     await waitFor(() => {
-      expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-swap')).toBeTruthy()
     })
-    fireEvent.click(screen.getByTestId('swap-option-denim-jacket'))
+    fireEvent.click(screen.getByTestId('today-outfit-swap-option-1'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('garment-tile-denim-jacket')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /denim jacket/i
+      )
     })
     expect(mockCapture).toHaveBeenCalledWith(
       'hero_interaction',
@@ -183,9 +188,11 @@ describe('TabOneScreen degraded and native-only paths', () => {
 
     await renderScreen()
 
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
     await waitFor(() => {
-      expect(screen.getByTestId('garment-tile-crewneck-sweater')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /merino sweater/i
+      )
     })
     expect(mockCapture).toHaveBeenCalledWith(
       'hero_interaction',
@@ -246,14 +253,15 @@ describe('TabOneScreen degraded and native-only paths', () => {
 
     await renderScreen()
     await waitFor(() => {
-      expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     })
 
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
-    fireEvent.click(screen.getByTestId('garment-tile-classic-trench-coat'))
+    fireEvent.click(screen.getByTestId('today-outfit-slot-0'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-swap')).toBeTruthy()
     })
     await waitFor(() => {
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledWith(
@@ -261,28 +269,29 @@ describe('TabOneScreen degraded and native-only paths', () => {
       )
     })
     // The sheet must still be dismissible after the native focus attempt.
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     await waitFor(() => {
-      expect(screen.queryByTestId('garment-swap-modal')).toBeNull()
+      expect(screen.queryByTestId('today-outfit-swap')).toBeNull()
     })
   })
 
   it('R52 the swap sheet covers the system bars and stays above the gesture bar', async () => {
     await renderScreen()
     await waitFor(() => {
-      expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     })
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
-    fireEvent.click(screen.getByTestId('garment-tile-classic-trench-coat'))
+    fireEvent.click(screen.getByTestId('today-outfit-slot-0'))
     await waitFor(() => {
-      expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-swap')).toBeTruthy()
     })
     expect(modalRenders.filter((props) => props.visible).at(-1)).toMatchObject({
       ...EDGE_TO_EDGE_MODAL_PROPS,
       transparent: true,
     })
-    expect(paddingBottomOf(screen.getByTestId('garment-swap-modal'))).toBe(
-      20 + TEST_SAFE_AREA_INSETS.bottom
+    expect(paddingBottomOf(screen.getByTestId('today-outfit-swap'))).toBe(
+      16 + TEST_SAFE_AREA_INSETS.bottom
     )
   })
 
@@ -311,7 +320,7 @@ describe('TabOneScreen degraded and native-only paths', () => {
       await i18n.changeLanguage('tr-TR')
     })
     await waitFor(() => {
-      expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(/trençkot/i)
     })
 
     releaseSupersededLoad()
@@ -320,6 +329,6 @@ describe('TabOneScreen degraded and native-only paths', () => {
     })
 
     expect(screen.queryByTestId('hero-error-state')).toBeNull()
-    expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+    expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(/trençkot/i)
   })
 })

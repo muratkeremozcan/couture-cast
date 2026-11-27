@@ -119,6 +119,7 @@ export function useLooksFeed({
       listSavedLooksPageFromMobile({
         accessToken: token,
         source: filter === 'today' ? 'home_sample' : undefined,
+        includeToday: true,
         sort: 'created_desc',
         limit: LOOKS_FEED_PAGE,
         offset,

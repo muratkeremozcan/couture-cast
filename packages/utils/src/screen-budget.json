@@ -34,6 +34,7 @@
   "tileSelectors": {
     "web": [
       "[data-testid^=\"garment-card-\"]",
+      "[data-testid^=\"today-outfit-slot-\"]",
       "[data-testid^=\"saved-look-card-\"]",
       "[data-testid^=\"looks-capsule-card-\"]",
       "[data-testid^=\"looks-idea-card-\"]",
@@ -42,6 +43,7 @@
     "native": [
       "[data-testid^=\"garment-card-\"]",
       "[data-testid^=\"garment-tile-\"]",
+      "[data-testid^=\"today-outfit-slot-\"]",
       "[data-testid^=\"saved-look-card-\"]",
       "[data-testid^=\"looks-capsule-card-\"]",
       "[data-testid^=\"looks-idea-card-\"]",

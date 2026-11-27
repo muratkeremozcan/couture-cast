@@ -32,7 +32,7 @@ tags:
       id: 'outfit-recommendation-card'
     timeout: 30000
 - tapOn:
-    id: 'today-primary-action'
+    id: 'today-outfit-details'
 
 # --- AC 1: the CTA renders, disclosed, on an eligible card -------------------
 
@@ -171,7 +171,7 @@ tags:
       id: 'outfit-recommendation-card'
     timeout: 30000
 - tapOn:
-    id: 'today-primary-action'
+    id: 'today-outfit-details'
 
 # Scroll to where the block would be before asserting it is not there.
 #
@@ -208,7 +208,7 @@ tags:
       id: 'outfit-recommendation-card'
     timeout: 30000
 - tapOn:
-    id: 'today-primary-action'
+    id: 'today-outfit-details'
 
 - runFlow: subflows/scroll-to-card-bottom.yaml
 
@@ -255,10 +255,10 @@ tags:
 - runFlow: subflows/open-app.yaml
 - extendedWaitUntil:
     visible:
-      id: 'today-primary-action'
+      id: 'today-outfit-details'
     timeout: 30000
 - tapOn:
-    id: 'today-primary-action'
+    id: 'today-outfit-details'
 
 - scrollUntilVisible:
     element:

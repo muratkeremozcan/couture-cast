@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 // Learning path Step 61: Import device-saved looks for the same member.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
+// Learning path Step 71: Today's outfit as a picture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
 import {
   ConflictException,
   ForbiddenException,
@@ -36,6 +38,7 @@ function makeSavedLookRow(overrides: Partial<SavedLook> = {}): SavedLook {
     user_id: 'user-1',
     source: 'style_piece',
     look_id: 'look-01',
+    worn_on: null,
     weather: 'warm-rainy',
     title: null,
     anchor_garment_id: 'garment-1',
@@ -168,18 +171,150 @@ function createHarness() {
   const signReadUrl = vi.fn().mockResolvedValue('https://storage.example.test/signed.png')
   const storage = { signReadUrl } as unknown as WardrobeStorage
   const canTeenAccess = vi.fn().mockResolvedValue(true)
+  const canTeenViewPrivateGarmentPhotos = vi.fn().mockResolvedValue(true)
   const guardianConsentStateService = {
     canTeenAccess,
+    canTeenViewPrivateGarmentPhotos,
   } as unknown as GuardianConsentStateService
   const service = new WardrobeSavedLookService(
     prisma as unknown as PrismaClient,
     storage,
     guardianConsentStateService
   )
-  return { prisma, storage, signReadUrl, canTeenAccess, service }
+  return {
+    prisma,
+    storage,
+    signReadUrl,
+    canTeenAccess,
+    canTeenViewPrivateGarmentPhotos,
+    service,
+  }
 }
 
 describe('WardrobeSavedLookService', () => {
+  it('[7.14-PIC-005] keeps legacy lists compatible and opts Today into the home filter', async () => {
+    const { prisma, service } = createHarness()
+    const input = createSavedLookInputSchema.parse({
+      source: 'today',
+      lookId: 'today:2026-11-20:fixture',
+      wornOn: '2026-11-20',
+      weather: 'clear',
+      composition: [
+        { slotIndex: 0, category: 'top', kind: 'catalog', itemId: 'sample:g:cotton-tee' },
+      ],
+    })
+    const row = makeSavedLookRow({
+      source: 'today',
+      look_id: input.lookId,
+      worn_on: new Date('2026-11-20T00:00:00.000Z'),
+      weather: input.weather,
+      anchor_garment_id: null,
+      anchor_snapshot: null,
+      composition: input.composition.map((slot) => ({ ...slot, label: null })),
+      swaps: {},
+    })
+    prisma.savedLook.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([row])
+    prisma.savedLook.count.mockResolvedValueOnce(0).mockResolvedValueOnce(1)
+
+    const legacy = await service.listSavedLooks(ACTOR, { limit: 50, offset: 0 })
+    expect(legacy.data).toEqual([])
+    expect(prisma.savedLook.findMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: { user_id: ACTOR.userId, deleted_at: null, source: { not: 'today' } },
+      })
+    )
+
+    const current = await service.listSavedLooks(ACTOR, {
+      source: 'home_sample',
+      includeToday: 'true',
+      limit: 50,
+      offset: 0,
+    })
+    expect(prisma.savedLook.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: {
+          user_id: ACTOR.userId,
+          deleted_at: null,
+          source: { in: ['home_sample', 'today'] },
+        },
+      })
+    )
+    expect(current.data).toMatchObject([
+      {
+        source: 'home_sample',
+        wornOn: '2026-11-20',
+        availabilityStatus: 'ready',
+        composition: [
+          {
+            slotIndex: 0,
+            category: 'top',
+            kind: 'catalog',
+            itemId: 'sample:g:cotton-tee',
+          },
+        ],
+      },
+    ])
+  })
+
+  it('[7.14-PIC-002/005] a pending teen can wear a catalog Today look and cannot attach a garment', async () => {
+    const { prisma, service, canTeenViewPrivateGarmentPhotos, signReadUrl } =
+      createHarness()
+    const teen: RequestAuthContext = { ...ACTOR, role: 'teen' }
+    canTeenViewPrivateGarmentPhotos.mockResolvedValue(false)
+    const common = {
+      source: 'today',
+      lookId: 'today:2026-11-20:fixture',
+      wornOn: '2026-11-20',
+      weather: 'clear',
+    }
+    const garmentInput = createSavedLookInputSchema.parse({
+      ...common,
+      composition: [
+        { slotIndex: 0, category: 'top', kind: 'garment', itemId: 'garment-1' },
+      ],
+    })
+    await expect(service.createSavedLook(teen, garmentInput)).rejects.toThrow(
+      ForbiddenException
+    )
+    expect(prisma.garmentItem.findMany).not.toHaveBeenCalled()
+    expect(prisma.savedLook.create).not.toHaveBeenCalled()
+
+    const catalogInput = createSavedLookInputSchema.parse({
+      ...common,
+      composition: [
+        { slotIndex: 0, category: 'top', kind: 'catalog', itemId: 'sample:g:cotton-tee' },
+      ],
+    })
+    prisma.savedLook.create.mockResolvedValueOnce(
+      makeSavedLookRow({
+        source: 'today',
+        look_id: catalogInput.lookId,
+        worn_on: new Date('2026-11-20T00:00:00.000Z'),
+        weather: catalogInput.weather,
+        anchor_garment_id: null,
+        anchor_snapshot: null,
+        composition: catalogInput.composition.map((slot) => ({ ...slot, label: null })),
+        swaps: {},
+      })
+    )
+    const created = await service.createSavedLook(teen, catalogInput)
+    expect(prisma.savedLook.create.mock.calls).toMatchObject([
+      [
+        {
+          data: {
+            user_id: teen.userId,
+            source: 'today',
+            worn_on: new Date('2026-11-20T00:00:00.000Z'),
+          },
+        },
+      ],
+    ])
+    expect(created.data).toMatchObject({ source: 'home_sample', wornOn: '2026-11-20' })
+    expect(signReadUrl).not.toHaveBeenCalled()
+  })
+
   it('formats and parses strong ETags and If-Match headers including multi-tag lists', () => {
     expect(formatSavedLookETag('sl-1', 2)).toBe('"saved-look:sl-1:2"')
     expect(parseSavedLookIfMatchHeader('*', 'sl-1')).toBeNull()

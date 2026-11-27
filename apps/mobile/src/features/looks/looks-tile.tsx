@@ -4,6 +4,7 @@
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 import { Children, useState, type ReactNode } from 'react'
+import { Image as ExpoImage } from 'expo-image'
 import { useTranslation } from 'react-i18next'
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import type {
@@ -30,7 +31,12 @@ const CELL_ART_SIZE = 44
 
 /** One collage cell: a member photo, catalog art or the dashed placeholder. */
 export type LooksTileCell =
-  | { readonly key: string; readonly kind: 'photo'; readonly url: string }
+  | {
+      readonly key: string
+      readonly kind: 'photo'
+      readonly url: string
+      readonly ephemeral?: boolean
+    }
   | { readonly key: string; readonly kind: 'art'; readonly garment: SampleGarment }
   | { readonly key: string; readonly kind: 'placeholder' }
 
@@ -53,7 +59,12 @@ export function savedLookCells(look: SavedLookContract): LooksTileCell[] {
       if (slot.missing || !slot.imageAccess?.url || !usable(slot.imageAccess.expiresAt)) {
         return { key, kind: 'placeholder' }
       }
-      return { key, kind: 'photo', url: slot.imageAccess.url }
+      return {
+        key,
+        kind: 'photo',
+        url: slot.imageAccess.url,
+        ephemeral: Boolean(look.wornOn),
+      }
     })
 }
 
@@ -105,10 +116,14 @@ function Cell({ cell }: { cell: LooksTileCell | null }) {
   const box = [styles.cell, { backgroundColor: colors.cardMuted }]
   if (!cell) return <View style={box} />
   if (cell.kind === 'photo' && failedUrl !== cell.url) {
+    const PieceImage = cell.ephemeral ? ExpoImage : Image
     return (
       <View style={box}>
-        <Image
+        <PieceImage
           source={{ uri: cell.url }}
+          {...(cell.ephemeral
+            ? { cachePolicy: 'none' as const, recyclingKey: cell.url }
+            : {})}
           accessible={false}
           style={styles.photo}
           onError={() => setFailedUrl(cell.url)}

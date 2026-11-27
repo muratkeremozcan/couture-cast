@@ -747,6 +747,7 @@ export interface SaveActionButtonProps extends UseSaveActionOptions {
   disabled?: boolean
   accessibilityLabel?: string
   barPlacement?: 'floating' | 'inline'
+  primary?: boolean
 }
 
 export function SaveActionButton({
@@ -766,6 +767,7 @@ export function SaveActionButton({
   disabled = false,
   accessibilityLabel,
   barPlacement = 'floating',
+  primary = false,
 }: SaveActionButtonProps) {
   const palette = useHeroPalette()
   const colors = useSchemeColors()
@@ -824,11 +826,17 @@ export function SaveActionButton({
         }
       case 'offline':
       case 'idle':
-        return {
-          backgroundColor: palette.page,
-          borderColor: palette.line,
-          textColor: palette.ink,
-        }
+        return primary
+          ? {
+              backgroundColor: palette.primary,
+              borderColor: palette.primary,
+              textColor: palette.onPrimary,
+            }
+          : {
+              backgroundColor: palette.page,
+              borderColor: palette.line,
+              textColor: palette.ink,
+            }
     }
   })()
 

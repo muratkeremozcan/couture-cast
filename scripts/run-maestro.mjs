@@ -65,6 +65,7 @@ import {
 } from './lib/weather-provider-double-data.mjs'
 import { startExpoGoLinkEndpoint } from './lib/expo-go-link-endpoint.mjs'
 import { startDeviceAppearanceEndpoint } from './lib/device-appearance-endpoint.mjs'
+import { startTodayVisualFixtures } from './lib/today-visual-fixtures.mjs'
 import {
   ANDROID_LOG_BUFFER,
   androidFailureCaptures,
@@ -2016,6 +2017,33 @@ const startAppearanceEndpoint = async (platform, devices) =>
     ? startDeviceAppearanceEndpoint({ adbBinary: resolveAdbBinary(), devices })
     : { url: '', close: async () => undefined }
 
+async function prepareTodayVisualFixtures({
+  platform,
+  mobileIdentity,
+  apiSetupBaseUrl,
+  startServer,
+}) {
+  if (platform !== 'android' || !flowsToRun.every(isVisualMaestroFlow))
+    return { close: () => Promise.resolve() }
+  if (!startServer)
+    throw new Error(
+      'Today visual fixtures require the runner to start a fresh Metro server'
+    )
+  const garmentId = mobileIdentity?.garmentIds?.[0]
+  if (!mobileIdentity || !garmentId)
+    throw new Error('Today visual fixtures require the seeded Android wardrobe')
+  const fixtures = await startTodayVisualFixtures({
+    apiOrigin: apiSetupBaseUrl,
+    mobileHost: androidHost,
+    accessToken: mobileIdentity.accessToken,
+    garmentId,
+  })
+  await forEachAndroidDevice(() => reverseAndroidPorts([fixtures.port]))
+  process.env.EXPO_PUBLIC_API_BASE_URL = fixtures.mobileOrigin
+  process.env.MAESTRO_TODAY_FIXTURE_URL = fixtures.controlUrl
+  return fixtures
+}
+
 const prepareAndroidFlows = async (appId, devices) => {
   /** @type {string[] | undefined} */
   let permissions
@@ -3826,7 +3854,7 @@ const cleanupGuestConversionAccounts = async (apiSetupBaseUrl) => {
  * @param {string} apiSetupBaseUrl
  * @param {string} mobileApiBaseUrl
  * @param {{ accessToken: string, userId: string }[]} mobileIdentities collected in place
- * @returns {Promise<{ accessToken: string, userId: string } | undefined>}
+ * @returns {Promise<{ accessToken: string, userId: string, garmentIds?: string[] } | undefined>}
  */
 const provisionMobileFixture = async (
   apiSetupBaseUrl,
@@ -4081,6 +4109,7 @@ const buildMaestroFlowEnvArgs = () => [
   // Story CC-7.9: Android only; empty on iOS (scripts/lib/device-appearance-endpoint.mjs).
   '-e',
   `MAESTRO_APPEARANCE_URL=${process.env.MAESTRO_APPEARANCE_URL ?? ''}`,
+  `MAESTRO_TODAY_FIXTURE_URL=${process.env.MAESTRO_TODAY_FIXTURE_URL ?? ''}`,
   // Story 6.16: the synthetic address the guest conversion signs up; empty otherwise.
   '-e',
   `GUEST_PREVIEW_EMAIL=${process.env.GUEST_PREVIEW_EMAIL ?? ''}`,
@@ -5251,7 +5280,14 @@ const run = async () => {
   const { resolvedPair: reusedPair, startServer } =
     await resolveExpoServerReuse(portPairs)
 
+  let todayVisualFixtures = { close: () => Promise.resolve() }
   try {
+    todayVisualFixtures = await prepareTodayVisualFixtures({
+      platform: target.platform,
+      mobileIdentity,
+      apiSetupBaseUrl,
+      startServer,
+    })
     const resolvedPair = await ensureExpoServerPair({
       startServer,
       resolvedPair: reusedPair,
@@ -5380,6 +5416,7 @@ const run = async () => {
 
     finishSuite(flowFailures)
   } finally {
+    await todayVisualFixtures.close()
     await cleanupMobileRun(apiSetupBaseUrl, mobileIdentities, children)
   }
 }

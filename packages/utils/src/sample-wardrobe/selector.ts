@@ -175,9 +175,9 @@ const DISPLAY_ORDER: readonly SampleGarmentCategory[] = [
 ]
 
 export function buildSampleContext(
-  input: Pick<SampleSelectionInput, 'weather' | 'comfort'>
+  input: Pick<SampleSelectionInput, 'weather' | 'comfort'>,
+  weather: SampleWeather = SAMPLE_WEATHER[input.weather]
 ): SampleContext {
-  const weather = SAMPLE_WEATHER[input.weather]
   const { runsColdWarm, windTolerance, precipPreparedness } = input.comfort
   const adjustedFeelsLike = adjustFeelsLike(weather.feelsLike, runsColdWarm)
   return {

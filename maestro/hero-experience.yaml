@@ -16,12 +16,12 @@ tags:
 # CC-7.13: Today's live details are collapsed until the primary action is pressed.
 - extendedWaitUntil:
     visible:
-      id: 'today-primary-action'
+      id: 'today-outfit-details'
     timeout: 30000
 - assertNotVisible:
     id: 'outfit-comfort-notes'
 - tapOn:
-    id: 'today-primary-action'
+    id: 'today-outfit-details'
 - scrollUntilVisible:
     element:
       id: 'outfit-comfort-notes'

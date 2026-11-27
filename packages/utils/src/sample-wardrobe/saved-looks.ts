@@ -40,7 +40,7 @@ import {
   type SampleGarmentCategory,
 } from './types'
 
-export type SavedLookSourceKind = 'style_piece' | 'home_sample'
+export type SavedLookSourceKind = 'style_piece' | 'home_sample' | 'today'
 export type SavedLookSlotKindValue = 'garment' | 'catalog'
 
 export type SavedLookCompositionSlotPayload = {
@@ -67,6 +67,7 @@ export type CreateSavedLookPayload = {
   source: SavedLookSourceKind
   lookId: string
   weather: string
+  wornOn?: string
   title?: string | null
   anchorGarmentId?: string | null
   anchorSnapshot?: SavedLookAnchorSnapshotPayload | null
@@ -81,6 +82,7 @@ export type SavedLookLike = {
   source: SavedLookSourceKind
   lookId: string
   weather: string
+  wornOn?: string
   anchorGarmentId: string | null
   swaps: Partial<Record<SampleGarmentCategory, string>>
   collection: string | null
@@ -430,6 +432,7 @@ export function doesSavedLookResolve(
   },
   catalog: SampleCatalog = SAMPLE_CATALOG
 ): boolean {
+  if (input.source === 'today') return true
   if (!SAMPLE_LOOK_ID_PATTERN.test(input.lookId)) {
     return true
   }
@@ -939,7 +942,7 @@ export function savedLookToStylePieceRecipe(
 export function savedLookToSampleBookmark(
   savedLook: SavedLookLike
 ): SampleBookmark | null {
-  if (savedLook.source !== 'home_sample') return null
+  if (savedLook.source !== 'home_sample' || savedLook.wornOn) return null
   if (!SAMPLE_WEATHER_SET.has(savedLook.weather)) return null
   if (!savedLook.collection || !SAMPLE_COLLECTION_SET.has(savedLook.collection)) {
     return null
@@ -982,6 +985,7 @@ export function savedLookMatchesHomeSample(
   if (!input) return false
   return (
     savedLook.source === 'home_sample' &&
+    !savedLook.wornOn &&
     savedLook.lookId === input.lookId &&
     savedLook.weather === input.weather &&
     savedLook.collection === input.collection &&

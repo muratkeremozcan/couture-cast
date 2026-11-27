@@ -115,14 +115,18 @@ async function withRequestTimeout<T>(
  */
 export async function listGarmentsFromMobile(
   accessToken: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  { today = false }: { today?: boolean } = {}
 ): Promise<GarmentWithColor[]> {
   try {
     const response = await withRequestTimeout(signal, (requestSignal) =>
       createMobileApiClient({
         accessToken,
       }).apiV1WardrobeGarmentsGet(
-        { xCoutureGarmentColor: '1' },
+        {
+          xCoutureGarmentColor: '1',
+          ...(today ? { xCoutureTodayWardrobe: '1' as const } : {}),
+        },
         { signal: requestSignal }
       )
     )

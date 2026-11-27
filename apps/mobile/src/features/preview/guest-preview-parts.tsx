@@ -63,7 +63,10 @@ export function SampleGarmentArt({
   label,
   size = 72,
 }: {
-  garment: Pick<SampleGarment, 'art' | 'category'>
+  garment: {
+    art: { key: string; primary: string; secondary: string }
+    category: SampleGarment['category']
+  }
   label?: string
   size?: number
 }) {

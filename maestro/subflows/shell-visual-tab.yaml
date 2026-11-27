@@ -24,6 +24,12 @@ appId: ${MAESTRO_APP_ID}
           timeout: 15000
       - assertVisible:
           id: 'weather-header'
+      - extendedWaitUntil:
+          visible:
+            id: 'today-outfit-photo-0'
+          timeout: 15000
+      - assertVisible:
+          id: 'today-outfit-catalog-1'
       - assertNotVisible:
           id: 'hourly-forecast-ribbon'
 - waitForAnimationToEnd:

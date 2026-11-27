@@ -70,6 +70,7 @@ function graphemeBoundedTitle(maxGraphemes: number) {
 }
 
 export const savedLookSourceEnum = z.enum(['style_piece', 'home_sample'])
+const savedLookWriteSourceEnum = z.enum([...savedLookSourceEnum.options, 'today'])
 export const savedLookAvailabilityStatusEnum = z.enum([
   'ready',
   'missing_garment',
@@ -123,9 +124,10 @@ export const savedLookComfortSchema = z
 
 export const createSavedLookInputSchema = z
   .object({
-    source: savedLookSourceEnum,
+    source: savedLookWriteSourceEnum,
     lookId: nonEmptyStringSchema.max(64),
     weather: nonEmptyStringSchema.max(32),
+    wornOn: z.iso.date().optional().describe('Today date in the forecast timezone.'),
     title: graphemeBoundedTitle(MAX_TITLE_GRAPHEMES).nullable().optional(),
     anchorGarmentId: nonEmptyStringSchema.max(128).nullable().optional(),
     anchorSnapshot: savedLookAnchorSnapshotSchema.nullable().optional(),
@@ -139,10 +141,25 @@ export const createSavedLookInputSchema = z
   })
   .strict()
   .superRefine((data, ctx) => {
+    if (data.source === 'today') {
+      if (!data.wornOn || !data.lookId.startsWith(`today:${data.wornOn}:`)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['wornOn'],
+          message: 'Today saved looks require wornOn and a matching dated lookId',
+        })
+      }
+    } else if (data.wornOn) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['wornOn'],
+        message: 'wornOn is only supported for Today saved looks',
+      })
+    }
+  })
+  .superRefine((data, ctx) => {
     const seen = new Set<number>()
-    for (let i = 0; i < data.composition.length; i += 1) {
-      const slot = data.composition[i]
-      if (!slot) continue
+    for (const [i, slot] of data.composition.entries()) {
       if (seen.has(slot.slotIndex)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -192,18 +209,18 @@ export const createSavedLookInputSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['anchorGarmentId'],
-          message: 'anchorGarmentId must be omitted or null for home_sample saved looks',
+          message: 'anchorGarmentId is only supported for style_piece saved looks',
         })
       }
       if (data.anchorSnapshot) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['anchorSnapshot'],
-          message: 'anchorSnapshot must be omitted or null for home_sample saved looks',
+          message: 'anchorSnapshot is only supported for style_piece saved looks',
         })
       }
-      for (let i = 0; i < data.composition.length; i += 1) {
-        if (data.composition[i]?.kind === 'garment') {
+      for (const [i, slot] of data.composition.entries()) {
+        if (data.source === 'home_sample' && slot.kind === 'garment') {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['composition', i, 'kind'],
@@ -215,7 +232,7 @@ export const createSavedLookInputSchema = z
   })
   .openapi({
     description:
-      'Composition slotIndex values must be unique and sequential starting from 0. style_piece requires anchorGarmentId and a matching anchorSnapshot; home_sample omits both anchors and cannot reference wardrobe garment slots.',
+      'Composition slotIndex values must be unique and sequential starting from 0. style_piece requires anchorGarmentId and a matching anchorSnapshot. home_sample uses catalog slots. today requires wornOn and a dated lookId.',
   })
 
 export const savedLookSchema = z
@@ -225,6 +242,12 @@ export const savedLookSchema = z
     source: savedLookSourceEnum,
     lookId: nonEmptyStringSchema.max(64),
     weather: nonEmptyStringSchema.max(32),
+    wornOn: z.iso
+      .date()
+      .optional()
+      .describe(
+        'Present on Today snapshots, which use the home_sample response source for compatibility.'
+      ),
     // Server enforces the 80-grapheme bound on write via Node ICU Intl.Segmenter.
     // Response parsing checks UTF-16 length only so Hermes (which lacks Intl.Segmenter)
     // never rejects an API-approved title containing multi-codepoint emoji clusters.
@@ -246,7 +269,13 @@ export const savedLookSchema = z
 
 export const listSavedLooksQuerySchema = z
   .object({
-    source: savedLookSourceEnum.optional(),
+    source: savedLookWriteSourceEnum.optional(),
+    includeToday: z
+      .enum(['true'])
+      .optional()
+      .describe(
+        'Opt into Today snapshots in an unfiltered list or alongside home_sample rows.'
+      ),
     anchorGarmentId: nonEmptyStringSchema.max(128).optional(),
     // Story CC-7.12 D3: opt-in newest-saved order for the Looks tab; omitted keeps updated_at desc.
     sort: savedLookListSortEnum.optional(),
