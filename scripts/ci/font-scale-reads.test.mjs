@@ -24,6 +24,8 @@
 // Story CC-7.17 lets the hourly forecast card grow with system text. Its width is capped
 // to the viewport, and its text retains React Native's sizing.
 // Looks also stacks the Plan segment and sample week labels at compact enlarged text.
+// Story CC-7.20 widens the mood cards and places them in a horizontal scroll row at enlarged
+// text sizes. React Native still sizes each label.
 // The owner's live font fix (PR 242) adds one read that rescales no text: React Native 0.81 keeps
 // a paragraph's layout through a live text size change, so `FontScaleText` (src/lib/
 // font-scale-text.tsx) gives every paragraph's outermost Text a maxFontSizeMultiplier that follows
@@ -97,6 +99,7 @@ const ALLOWED = {
   'src/components/nav-row.tsx': ['NavRow'],
   'src/features/looks/looks-screen.tsx': ['SegmentControl'],
   'src/features/premium/planner-screen.tsx': ['FreePlanPreview'],
+  'src/features/preview/style-profile-controls.tsx': ['StyleMoodRow'],
   'src/features/wardrobe/wardrobe-hub-screen.tsx': ['MemberWardrobeHub'],
   'src/lib/font-scale-text.tsx': ['remeasureCap', 'createFontScaleText.FontScaleText'],
 }
@@ -157,6 +160,23 @@ function hourlyCardScaleRead(node, source) {
   )
 }
 
+function moodRowScaleRead(node, source) {
+  if (readsScaleFrom(node, source, 'useWindowDimensions()')) return true
+  const expression = node.parent
+  const initializer = ts.isConditionalExpression(expression.parent)
+    ? expression.parent
+    : expression
+  const declaration = initializer.parent
+  if (!ts.isVariableDeclaration(declaration) || declaration.initializer !== initializer)
+    return false
+  const name = declaration.name.getText(source)
+  const value = initializer.getText(source)
+  return (
+    (name === 'scrollChoices' && value === 'fontScale >= 1.5') ||
+    (name === 'minWidth' && value === 'scrollChoices ? 80 * fontScale : undefined')
+  )
+}
+
 /** file -> scope path -> approved forms of each fontScale occurrence in that scope. */
 const FONT_SCALE_FORMS = {
   'components/hero/hourly-forecast-ribbon.tsx': {
@@ -165,6 +185,7 @@ const FONT_SCALE_FORMS = {
   'src/components/nav-row.tsx': { NavRow: compactLayoutScaleRead },
   'src/features/looks/looks-screen.tsx': { SegmentControl: compactLayoutScaleRead },
   'src/features/premium/planner-screen.tsx': { FreePlanPreview: compactLayoutScaleRead },
+  'src/features/preview/style-profile-controls.tsx': { StyleMoodRow: moodRowScaleRead },
   'src/features/wardrobe/wardrobe-hub-screen.tsx': {
     MemberWardrobeHub: compactLayoutScaleRead,
   },
@@ -502,6 +523,25 @@ describe('font-scale reads in app code', () => {
     ].join('\n')
     assert.deepEqual(fontScaleReads({ [file]: ribbon }), [
       `${file}:5 return <Text style={{ width: cardWidth, fontSize: 12 * fontScale }} />`,
+    ])
+  })
+
+  test('mood cards can widen and scroll while retaining system text scaling', () => {
+    const file = 'src/features/preview/style-profile-controls.tsx'
+    const row = [
+      'export function StyleMoodRow() {',
+      '  const { fontScale } = useWindowDimensions()',
+      '  const scrollChoices = fontScale >= 1.5',
+      '  const minWidth = scrollChoices ? 80 * fontScale : undefined',
+      '  const otherLayout = fontScale >= 1.5',
+      '  return <Text style={{ minWidth, fontSize: 12 * fontScale }} />',
+      '}',
+      'function OtherRow() { return useWindowDimensions().fontScale }',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ [file]: row }), [
+      `${file}:5 const otherLayout = fontScale >= 1.5`,
+      `${file}:6 return <Text style={{ minWidth, fontSize: 12 * fontScale }} />`,
+      `${file}:8 function OtherRow() { return useWindowDimensions().fontScale }`,
     ])
   })
 
