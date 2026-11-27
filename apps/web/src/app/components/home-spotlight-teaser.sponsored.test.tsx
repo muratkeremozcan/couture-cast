@@ -2,7 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the sponsored CTA on the web Home spotlight teaser, inside the real
 // Lookbook Prism layout and through the real web transport and MSW.
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
@@ -20,14 +20,15 @@ import { LookbookPrismLayout } from './lookbook-prism-layout'
 
 vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
 // Story CC-7.12 D7: the Home sample outfit's View pushes the saved look through the app router.
+const router = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  back: vi.fn(),
+  prefetch: vi.fn(),
+}))
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-    back: vi.fn(),
-    prefetch: vi.fn(),
-  }),
+  useRouter: () => router,
   useSearchParams: () => new URLSearchParams(),
 }))
 
@@ -142,6 +143,7 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     partner = stubPartnerTab()
   })
   afterEach(() => {
+    cleanup()
     vi.unstubAllGlobals()
     delete window.__enableAnalyticsTestHook
     delete window.__capturedAnalyticsEvents
@@ -261,7 +263,10 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     observer.disconnect()
 
     await user.keyboard('{Enter}')
-    await waitFor(() => expect(partner.navigations).toHaveLength(1))
+    await waitFor(() => {
+      expect(partner.navigations).toHaveLength(1)
+      expect(cta).not.toHaveAttribute('aria-busy')
+    })
     expect(clicks.bodies).toHaveLength(2)
   })
 
@@ -296,7 +301,10 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     expect(cta).toHaveFocus()
 
     await user.keyboard('{Enter}')
-    await waitFor(() => expect(partner.navigations).toHaveLength(1))
+    await waitFor(() => {
+      expect(partner.navigations).toHaveLength(1)
+      expect(cta).not.toHaveAttribute('aria-busy')
+    })
     expect(clicks.bodies).toEqual([
       {
         offerId: SPONSORSHIP.offerId,

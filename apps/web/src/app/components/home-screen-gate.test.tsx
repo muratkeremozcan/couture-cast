@@ -498,11 +498,15 @@ describe('7.7 Home screen gate', () => {
     const firstVisit = renderHomeGate()
     await answer(0, cityPage())
     await waitFor(() => expect(keptRitual()?.city).toBe('Chicago home'))
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
     firstVisit.unmount()
 
     // The return's outfit answers for Denver while its city line is still out.
     returning = true
     renderHomeGate()
+    expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
     await waitFor(() => expect(ritualReads).toBe(2))
     await settle()
     expect(keptRitual()).toMatchObject({
@@ -527,6 +531,7 @@ describe('7.7 Home screen gate', () => {
     expect(
       within(screen.getByTestId('weather-header')).getByText('Denver home')
     ).toBeVisible()
+    await answer(1, cityPage())
   })
 
   it("7.7-CMP-054 a fixture bearer switch on a mounted Home drops member A's outfit and teaser in the first commit, with A's refresh still out (CI 7.7-E2E-009 swap-while-reading)", async () => {
