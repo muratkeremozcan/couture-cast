@@ -300,7 +300,7 @@ skip_nonce_check = false
 enabled = true
 client_id = "couturecast-e2e"
 secret = "env(SUPABASE_AUTH_EXTERNAL_KEYCLOAK_SECRET)"
-url = "http://127.0.0.1:53052/realms/cc"
+url = "http://127.0.0.1:23052/realms/cc"
 
 [auth.external.apple]
 enabled = false

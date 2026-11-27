@@ -40,6 +40,7 @@ import {
   type CommunityFeedMode,
 } from '@couture/api-client/contracts/http'
 import { AccessibilityInfo, Platform, findNodeHandle } from 'react-native'
+import { modalRenders } from '@/src/test-utils/edge-to-edge-modal'
 import { CommunityScreen } from '@/src/features/community/community-screen'
 import enUS from '@/assets/locales/en-US.json'
 import { press } from '@/src/test-utils/press'
@@ -280,7 +281,7 @@ export function registerCommunityFeedCases() {
     }
   )
 
-  it('restores close focus to the highlighted card title', async () => {
+  it('restores focus to the highlighted title when Comments onShow arrives during close', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
     const handleOf = distinctNodeHandles()
     setMockParams({ source: 'notification', type: 'community', cardId: 'post-a' })
@@ -296,9 +297,17 @@ export function registerCommunityFeedCases() {
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
     )
     await openCommunityPostComments('post-a')
-    const close = await screen.findByRole('button', { name: 'Close comments' })
+    const comments = within(await screen.findByTestId('comments-sheet'))
+    const heading = comments.getByText('Comments', { exact: true })
+    const close = comments.getByRole('button', { name: 'Close comments' })
+    const lateOnShow = modalRenders.findLast((props) => props.visible === true)
+      ?.onShow as (() => void) | undefined
+    expect(lateOnShow).toBeTypeOf('function')
     vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
-    press(close)
+    act(() => {
+      press(close)
+      lateOnShow!()
+    })
     await waitFor(() => expect(close).not.toBeInTheDocument())
     const highlight = await screen.findByTestId('highlighted-community-card-post-a')
     const liveInvoker = within(highlight).getByTestId('community-card-title-post-a')
@@ -306,6 +315,9 @@ export function registerCommunityFeedCases() {
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
         handleOf(liveInvoker)
       )
+    )
+    expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalledWith(
+      handleOf(heading)
     )
     expect(liveInvoker).toBeVisible()
   })
@@ -330,7 +342,14 @@ export function registerCommunityFeedCases() {
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
     )
     await openCommunityPostComments('post-b')
-    const close = await screen.findByRole('button', { name: 'Close comments' })
+    const comments = within(await screen.findByTestId('comments-sheet'))
+    const heading = comments.getByText('Comments', { exact: true })
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        handleOf(heading)
+      )
+    )
+    const close = comments.getByRole('button', { name: 'Close comments' })
     vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
     press(close)
     await waitFor(() => expect(close).not.toBeInTheDocument())

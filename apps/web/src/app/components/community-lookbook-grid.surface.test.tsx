@@ -1,6 +1,7 @@
 // Learning path Step 58: Production status and nightly health, production follow-ups.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Community grid journeys through the real web transport and MSW.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 import {
   openCommunityCardActions,
   selectCommunityClimate,
@@ -102,6 +103,42 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(card.getByTestId('community-card-actions')).toBeVisible()
       expect(card.queryByTestId(scope + 'comments-button-' + id)).toBeNull()
     }
+  })
+
+  it('7.15-COM-003 Escape closes card actions and the title opens detail by keyboard', async () => {
+    signIn()
+    useMswHandlers(feedHandler({ items: [item({ title: 'Rain layers' })] }))
+    const user = userEvent.setup()
+    renderGrid()
+
+    const card = within(await screen.findByTestId('lookbook-card-post-1'))
+    const trigger = card.getByTestId('community-card-actions')
+    const menu = trigger.closest('details')!
+    await user.click(trigger)
+    expect(menu).toHaveAttribute('open')
+    card.getByTestId('report-button-post-1').focus()
+    await user.keyboard('{Escape}')
+    expect(menu).not.toHaveAttribute('open')
+    expect(trigger).toHaveFocus()
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    card.getByRole('button', { name: 'Rain layers' }).focus()
+    await user.keyboard('{Enter}')
+    expect(await screen.findByRole('dialog', { name: 'Rain layers' })).toBeVisible()
+  })
+
+  it('7.15-COM-001 keeps Post out of the feed until the shell slot mounts', async () => {
+    signIn()
+    useMswHandlers(feedHandler())
+    const view = renderGrid({ postActionSlot: null })
+
+    expect(await screen.findByTestId('lookbook-card-post-1')).toBeVisible()
+    expect(screen.queryByTestId('create-post-button')).toBeNull()
+
+    const slot = document.createElement('header')
+    view.container.prepend(slot)
+    view.rerender(<CommunityLookbookGrid showFilterNav postActionSlot={slot} />)
+    expect(within(slot).getByTestId('create-post-button')).toBeVisible()
   })
 
   describe('weekly challenge', () => {

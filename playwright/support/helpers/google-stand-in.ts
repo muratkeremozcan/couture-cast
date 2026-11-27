@@ -11,7 +11,7 @@
 import type { Page, Route } from '@playwright/test'
 
 /** The mock's one origin, for GoTrue and every browser (`mock-oidc-container.mjs`). */
-export const MOCK_OIDC_ORIGIN = 'http://127.0.0.1:53052'
+export const MOCK_OIDC_ORIGIN = 'http://127.0.0.1:23052'
 
 export type StandInIdentity = {
   sub: string

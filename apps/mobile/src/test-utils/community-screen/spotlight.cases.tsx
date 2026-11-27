@@ -22,7 +22,8 @@ import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
 import { dragFrom } from '@/src/test-utils/layer-swipe'
 import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
-import { expect, it, vi } from 'vitest'
+import { expect, it, onTestFinished, vi } from 'vitest'
+import { userEvent as browserUser } from 'vitest/browser'
 import {
   COMMUNITY_AGE_GATE_DENIED_MESSAGE,
   COMMUNITY_CURSOR_INVALID_MESSAGE,
@@ -951,9 +952,12 @@ export function registerCommunitySpotlightCases() {
     const spotlightHeld = new Promise<void>((resolve) => {
       releaseSpotlight = resolve
     })
+    onTestFinished(() => releaseSpotlight())
+    let spotlightReads = 0
     serveFeed(() => feedJson({ items: [base] }))
     server.use(
       http.get(SPOTLIGHT_ROUTE, async () => {
+        if (++spotlightReads === 1) return page({ items: [] })
         await spotlightHeld
         return page({ items: [{ ...base, rank: 1 }] })
       }),
@@ -969,10 +973,13 @@ export function registerCommunitySpotlightCases() {
     )
 
     await render(<CommunityScreen />)
+    await communityGateOpen()
     expect(await screen.findByTestId('community-card-title-spot-edit')).toHaveTextContent(
       'Initial spotlight title'
     )
-    press(screen.getByTestId('community-card-open-spot-edit'))
+    act(() => refreshEvents.onRefresh!())
+    await waitFor(() => expect(spotlightReads).toBe(2))
+    await browserUser.click(screen.getByTestId('community-card-open-spot-edit'))
     const ordinaryDetail = await screen.findByTestId('community-post-detail')
     press(within(ordinaryDetail).getByTestId('community-edit-text'))
     const titleInput = screen.getByTestId('community-edit-title')
@@ -992,7 +999,7 @@ export function registerCommunitySpotlightCases() {
     press(within(ordinaryDetail).getByTestId('app-top-bar-back'))
     await waitFor(() => expect(ordinaryDetail).not.toBeInTheDocument())
 
-    // Delayed Spotlight first-page response carries stale textRevision: 0.
+    // The held Spotlight refresh carries the text revision from before the edit.
     releaseSpotlight()
     const spotCard = await screen.findByTestId('community-spotlight-item-spot-edit')
     expect(
@@ -1000,7 +1007,7 @@ export function registerCommunitySpotlightCases() {
     ).toHaveTextContent('Updated spotlight title')
 
     // Open Spotlight detail and confirm it renders the updated title and Edited label.
-    press(within(spotCard).getByTestId('community-card-open-spot-edit'))
+    await browserUser.click(within(spotCard).getByTestId('community-card-open-spot-edit'))
     const detail = await screen.findByTestId('community-spotlight-detail')
     // Codex 7.11 #10 (D12): a titled look names the layer's top bar, the edited title included.
     expect(within(detail).getByTestId('app-top-bar-title').textContent).toBe(

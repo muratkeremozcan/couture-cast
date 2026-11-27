@@ -34,7 +34,7 @@ import { randomBytes } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
-const PORT = Number(process.env.MOCK_OIDC_PORT ?? 53052)
+const PORT = Number(process.env.MOCK_OIDC_PORT ?? 23052)
 const HOST = process.env.MOCK_OIDC_HOST ?? '127.0.0.1'
 const CLIENT_ID = process.env.MOCK_OIDC_CLIENT_ID ?? 'couturecast-e2e'
 const tickets = new Map()

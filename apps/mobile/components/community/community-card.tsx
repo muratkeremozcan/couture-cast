@@ -5,7 +5,7 @@ import {
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import type { ReactionControls } from '@couture/api-client'
 import { CommunityReactions } from './community-reactions'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type {
@@ -461,9 +461,10 @@ export function CommunityCard({
   // latest item and callback through a ref is what stops a refetch from
   // re-arming the timer with a brand new object identity.
   const latestRef = useRef({ item, onImageExpiry, onOpen })
-  useEffect(() => {
+  useLayoutEffect(() => {
+    // A ranked result can reuse an ordinary row. Its next tap belongs to the newly committed card.
     latestRef.current = { item, onImageExpiry, onOpen }
-  })
+  }, [item, onImageExpiry, onOpen])
 
   const requestImageRefresh = useCallback(() => {
     if (attemptsRef.current >= MAX_IMAGE_REFRESH_ATTEMPTS) {

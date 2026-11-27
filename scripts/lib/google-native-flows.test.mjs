@@ -216,11 +216,11 @@ describe('Google device flow values', () => {
   })
 
   test('the device reaches the API, Metro, Supabase and the mock', () => {
-    assert.deepEqual(googleNativeReversePorts('http://127.0.0.1:54321', 53052), [
+    assert.deepEqual(googleNativeReversePorts('http://127.0.0.1:54321', 23052), [
       GOOGLE_NATIVE_PORTS.api,
       GOOGLE_NATIVE_PORTS.metro,
       54321,
-      53052,
+      23052,
     ])
   })
 })

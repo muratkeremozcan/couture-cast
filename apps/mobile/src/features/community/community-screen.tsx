@@ -409,7 +409,6 @@ export function CommunityScreen() {
   translationRef.current = t
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null)
   realtimeOpenPost.current = commentsPostId
-  const commentsInvokerRef = useRef<View | null>(null)
   // R46: the member's own unsent comments outlive an unverified-access hide.
   const [commentDrafts] = useState(() => new CommunityCommentDrafts())
   const [comments] = useState(
@@ -2272,12 +2271,7 @@ export function CommunityScreen() {
       onExport={(postId, opener) => closeFeedDetail(() => openShareCard(postId, opener))}
       onComments={(target) => {
         notificationIntentRef.current++
-        closeFeedDetail(() => {
-          commentsInvokerRef.current =
-            cardRefs.current.get(target.id) ??
-            (deepLinkPost?.id === target.id ? targetRef.current : null)
-          setCommentsPostId(target.id)
-        })
+        closeFeedDetail(() => setCommentsPostId(target.id))
       }}
       reactionControls={reactionState.controls(post.id)}
       item={post}
@@ -2321,11 +2315,7 @@ export function CommunityScreen() {
           inDetail
             ? (target) => {
                 notificationIntentRef.current++
-                viaDetail(() => {
-                  commentsInvokerRef.current =
-                    spotlightRankRefs.current.get(target.id) ?? null
-                  setCommentsPostId(target.id)
-                })
+                viaDetail(() => setCommentsPostId(target.id))
               }
             : undefined
         }
@@ -2673,28 +2663,26 @@ export function CommunityScreen() {
         member={sessionScope ?? null}
         locale={locale}
         onClose={() => {
-          notificationIntentRef.current++
-          if (commentsPostId) comments.retireFocus(commentsPostId)
+          const intent = ++notificationIntentRef.current
           setCommentTarget(undefined)
-          const highlighted =
-            deepLinkPost?.id === commentsPostId ? targetRef.current : null
-          const feed = commentsPostId
-            ? (cardRefs.current.get(commentsPostId) ?? null)
-            : null
-          const spotlightInvoker = commentsPostId
-            ? (spotlightRankRefs.current.get(commentsPostId) ?? null)
-            : null
-          const original = commentsInvokerRef.current
-          const target =
-            original &&
-            (original === highlighted ||
-              original === feed ||
-              original === spotlightInvoker)
-              ? original
-              : (highlighted ?? feed ?? spotlightInvoker)
-          const node = safeFindNodeHandle(target)
           setCommentsPostId(null)
-          if (node) AccessibilityInfo.setAccessibilityFocus(node)
+          if (!commentsPostId) return
+          comments.retireFocus(commentsPostId)
+          // Resolve after the modal closes. Verification or a ranked promotion can remount the
+          // title while the thread is open, so use the current host node for the same post.
+          requestAnimationFrame(() => {
+            if (
+              !screenFocusedRef.current ||
+              sessionScopeRef.current !== sessionScope ||
+              notificationIntentRef.current !== intent
+            )
+              return
+            const title =
+              spotlightRankRefs.current.get(commentsPostId) ??
+              cardRefs.current.get(commentsPostId)
+            const node = safeFindNodeHandle(title)
+            if (node) AccessibilityInfo.setAccessibilityFocus(node)
+          })
         }}
       />
       <CommunitySpotlightDetail

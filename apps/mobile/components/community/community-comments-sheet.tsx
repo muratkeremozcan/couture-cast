@@ -133,6 +133,10 @@ export function CommunityCommentsSheet({
   const removedFocus = useRef<string | null>(null)
   const refocusComposer = useRef(false)
   const closedByMember = useRef(false)
+  const visiblePostRef = useRef(postId)
+  useLayoutEffect(() => {
+    visiblePostRef.current = postId
+  }, [postId])
   const thread = state.current(postId ?? '__closed__')
   // R51 layout rule: while the software keyboard is open the thread region is hidden,
   // with or without a reply target and at any window height. The title row, the reply
@@ -407,7 +411,7 @@ export function CommunityCommentsSheet({
       animationType={modalAnimation}
       scrim={scrim}
       scrimTestID="comments-scrim"
-      // Story CC-7.11 D13: the Community screen's onClose focuses the comments button.
+      // Story CC-7.11 D13: the Community screen restores focus to the live card title.
       returnFocusRef={null}
       onRequestClose={() => {
         // R51: Back with the keyboard open closes the keyboard and keeps the sheet. On
@@ -416,6 +420,8 @@ export function CommunityCommentsSheet({
         dismissKeyboard()
       }}
       onShow={() => {
+        // A quick Close can arrive before the presentation's onShow callback.
+        if (closedByMember.current || visiblePostRef.current !== postId) return
         // A native composer can only take focus once its modal is on screen.
         if (refocusComposer.current) {
           refocusComposer.current = false
