@@ -14,6 +14,10 @@ import {
 } from '@couture/utils'
 import type * as GuestPreviewLib from '../../../lib/guest-preview'
 import { setWebGuestPreviewStoreForTests } from '../../../lib/guest-preview'
+import {
+  destinationAfterSignIn,
+  hasGuestLookSave,
+} from '../../../lib/post-signin-destination'
 import { GuestPreview } from './guest-preview'
 import { GuestPreviewReview } from './guest-preview-review'
 
@@ -58,9 +62,9 @@ function memoryAdapter(options: { failWrites?: boolean } = {}) {
 
 let adapter: ReturnType<typeof memoryAdapter>
 
-function useStore(next = memoryAdapter()) {
+function useStore(next = memoryAdapter(), now?: () => number) {
   adapter = next
-  const store = createGuestPreviewStore({ adapter, catalog: SAMPLE_CATALOG })
+  const store = createGuestPreviewStore({ adapter, catalog: SAMPLE_CATALOG, now })
   setWebGuestPreviewStoreForTests(store)
   return store
 }
@@ -290,6 +294,7 @@ describe('guest preview surfaces', () => {
       const link = within(sheet).getByTestId(`guest-preview-${door}`)
       fireEvent.click(link, { ctrlKey: true })
       expect(JSON.parse(adapter.value() ?? '{}')).not.toHaveProperty('conversion')
+      await expect(hasGuestLookSave()).resolves.toBe(false)
       fireEvent.click(link)
       await waitFor(() =>
         expect(JSON.parse(adapter.value() ?? '{}')).toHaveProperty(
@@ -297,8 +302,42 @@ describe('guest preview surfaces', () => {
           'guest-preview-save-look'
         )
       )
+      await expect(hasGuestLookSave()).resolves.toBe(true)
+      await expect(destinationAfterSignIn(true)).resolves.toBe('/preview/continue')
     }
   )
+
+  it('returns to the age check when the in-progress preview expires at the account sheet', async () => {
+    let now = Date.now()
+    const store = useStore(memoryAdapter(), () => now)
+    await passGate()
+    fireEvent.click(screen.getByTestId('sample-save-look'))
+    const link = await screen.findByTestId('guest-preview-create-account')
+    now = store.snapshot().state!.eligibility.expiresAt
+    fireEvent.click(link)
+    const gate = await screen.findByTestId('guest-preview-gate')
+    expect(screen.getByText(en.firstRun.previewExpired)).toBeVisible()
+    expect(within(gate).getByTestId('guest-preview-birthdate')).toHaveValue('')
+  })
+
+  it('updates the look with optional colors and toggles a selected mood off', async () => {
+    const store = useStore()
+    await passGate()
+    const cozy = screen.getByTestId('style-mood-cozy')
+    fireEvent.click(cozy)
+    expect(cozy).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByTestId('sample-style-preferences'))
+    fireEvent.change(screen.getByRole('combobox', { name: en.styleIdeas.palette }), {
+      target: { value: 'colorful' },
+    })
+    expect(store.snapshot().state?.preferences).toMatchObject({
+      style: 'cozy',
+      palette: 'colorful',
+    })
+    fireEvent.click(cozy)
+    expect(cozy).toHaveAttribute('aria-pressed', 'false')
+    expect(store.snapshot().state?.preferences).toMatchObject({ palette: 'colorful' })
+  })
 
   it('reports no alternative when only one look suits', async () => {
     const store = useStore()

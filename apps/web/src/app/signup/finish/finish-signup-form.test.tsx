@@ -13,9 +13,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type * as NextNavigation from 'next/navigation'
 import {
+  createGuestPreviewState,
   evaluateBirthdateInput,
   getFederatedSignInStrings,
   GUEST_PREVIEW_SAVE_INTENT,
+  SAMPLE_CATALOG,
 } from '@couture/utils'
 import { getI18n } from '../../../i18n'
 import type * as CoutureUtils from '@couture/utils'
@@ -47,7 +49,7 @@ vi.mock('../../../lib/web-session', async (importOriginal) => ({
   fetchWebAwaitingGuardianAccount: session.awaiting,
   signOutWebSession: session.signOut,
 }))
-const preview = vi.hoisted(() => ({ clear: vi.fn(), load: vi.fn() }))
+const preview = vi.hoisted(() => ({ clear: vi.fn(), load: vi.fn(), snapshot: vi.fn() }))
 const guardian = vi.hoisted(() => ({ invite: vi.fn() }))
 vi.mock('../../../lib/guardian', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -59,8 +61,13 @@ vi.mock('../../../lib/post-signin-destination', () => ({
 }))
 vi.mock('../../../lib/guest-preview', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  webGuestPreviewStore: () => ({ clear: preview.clear, load: preview.load }),
+  webGuestPreviewStore: () => ({
+    clear: preview.clear,
+    load: preview.load,
+    snapshot: preview.snapshot,
+  }),
 }))
+import { webGuestPreviewBirthdate } from '../../../lib/guest-preview-birthdate'
 import { FinishSignupForm } from './finish-signup-form'
 
 // Story CC-7.11 D11: the top bar's back reads the router. Outside a mounted app router the real
@@ -124,11 +131,13 @@ beforeEach(async () => {
   session.awaiting.mockResolvedValue(null)
   session.signOut.mockResolvedValue(undefined)
   preview.load.mockResolvedValue({ state: null, persistent: true })
+  preview.snapshot.mockReturnValue({ state: null, persistent: true })
   destination.next.mockResolvedValue('/')
   agePolicy.current = 'off'
 })
 
 afterEach(() => {
+  webGuestPreviewBirthdate.clear()
   Object.defineProperty(window, 'location', { configurable: true, value: realLocation })
   vi.clearAllMocks()
 })
@@ -224,6 +233,40 @@ it('lets a guardian-pending teen continue to the first-run review', async () => 
   fireEvent.click(continueButton)
   await waitFor(() => expect(replace).toHaveBeenCalledWith('/preview/continue'))
   expect(session.signOut).not.toHaveBeenCalled()
+})
+
+it('reuses the age-check date when Google returns to a first-run look in the same app', async () => {
+  const draft = createGuestPreviewState(Date.now(), SAMPLE_CATALOG)
+  const snapshot = {
+    state: { ...draft, conversion: { intent: GUEST_PREVIEW_SAVE_INTENT } },
+    persistent: true,
+  }
+  preview.load.mockResolvedValue(snapshot)
+  preview.snapshot.mockReturnValue(snapshot)
+  const date = birthdate(30)
+  webGuestPreviewBirthdate.remember(draft, date)
+  session.finish.mockResolvedValue({ kind: 'signed_in' })
+  destination.next.mockResolvedValue('/preview/continue')
+  const field = await renderForm({ fromPreview: true, door: 'signup' })
+  await waitFor(() => expect(field).toHaveValue(date))
+  fireEvent.click(screen.getByRole('button', { name: strings.create }))
+  await waitFor(() => expect(replace).toHaveBeenCalledWith('/preview/continue'))
+  expect(session.finish).toHaveBeenCalledExactlyOnceWith(date, true)
+  expect(field).toHaveValue('')
+})
+
+it.each([
+  ['guardian_minor', strings.guardianMinor, 'finish-signup-message'],
+  ['unavailable', strings.createUnavailable, 'finish-signup-message'],
+  ['refused', strings.refused, 'finish-signup-outcome'],
+  ['no_session', strings.noSession, 'finish-signup-outcome'],
+] as const)('shows the finish outcome for %s', async (kind, copy, target) => {
+  session.finish.mockResolvedValue({ kind })
+  const field = await renderForm()
+  fireEvent.change(field, { target: { value: birthdate(30) } })
+  fireEvent.click(screen.getByRole('button', { name: strings.create }))
+  await waitFor(() => expect(screen.getByTestId(target)).toHaveTextContent(copy))
+  expect(replace).not.toHaveBeenCalled()
 })
 
 // Antigravity P2-1, D3: an age refusal clears any guest preview stored on this device, whichever

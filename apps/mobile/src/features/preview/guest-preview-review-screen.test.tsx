@@ -9,6 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { ResponseError } from '@couture/api-client'
 import type * as ApiClient from '@couture/api-client'
 import type * as SavedLooks from '@/src/lib/saved-looks'
+import type * as StyleProfile from '@/src/lib/style-profile'
 import {
   beginGuestLookSave,
   createGuestPreviewStore,
@@ -63,7 +64,8 @@ vi.mock('@couture/api-client', async (importOriginal) => ({
   ...(await importOriginal<typeof ApiClient>()),
   requestStyleProfile: lookApi.read,
 }))
-vi.mock('@/src/lib/style-profile', () => ({
+vi.mock('@/src/lib/style-profile', async (importOriginal) => ({
+  ...(await importOriginal<typeof StyleProfile>()),
   saveMobileStyleProfileForScope: lookApi.style,
 }))
 vi.mock('@/src/lib/saved-looks', async (importOriginal) => ({

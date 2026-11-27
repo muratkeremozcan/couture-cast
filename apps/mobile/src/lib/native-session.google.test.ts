@@ -635,7 +635,7 @@ describe('a teen waiting on a guardian', () => {
       const status = awaiting()
       const { session } = await load()
       await expect(
-        session.completeNativeOAuth(`${REDIRECT}?code=pending-teen`)
+        session.completeNativeOAuth(`${REDIRECT}?code=pending-teen-${statusCode}`)
       ).resolves.toEqual({ kind: 'awaiting_guardian' })
       expect(status).toHaveLength(1)
       expect(sdk.signOut).not.toHaveBeenCalled()

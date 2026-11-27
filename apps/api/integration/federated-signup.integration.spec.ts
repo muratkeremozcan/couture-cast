@@ -437,20 +437,21 @@ describe('A-FED-GET-STATUS: GET decides the route after a 401 profile check', ()
       })
     })
 
-    it('A-LOCK-HOLDS: the waiting teen gets 403 from every signed-in endpoint', async () => {
+    it('A-LOCK-HOLDS: a pending teen can read their profile while the preferences write stays gated', async () => {
       const email = address()
       const { bearer } = googleUser(email)
-      expect((await federated('POST', bearer, { birthdate: birthdate(14) })).status).toBe(
-        201
-      )
+      const created = await federated('POST', bearer, { birthdate: birthdate(14) })
+      expect(created.status).toBe(201)
+      const { userId } = (await created.json()) as { userId: string }
       const profile = await signedIn('GET', '/api/v1/user/profile', bearer)
-      expect(profile.status).toBe(403)
-      expect(await profile.json()).toMatchObject({
+      expect(profile.status).toBe(200)
+      expect(await profile.json()).toMatchObject({ user: { id: userId, role: 'teen' } })
+      const preferences = await signedIn('PUT', '/api/v1/user/preferences', bearer, {})
+      expect(preferences.status).toBe(403)
+      expect(await preferences.json()).toMatchObject({
         statusCode: 403,
         message: 'Guardian consent required before continuing',
       })
-      const preferences = await signedIn('PUT', '/api/v1/user/preferences', bearer, {})
-      expect(preferences.status).toBe(403)
     })
   })
 

@@ -21,6 +21,7 @@ import {
   SAMPLE_CATALOG,
   type GuestPreviewStore,
   type SampleComfort,
+  type StatusBarNoticeInput,
 } from '@couture/utils'
 import type * as GuestPreviewLib from '../../../lib/guest-preview'
 import { setWebGuestPreviewStoreForTests } from '../../../lib/guest-preview'
@@ -37,7 +38,14 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/preview/continue',
 }))
 
-const member = vi.hoisted(() => ({ id: 'member-a' as string | null, token: 'token-a' }))
+const member = vi.hoisted(() => ({
+  id: 'member-a' as string | null,
+  token: 'token-a',
+  revision: 0,
+  scope() {
+    return this.id ? `${this.id}:${this.revision}` : null
+  },
+}))
 vi.mock('../../../lib/web-session', () => ({
   webSessionIdentity: () => member.id,
   // The app's resolver awaits session verification; this one answers a little later with
@@ -63,14 +71,20 @@ const lookApi = vi.hoisted(() => ({
   style: vi.fn(),
   save: vi.fn(),
 }))
+const notice = vi.hoisted(() => vi.fn<(input: StatusBarNoticeInput) => void>())
+vi.mock('../save-feedback', () => ({ useStatusBar: () => ({ showNotice: notice }) }))
 vi.mock('@couture/api-client', async (importOriginal) => ({
   ...(await importOriginal<typeof ApiClient>()),
   requestStyleProfile: lookApi.read,
 }))
 vi.mock('../../../lib/use-web-session', () => ({
-  currentWebStyleScope: () => member.id,
-  captureWebStyleBearer: (scope: string) => (scope === member.id ? member.token : null),
-  subscribeWebStyleScope: () => () => undefined,
+  currentWebStyleScope: () => member.scope(),
+  captureWebStyleBearer: (scope: string) =>
+    scope === member.scope() ? member.token : null,
+  subscribeWebStyleScope: (listener: () => void) => {
+    window.addEventListener('storage', listener)
+    return () => window.removeEventListener('storage', listener)
+  },
 }))
 vi.mock('../../../lib/style-profile', () => ({
   saveWebStyleProfileForScope: lookApi.style,
@@ -160,6 +174,7 @@ function server(initial: SampleComfort = ACCOUNT) {
 
 beforeEach(async () => {
   member.id = 'member-a'
+  member.revision = 0
   navigation.push.mockReset()
   navigation.replace.mockReset()
   api.verified.mockReset()
@@ -427,6 +442,7 @@ describe('CC-7.21 first-run look review', () => {
     lookApi.read.mockReset().mockResolvedValue(null)
     lookApi.style.mockReset().mockResolvedValue(undefined)
     lookApi.save.mockReset().mockResolvedValue({ id: 'look-saved' })
+    notice.mockClear()
   })
 
   it.each(['use', 'keep'] as const)(
@@ -489,5 +505,62 @@ describe('CC-7.21 first-run look review', () => {
     expect(lookApi.save).toHaveBeenCalledTimes(2)
     expect(lookApi.save.mock.calls[1]).toEqual(lookApi.save.mock.calls[0])
     expect(client.write).toHaveBeenCalledOnce()
+  })
+
+  it('stops when another tab already claimed the guest save', async () => {
+    await seedProposal(GUEST_PREVIEW_SAVE_INTENT)
+    const client = server()
+    render(<GuestPreviewReview />)
+    const use = await screen.findByTestId('guest-preview-review-use')
+    await adapter.remove()
+    fireEvent.click(use)
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
+    expect(client.write).not.toHaveBeenCalled()
+    expect(lookApi.save).not.toHaveBeenCalled()
+  })
+
+  it('clears the visible review on a same-account session change in another tab', async () => {
+    await seedProposal(GUEST_PREVIEW_SAVE_INTENT)
+    server()
+    render(<GuestPreviewReview />)
+    await screen.findByTestId('guest-preview-review-proposed')
+    act(() => {
+      member.revision += 1
+      window.dispatchEvent(new Event('storage'))
+    })
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
+    expect(screen.queryByTestId('guest-preview-review-proposed')).toBeNull()
+    expect(lookApi.save).not.toHaveBeenCalled()
+  })
+
+  it('ends the review when the server refuses access to saved catalog looks', async () => {
+    await seedProposal(GUEST_PREVIEW_SAVE_INTENT)
+    const client = server()
+    lookApi.save.mockRejectedValueOnce(
+      new ResponseError(new Response(null, { status: 403 }))
+    )
+    render(<GuestPreviewReview />)
+    fireEvent.click(await screen.findByTestId('guest-preview-review-keep'))
+    expect(await screen.findByTestId('guest-preview-review-result')).toHaveTextContent(
+      en.review.rejected
+    )
+    expect(client.write).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('guest-preview-review-proposed')).toBeNull()
+    expect(adapter.value()).toBeNull()
+  })
+
+  it('opens the saved look through its confirmation while the same session is active', async () => {
+    await seedProposal(GUEST_PREVIEW_SAVE_INTENT)
+    server()
+    render(<GuestPreviewReview />)
+    fireEvent.click(await screen.findByTestId('guest-preview-review-keep'))
+    await waitFor(() => expect(notice).toHaveBeenCalledOnce())
+    const open = notice.mock.calls[0]?.[0].actions?.[0]?.onPress
+    expect(open).toBeTypeOf('function')
+    void open?.()
+    expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/looks/saved/look-saved')
+    member.revision += 1
+    void open?.()
+    expect(navigation.push).toHaveBeenCalledOnce()
   })
 })
