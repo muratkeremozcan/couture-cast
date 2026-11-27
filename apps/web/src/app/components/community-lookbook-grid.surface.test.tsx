@@ -129,7 +129,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
 
   it('7.15-COM-001 keeps Post out of the feed until the shell slot mounts', async () => {
     signIn()
-    useMswHandlers(feedHandler())
+    useMswHandlers(feedHandler({ items: [item()] }))
     const view = renderGrid({ postActionSlot: null })
 
     expect(await screen.findByTestId('lookbook-card-post-1')).toBeVisible()
