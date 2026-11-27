@@ -112,7 +112,7 @@ vi.mock('@/src/lib/premium', () => ({
 import i18n, { initI18n } from '../lib/i18n'
 import enUS from '../../assets/locales/en-US.json'
 import { mockSubscriptionActive, mockSubscriptionNone } from '../test-utils/msw/handlers'
-import SettingsScreen from '../../app/(tabs)/settings'
+import SettingsScreen from '../../app/settings-premium'
 import { screenFocus } from '../test-utils/focus-effect'
 
 const premiumCopy = (

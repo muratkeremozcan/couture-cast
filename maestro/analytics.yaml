@@ -5,7 +5,7 @@ tags:
   - analytics
   - maestro
 env:
-  SETTINGS_TITLE: 'Language'
+  SETTINGS_TITLE: 'Account'
   ALERT_EVENT: 'Analytics event: alert_received'
 ---
 # `clearState: true`, like every other flow in this suite.
@@ -55,7 +55,9 @@ env:
     id: 'scenario-toggle-evening'
     selected: true
 
-- runFlow: subflows/open-settings.yaml
+- runFlow:
+    file: subflows/open-profile-topic.yaml
+    env: { PROFILE_TOPIC: 'account' }
 - assertVisible: ${SETTINGS_TITLE}
 
 # The diagnostics panel is the last section on the settings screen, below

@@ -77,7 +77,7 @@ async function openSettings(
 ): Promise<SubscriptionExchange> {
   const load = watchSubscriptionRead(interceptNetworkCall)
 
-  await page.goto('/settings')
+  await page.goto('/settings/premium')
 
   const exchange = await load
   await waitForAccessibilityReady(page)
@@ -248,7 +248,7 @@ premiumSeededTest.describe('Story 5.2 web settings, seeded expired subscriber', 
       expect(loaded.status).toBe(403)
 
       await expect(plannerRail(page)).toBeVisible()
-      await expectFreePlanPreview(page, '/settings#premium')
+      await expectFreePlanPreview(page, '/settings/premium')
     }
   )
 })
@@ -379,7 +379,7 @@ premiumFreshTest.describe('Story 5.2 web settings, never-subscribed user', () =>
       await expect(plannerRail(page)).toBeVisible()
       // Decision 2's no-dark-patterns guardrail, as Story CC-7.12 D10 words it: one plain line
       // on what Premium adds and one Upgrade to Profile's Premium section, nothing more.
-      await expectFreePlanPreview(page, '/settings#premium')
+      await expectFreePlanPreview(page, '/settings/premium')
     }
   )
 })
@@ -394,7 +394,7 @@ anonymousTest.describe('Story 5.2 web settings and planner rail signed out', () 
         await route.fallback()
       })
 
-      await page.goto('/settings')
+      await page.goto('/settings/premium')
       await waitForAccessibilityReady(page)
 
       await expect(page.getByRole('heading', { name: 'Premium' })).toBeVisible()

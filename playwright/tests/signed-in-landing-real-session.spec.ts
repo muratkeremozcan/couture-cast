@@ -213,7 +213,9 @@ test('L-1: a member who signs in with Google lands on the member landing, never 
   expect(html).not.toContain(session!.refresh_token)
 
   await page.getByTestId('home-set-city').click()
-  await expect(page).toHaveURL(`${WEB}/settings?addLocation=1&returnTo=%2F#locations`)
+  await expect(page).toHaveURL(
+    `${WEB}/settings/places?addLocation=1&returnTo=%2F#locations`
+  )
 })
 
 test('L-2: a signed-out visitor sees Create account, Try a sample look and Sign in', async ({

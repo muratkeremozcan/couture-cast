@@ -34,6 +34,7 @@ import {
 import { localE2EAccessToken } from '../support/helpers/local-e2e-token'
 import {
   closeCommunitySocket,
+  SHELL_PROFILE_NAME,
   createShellRouter,
   DELAY_MS,
   ownerMarker,
@@ -235,8 +236,8 @@ async function expectMemberContent(
     else await expect(page.getByTestId('lookbook-card-shell-look-1')).toBeVisible()
   }
   if (screen === 'profile')
-    await expect(page.getByTestId('profile-account-email')).toContainText(
-      'shell-member@example.test'
+    await expect(page.getByTestId('profile-account-row')).toContainText(
+      SHELL_PROFILE_NAME
     )
 }
 
@@ -738,17 +739,18 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
     })
   }
 
-  test('[P0] 7.7-E2E-012 Profile return with delayed reads: the remembered sections and scroll are in the first frame', async ({
+  test('[P0] 7.7-E2E-012 Profile return with delayed reads: the remembered rows and scroll are in the first frame', async ({
     page,
     interceptNetworkCall,
   }) => {
     test.setTimeout(90_000)
+    await page.setViewportSize({ width: 390, height: 450 })
     // Codex P1-2: every tab, Profile included, returns with its content, not an empty shell.
     const { router, setScreen } = await openShell(page, interceptNetworkCall, {
       mode: 'delayed',
       screen: 'profile',
       signedIn: true,
-      watchText: ['shell-member@example.test'],
+      watchText: [SHELL_PROFILE_NAME],
     })
     await page.goto('/settings')
     await settleTransition(page, {
@@ -756,10 +758,14 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
       fromMs: 0,
       inflight: router.inflight,
     })
-    await page.evaluate(() => window.scrollTo(0, 200))
+    const targetScroll = await page.evaluate(() =>
+      Math.min(200, document.documentElement.scrollHeight - window.innerHeight)
+    )
+    expect(targetScroll).toBeGreaterThan(0)
+    await page.evaluate((target) => window.scrollTo(0, target), targetScroll)
     await recurse(
       () => page.evaluate(() => window.scrollY),
-      (scrollY) => scrollY === 200,
+      (scrollY) => scrollY === targetScroll,
       { timeout: 5000, interval: 50, log: false }
     )
 
@@ -788,8 +794,8 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
     expect(firstFrame, 'Profile never rendered').toBeDefined()
     // The refresh is DELAY_MS late, so this content can only come from the snapshot.
     expect(firstFrame!.ready).toContain('profile')
-    expect(firstFrame!.texts).toContain('shell-member@example.test')
-    expect(Math.abs(firstFrame!.scrollY - 200)).toBeLessThanOrEqual(1)
+    expect(firstFrame!.texts).toContain(SHELL_PROFILE_NAME)
+    expect(Math.abs(firstFrame!.scrollY - targetScroll)).toBeLessThanOrEqual(1)
     expect(sightings(snapshot.frames, ['screen-placeholder'], returnedAt)).toEqual({})
     expectWithinBudget(snapshot, returnedAt, 'community > profile return')
     expect(router.calls('profile')).toBeGreaterThan(profileReads)

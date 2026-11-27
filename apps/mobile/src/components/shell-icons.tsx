@@ -10,6 +10,9 @@ const PATHS = {
   back: 'M15 18l-6-6 6-6',
   forward: 'M9 18l6-6-6-6',
   close: 'M18 6L6 18M6 6l12 12',
+  tag: 'M20 13l-7 7L4 11V4h7zM8 8h.01',
+  warning: 'M12 3 2 20h20zM12 9v4m0 3h.01',
+  clock: 'M12 7v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
 } as const
 
 export type ShellIconName = keyof typeof PATHS

@@ -6,8 +6,20 @@ appId: ${MAESTRO_APP_ID}
 - runFlow: open-settings-tab.yaml
 - scrollUntilVisible:
     element:
+      id: 'profile-language-row'
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: 'profile-language-row'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'settings-language-screen'
+    timeout: 15000
+- scrollUntilVisible:
+    element:
       id: 'locale-btn-${MAESTRO_LOCALE}'
-    direction: UP
+    direction: DOWN
     # A top-row button cannot be centered beyond the scroll boundary.
     centerElement: false
     timeout: 15000
@@ -49,3 +61,9 @@ appId: ${MAESTRO_APP_ID}
             enabled: false
           timeout: 6000
 - waitForAnimationToEnd
+- tapOn:
+    id: 'app-top-bar-back'
+- extendedWaitUntil:
+    visible:
+      id: 'settings-screen'
+    timeout: 15000

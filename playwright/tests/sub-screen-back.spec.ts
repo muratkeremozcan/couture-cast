@@ -134,6 +134,14 @@ const SUB_SCREENS: SubScreen[] = [
     backTo: { inApp: /\/looks$/, direct: /\/looks\?segment=saved$/ },
   },
   {
+    name: 'places',
+    path: '/settings/places',
+    parent: 'profile',
+    title: /^Places$/,
+    enter: viaTestId('profile-places-row'),
+    content: (page) => page.getByTestId('locations-section'),
+  },
+  {
     name: 'style',
     path: '/settings/style',
     parent: 'profile',

@@ -537,6 +537,9 @@
       "deleteUsageFailed": "Bu parçanın nerede kullanıldığı kontrol edilemedi. Tekrar dene."
     },
     "hub": {
+      "categoryAll": "Tümü",
+      "categoryFilters": "Kategoriye göre filtrele",
+      "setupProgress": "{{total}} adımın {{completed}} tanesi tamamlandı",
       "loading": "Gardırobun yükleniyor...",
       "emptyTitle": "Henüz kıyafet eklenmedi",
       "emptyBody": "Başlamak için en sevdiğin ceketin, üstün ya da elbisenin fotoğrafını çek.",
@@ -556,7 +559,7 @@
         "pending_upload": "Yükleniyor",
         "bytes_uploaded": "Yüklendi",
         "processing": "İşleniyor",
-        "awaiting_tags": "Etiket bekliyor",
+        "awaiting_tags": "Etiket gerekiyor",
         "ready": "Hazır",
         "failed": "Başarısız",
         "unknown": "Devam ediyor"
@@ -1037,6 +1040,44 @@
     }
   },
   "settings": {
+    "profile": {
+      "account": "Hesap",
+      "places": "Yerler",
+      "style": "Stil",
+      "premium": "Premium",
+      "notifications": "Bildirimler",
+      "language": "Dil",
+      "about": "Hakkında ve gizlilik",
+      "unavailable": "Kullanılamıyor",
+      "premiumActive": "Etkin",
+      "premiumFree": "Ücretsiz",
+      "on": "Açık",
+      "off": "Kapalı",
+      "learnMore": "Daha fazla bilgi",
+      "languageHelp": "Dili tarayıcın belirler.",
+      "browserLanguageHelp": "Tarayıcı ayarlarından tercih ettiğin dili değiştir, ardından CoutureCast’i yeniden yükle.",
+      "aboutHelp": "Hava durumuna göre kombin planla ve dolabını düzenle.",
+      "themeHelp": "Uygulamanın renklerini seç.",
+      "privacy": "Gizlilik politikası",
+      "terms": "Hizmet koşulları",
+      "setup": {
+        "not_started": "Başlamadı",
+        "in_progress": "Devam ediyor",
+        "completed": "Tamamlandı"
+      },
+      "languages": {
+        "en-US": "English (US)",
+        "en-CA": "English (Canada)",
+        "es-419": "Español (LatAm)",
+        "fr-CA": "Français (Canada)",
+        "fr-FR": "Français (Europe)",
+        "tr-TR": "Türkçe",
+        "de-DE": "Deutsch",
+        "it-IT": "Italiano",
+        "pt-BR": "Português (Brasil)",
+        "pt-PT": "Português (Portugal)"
+      }
+    },
     "title": "Profil",
     "account": "Hesabınız",
     "style": {

@@ -31,7 +31,7 @@ export function FreePlanPreview() {
     <div data-testid="plan-free-preview" className="space-y-4">
       <p className="text-base text-ink">{t('looks.freePlan.line')}</p>
       <Link
-        href={owner ? '/settings#premium' : '/signin'}
+        href={owner ? '/settings/premium' : '/signin'}
         data-testid="plan-upgrade"
         className="inline-flex min-h-touch items-center rounded-lg bg-primary px-6 text-sm font-semibold text-on-primary"
       >

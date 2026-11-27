@@ -65,6 +65,32 @@
     "precipitation": "Précipitations"
   },
   "settings": {
+    "profile": {
+      "account": "Compte",
+      "places": "Lieux",
+      "style": "Style",
+      "premium": "Premium",
+      "notifications": "Notifications",
+      "language": "Langue",
+      "about": "À propos et confidentialité",
+      "unavailable": "Indisponible",
+      "premiumActive": "Actif",
+      "premiumFree": "Gratuit",
+      "on": "Activées",
+      "off": "Désactivées",
+      "learnMore": "En savoir plus",
+      "languageHelp": "Ton navigateur détermine la langue.",
+      "browserLanguageHelp": "Change ta langue préférée dans les paramètres de ton navigateur, puis recharge CoutureCast.",
+      "aboutHelp": "Planifie tes tenues selon la météo et organise ta garde-robe.",
+      "themeHelp": "Choisis les couleurs de l’application.",
+      "privacy": "Politique de confidentialité",
+      "terms": "Conditions d’utilisation",
+      "setup": {
+        "not_started": "Non commencé",
+        "in_progress": "En cours",
+        "completed": "Terminé"
+      }
+    },
     "title": "Paramètres",
     "account": {
       "label": "Compte"
@@ -415,15 +441,18 @@
       "deleteUsageFailed": "Impossible de vérifier où cette pièce est utilisée. Réessaie."
     },
     "hub": {
+      "categoryAll": "Toutes",
+      "categoryFilters": "Filtrer par catégorie",
+      "setupProgress": "{{completed}} étapes terminées sur {{total}}",
       "loading": "Chargement de la garde-robe",
       "saved_looks_failed": "Impossible de charger vos looks enregistrés.",
       "status": {
         "pending_upload": "Envoi en cours",
         "bytes_uploaded": "Envoi en cours",
         "processing": "Traitement en cours",
-        "awaiting_tags": "En attente d’étiquettes",
+        "awaiting_tags": "Étiquettes manquantes",
         "ready": "Prêt",
-        "failed": "Échec de l’envoi",
+        "failed": "Échec",
         "unknown": "En cours"
       },
       "detailTitle": "Détails de la pièce"

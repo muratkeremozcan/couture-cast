@@ -65,6 +65,32 @@
     "precipitation": "Precipitação"
   },
   "settings": {
+    "profile": {
+      "account": "Conta",
+      "places": "Locais",
+      "style": "Estilo",
+      "premium": "Premium",
+      "notifications": "Notificações",
+      "language": "Idioma",
+      "about": "Sobre e privacidade",
+      "unavailable": "Indisponível",
+      "premiumActive": "Ativo",
+      "premiumFree": "Grátis",
+      "on": "Ativadas",
+      "off": "Desativadas",
+      "learnMore": "Saber mais",
+      "languageHelp": "O teu navegador define o idioma.",
+      "browserLanguageHelp": "Altera o idioma preferido nas definições do navegador e volta a carregar o CoutureCast.",
+      "aboutHelp": "Planeia os teus conjuntos de acordo com o tempo e organiza o teu guarda-roupa.",
+      "themeHelp": "Escolhe as cores da aplicação.",
+      "privacy": "Política de privacidade",
+      "terms": "Termos de serviço",
+      "setup": {
+        "not_started": "Por iniciar",
+        "in_progress": "Em curso",
+        "completed": "Concluída"
+      }
+    },
     "title": "Definições",
     "account": {
       "label": "Conta"
@@ -415,15 +441,18 @@
       "deleteUsageFailed": "Não foi possível verificar onde esta peça é usada. Tenta novamente."
     },
     "hub": {
+      "categoryAll": "Todas",
+      "categoryFilters": "Filtrar por categoria",
+      "setupProgress": "{{completed}} de {{total}} passos concluídos",
       "loading": "A carregar o guarda-roupa",
       "saved_looks_failed": "Não foi possível carregar os seus looks guardados.",
       "status": {
         "pending_upload": "A enviar",
         "bytes_uploaded": "A enviar",
         "processing": "A processar",
-        "awaiting_tags": "A aguardar tags",
+        "awaiting_tags": "Faltam etiquetas",
         "ready": "Pronta",
-        "failed": "Falha no envio",
+        "failed": "Falhou",
         "unknown": "Em curso"
       },
       "detailTitle": "Detalhes da peça"

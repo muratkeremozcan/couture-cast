@@ -44,38 +44,17 @@ tags:
 
 - runFlow: subflows/open-app.yaml
 
-- runFlow: subflows/open-settings.yaml
-
-# --- Decision 14: the entry point is a link row, not a fourth inline section --
-
-# The row sits after the premium theme section, well below the fold on a phone,
-# so it is scrolled into view rather than merely waited for. The same viewport
-# lesson `premium-subscription.yaml` records: `extendedWaitUntil: visible`
-# requires the element inside the VIEWPORT, and CI's `pixel_3a` profile is
-# shorter than the local `medium_phone`.
-# No `centerElement`: this row sits at the end of the Settings list and can
-# never reach the middle of the screen. Maestro then spends five more settling
-# swipes before it accepts the row, and on a slow emulator those outlast the
-# timeout and the step reports a row it is showing as not found (Story 1.2b
-# R25 verification run). A fully visible row is what the tap below needs.
-- scrollUntilVisible:
-    element:
-      id: 'palette-advisor-link'
-    direction: DOWN
+- runFlow:
+    file: subflows/open-profile-topic.yaml
+    env: { PROFILE_TOPIC: 'style' }
+- extendedWaitUntil:
+    visible:
+      id: 'settings-style-screen'
     timeout: 15000
-    label: 'Palette advisor entry row is reachable from settings'
-
-# Pin the list end. The row is at the bottom of Settings, where the scroll view
-# stops with the row clear of the tab bar. iOS judges visibility from unclipped
-# XCUI frames, so the step above can stop with the row half behind the tab bar
-# and the tap below would land on a tab (Story 1.2b R27). One more scroll to the
-# end settles the row in the same place on both platforms.
-- scroll
-
 - tapOn:
-    id: 'palette-advisor-link'
+    id: 'style-row-palette'
     retryTapIfNoChange: true
-    label: 'Open the palette advisor'
+    label: 'Open Color palette from Style'
 
 - extendedWaitUntil:
     visible:

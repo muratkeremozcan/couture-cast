@@ -4,8 +4,10 @@ import {
   communityCommentSubmissionsResponseSchema,
   communityEventsResponseSchema,
   communityFeedModeSchema,
+  communityNotificationPreferencesResponseSchema,
   communityReactionFeedResponseSchema,
   communityReactionSpotlightResponseSchema,
+  garmentListResponseSchema,
   listSavedLocationsResponseSchema,
   outfitCapsuleListResponseSchema,
   plannerResponseSchema,
@@ -21,8 +23,10 @@ import {
   type CommunityReactionFeed,
   type CommunityReactionFeedItem,
   type CommunityReactionSpotlight,
+  type GarmentListResponse,
   type ResolveCommunityTargetsInput,
   type ShopThisLook,
+  type WardrobeOnboardingStateResponse,
 } from '@couture/api-client/contracts/http'
 
 /**
@@ -69,6 +73,10 @@ export type ShellCommunityFixture = {
   feed: (mode: CommunityFeedMode) => CommunityReactionFeed
   spotlight: CommunityReactionSpotlight
 }
+export type ShellClosetFixture = {
+  garments: GarmentListResponse
+  onboarding: WardrobeOnboardingStateResponse
+}
 
 export const DELAY_MS = 3000
 /** The Community sync channel's slow answer: late, and half its ~2 s deadline. */
@@ -77,6 +85,7 @@ export const SYNC_DELAY_MS = 1000
 /** Text the Home outfit renders for one member, so a test can tell two members apart. */
 export const ownerMarker = (memberId: string) => `comfort note for ${memberId}`
 export const POPULATED_GARMENTS = 24
+export const SHELL_PROFILE_NAME = 'Alex Morgenstern-Falkenberg'
 /** Story CC-7.12: the populated member's one saved look and one capsule (Looks > Saved tiles). */
 export const SHELL_SAVED_LOOK_ID = 'shell-saved-look-1'
 export const SHELL_CAPSULE_ID = 'shell-capsule-1'
@@ -114,6 +123,7 @@ export function readKey(url: string, method: string) {
     'events/poll': 'events-poll',
     'community/feed': 'community-feed',
     'community/events': 'community-events',
+    'community/notification-preferences': 'notification-preferences',
     'user/profile': 'profile',
     'wardrobe/onboarding': 'onboarding',
     'wardrobe/garments': 'garments',
@@ -140,13 +150,12 @@ export const GATE_READS: Record<ShellScreen, string[]> = {
   // capsules read follows the profile read that names its owner.
   looks: ['saved-looks', 'capsules'],
   community: ['community-feed', 'community-spotlight'],
-  // The account header's profile read shares the session check, so it is not a gate read.
   profile: [
+    'profile',
     'locations',
-    'commerce-preferences',
-    'subscription',
+    'onboarding',
     'premium-access',
-    'premium-theme',
+    'notification-preferences',
   ],
 }
 
@@ -256,6 +265,7 @@ export function bodies(
     todayPhotoUrl?: string
     todayOffer?: ShopThisLook
     community?: ShellCommunityFixture
+    closet?: ShellClosetFixture
   } = {}
 ) {
   // Community content is other members' posts, so a pending teen with nothing of their own still
@@ -447,7 +457,7 @@ export function bodies(
         user: {
           id: memberId,
           email: 'shell-member@example.test',
-          displayName: null,
+          displayName: SHELL_PROFILE_NAME,
           // 14 at the fixed clock (2026-11-20), inside the 13 to 15 consent band.
           birthdate: '2012-06-01T00:00:00.000Z',
           role: 'teen',
@@ -465,7 +475,7 @@ export function bodies(
         user: {
           id: memberId,
           email: 'shell-member@example.test',
-          displayName: null,
+          displayName: SHELL_PROFILE_NAME,
           birthdate: null,
           role: 'guardian',
         },
@@ -562,13 +572,30 @@ export function bodies(
     'community-events': checked(communityEventsResponseSchema, {
       data: { events: [], nextCursor: 'fixture', hasMore: false, resyncRequired: false },
     }),
+    'notification-preferences': checked(communityNotificationPreferencesResponseSchema, {
+      data: {
+        enabled: true,
+        pushEnabled: true,
+        quietHoursEnabled: false,
+        quietHoursStart: '22:00',
+        quietHoursEnd: '07:00',
+        timezone: 'America/Chicago',
+        revision: 'shell-notification-preferences',
+      },
+    }),
     profile: checked(userProfileResponseSchema, profile),
-    onboarding: checked(wardrobeOnboardingStateResponseSchema, { data: onboarding }),
-    garments: {
-      data: populated
-        ? Array.from({ length: POPULATED_GARMENTS }, (_, i) => garment(i))
-        : [],
-    },
+    onboarding: checked(
+      wardrobeOnboardingStateResponseSchema,
+      options.closet?.onboarding ?? { data: onboarding }
+    ),
+    garments: checked(
+      garmentListResponseSchema,
+      options.closet?.garments ?? {
+        data: populated
+          ? Array.from({ length: POPULATED_GARMENTS }, (_, i) => garment(i))
+          : [],
+      }
+    ),
     'commerce-preferences': { data: { affiliateCtasEnabled: true } },
     subscription: { data: subscription },
     'premium-access': {
@@ -648,6 +675,7 @@ export function createShellRouter(options: {
   todayPhotoUrl?: string
   todayOffer?: ShopThisLook
   community?: ShellCommunityFixture
+  closet?: ShellClosetFixture
   /**
    * A member run: a stubbed read without a fixture bearer answers 401 instead of member data,
    * so a member who lost the bearer cannot pass on fixture content (Codex P2-10). A signed-out
@@ -674,6 +702,7 @@ export function createShellRouter(options: {
           todayPhotoUrl: options.todayPhotoUrl,
           todayOffer: options.todayOffer,
           community: options.community,
+          closet: options.closet,
         })
       )
     return bodiesByOwner.get(owner)!

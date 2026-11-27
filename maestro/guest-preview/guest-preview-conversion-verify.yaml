@@ -111,7 +111,7 @@ env:
           id: 'garment-tagging-save'
       - extendedWaitUntil:
           visible:
-            id: 'garment-status-ready'
+            id: 'garment-open-.+'
           timeout: 30000
           label: 'The saved garment appears as ready in Wardrobe'
       - assertVisible:

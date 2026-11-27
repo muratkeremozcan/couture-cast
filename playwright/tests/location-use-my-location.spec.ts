@@ -104,7 +104,7 @@ async function memberEmail(userId: string): Promise<string> {
 }
 
 async function openLocations(page: Page) {
-  await page.goto('/settings')
+  await page.goto('/settings/places')
   await waitForAccessibilityReady(page)
   const section = page.getByTestId('locations-section')
   await expect(section).toHaveAttribute('data-state', 'ready')
@@ -311,20 +311,18 @@ test.describe('Use my location and the Profile page @local-lane', () => {
       await profileLink.click()
       await expect(page).toHaveURL(/\/settings$/)
       await expect(page.getByRole('heading', { level: 1 })).toHaveText('Profile')
+      await checkA11y(page)
+      await page.getByTestId('profile-account-row').click()
+      await expect(page).toHaveURL(/\/settings\/account$/)
       await expect(page.getByTestId('profile-account')).toContainText(email)
-      // Everything Settings held is still here.
+      await page.getByTestId('app-top-bar-back').click()
+      await expect(page).toHaveURL(/\/settings$/)
+      await page.getByTestId('profile-places-row').click()
+      await expect(page).toHaveURL(/\/settings\/places$/)
       await expect(page.getByTestId('locations-section')).toHaveAttribute(
         'data-state',
         'ready'
       )
-      await expect(
-        page.getByRole('heading', { name: 'Shopping and partners' })
-      ).toBeVisible()
-      await expect(page.getByRole('heading', { name: 'Premium' })).toBeVisible()
-      await expect(
-        page.getByRole('heading', { name: 'Interface palettes' })
-      ).toBeVisible()
-      await checkA11y(page)
     })
   }
 })
@@ -353,7 +351,10 @@ test.describe('the Profile entry in German @local-lane', () => {
     await profileLink.click()
     await expect(page).toHaveURL(/\/settings$/)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Profil')
+    await page.getByTestId('profile-account-row').click()
     await expect(page.getByTestId('profile-account')).toContainText(email)
+    await page.getByTestId('app-top-bar-back').click()
+    await page.getByTestId('profile-places-row').click()
     await expect(
       page.getByTestId('locations-section').getByRole('button', {
         name: 'Meinen Standort verwenden',

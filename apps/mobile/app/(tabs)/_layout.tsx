@@ -9,10 +9,9 @@ import {
   setMobileTabBarHeight,
 } from '@/components/save-feedback'
 import { ShareCardTabHeading } from '@/components/share-card-tab-heading'
-import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { APP_TABS, type AppTab, type AppTabId } from '@couture/utils'
-import { Link, Tabs } from 'expo-router'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Tabs } from 'expo-router'
+import { StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 
@@ -110,25 +109,6 @@ export default function TabLayout() {
   const tabOptions: Partial<Record<AppTabId, TabExtraOptions>> = {
     home: {
       headerTitle: (props) => <ShareCardTabHeading {...props} scope="outfit" />,
-      headerRight: () => (
-        <Link href="/modal" asChild>
-          <Pressable
-            testID="header-info-modal"
-            accessibilityRole="button"
-            accessibilityLabel={t('common.about_couturecast')}
-            style={styles.headerButton}
-          >
-            {({ pressed }) => (
-              <FontAwesome
-                name="info-circle"
-                size={25}
-                color={colors.ink}
-                style={{ marginRight: 16, opacity: pressed ? 0.5 : 1 }}
-              />
-            )}
-          </Pressable>
-        </Link>
-      ),
     },
     // The Closet's Add and More live in its top bar; the hub sets them (D4), since Add opens
     // the hub's own capture flow.
@@ -223,12 +203,6 @@ export default function TabLayout() {
 const INDICATOR_BOTTOM = -23
 
 const styles = StyleSheet.create({
-  headerButton: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',

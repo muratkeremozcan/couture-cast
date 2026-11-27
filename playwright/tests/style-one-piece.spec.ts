@@ -12,10 +12,18 @@ import {
 
 const openerName = 'Style this piece'
 
+async function openStyleDetail(page: Page, id: string) {
+  if (new URL(page.url()).searchParams.get('garment') !== id) {
+    await page.getByTestId(`garment-open-${id}`).click()
+  }
+  const detail = page.getByTestId('garment-detail')
+  await expect(detail).toBeVisible()
+  return detail
+}
+
 async function openStylePanel(page: Page, id: string) {
-  const card = page.getByTestId(`garment-card-${id}`)
-  await expect(card.getByTestId('garment-status-ready')).toBeVisible()
-  const opener = card.getByTestId('style-piece-open')
+  const detail = await openStyleDetail(page, id)
+  const opener = detail.getByTestId('style-piece-open')
   await expect(opener).toHaveAccessibleName(openerName)
   await opener.click()
   const panel = page.getByTestId('style-piece-panel')
@@ -334,14 +342,15 @@ test.describe('Style this piece on a phone', () => {
     await expect(page.getByTestId('style-piece-open')).toHaveCount(0)
 
     const expiredCard = page.getByTestId(`garment-card-${expired.id}`)
-    const refresh = expiredCard.getByTestId('style-piece-refresh')
+    const detail = await openStyleDetail(page, expired.id)
+    const refresh = detail.getByTestId('style-piece-refresh')
     await expect(refresh).toHaveAccessibleName('Refresh photo')
     // The list still contains the same garment ID. The simulated list refresh supplies
     // a new photo URL, just as the signed inventory response would.
     garments.splice(garments.indexOf(expired), 1, ready)
     await refresh.click()
     await expect(refresh).toHaveCount(0)
-    await expect(expiredCard.getByTestId('style-piece-open')).toBeFocused()
+    await expect(detail.getByTestId('style-piece-open')).toBeFocused()
     const panel = await openStylePanel(page, ready.id)
     await expectPinnedPhoto(
       panel.getByTestId('style-piece-look').first(),
@@ -388,7 +397,7 @@ test.describe('Style this piece on a phone', () => {
     await expect(saved).toHaveCount(1)
 
     await switchStyleMember(page, memberB)
-    const inventoryPhoto = page.getByTestId(`garment-card-${current.id}`).getByRole('img')
+    const inventoryPhoto = page.getByTestId(`garment-card-${current.id}`).locator('img')
     await expect(inventoryPhoto).toHaveAttribute('src', current.imageAccess.url)
     await expect(panel).toHaveCount(0)
     await openStylePanel(page, current.id)
@@ -417,8 +426,8 @@ test.describe('Style this piece on a phone', () => {
       if (trigger === 'periodic') await page.clock.install()
       await mockStyleWardrobe(page, baseURL!, interceptNetworkCall, inventory)
       await page.goto('/wardrobe')
-      const card = page.getByTestId(`garment-card-${garment.id}`)
-      const opener = card.getByTestId('style-piece-open')
+      const detail = await openStyleDetail(page, garment.id)
+      const opener = detail.getByTestId('style-piece-open')
       await expect(opener).toBeEnabled()
 
       // Hold the server's empty reply to inspect the UI while the inventory check is in flight.
@@ -462,7 +471,7 @@ test.describe('Style this piece on a phone', () => {
             await expect(page.getByTestId('style-piece-anchor')).toHaveCount(0)
           }
         )
-        await expect(card).toHaveCount(0)
+        await expect(page.getByTestId(`garment-card-${garment.id}`)).toHaveCount(0)
         await expect(page.getByTestId('style-piece-anchor')).toHaveCount(0)
         return
       }

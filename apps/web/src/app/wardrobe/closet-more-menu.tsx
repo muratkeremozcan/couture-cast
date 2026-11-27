@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { getI18n } from '../../i18n'
 
 const ITEM_CLASS =
-  'flex min-h-touch w-full items-center whitespace-nowrap rounded-md px-3 text-sm font-medium text-ink hover:bg-card-muted focus-visible:bg-card-muted'
+  'flex min-h-touch w-full items-center rounded-md px-3 py-1 [overflow-wrap:anywhere] text-sm font-medium text-ink hover:bg-card-muted focus-visible:bg-card-muted'
 
 /**
  * A neutral More button with a `menu` popover anchored below it. Escape, an outside click or a
@@ -77,7 +77,7 @@ export function ClosetMoreMenu({ setupDone }: { setupDone: boolean }) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0 max-w-full">
       <button
         ref={buttonRef}
         type="button"
@@ -94,7 +94,7 @@ export function ClosetMoreMenu({ setupDone }: { setupDone: boolean }) {
             setOpen(true)
           }
         }}
-        className="flex min-h-touch min-w-touch items-center justify-center rounded-lg border border-line-strong bg-page px-3 text-sm font-semibold text-ink"
+        className="flex min-h-touch max-w-full items-center justify-center rounded-lg border border-line-strong bg-page px-2 py-1 text-sm font-semibold text-ink [overflow-wrap:anywhere]"
       >
         {t('wardrobe.menu.more')}
       </button>
@@ -106,7 +106,7 @@ export function ClosetMoreMenu({ setupDone }: { setupDone: boolean }) {
           aria-label={t('wardrobe.menu.label')}
           data-testid="closet-more-menu-popover"
           onKeyDown={onMenuKeyDown}
-          className="absolute right-0 top-full z-40 mt-2 flex min-w-48 flex-col gap-1 rounded-lg border border-line bg-page p-2 shadow-overlay"
+          className="absolute right-0 top-full z-40 mt-2 flex w-max max-w-[calc(100vw-3rem)] flex-col gap-1 rounded-lg border border-line bg-page p-2 shadow-overlay"
         >
           <Link
             href="/wardrobe/onboarding"

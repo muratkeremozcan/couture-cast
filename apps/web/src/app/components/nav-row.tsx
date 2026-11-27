@@ -7,6 +7,7 @@ import Link from 'next/link'
 export interface NavRowProps {
   href: string
   label: string
+  value?: string
   testId: string
   /**
    * The last row of a group that a ruled section follows: it drops its own rule, so the two
@@ -16,7 +17,7 @@ export interface NavRowProps {
 }
 
 /** A neutral full-width link row with a chevron: a 44 px target with a rule below. */
-export function NavRow({ href, label, testId, last = false }: NavRowProps) {
+export function NavRow({ href, label, value, testId, last = false }: NavRowProps) {
   return (
     <Link
       href={href}
@@ -25,7 +26,12 @@ export function NavRow({ href, label, testId, last = false }: NavRowProps) {
         last ? '' : 'border-b border-line'
       }`}
     >
-      <span className="min-w-0 truncate">{label}</span>
+      <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-4 gap-y-1 [overflow-wrap:anywhere]">
+        <span className="min-w-0">{label}</span>
+        {value && (
+          <span className="min-w-0 text-sm font-normal text-ink-muted">{value}</span>
+        )}
+      </span>
       <svg
         aria-hidden="true"
         viewBox="0 0 24 24"

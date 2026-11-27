@@ -7,7 +7,7 @@ tags:
   - smoke
   - maestro
 env:
-  SETTINGS_TITLE: 'Language'
+  SETTINGS_TITLE: 'Profile'
 ---
 - launchApp:
     appId: ${MAESTRO_APP_ID}

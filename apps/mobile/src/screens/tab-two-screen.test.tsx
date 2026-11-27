@@ -142,12 +142,30 @@ vi.mock('@/src/lib/premium', () => ({
   ...premiumPassthroughMocks,
 }))
 
+vi.mock('@/src/lib/locations', () => ({
+  listLocationsFromMobile: () => Promise.resolve([]),
+}))
+
+vi.mock('@/src/lib/wardrobe', () => ({
+  getWardrobeOnboardingStateFromMobile: () => Promise.resolve({ status: 'not_started' }),
+}))
+
+vi.mock('@/src/lib/community', () => ({
+  communitySyncFromMobile: () => ({
+    preferences: () => Promise.resolve({ enabled: true }),
+  }),
+}))
+
 import i18n, { initI18n } from '../lib/i18n'
 import { mockSubscriptionNone } from '../test-utils/msw/handlers'
 import { getSavedSettings } from '../lib/settings-storage'
 import { setMobileAnalyticsDiagnosticsEnabled } from '../analytics/mobile-analytics-diagnostics'
 import { router } from 'expo-router'
-import SettingsScreen, { API_HEALTH_TIMEOUT_MS } from '../../app/(tabs)/settings'
+import SettingsScreen from '../../app/(tabs)/settings'
+import AccountScreen, { API_HEALTH_TIMEOUT_MS } from '../../app/settings-account'
+import AboutScreen from '../../app/settings-about'
+import LanguageScreen from '../../app/settings-language'
+import PremiumScreen from '../../app/settings-premium'
 import { screenFocus } from '../test-utils/focus-effect'
 
 const SUBPIXEL_ROUNDING_SLACK_PX = 2
@@ -228,100 +246,65 @@ describe('SettingsScreen', () => {
 
   const placeholder = () => screen.queryByTestId('screen-placeholder')
 
-  it('7.7-NAT-004 the Profile gate waits for the account header read, the first section', async () => {
+  it('7.7-NAT-004 waits for the owner summary before showing the Profile rows', async () => {
     const profile = held<ReturnType<typeof memberProfile>>()
     getUserProfileMock.mockReturnValue(profile.promise)
     await render(<SettingsScreen />)
 
-    // Every other gate read answered: the preference, the subscription, the store.
-    expect(await screen.findByTestId('commerce-opt-out-toggle')).not.toBeVisible()
-    expect(await screen.findByTestId('premium-restore')).not.toBeVisible()
+    await waitFor(() => expect(getUserProfileMock).toHaveBeenCalledTimes(1))
     expect(placeholder()).toBeVisible()
-    expect(screen.queryByTestId('profile-account')).toBeNull()
+    expect(screen.getByTestId('profile-account-row')).not.toBeVisible()
+    expect(getCommercePreferenceMock).not.toHaveBeenCalled()
+    expect(getSubscriptionMock).not.toHaveBeenCalled()
 
     act(() => profile.release(memberProfile('Jade')))
-
-    // The header arrives with the body, so it never pushes the sections below it down. The
-    // name mounts with the read's answer; the gate opens on the settle that follows it.
-    const name = await screen.findByTestId('profile-account-name')
-    await waitFor(() => expect(name).toBeVisible())
-    await waitFor(() =>
-      expect(screen.getByTestId('commerce-opt-out-toggle')).toBeVisible()
-    )
+    await waitFor(() => expect(screen.getByTestId('profile-account-row')).toBeVisible())
+    expect(screen.getByTestId('profile-account-row')).toHaveTextContent('Jade')
     expect(placeholder()).toBeNull()
   })
 
-  it('7.9-NAT-INSET-001 insets the Profile body once, 16 from each edge like every tab body', async () => {
-    getUserProfileMock.mockResolvedValue(memberProfile('Jade'))
+  it('7.9-NAT-INSET-001 insets the Profile rows once from the edge', async () => {
     await render(<SettingsScreen />)
     const body = await screen.findByTestId('settings-screen')
-    await waitFor(() =>
-      expect(screen.getByTestId('commerce-settings-section')).toBeVisible()
-    )
+    const account = screen.getByTestId('profile-account-row')
+    await waitFor(() => expect(account).toBeVisible())
+    const frame = body.parentElement!.getBoundingClientRect()
+    const row = account.getBoundingClientRect()
 
-    // CC-7.9 small-phone capture: 16 in the container plus a centered 90% section put the
-    // body about 33 from the edge. Every tab body now shares TAB_BODY_INSET (web's px-4).
-    expect(TAB_BODY_INSET).toBe(16)
-    const style = getComputedStyle(body)
-    expect(style.paddingLeft).toBe('16px')
-    expect(style.paddingRight).toBe('16px')
-    const frame = body.getBoundingClientRect()
-    const section = screen
-      .getByTestId('commerce-settings-section')
-      .getBoundingClientRect()
-    expect(section.left - frame.left).toBeCloseTo(16, 0)
-    expect(frame.right - section.right).toBeCloseTo(16, 0)
+    expect(row.left - frame.left).toBeCloseTo(TAB_BODY_INSET, 0)
+    expect(frame.right - row.right).toBeCloseTo(TAB_BODY_INSET, 0)
   })
 
-  it('7.7-NAT-004 the Profile gate waits for the store to answer whether purchases are available', async () => {
+  it('7.7-NAT-004 Premium waits for the store before offering purchase controls', async () => {
     const store = held<'ready'>()
     ensurePurchasesConfiguredMock.mockReturnValue(store.promise)
-    await render(<SettingsScreen />)
+    await render(<PremiumScreen />)
 
-    // Every other gate read answered: the header, the preference, the subscription access.
-    expect(await screen.findByTestId('profile-account')).not.toBeVisible()
-    expect(await screen.findByTestId('commerce-opt-out-toggle')).not.toBeVisible()
     await waitFor(() => expect(ensurePurchasesConfiguredMock).toHaveBeenCalled())
-    expect(screen.getByTestId('premium-settings-section')).not.toBeVisible()
     expect(screen.queryByTestId('premium-restore')).toBeNull()
-    expect(placeholder()).toBeVisible()
 
     act(() => store.release('ready'))
-
-    // The subscribe controls appear with the section, never under the member's finger.
-    const restore = await screen.findByTestId('premium-restore')
-    await waitFor(() => expect(restore).toBeVisible())
-    expect(placeholder()).toBeNull()
+    expect(await screen.findByTestId('premium-restore')).toBeVisible()
   })
 
-  it('7.7-NAT-003 a return to Profile re-reads its sections in place', async () => {
+  it('7.7-NAT-003 keeps the Profile summary in place while return reads settle', async () => {
+    getUserProfileMock.mockResolvedValue(memberProfile('Jade'))
     await render(<SettingsScreen />)
-    const email = await screen.findByTestId('profile-account-email')
-    await waitFor(() => expect(email).toBeVisible())
-    expect(getUserProfileMock).toHaveBeenCalledTimes(1)
-    expect(getCommercePreferenceMock).toHaveBeenCalledTimes(1)
-    expect(getSubscriptionMock).toHaveBeenCalledTimes(1)
+    const account = await screen.findByTestId('profile-account-row')
+    await waitFor(() => expect(account).toBeVisible())
+    expect(account).toHaveTextContent('Jade')
 
     const profile = held<ReturnType<typeof memberProfile>>()
     getUserProfileMock.mockReturnValue(profile.promise)
-    // Leaving reads nothing: only the return does.
-    act(() => screenFocus.set(false))
-    expect(getUserProfileMock).toHaveBeenCalledTimes(1)
-    act(() => screenFocus.set(true))
+    leaveAndReturn()
 
     await waitFor(() => expect(getUserProfileMock).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(getCommercePreferenceMock).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(getSubscriptionMock).toHaveBeenCalledTimes(2))
-    // The header and the sections stay while the reads run: no placeholder, no empty header.
     expect(placeholder()).toBeNull()
-    expect(screen.getByTestId('profile-account-email')).toBe(email)
-    expect(email).toBeVisible()
-    await waitFor(() =>
-      expect(screen.getByTestId('commerce-opt-out-toggle')).toBeVisible()
-    )
+    expect(account).toHaveTextContent('Jade')
+    expect(account).toBeVisible()
 
-    act(() => profile.release(memberProfile('Jade')))
-    expect(await screen.findByTestId('profile-account-name')).toHaveTextContent('Jade')
+    act(() => profile.release(memberProfile('Jade Rivers')))
+    await waitFor(() => expect(account).toHaveTextContent('Jade Rivers'))
     expect(placeholder()).toBeNull()
   })
 
@@ -334,7 +317,7 @@ describe('SettingsScreen', () => {
   // CodeRabbit r1: a return read that began before a toggle answers with the value the toggle
   // replaced. The saved choice stays.
   it('7.7-NAT-013 a return read that started before a toggle never lands over the saved choice', async () => {
-    await render(<SettingsScreen />)
+    await render(<AboutScreen />)
     const toggle = await screen.findByTestId('commerce-opt-out-toggle')
     await waitFor(() => {
       expect(toggle).toBeVisible()
@@ -367,53 +350,48 @@ describe('SettingsScreen', () => {
 
   // CodeRabbit r1: a return read belongs to the member it started for. One that answers after
   // the device changed hands restores nothing of theirs.
-  it('7.7-NAT-015 return reads that answer after the member changed leave the screen as it is', async () => {
+  it('7.7-NAT-015 drops a Profile read that answers after the member changes', async () => {
+    getUserProfileMock.mockResolvedValue(memberProfile('Jade'))
     await render(<SettingsScreen />)
-    const email = await screen.findByTestId('profile-account-email')
-    const toggle = screen.getByTestId('commerce-opt-out-toggle')
-    await waitFor(() => {
-      expect(email).toBeVisible()
-      expect(toggle).toHaveAttribute('aria-checked', 'true')
-    })
+    const account = await screen.findByTestId('profile-account-row')
+    await waitFor(() => expect(account).toHaveTextContent('Jade'))
+
     const profile = held<ReturnType<typeof memberProfile>>()
     getUserProfileMock.mockReturnValue(profile.promise)
+    leaveAndReturn()
+    await waitFor(() => expect(getUserProfileMock).toHaveBeenCalledTimes(2))
+
+    identityEpochMock.mockReturnValue(1)
+    await act(async () => {
+      profile.release(memberProfile('Previous member'))
+      await profile.promise
+    })
+    expect(account).toHaveTextContent('Jade')
+  })
+
+  it('drops an About preference read that answers after the member changes', async () => {
+    await render(<AboutScreen />)
+    const toggle = await screen.findByTestId('commerce-opt-out-toggle')
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'))
+
     const preference = held<{ affiliateCtasEnabled: boolean }>()
     getCommercePreferenceMock.mockReturnValue(preference.promise)
     leaveAndReturn()
-    await waitFor(() => {
-      expect(getUserProfileMock).toHaveBeenCalledTimes(2)
-      expect(getCommercePreferenceMock).toHaveBeenCalledTimes(2)
-    })
-
-    // Another identity takes the device while both reads are in flight.
+    await waitFor(() => expect(getCommercePreferenceMock).toHaveBeenCalledTimes(2))
     identityEpochMock.mockReturnValue(1)
-    const previous = memberProfile('Previous member')
     await act(async () => {
-      profile.release({
-        ...previous,
-        user: { ...previous.user, email: 'previous@example.test' },
-      })
       preference.release({ affiliateCtasEnabled: false })
-      // A task boundary: every promise step of both reads' chains runs before it.
-      await new Promise((resolve) => setTimeout(resolve, 0))
+      await preference.promise
     })
-
-    expect(screen.queryByTestId('profile-account-name')).toBeNull()
-    expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
-      'jade@example.test'
-    )
-    expect(screen.getByTestId('commerce-opt-out-toggle')).toHaveAttribute(
-      'aria-checked',
-      'true'
-    )
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
   })
 
   it('6.5-MOB-POLISH-07 keeps API health and wiring notes out of the user build', async () => {
     // Diagnostics stay off unless EXPO_PUBLIC_MOBILE_ANALYTICS_DIAGNOSTICS=1, so users
     // never see developer status lines and the screen never polls the health route.
-    await render(<SettingsScreen />)
+    await render(<AccountScreen />)
 
-    await screen.findByTestId('locale-btn-tr-TR')
+    await screen.findByTestId('settings-account-screen')
     expect(screen.queryByText(/API health/)).toBeNull()
     expect(screen.queryByText(/alert_received/)).toBeNull()
     expect(loadMobileApiHealthMock).not.toHaveBeenCalled()
@@ -423,23 +401,15 @@ describe('SettingsScreen', () => {
     // Switching primary takes two taps from Settings: this row, then Make primary.
     await render(<SettingsScreen />)
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Locations' }))
+    await userEvent.click(await screen.findByTestId('profile-places-row'))
 
     expect(vi.mocked(router.push)).toHaveBeenCalledWith('/locations')
   })
 
-  it('[P1] [7.12-NAT-031] opens Looks on Plan from the planner row in one press', async () => {
+  it('[P1] [7.16-PRO-003] Profile keeps About and privacy and drops its Planner entry', async () => {
     await render(<SettingsScreen />)
-
-    const row = await screen.findByTestId('planner-link')
-    expect(row).toHaveTextContent('7-Day Planner')
-    await userEvent.click(row)
-
-    expect(vi.mocked(router.navigate).mock.calls).toEqual([
-      [{ pathname: '/looks', params: { segment: 'plan' } }],
-    ])
-    // The old planner route is a redirect now; the row never pushes it.
-    expect(vi.mocked(router.push)).not.toHaveBeenCalledWith('/planner')
+    expect(await screen.findByTestId('profile-about-row')).toBeVisible()
+    expect(screen.queryByTestId('planner-link')).toBeNull()
   })
 
   it('renders API health loaded from the generated client', async () => {
@@ -448,7 +418,7 @@ describe('SettingsScreen', () => {
       status: 'ok',
     })
 
-    await render(<SettingsScreen />)
+    await render(<AccountScreen />)
 
     await screen.findByText('API health: ok')
   })
@@ -458,7 +428,7 @@ describe('SettingsScreen', () => {
     setMobileAnalyticsDiagnosticsEnabled(true)
     loadMobileApiHealthMock.mockImplementation(() => new Promise(() => undefined))
 
-    await render(<SettingsScreen />)
+    await render(<AccountScreen />)
 
     await act(async () => {
       // The screen's own bound, imported rather than mirrored: a change there
@@ -470,7 +440,7 @@ describe('SettingsScreen', () => {
   })
 
   it('persists, profiles, tracks, and renders a selected locale', async () => {
-    await render(<SettingsScreen />)
+    await render(<LanguageScreen />)
 
     fireEvent.click(screen.getByTestId('locale-btn-tr-TR'))
 
@@ -500,7 +470,7 @@ describe('SettingsScreen', () => {
       })
 
     try {
-      await render(<SettingsScreen />)
+      await render(<LanguageScreen />)
 
       fireEvent.click(screen.getByTestId('locale-btn-tr-TR'))
 
@@ -521,7 +491,7 @@ describe('SettingsScreen', () => {
       JSON.stringify({ locale: 'tr-TR', localeSyncPending: true })
     )
 
-    await render(<SettingsScreen />)
+    await render(<LanguageScreen />)
 
     await waitFor(() => {
       expect(updatePreferredLocaleMock).toHaveBeenCalledWith('tr-TR')
@@ -539,7 +509,7 @@ describe('SettingsScreen', () => {
       JSON.stringify({ locale: 'tr-TR', localeSyncPending: true })
     )
 
-    await render(<SettingsScreen />)
+    await render(<LanguageScreen />)
 
     await screen.findByText(
       'Language changed on this device. Profile sync will retry later.'
@@ -554,7 +524,7 @@ describe('SettingsScreen', () => {
   it('applies a language change locally even when the profile sync is rejected', async () => {
     updatePreferredLocaleMock.mockRejectedValue(new Error('profile service down'))
 
-    await render(<SettingsScreen />)
+    await render(<LanguageScreen />)
 
     fireEvent.click(screen.getByTestId('locale-btn-tr-TR'))
 
@@ -575,7 +545,7 @@ describe('SettingsScreen', () => {
     setMobileAnalyticsDiagnosticsEnabled(true)
     loadMobileApiHealthMock.mockRejectedValue(new Error('health endpoint down'))
 
-    await render(<SettingsScreen />)
+    await render(<AccountScreen />)
 
     await screen.findByText('API health unavailable')
   })
@@ -585,7 +555,7 @@ describe('SettingsScreen', () => {
     // alert_received analytics contract without a real push notification.
     setMobileAnalyticsDiagnosticsEnabled(true)
 
-    await render(<SettingsScreen />)
+    await render(<AccountScreen />)
 
     // Story CC-7.7: the Profile body shows once its gate reads settle.
     fireEvent.click(
@@ -607,7 +577,7 @@ describe('SettingsScreen', () => {
     analyticsDistinctIdMock.mockReturnValue('')
     setMobileAnalyticsDiagnosticsEnabled(true)
 
-    await render(<SettingsScreen />)
+    await render(<AccountScreen />)
 
     // Story CC-7.7: the Profile body shows once its gate reads settle.
     fireEvent.click(
@@ -628,7 +598,7 @@ describe('SettingsScreen', () => {
   })
 
   it('5.1-MOB-SET-01 discloses the integration above the toggle and reflects the stored value', async () => {
-    await render(<SettingsScreen />)
+    await render(<AboutScreen />)
 
     const section = await screen.findByTestId('commerce-settings-section')
     expect(screen.getByText('Shopping and partners')).toBeTruthy()
@@ -654,7 +624,7 @@ describe('SettingsScreen', () => {
   })
 
   it('5.1-MOB-SET-02 turns the affiliate suggestions off and confirms the round trip', async () => {
-    await render(<SettingsScreen />)
+    await render(<AboutScreen />)
 
     const toggle = await screen.findByTestId('commerce-opt-out-toggle')
     await waitFor(() => {
@@ -681,7 +651,7 @@ describe('SettingsScreen', () => {
   it('5.1-MOB-SET-03 turns them back on again', async () => {
     getCommercePreferenceMock.mockResolvedValue({ affiliateCtasEnabled: false })
 
-    await render(<SettingsScreen />)
+    await render(<AboutScreen />)
 
     const toggle = await screen.findByTestId('commerce-opt-out-toggle')
     await waitFor(() => {
@@ -707,7 +677,7 @@ describe('SettingsScreen', () => {
   it('5.1-MOB-SET-04 reverts the optimistic switch and alerts when the write fails', async () => {
     updateCommercePreferenceMock.mockRejectedValue(new Error('preferences unavailable'))
 
-    await render(<SettingsScreen />)
+    await render(<AboutScreen />)
     const toggle = await screen.findByTestId('commerce-opt-out-toggle')
     await waitFor(() => {
       expect(toggle).toHaveAttribute('aria-checked', 'true')
@@ -734,7 +704,7 @@ describe('SettingsScreen', () => {
   it('5.1-MOB-SET-05 keeps the toggle inert while the stored value is unknown', async () => {
     getCommercePreferenceMock.mockRejectedValue(new Error('preferences unavailable'))
 
-    await render(<SettingsScreen />)
+    await render(<AboutScreen />)
 
     const alert = await screen.findByTestId('commerce-settings-error')
     // The load string, not the save string. This path reused
@@ -751,76 +721,65 @@ describe('SettingsScreen', () => {
     expect(updateCommercePreferenceMock).not.toHaveBeenCalled()
   })
 
-  it('6.5-MOB-POLISH-03 shows a signed-out device no load errors for member data it cannot have', async () => {
-    resolveMobileAccessTokenMock.mockResolvedValue(undefined)
-    // What the API answers without a bearer, so a read here would surface as an error.
-    getCommercePreferenceMock.mockRejectedValue(new Error('401'))
-    getSubscriptionMock.mockRejectedValue(new Error('401'))
+  it.each([
+    [
+      'About',
+      AboutScreen,
+      'commerce-settings-signed-out',
+      'commerce-settings-error',
+      getCommercePreferenceMock,
+    ],
+    [
+      'Premium',
+      PremiumScreen,
+      'premium-signed-out',
+      'premium-load-error',
+      getSubscriptionMock,
+    ],
+  ] as const)(
+    '6.5-MOB-POLISH-03 shows a signed-out reader the %s state without a private read',
+    async (_name, Destination, signedOut, error, privateRead) => {
+      resolveMobileAccessTokenMock.mockResolvedValue(undefined)
+      privateRead.mockRejectedValue(new Error('401'))
+      await render(<Destination />)
+      expect(await screen.findByTestId(signedOut)).toBeInTheDocument()
+      expect(screen.queryByTestId(error)).toBeNull()
+      expect(privateRead).not.toHaveBeenCalled()
+    }
+  )
 
-    await render(<SettingsScreen />)
-
-    expect(await screen.findByTestId('commerce-settings-signed-out')).toBeInTheDocument()
-    expect(await screen.findByTestId('premium-signed-out')).toBeInTheDocument()
-    expect(screen.queryByTestId('commerce-settings-error')).toBeNull()
-    expect(screen.queryByTestId('premium-load-error')).toBeNull()
-    expect(screen.queryByTestId('commerce-opt-out-toggle')).toBeNull()
-    expect(getCommercePreferenceMock).not.toHaveBeenCalled()
-    expect(getSubscriptionMock).not.toHaveBeenCalled()
-  })
-
-  /*
-   * Production follow-up (2026-11-19): Jade could not find a profile. The tab reads Profile and
-   * opens on whose account it is, above everything Settings already held.
-   */
-  it('PROFILE-MOB-01 opens on the member display name and email, above the language section', async () => {
+  it('PROFILE-MOB-01 names the member in Profile and shows the email on Account', async () => {
     getUserProfileMock.mockResolvedValue(memberProfile('Jade'))
+    const profile = await render(<SettingsScreen />)
+    const account = await screen.findByTestId('profile-account-row')
+    await waitFor(() => expect(account).toHaveTextContent('Jade'))
+    expect(account).not.toHaveTextContent('jade@example.test')
+    expect(screen.getByTestId('profile-places-row')).toBeVisible()
+    await profile.unmount()
 
-    await render(<SettingsScreen />)
-
-    const header = await screen.findByTestId('profile-account')
-    expect(screen.getByTestId('profile-account-name').textContent).toBe('Jade')
-    expect(screen.getByTestId('profile-account-email').textContent).toBe(
+    await render(<AccountScreen />)
+    expect(await screen.findByTestId('profile-account-name')).toHaveTextContent('Jade')
+    expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
       'jade@example.test'
     )
-    expect(header).toHaveTextContent('Account')
-    expect(
-      header.compareDocumentPosition(screen.getByTestId('settings-language-title')) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
-    expect(screen.getByTestId('locations-link')).toBeInTheDocument()
-    expect(screen.getByTestId('commerce-settings-section')).toBeInTheDocument()
   })
 
-  it('PROFILE-MOB-02 shows the email alone when the member set no display name', async () => {
+  it('PROFILE-MOB-02 shows the email on Account when the member set no display name', async () => {
     getUserProfileMock.mockResolvedValue(memberProfile('   '))
-
-    await render(<SettingsScreen />)
-
-    expect((await screen.findByTestId('profile-account-email')).textContent).toBe(
+    await render(<AccountScreen />)
+    expect(await screen.findByTestId('profile-account-email')).toHaveTextContent(
       'jade@example.test'
     )
     expect(screen.queryByTestId('profile-account-name')).toBeNull()
   })
 
-  it('PROFILE-MOB-03 shows no account header signed out or when the profile read fails, and the rest still renders', async () => {
-    resolveMobileAccessTokenMock.mockResolvedValue(undefined)
-
-    const signedOut = await render(<SettingsScreen />)
-
-    await screen.findByTestId('commerce-settings-signed-out')
-    expect(screen.queryByTestId('profile-sign-out')).toBeNull()
-    expect(getUserProfileMock).not.toHaveBeenCalled()
-    expect(screen.queryByTestId('profile-account')).toBeNull()
-    await signedOut.unmount()
-
-    resolveMobileAccessTokenMock.mockResolvedValue('member-token')
+  it('PROFILE-MOB-03 leaves Profile usable when the account read fails', async () => {
     getUserProfileMock.mockRejectedValue(new Error('503'))
-
     await render(<SettingsScreen />)
 
-    await waitFor(() => expect(getUserProfileMock).toHaveBeenCalled())
-    expect(await screen.findByTestId('commerce-opt-out-toggle')).toBeInTheDocument()
-    expect(screen.queryByTestId('profile-account')).toBeNull()
+    await waitFor(() => expect(screen.getByTestId('profile-account-row')).toBeVisible())
+    expect(screen.getByTestId('profile-about-row')).toBeVisible()
+    expect(screen.queryByText('jade@example.test')).toBeNull()
   })
 
   it('7.13-NAT-005 guards Profile sign-out while pending and permits retry after an error', async () => {
@@ -858,23 +817,21 @@ describe('SettingsScreen', () => {
     // data once the read succeeds.
     resolveMobileAccessTokenMock.mockRejectedValueOnce(new Error('keychain busy'))
 
-    await render(<SettingsScreen />)
+    await render(<AboutScreen />)
 
     await waitFor(
       () => {
         expect(getCommercePreferenceMock).toHaveBeenCalled()
-        expect(getSubscriptionMock).toHaveBeenCalled()
       },
       { timeout: 5_000 }
     )
     expect(await screen.findByTestId('commerce-opt-out-toggle')).toBeInTheDocument()
     expect(screen.queryByTestId('commerce-settings-signed-out')).toBeNull()
-    expect(screen.queryByTestId('premium-signed-out')).toBeNull()
     expect(resolveMobileAccessTokenMock.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
 
   it('5.1-MOB-SET-06 gives the toggle a touch target of at least 44 by 44 pixels', async () => {
-    await render(<SettingsScreen />)
+    await render(<AboutScreen />)
 
     const toggle = await screen.findByTestId('commerce-opt-out-toggle')
     const style = window.getComputedStyle(toggle)
@@ -903,7 +860,12 @@ describe('SettingsScreen', () => {
         await i18n.changeLanguage(locale)
       })
 
-      const { container, unmount } = await render(<SettingsScreen />)
+      const { container, unmount } = await render(
+        <>
+          <AboutScreen />
+          <PremiumScreen />
+        </>
+      )
 
       // The commerce section carries the longest string on this screen, a
       // multi-sentence disclosure, so it is named explicitly: without this the

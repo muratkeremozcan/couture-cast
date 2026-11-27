@@ -403,7 +403,7 @@ describe('WardrobePage garment card label', () => {
     expect(card).not.toHaveTextContent(tagged.id)
   })
 
-  it('labels a status the catalogs do not name with the localized fallback, never the raw code', async () => {
+  it('leaves an unfamiliar status off the card', async () => {
     // Review P2-11: the status list is an open set; a newer backend code is diagnostic data.
     const unfamiliar = garmentFixture('unfamiliar-status-1', 'ready', {
       status: 'quarantine_review' as GarmentItemContract['status'],
@@ -413,8 +413,7 @@ describe('WardrobePage garment card label', () => {
     render(<WardrobePage />)
 
     const card = await screen.findByTestId(`garment-card-${unfamiliar.id}`)
-    const chip = within(card).getByTestId('garment-status-quarantine_review')
-    expect(chip).toHaveTextContent(/^In progress$/)
+    expect(within(card).queryByTestId(/^garment-status-/)).toBeNull()
     expect(card).not.toHaveTextContent(/quarantine/i)
   })
 })
@@ -1105,7 +1104,7 @@ describe('WardrobePage processing poll', () => {
     sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-styling-member')
     try {
       render(<WardrobePage />)
-      const openStyling = await screen.findByRole('button', { name: 'Style this piece' })
+      const openDetail = await screen.findByTestId(`garment-open-${anchor.id}`)
       await commitGarmentThroughCapture(
         user,
         processing,
@@ -1113,7 +1112,8 @@ describe('WardrobePage processing poll', () => {
       )
       await user.click(screen.getByRole('button', { name: 'Done' }))
       await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2))
-      await user.click(openStyling)
+      await user.click(openDetail)
+      await user.click(await screen.findByTestId('style-piece-open'))
       const panel = await screen.findByRole('dialog', { name: 'Style this piece' })
       await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(3))
       const card = screen.getByTestId(`garment-card-${processing.id}`)
@@ -1121,13 +1121,13 @@ describe('WardrobePage processing poll', () => {
         poll.resolve([anchor, ready])
         await poll.promise
       })
-      expect(within(card).getByTestId('garment-status-ready')).toBeVisible()
+      expect(within(card).getByTestId(`garment-open-${processing.id}`)).toBeEnabled()
 
       await act(async () => {
         styling.resolve([anchor, processing])
         await styling.promise
       })
-      expect(within(card).getByTestId('garment-status-ready')).toBeVisible()
+      expect(within(card).getByTestId(`garment-open-${processing.id}`)).toBeEnabled()
       expect(
         within(panel).queryByRole('img', { name: 'Your piece' })
       ).not.toBeInTheDocument()
@@ -1141,7 +1141,7 @@ describe('WardrobePage processing poll', () => {
         within(panel).queryByRole('img', { name: 'Your piece' })
       ).not.toBeInTheDocument()
       await user.keyboard('{Escape}')
-      expect(within(card).getByTestId('garment-status-ready')).toBeVisible()
+      expect(within(card).getByTestId(`garment-open-${processing.id}`)).toBeEnabled()
     } finally {
       cleanup()
       verifiedSession.owner = null
@@ -1224,10 +1224,10 @@ describe('WardrobePage processing poll', () => {
     )
 
     // Same reason as above: the rendered status proves the poll settled.
-    await screen.findByTestId('garment-status-ready')
+    await screen.findByTestId('garment-open-garment-poll')
     await user.click(screen.getByRole('button', { name: 'Done' }))
 
-    expect(screen.getByTestId('garment-status-ready')).toBeInTheDocument()
+    expect(screen.getByTestId('garment-open-garment-poll')).toBeInTheDocument()
     expect(screen.queryByText('Organize Garment Tags')).not.toBeInTheDocument()
     // A single poll settles it; the ladder must not keep firing.
     expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2)

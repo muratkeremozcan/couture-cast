@@ -53,8 +53,11 @@ test.describe('The production synthetic member', () => {
       const page = await context.newPage()
       await page.goto('/settings')
 
-      // The page verifies the stored session against production, then names the member.
+      // The account and places destinations restore the same verified session.
+      await page.getByTestId('profile-account-row').click()
       await expect(page.getByTestId('profile-account')).toContainText(prodMember!.email)
+      await page.getByTestId('app-top-bar-back').click()
+      await page.getByTestId('profile-places-row').click()
       await expect(page.getByTestId('locations-section')).toHaveAttribute(
         'data-state',
         'ready'

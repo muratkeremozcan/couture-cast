@@ -1,0 +1,17 @@
+# Learning path Step 73: Calm Closet and Profile.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-73-calm-closet-and-profile
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: open-settings.yaml
+- scrollUntilVisible:
+    element:
+      id: 'profile-${PROFILE_TOPIC}-row'
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: 'profile-${PROFILE_TOPIC}-row'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'app-top-bar-back'
+    timeout: 15000

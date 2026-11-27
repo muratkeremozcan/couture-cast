@@ -163,12 +163,12 @@ test.describe('Guest preview and first garment with verified auth', () => {
         await prisma.wardrobeOnboardingState.findFirst({ where: { user_id: userId } })
       ).toBeNull()
       const card = page.getByTestId(`garment-card-${garments[0]!.id}`)
-      await expect(card.getByTestId('garment-status-ready')).toBeVisible()
+      await expect(card.getByTestId(`garment-open-${garments[0]!.id}`)).toBeVisible()
       await expect(
         page.getByRole('link', { name: /back to today.s outfit/i })
       ).toBeVisible()
       await page.reload()
-      await expect(card.getByTestId('garment-status-ready')).toBeVisible()
+      await expect(card.getByTestId(`garment-open-${garments[0]!.id}`)).toBeVisible()
       await expect(capture).toBeHidden()
     } finally {
       try {

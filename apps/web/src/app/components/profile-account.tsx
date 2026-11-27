@@ -1,115 +1,50 @@
-// Production follow-up after the project close (2026-11-19): Jade looked for her profile and
-// found a page called Settings with no sign of her account on it. The page is now Profile, and
-// this header names the signed-in account (display name when there is one, always the email)
-// above the sections. Signed out, or while the session is still being verified, it renders
-// nothing, so the unauthenticated accessibility audit of `/settings` sees the page unchanged.
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useWebSession } from '../../lib/use-web-session'
+import { getI18n } from '../../i18n'
+import { currentWebSessionScope, useWebSessionScope } from '../../lib/use-web-session'
 import { getSignedInUserProfileFromWeb } from '../../lib/user'
-import { useGuestFirstPaint, useScreenGateOpen, useSectionSnapshot } from './screen-gate'
-
-/**
- * The header's footprint: its two lines (an 18px name line on a 28px line box and a 14px email
- * line on a 20px one, 48px together). Once the reserved lines were on screen they are held until
- * the member leaves, so an account without a display name, or a read that failed, never shrinks
- * it and pulls the sections below up after the reveal (CodeRabbit r2 #9).
- */
-const ACCOUNT_FOOTPRINT = 'min-h-12 max-w-2xl'
-/**
- * An account that answered while Profile's gate still hid the body takes only the lines it
- * shows: the email alone left 28 px of blank page under it (CC-7.9 CI snapshot), and nothing
- * moves on screen because the body is not shown yet.
- */
-const ACCOUNT_SETTLED_FOOTPRINT = 'max-w-2xl'
-
-interface Account {
-  displayName: string | null
-  email: string
-}
 
 export function ProfileAccount() {
-  const { t } = useTranslation()
-  const session = useWebSession()
-  const owner = session.status === 'signed_in' ? session.owner : null
-  // Story CC-7.7 D5 (Codex review P1-2): a return to Profile shows this member's account at once
-  // and reads it again in place.
-  const snapshot = useSectionSnapshot<Account>('account', owner)
-  const restoredFor = snapshot.restoredFor
-  const [account, setAccount] = useState<Account | null>(() => snapshot.restored ?? null)
-  /*
-   * Story CC-7.7: the account sits at the top of Profile, above every section. Its read is the
-   * same request the session's own verification makes, so Profile's gate does not wait for it
-   * (CI real-session PS-2 on 61d7156e: a reload held the whole page behind a verification still
-   * out). Instead the header keeps its two lines for a signed-in member (while the read is out,
-   * and after it fails) and while a page painted for a stored session is still checked, so the
-   * account never pushes the sections below it when it lands and never pulls them up after.
-   */
-  const guestFirstPaint = useGuestFirstPaint()
-  const reserved = owner !== null || (session.status === 'checking' && !guestFirstPaint)
+  const scope = useWebSessionScope()
+  return <MemberAccount key={scope} scope={scope} />
+}
 
-  /*
-   * The member whose reserved lines were shown in an open body. Their account keeps the full
-   * footprint when it lands, so a late answer never pulls the sections up.
-   */
-  const gateOpen = useScreenGateOpen()
-  const [heldFor, setHeldFor] = useState<string | null>(null)
+function MemberAccount({ scope }: { scope: string | null }) {
+  const { t } = useTranslation('translation', { i18n: getI18n() })
+  const [account, setAccount] = useState<{ displayName: string | null; email: string }>()
   useEffect(() => {
-    if (gateOpen && !account && owner !== null) setHeldFor(owner)
-  }, [account, gateOpen, owner])
-  const held = owner !== null && heldFor === owner
-
-  const { beginRead, remember } = snapshot
-  // One profile request per member, like the Locations list. The restored member's account
-  // stays on screen while it is read again; a failed refresh keeps it.
-  useEffect(() => {
-    if (owner === null || owner !== restoredFor) setAccount(null)
-    if (!owner) return
+    if (!scope || currentWebSessionScope() !== scope) return
     const controller = new AbortController()
-    beginRead()
-    getSignedInUserProfileFromWeb(controller.signal)
+    void getSignedInUserProfileFromWeb(controller.signal)
       .then(({ user }) => {
-        if (controller.signal.aborted) return
-        const next = { displayName: user.displayName?.trim() || null, email: user.email }
-        setAccount(next)
-        remember(next)
+        if (controller.signal.aborted || currentWebSessionScope() !== scope) return
+        setAccount({ displayName: user.displayName?.trim() || null, email: user.email })
       })
-      .catch(() => {
-        // The header is a courtesy: every section below reports its own failures, and the
-        // header keeps its reserved lines.
-      })
+      .catch(() => undefined)
     return () => controller.abort()
-  }, [owner, restoredFor, beginRead, remember])
-
-  if (!account)
-    return reserved ? (
-      <div
-        aria-hidden="true"
-        data-testid="profile-account-reserved"
-        className={ACCOUNT_FOOTPRINT}
-      >
-        <p className="text-lg font-semibold">&nbsp;</p>
-        <p className="text-sm">&nbsp;</p>
-      </div>
-    ) : null
+  }, [scope])
 
   return (
     <section
-      aria-label={t('settings.account')}
+      aria-label={t('settings.profile.account')}
       data-testid="profile-account"
-      className={
-        held || account.displayName ? ACCOUNT_FOOTPRINT : ACCOUNT_SETTLED_FOOTPRINT
-      }
+      className="min-h-12"
     >
-      {account.displayName && (
-        <p className="text-lg font-semibold text-ink" data-testid="profile-account-name">
+      {account?.displayName && (
+        <p
+          className="text-lg font-semibold text-ink [overflow-wrap:anywhere]"
+          data-testid="profile-account-name"
+        >
           {account.displayName}
         </p>
       )}
-      <p className="break-all text-sm text-ink-soft" data-testid="profile-account-email">
-        {account.email}
+      <p
+        className="text-sm text-ink-soft [overflow-wrap:anywhere]"
+        data-testid="profile-account-email"
+      >
+        {account?.email ?? t('settings.profile.unavailable')}
       </p>
     </section>
   )

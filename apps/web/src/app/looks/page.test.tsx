@@ -1273,7 +1273,7 @@ describe('7.12 Looks Plan segment (D10, D11)', () => {
     expect(screen.getAllByTestId('plan-upgrade')).toHaveLength(1)
     expect(screen.getByTestId('plan-upgrade')).toHaveAttribute(
       'href',
-      '/settings#premium'
+      '/settings/premium'
     )
     expect(screen.queryByTestId('planner-rail-locked')).toBeNull()
   })

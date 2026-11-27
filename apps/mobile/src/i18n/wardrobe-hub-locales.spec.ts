@@ -106,12 +106,19 @@ function flatten(value: unknown, prefix = ''): Map<string, string> {
 const reference = flatten(hubTree(enUS as Catalog))
 
 describe('7.9 mobile Wardrobe hub locale parity', () => {
-  it('7.9-I18N-MOB-01 ships 11 hub keys in the reference catalog, one per garment status', () => {
-    expect(reference.size).toBe(11)
+  it('7.9-I18N-MOB-01 ships the Closet controls and status labels', () => {
+    expect(reference.size).toBe(14)
     for (const status of STATUS_KEYS) {
       expect(reference.has(`hub.status.${status}`), status).toBe(true)
     }
-    expect(reference.has('hub.detailTitle')).toBe(true)
+    for (const key of [
+      'categoryAll',
+      'categoryFilters',
+      'detailTitle',
+      'setupProgress',
+    ]) {
+      expect(reference.has(`hub.${key}`), key).toBe(true)
+    }
   })
 
   it('7.9-I18N-MOB-06 titles garment detail with the web catalog words', () => {
@@ -149,15 +156,9 @@ describe('7.9 mobile Wardrobe hub locale parity', () => {
     }
   })
 
-  it('7.9-I18N-MOB-05 keeps the awaiting-tags status apart from the Needs tags action', () => {
-    // A device flow taps the "Needs tags" button by its text; a status word equal to it would
-    // put two matches on the card.
-    for (const locale of SUPPORTED_LOCALES) {
-      const wardrobe = CATALOGS[locale].wardrobe as { tagging: { needs_tags: string } }
-      expect(
-        flatten(hubTree(CATALOGS[locale])).get('hub.status.awaiting_tags'),
-        locale
-      ).not.toBe(wardrobe.tagging.needs_tags)
-    }
+  it('7.9-I18N-MOB-05 gives the combined badge and action the product wording', () => {
+    expect(reference.get('hub.status.awaiting_tags')).toBe('Needs tags')
+    expect(reference.get('hub.status.failed')).toBe('Failed')
+    expect(reference.get('hub.status.processing')).toBe('Processing')
   })
 })

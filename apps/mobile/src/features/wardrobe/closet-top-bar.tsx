@@ -36,9 +36,14 @@ export function ClosetTopBarActions({
     minHeight: shell.touchTarget,
     minWidth: shell.touchTarget,
     borderRadius: radius.md,
-    paddingHorizontal: space[3],
+    paddingHorizontal: space[2],
+    paddingVertical: space[1],
   }
-  const label = { fontSize: type.sm.fontSize, fontWeight: fontWeight.semibold }
+  const label = {
+    fontSize: type.sm.fontSize,
+    fontWeight: fontWeight.semibold,
+    textAlign: 'center' as const,
+  }
   return (
     <View style={[styles.actions, { gap: space[2], paddingEnd: space[2] }]}>
       <Pressable
@@ -139,6 +144,7 @@ export function ClosetMoreSheet({
                 color: colors.ink,
                 fontSize: type.lg.fontSize,
                 fontWeight: fontWeight.semibold,
+                flexShrink: 1,
               }}
             >
               {t('wardrobe.menu.label')}
@@ -181,8 +187,14 @@ export function ClosetMoreSheet({
 }
 
 const styles = StyleSheet.create({
-  actions: { flexDirection: 'row', alignItems: 'center' },
-  button: { alignItems: 'center', justifyContent: 'center' },
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    flexShrink: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  button: { alignItems: 'center', justifyContent: 'center', maxWidth: '100%' },
   outline: { borderWidth: 1 },
   overlay: { flex: 1, justifyContent: 'flex-end' },
   sheet: {},

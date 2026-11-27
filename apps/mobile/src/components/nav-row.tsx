@@ -9,10 +9,12 @@ import { useTokens } from '@/src/theme/tokens'
 
 export function NavRow({
   label,
+  value,
   testID,
   onPress,
 }: {
   label: string
+  value?: string
   testID: string
   onPress: () => void
 }) {
@@ -21,7 +23,7 @@ export function NavRow({
     <Pressable
       testID={testID}
       accessibilityRole="link"
-      accessibilityLabel={label}
+      accessibilityLabel={value ? `${label}, ${value}` : label}
       onPress={onPress}
       style={[
         styles.row,
@@ -36,6 +38,13 @@ export function NavRow({
       <Text style={[styles.label, { color: colors.ink, fontSize: type.base.fontSize }]}>
         {label}
       </Text>
+      {value ? (
+        <Text
+          style={[styles.value, { color: colors.inkMuted, fontSize: type.sm.fontSize }]}
+        >
+          {value}
+        </Text>
+      ) : null}
       <ShellIcon name="forward" size={type.sm.fontSize} color={colors.inkMuted} />
     </Pressable>
   )
@@ -48,4 +57,5 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   label: { flex: 1 },
+  value: { maxWidth: '45%', flexShrink: 1, textAlign: 'right' },
 })

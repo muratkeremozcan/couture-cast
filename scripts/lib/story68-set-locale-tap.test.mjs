@@ -60,12 +60,17 @@ test('the language button is tapped only while it reads enabled, then judged in 
   assert.equal(settled.extendedWaitUntil.timeout, SET_LOCALE_SETTLE_WAIT_MS)
   assert.deepEqual(selected.extendedWaitUntil.visible, { ...button, enabled: false })
   assert.equal(selected.extendedWaitUntil.timeout, CONDITION_CHECK_MS)
-  assert.equal(commands.at(-1), 'waitForAnimationToEnd')
+  assert.equal(commands.at(-3), 'waitForAnimationToEnd')
+  assert.equal(commands.at(-2).tapOn.id, 'app-top-bar-back')
+  assert.equal(commands.at(-1).extendedWaitUntil.visible.id, 'settings-screen')
 })
 
 test('the product disables a language button that is selected or changing', () => {
   const settings = fs.readFileSync(
-    new URL('../../apps/mobile/app/(tabs)/settings.tsx', import.meta.url),
+    new URL(
+      '../../apps/mobile/src/features/settings/settings-destination-screens.tsx',
+      import.meta.url
+    ),
     'utf8'
   )
   assert.match(settings, /disabled=\{isChangingLocale \|\| isSelected\}/)
@@ -84,12 +89,18 @@ test('the process budget covers the settings opener, the scroll and every tap at
       .split(/^---$/m)[1]
   ).find((step) => step.retry)
   const attempts = opener.retry.maxRetries + 1
-  const scroll = commands.find((step) => step.scrollUntilVisible).scrollUntilVisible
+  const routeSteps = commands
+    .filter((step) => step.scrollUntilVisible || step.extendedWaitUntil)
+    .reduce(
+      (total, step) =>
+        total + (step.scrollUntilVisible ?? step.extendedWaitUntil).timeout,
+      0
+    )
   assert.equal(
     SET_LOCALE_OTHER_STEPS_MS,
     attempts * (opener.retry.commands[1].extendedWaitUntil.timeout + 2_000) +
-      scroll.timeout +
-      2_000
+      routeSteps +
+      4_000
   )
   assert.equal(
     SET_LOCALE_TAP_ATTEMPT_MS,

@@ -72,6 +72,7 @@ export function AppTopBar({
           style={[
             styles.back,
             { minHeight: shell.touchTarget, minWidth: shell.touchTarget, gap: space[1] },
+            wrapTitle && styles.backWrap,
           ]}
         >
           <ShellIcon name="back" size={type.base.fontSize} color={colors.ink} />
@@ -80,6 +81,7 @@ export function AppTopBar({
               color: colors.ink,
               fontSize: type.sm.fontSize,
               fontWeight: fontWeight.medium,
+              flexShrink: 1,
             }}
           >
             {backLabel}
@@ -131,7 +133,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  trailingWrap: { maxWidth: '45%', flexShrink: 1 },
+  backWrap: { maxWidth: '40%' },
+  trailingWrap: { maxWidth: '55%', flexShrink: 1 },
   trailing: {
     flexDirection: 'row',
     alignItems: 'center',

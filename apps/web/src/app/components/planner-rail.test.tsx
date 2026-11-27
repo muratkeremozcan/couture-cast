@@ -974,7 +974,7 @@ describe('7.12 PlannerRail free preview (D10)', () => {
     renderRail({ hideHeader: true })
 
     await screen.findByTestId('plan-free-preview')
-    expectFreePreview('/settings#premium')
+    expectFreePreview('/settings/premium')
     expect(screen.queryByTestId('planner-days')).toBeNull()
   })
 

@@ -29,13 +29,6 @@ vi.mock('./guest-preview/guest-preview-entry', () => ({
 vi.mock('./analytics-event-actions', () => ({ AnalyticsEventActions: () => null }))
 vi.mock('./posthog-click-tracker', () => ({ PostHogClickTracker: () => null }))
 vi.mock('./community-lookbook-grid', () => ({ CommunityLookbookGrid: () => <section /> }))
-vi.mock('./profile-account', () => ({ ProfileAccount: () => <section /> }))
-vi.mock('./locations/locations-section', () => ({ LocationsSection: () => <section /> }))
-vi.mock('./commerce-preferences-section', () => ({
-  CommercePreferencesSection: () => <section />,
-}))
-vi.mock('./subscription-section', () => ({ SubscriptionSection: () => <section /> }))
-vi.mock('./premium-theme-section', () => ({ PremiumThemeSection: () => <section /> }))
 
 const TABS: readonly { name: string; Page: ComponentType }[] = [
   { name: 'Today', Page: Home },

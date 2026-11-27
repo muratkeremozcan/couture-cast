@@ -413,7 +413,7 @@ function MemberLocationsSection({
       aria-labelledby="locations-title"
       data-testid="locations-section"
       data-state={sectionState}
-      className="mt-10 max-w-2xl border-t border-line pt-8"
+      className="min-w-0 max-w-2xl [overflow-wrap:anywhere]"
     >
       <h2
         id="locations-title"

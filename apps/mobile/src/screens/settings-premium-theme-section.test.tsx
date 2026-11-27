@@ -125,7 +125,7 @@ import { mockSubscriptionNone } from '../test-utils/msw/handlers'
 import { press } from '../test-utils/press'
 import { setMobileAccessTokenResolver } from '../lib/mobile-auth'
 import { AppThemeProvider, useAppTheme } from '../theme/theme-context'
-import SettingsScreen from '../../app/(tabs)/settings'
+import SettingsScreen from '../../app/settings-premium'
 
 const THEME_ROUTE = '*/api/v1/commerce/premium/theme'
 

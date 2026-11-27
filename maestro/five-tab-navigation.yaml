@@ -7,7 +7,7 @@
 # The tab bar shows five tabs in order (Today, Closet, Looks, Community, Profile), each by its
 # test id. Each tab tap selects that tab and lands on its first own content: Today's
 # `today-first-content`, the Closet grid or its empty state, `looks-first-content`,
-# `community-first-content` and Profile's `profile-account`. Closet's More menu offers Closet setup
+# `community-first-content` and Profile's `profile-account-row`. Closet's More menu offers Closet setup
 # and Silhouette and closes with its X. Last, a sub-screen under Looks (the capsule library) shows
 # the top bar back and title, and back returns to the Looks tab.
 #
@@ -144,10 +144,10 @@ tags:
 - runFlow: subflows/open-settings.yaml
 - scrollUntilVisible:
     element:
-      id: 'profile-account'
+      id: 'profile-account-row'
     direction: UP
     timeout: 10000
-    label: 'Profile opens on its account header'
+    label: 'Profile opens on its Account row'
 - assertVisible:
     id: 'app-top-bar-title'
     text: 'Profile'
@@ -155,6 +155,33 @@ tags:
     id: 'tab-settings'
     selected: true
     label: 'Profile is the selected tab'
+
+# CC-7.16 AC2 and the CC-7.11 handoff: Profile opens the native Style destination.
+- tapOn:
+    id: 'profile-style-row'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'settings-style-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'Style'
+- assertVisible:
+    id: 'style-row-silhouette'
+- assertVisible:
+    id: 'style-row-setup'
+- assertVisible:
+    id: 'style-row-palette'
+- tapOn:
+    id: 'app-top-bar-back'
+- extendedWaitUntil:
+    visible:
+      id: 'settings-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'tab-settings'
+    selected: true
 
 # --- AC4, D10: a sub-screen has the top bar back and title; back returns to its tab ---
 - runFlow: subflows/open-capsules.yaml

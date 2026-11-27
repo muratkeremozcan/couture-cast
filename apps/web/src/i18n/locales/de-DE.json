@@ -537,6 +537,9 @@
       "deleteUsageFailed": "Wir konnten nicht prüfen, wo dieses Teil verwendet wird. Versuche es erneut."
     },
     "hub": {
+      "categoryAll": "Alle",
+      "categoryFilters": "Nach Kategorie filtern",
+      "setupProgress": "{{completed}} von {{total}} Schritten abgeschlossen",
       "loading": "Deine Garderobe wird geladen...",
       "emptyTitle": "Noch keine Kleidungsstücke",
       "emptyBody": "Fotografiere deine Lieblingsjacke, dein Lieblingsoberteil oder dein Lieblingskleid, um loszulegen.",
@@ -556,7 +559,7 @@
         "pending_upload": "Wird hochgeladen",
         "bytes_uploaded": "Hochgeladen",
         "processing": "Wird verarbeitet",
-        "awaiting_tags": "Wartet auf Tags",
+        "awaiting_tags": "Tags fehlen",
         "ready": "Bereit",
         "failed": "Fehlgeschlagen",
         "unknown": "In Bearbeitung"
@@ -1037,6 +1040,44 @@
     }
   },
   "settings": {
+    "profile": {
+      "account": "Konto",
+      "places": "Orte",
+      "style": "Stil",
+      "premium": "Premium",
+      "notifications": "Benachrichtigungen",
+      "language": "Sprache",
+      "about": "Über die App und Datenschutz",
+      "unavailable": "Nicht verfügbar",
+      "premiumActive": "Aktiv",
+      "premiumFree": "Kostenlos",
+      "on": "An",
+      "off": "Aus",
+      "learnMore": "Mehr erfahren",
+      "languageHelp": "Dein Browser legt die Sprache fest.",
+      "browserLanguageHelp": "Ändere die bevorzugte Sprache in den Browsereinstellungen und lade CoutureCast neu.",
+      "aboutHelp": "Plane Outfits passend zum Wetter und behalte deinen Kleiderschrank im Blick.",
+      "themeHelp": "Wähle die Farben der App.",
+      "privacy": "Datenschutzerklärung",
+      "terms": "Nutzungsbedingungen",
+      "setup": {
+        "not_started": "Nicht begonnen",
+        "in_progress": "In Bearbeitung",
+        "completed": "Abgeschlossen"
+      },
+      "languages": {
+        "en-US": "English (US)",
+        "en-CA": "English (Canada)",
+        "es-419": "Español (LatAm)",
+        "fr-CA": "Français (Canada)",
+        "fr-FR": "Français (Europe)",
+        "tr-TR": "Türkçe",
+        "de-DE": "Deutsch",
+        "it-IT": "Italiano",
+        "pt-BR": "Português (Brasil)",
+        "pt-PT": "Português (Portugal)"
+      }
+    },
     "title": "Profil",
     "account": "Dein Konto",
     "style": {

@@ -57,7 +57,14 @@ function NavigatorTopBar({
     <AppTopBar
       title={title}
       titleNode={titleNode}
-      wrapTitle={route.name === 'community'}
+      wrapTitle={
+        route.name === 'community' ||
+        route.name === 'wardrobe' ||
+        route.name === 'settings' ||
+        route.name.startsWith('settings-') ||
+        route.name === 'locations' ||
+        route.name === 'notification-settings'
+      }
       trailing={trailing}
       onBack={showBack ? () => navigation.goBack() : undefined}
     />
@@ -83,6 +90,10 @@ export const PARENT_TAB: Readonly<Record<string, Href>> = {
   'palette-advisor': '/settings',
   planner: '/looks',
   'settings-style': '/settings',
+  'settings-account': '/settings',
+  'settings-premium': '/settings',
+  'settings-language': '/settings',
+  'settings-about': '/settings',
   'wardrobe-garment': '/wardrobe',
   'wardrobe-onboarding': '/wardrobe',
   'wardrobe-silhouette': '/wardrobe',

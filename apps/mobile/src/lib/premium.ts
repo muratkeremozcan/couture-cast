@@ -41,9 +41,9 @@ import { getUserProfileFromMobile } from './user'
 export const PREMIUM_ENTITLEMENT_POLL_INTERVAL_MS = 5_000
 export const PREMIUM_ENTITLEMENT_POLL_CAP_MS = 120_000
 
-function premiumClient() {
+function premiumClient(accessToken?: string) {
   return createMobileApiClient({
-    accessToken: async () => (await resolveMobileAccessToken()) || '',
+    accessToken: accessToken ?? (async () => (await resolveMobileAccessToken()) || ''),
   })
 }
 
@@ -61,10 +61,11 @@ export async function getSubscriptionFromMobile(
  * subscription, whose contract stays frozen for installed builds.
  */
 export async function getPremiumAccessFromMobile(
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  accessToken?: string
 ): Promise<PremiumAccess> {
   const response = await withRequestTimeout(signal, (requestSignal) =>
-    premiumClient().apiV1CommercePremiumAccessGet({ signal: requestSignal })
+    premiumClient(accessToken).apiV1CommercePremiumAccessGet({ signal: requestSignal })
   )
   return premiumAccessResponseSchema.parse(response).data
 }

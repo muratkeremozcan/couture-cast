@@ -591,7 +591,7 @@ it('shows the city and garment entry links beside an editable sample when the me
 
   expect(await screen.findByRole('link', { name: 'Set your city' })).toHaveAttribute(
     'href',
-    '/settings?addLocation=1&returnTo=%2F#locations'
+    '/settings/places?addLocation=1&returnTo=%2F#locations'
   )
   expect(await screen.findByTestId('home-add-garment')).toHaveAttribute(
     'href',

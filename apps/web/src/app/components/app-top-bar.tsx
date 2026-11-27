@@ -74,7 +74,8 @@ export function AppTopBar({
     router.replace(parent)
   }
   const backClass =
-    'flex min-h-touch min-w-touch shrink-0 items-center gap-1 rounded-md px-2 text-sm font-medium text-ink'
+    'flex min-h-touch min-w-touch shrink-0 items-center gap-1 rounded-md px-2 text-sm font-medium text-ink' +
+    (wrapTitle ? ' max-w-[40%] [overflow-wrap:anywhere]' : '')
 
   return (
     <header
@@ -110,12 +111,12 @@ export function AppTopBar({
         ) : null}
         <h1
           data-testid="app-top-bar-title"
-          className={`min-w-0 flex-1 text-lg font-semibold ${wrapTitle ? 'break-words' : 'truncate'}`}
+          className={`min-w-0 flex-1 text-lg font-semibold ${wrapTitle ? '[overflow-wrap:anywhere]' : 'truncate'}`}
         >
           {heading}
         </h1>
         <div
-          className={`flex shrink-0 items-center gap-2 ${wrapTitle ? 'max-w-[45%] md:max-w-none' : ''}`}
+          className={`flex shrink-0 items-center gap-2 ${wrapTitle ? 'min-w-0 max-w-[55%] md:max-w-none' : ''}`}
         >
           {trailing}
           <nav

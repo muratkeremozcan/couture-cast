@@ -43,8 +43,13 @@ for (const viewport of [
     await profileLink.click()
     await expect(page).toHaveURL(/\/settings$/)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Profile')
-    // Everything the page held is still there: Locations, and the member sections.
-    await expect(page.getByTestId('locations-section')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Premium' })).toBeVisible()
+    await expect(page.getByTestId('profile-places-row')).toHaveAttribute(
+      'href',
+      '/settings/places'
+    )
+    await expect(page.getByTestId('profile-premium-row')).toHaveAttribute(
+      'href',
+      '/settings/premium'
+    )
   })
 }

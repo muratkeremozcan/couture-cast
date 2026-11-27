@@ -31,6 +31,7 @@
 // member changes or signs out, applied once the verified member's read lands.
 'use client'
 
+import { SettingsHelp } from './settings-help'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PremiumTheme, PremiumThemeKey } from '@couture/api-client/contracts/http'
@@ -622,17 +623,11 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
         {t('commerce.premium.theme.sectionTitle')}
       </h2>
 
-      {/*
-        AC 7: what a palette is, where the choice is stored, and what it does not
-        change. A sibling text node in reading order before the gallery, never a
-        tooltip and never only an accessible name.
-      */}
-      <p
-        className="mt-3 text-sm leading-relaxed text-ink-soft"
-        data-testid="premium-theme-disclosure"
-      >
-        {t('commerce.premium.theme.disclosure')}
-      </p>
+      <SettingsHelp summary={t('settings.profile.themeHelp')}>
+        <p data-testid="premium-theme-disclosure">
+          {t('commerce.premium.theme.disclosure')}
+        </p>
+      </SettingsHelp>
 
       {/*
         The kill-switch note precedes the cards it explains, and is the target of their

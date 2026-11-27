@@ -34,7 +34,14 @@ appId: ${MAESTRO_APP_ID}
 # relative to the file it appears in, so the prefixed form looks for
 # `maestro/subflows/subflows/open-settings.yaml` and fails with "Invalid File
 # Path". Top-level flows in `maestro/` do need the `subflows/` prefix.
-- runFlow: open-settings.yaml
+- runFlow:
+    file: open-profile-topic.yaml
+    env: { PROFILE_TOPIC: 'language' }
+- scrollUntilVisible:
+    element:
+      id: 'locale-btn-${LOCALE}'
+    direction: DOWN
+    timeout: 15000
 
 - tapOn:
     id: 'locale-btn-${LOCALE}'
@@ -42,3 +49,9 @@ appId: ${MAESTRO_APP_ID}
     label: 'Switch the app locale to ${LOCALE}'
 
 - waitForAnimationToEnd
+- tapOn:
+    id: 'app-top-bar-back'
+- extendedWaitUntil:
+    visible:
+      id: 'settings-screen'
+    timeout: 15000

@@ -12,11 +12,13 @@ appId: ${MAESTRO_APP_ID}
       # Centered, because iOS Settings has a fixed band above the tab bar that clips the
       # bottom.
       - scrollUntilVisible:
-          element: ${MAESTRO_TITLE}
+          element:
+            id: 'profile-notifications-row'
           direction: DOWN
           centerElement: true
           timeout: 20000
-      - tapOn: ${MAESTRO_TITLE}
+      - tapOn:
+          id: 'profile-notifications-row'
       - extendedWaitUntil:
           visible:
             id: 'notification-settings-screen'

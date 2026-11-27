@@ -65,6 +65,32 @@
     "precipitation": "Precipitation"
   },
   "settings": {
+    "profile": {
+      "account": "Account",
+      "places": "Places",
+      "style": "Style",
+      "premium": "Premium",
+      "notifications": "Notifications",
+      "language": "Language",
+      "about": "About and privacy",
+      "unavailable": "Unavailable",
+      "premiumActive": "Active",
+      "premiumFree": "Free",
+      "on": "On",
+      "off": "Off",
+      "learnMore": "Learn more",
+      "languageHelp": "Your browser sets the language.",
+      "browserLanguageHelp": "Change your preferred language in your browser’s settings, then reload CoutureCast.",
+      "aboutHelp": "Plan outfits for the weather and keep track of your closet.",
+      "themeHelp": "Choose colors for the app.",
+      "privacy": "Privacy policy",
+      "terms": "Terms of service",
+      "setup": {
+        "not_started": "Not started",
+        "in_progress": "In progress",
+        "completed": "Complete"
+      }
+    },
     "title": "Settings",
     "account": {
       "label": "Account"
@@ -415,15 +441,18 @@
       "deleteUsageFailed": "Could not check where this piece is used. Try again."
     },
     "hub": {
+      "categoryAll": "All",
+      "categoryFilters": "Filter by category",
+      "setupProgress": "{{completed}} of {{total}} steps complete",
       "loading": "Loading wardrobe",
       "saved_looks_failed": "Unable to load your saved looks.",
       "status": {
         "pending_upload": "Uploading",
         "bytes_uploaded": "Uploading",
         "processing": "Processing",
-        "awaiting_tags": "Waiting for tags",
+        "awaiting_tags": "Needs tags",
         "ready": "Ready",
-        "failed": "Upload failed",
+        "failed": "Failed",
         "unknown": "In progress"
       },
       "detailTitle": "Piece details"

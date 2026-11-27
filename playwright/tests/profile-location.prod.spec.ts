@@ -41,7 +41,7 @@ async function memberContext(
 
 /** Opens Settings as the member and waits for Locations to finish loading. */
 async function openLocations(page: Page) {
-  await page.goto('/settings')
+  await page.goto('/settings/places')
   const section = page.getByTestId('locations-section')
   await expect(section).toHaveAttribute('data-state', 'ready')
   return section
@@ -79,6 +79,8 @@ test.describe('Profile and location in production, as the synthetic member', () 
 
         await expect(page).toHaveURL(/\/settings$/)
         await expect(page.getByRole('heading', { level: 1 })).toHaveText('Profile')
+        await page.getByTestId('profile-account-row').click()
+        await expect(page).toHaveURL(/\/settings\/account$/)
         await expect(page.getByTestId('profile-account')).toContainText(prodMember!.email)
       } finally {
         await context.close()

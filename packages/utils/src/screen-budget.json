@@ -55,12 +55,14 @@
     "web": [
       "[data-testid=\"chip-navigation-bar\"]",
       "[data-testid=\"home-scenario-choices\"]",
-      "[data-testid=\"community-chip-row\"]"
+      "[data-testid=\"community-chip-row\"]",
+      "[data-testid=\"closet-category-filters\"]"
     ],
     "native": [
       "[data-testid=\"mobile-chip-navigation\"]",
       "[data-testid=\"community-sticky-filter-chips\"]",
-      "[data-testid=\"sample-weather-choices\"]"
+      "[data-testid=\"sample-weather-choices\"]",
+      "[data-testid=\"closet-category-filters\"]"
     ]
   },
   "selectors": {
@@ -101,216 +103,64 @@
   ],
   "known": [
     {
-      "platform": "native",
+      "platform": "web",
       "screen": "profile",
       "fixture": "empty",
-      "rule": "chip-rows",
-      "value": 4,
+      "rule": "targets-above-fold",
+      "value": 8,
       "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
+      "decision": "D-PROFILE-ROWS-7.16",
+      "decidedIn": "7.16"
     },
     {
-      "platform": "native",
+      "platform": "web",
       "screen": "profile",
-      "fixture": "empty",
-      "rule": "paragraph-lines",
-      "value": 3,
-      "elements": [
-        {
-          "key": "commerce-settings-disclosure",
-          "lines": 4
-        },
-        {
-          "key": "premium-settings-disclosure",
-          "lines": 5
-        },
-        {
-          "key": "premium-theme-disclosure",
-          "lines": 7
-        }
-      ],
+      "fixture": "guardian-pending",
+      "rule": "targets-above-fold",
+      "value": 8,
       "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
+      "decision": "D-PROFILE-ROWS-7.16",
+      "decidedIn": "7.16"
+    },
+    {
+      "platform": "web",
+      "screen": "profile",
+      "fixture": "populated",
+      "rule": "targets-above-fold",
+      "value": 8,
+      "story": "7.16",
+      "decision": "D-PROFILE-ROWS-7.16",
+      "decidedIn": "7.16"
     },
     {
       "platform": "native",
       "screen": "profile",
       "fixture": "empty",
       "rule": "targets-above-fold",
-      "value": 14,
+      "value": 8,
       "story": "7.16",
-      "decision": "D-KNOWN-7.11",
-      "decidedIn": "7.11"
-    },
-    {
-      "platform": "native",
-      "screen": "profile",
-      "fixture": "guardian-pending",
-      "rule": "chip-rows",
-      "value": 4,
-      "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
-    },
-    {
-      "platform": "native",
-      "screen": "profile",
-      "fixture": "guardian-pending",
-      "rule": "paragraph-lines",
-      "value": 3,
-      "elements": [
-        {
-          "key": "commerce-settings-disclosure",
-          "lines": 4
-        },
-        {
-          "key": "premium-settings-disclosure",
-          "lines": 5
-        },
-        {
-          "key": "premium-theme-disclosure",
-          "lines": 7
-        }
-      ],
-      "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
+      "decision": "D-PROFILE-ROWS-7.16",
+      "decidedIn": "7.16"
     },
     {
       "platform": "native",
       "screen": "profile",
       "fixture": "guardian-pending",
       "rule": "targets-above-fold",
-      "value": 14,
+      "value": 8,
       "story": "7.16",
-      "decision": "D-KNOWN-7.11",
-      "decidedIn": "7.11"
-    },
-    {
-      "platform": "native",
-      "screen": "profile",
-      "fixture": "populated",
-      "rule": "chip-rows",
-      "value": 6,
-      "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
-    },
-    {
-      "platform": "native",
-      "screen": "profile",
-      "fixture": "populated",
-      "rule": "paragraph-lines",
-      "value": 3,
-      "elements": [
-        {
-          "key": "commerce-settings-disclosure",
-          "lines": 4
-        },
-        {
-          "key": "premium-settings-disclosure",
-          "lines": 5
-        },
-        {
-          "key": "premium-theme-disclosure",
-          "lines": 7
-        }
-      ],
-      "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
+      "decision": "D-PROFILE-ROWS-7.16",
+      "decidedIn": "7.16"
     },
     {
       "platform": "native",
       "screen": "profile",
       "fixture": "populated",
       "rule": "targets-above-fold",
-      "value": 14,
+      "value": 8,
       "story": "7.16",
-      "decision": "D-KNOWN-7.11",
-      "decidedIn": "7.11"
-    },
-    {
-      "platform": "web",
-      "screen": "profile",
-      "fixture": "empty",
-      "rule": "paragraph-lines",
-      "value": 4,
-      "elements": [
-        {
-          "key": "commerce-disclosure",
-          "lines": 5
-        },
-        {
-          "key": "p \"Subscribe to Premium with the controls a\"",
-          "lines": 3
-        },
-        {
-          "key": "premium-disclosure",
-          "lines": 7
-        },
-        {
-          "key": "premium-theme-disclosure",
-          "lines": 8
-        }
-      ],
-      "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
-    },
-    {
-      "platform": "web",
-      "screen": "profile",
-      "fixture": "guardian-pending",
-      "rule": "paragraph-lines",
-      "value": 4,
-      "elements": [
-        {
-          "key": "commerce-disclosure",
-          "lines": 5
-        },
-        {
-          "key": "p \"Subscribe to Premium with the controls a\"",
-          "lines": 3
-        },
-        {
-          "key": "premium-disclosure",
-          "lines": 7
-        },
-        {
-          "key": "premium-theme-disclosure",
-          "lines": 8
-        }
-      ],
-      "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
-    },
-    {
-      "platform": "web",
-      "screen": "profile",
-      "fixture": "populated",
-      "rule": "paragraph-lines",
-      "value": 3,
-      "elements": [
-        {
-          "key": "commerce-disclosure",
-          "lines": 5
-        },
-        {
-          "key": "premium-disclosure",
-          "lines": 7
-        },
-        {
-          "key": "premium-theme-disclosure",
-          "lines": 8
-        }
-      ],
-      "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
+      "decision": "D-PROFILE-ROWS-7.16",
+      "decidedIn": "7.16"
     }
   ]
 }

@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
 Updated: 2026-11-27.
-Added Steps 40 to 72:
+Added Steps 40 to 73:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -36,7 +36,8 @@ Added Steps 40 to 72:
 - Step 69: Story 7.12, Looks tab for saved looks, ideas and plans, `0d3b82a3` (PR #296), merged on 2026-11-26.
 - Step 70: Story 7.13, Calm Today with one primary job, `a519243d` (PR #297), merged on 2026-11-26.
 - Step 71: Story 7.14, Today's outfit as a picture, `53adbe2f` (PR #298), merged on 2026-11-27.
-- Step 72: Story 7.15, Calm Community with an empty state (PR #299).
+- Step 72: Story 7.15, Calm Community with an empty state, `d64216fa` (PR #299), merged on 2026-11-27.
+- Step 73: Story 7.16, Calm Closet and Profile.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -44,6 +45,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 73 for Story CC-7.16 (Calm Closet and Profile) and moved Step 72 to merged (`d64216fa`, PR #299).
 Added Step 72 for Story CC-7.15 (Calm Community with an empty state) and moved Step 71 to merged (`53adbe2f`, PR #298).
 Added Step 71 for Story CC-7.14 (Today's outfit as a picture) and moved Step 70 to merged (`a519243d`, PR #297).
 Added Step 70 for Story CC-7.13 (Calm Today with one primary job) and moved Step 69 to merged (`0d3b82a3`, PR #296).
@@ -170,10 +172,10 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest step: Step 72, Story CC-7.15, Calm Community with an empty state.
-  Its plan is `_bmad-output/implementation-artifacts/spec-7-15-calm-community-empty-state.md`.
+- Latest step: Step 73, Story CC-7.16, Calm Closet and Profile.
+  Its plan is `_bmad-output/implementation-artifacts/spec-7-16-calm-closet-profile.md`.
   `epic-7` is `in-progress` in `sprint-status.yaml`; CC-7.8 is `done` as dropped by owner decision.
-- Previous completed steps: Steps 59 to 71, Stories CC-7.1 to CC-7.7 and CC-7.9 to CC-7.14, merged on `main` (the last, Step 71, as `53adbe2f`, PR #298).
+- Previous completed steps: Steps 59 to 72, Stories CC-7.1 to CC-7.7 and CC-7.9 to CC-7.15, merged on `main` (the last, Step 72, as `d64216fa`, PR #299).
 - Previous completed step: Step 58, production status and nightly health, the project close on 2026-11-19, merged on `main` (including its production follow-ups: image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week races, and production profile/location checks).
   It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
   Delivery for Epic 6 stays `in-progress` while `6-15b-expo-sdk-55-58-upgrade` stays `backlog`.
@@ -22352,3 +22354,31 @@ The card menu keeps Report and Withdraw within reach.
   [Android Spotlight journey](../../maestro/community-spotlight.yaml).
 - [Step 65](#step-65-signed-in-shell-without-flashes) covers read readiness and session scope.
   [Step 68](#step-68-five-tab-navigation-and-back-pattern) covers screen layers and focus return.
+
+## Step 73: Calm Closet and Profile
+
+Closet keeps Add and More in its header, followed by a category row and garment tiles.
+The three actionable states have text and icons. Setup progress sits below the grid.
+Profile moves settings to seven titled destinations and keeps Sign out at the end.
+
+### Sequence to follow
+
+1. In a mixed Closet, select a category and return to All. Open a ready garment and
+   find Style this piece in its detail. Follow a Needs tags tile into tagging.
+2. Check the setup row before completing setup and after returning to Closet.
+3. On web, open Places from Profile, then load its route directly and use Back.
+   Check the guided city path from Today. On native, open Style and check the
+   Silhouette, Closet setup and Color palette links before returning to Profile.
+4. Switch to German and enlarge text at 320 px on web or 320 dp on Android.
+   Check light and dark for full labels, tappable controls and readable contrast.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-16-calm-closet-profile.md) and
+  [acceptance plan](../test-artifacts/test-design-7-16-calm-closet-profile.md).
+- [Web acceptance](../../playwright/tests/calm-closet-profile.spec.ts),
+  [native Profile](../../apps/mobile/src/screens/screen-budget-profile.test.tsx), and
+  [native Closet](../../apps/mobile/src/features/wardrobe/five-tab-closet.test.tsx).
+- [Android enlarged-text journey](../../maestro/subflows/calm-closet-profile-enlarged-text.yaml).
+- [Step 67](#step-67-screen-budget-guard) explains the screen limits and the ratchet.
+  [Step 68](#step-68-five-tab-navigation-and-back-pattern) explains Back and the tab shell.

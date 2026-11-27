@@ -117,7 +117,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: 'garment-status-ready'
+      id: 'garment-open-.+'
     timeout: 15000
 
 - stopApp:
@@ -145,7 +145,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: 'garment-status-ready'
+      id: 'garment-open-.+'
     timeout: 30000
 
 - takeScreenshot:

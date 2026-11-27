@@ -6,10 +6,8 @@
 
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import { getI18n } from '../../../i18n'
-import { AppPage, APP_MAIN_NARROW_CLASS } from '../../components/app-page'
-import { AppTopBar } from '../../components/app-top-bar'
 import { NavRow } from '../../components/nav-row'
-import { StickyBottomNav } from '../../components/sticky-bottom-nav'
+import { SettingsDestination } from '../settings-destination'
 
 function StyleRows() {
   const { t } = useTranslation()
@@ -38,13 +36,9 @@ function StyleRows() {
 export default function SettingsStylePage() {
   return (
     <I18nextProvider i18n={getI18n()}>
-      <AppPage>
-        <AppTopBar titleKey="settings.style.title" parentHref="/settings" />
-        <main id="main-content" tabIndex={-1} className={APP_MAIN_NARROW_CLASS}>
-          <StyleRows />
-        </main>
-        <StickyBottomNav />
-      </AppPage>
+      <SettingsDestination topic="style">
+        <StyleRows />
+      </SettingsDestination>
     </I18nextProvider>
   )
 }

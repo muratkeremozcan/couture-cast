@@ -19,16 +19,20 @@ import React, {
 } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { I18nextProvider, useTranslation } from 'react-i18next'
-import type {
-  GarmentItemContract,
-  GarmentWithColor,
-  WardrobeOnboardingStatus,
+import {
+  garmentCategoryEnum,
+  wardrobeOnboardingStepEnum,
+  type GarmentCategory,
+  type GarmentItemContract,
+  type GarmentWithColor,
+  type WardrobeOnboardingStep,
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
 import { GarmentCaptureModal } from '../components/garment-capture-modal'
 import { GarmentTaggingModal } from '../components/garment-tagging-modal'
 import { AppPage, APP_MAIN_CLASS } from '../components/app-page'
 import { AppTopBar } from '../components/app-top-bar'
+import { NavRow } from '../components/nav-row'
 import { StickyBottomNav } from '../components/sticky-bottom-nav'
 import {
   listGarmentsFromWeb,
@@ -48,14 +52,14 @@ import {
 } from '../../lib/use-web-session'
 import {
   formatGarmentAlt,
+  formatGarmentCategory,
   formatGarmentTagLabels,
   getGuestPreviewStrings,
-  getStylePieceStrings,
   nextStylePiecePhotoExpiry,
   scheduleStylePiecePhotoExpiry,
   type StylePieceSelection,
 } from '@couture/utils'
-import { StylePieceEntry, StylePiecePanel } from './style-piece-panel'
+import { StylePiecePanel } from './style-piece-panel'
 import { ClosetMoreMenu } from './closet-more-menu'
 import { GarmentDetail, garmentPhotoAlt, type ClosetGarment } from './garment-detail'
 import { useGarmentDeletion, type GarmentDeleteMode } from './garment-deletion'
@@ -93,18 +97,51 @@ function GarmentDetailParamSync({
 const WARDROBE_LOAD_FAILED = 'Unable to load your wardrobe.'
 const WARDROBE_REFRESH_FAILED = 'Unable to refresh your wardrobe.'
 
-/**
- * A garment status chip label. The status list is an open set, so a status the catalogs do not
- * name reads as the localized "In progress" (review P2-11); the raw API code stays out of the
- * visible text and is kept only in the chip's `data-testid` for diagnostics.
- */
-function garmentStatusLabel(
-  t: (key: string, options?: Record<string, unknown>) => string,
-  status: string
-): string {
-  return t(`wardrobe.hub.status.${status}`, {
-    defaultValue: t('wardrobe.hub.status.unknown'),
-  })
+const STATUS_ACTION_CLASS =
+  'flex min-h-touch min-w-touch max-w-full items-center self-start rounded-md text-left'
+
+const GARMENT_STATUS_BADGES = {
+  awaiting_tags: {
+    tone: 'bg-notice-surface text-notice-ink',
+    path: 'M20 13l-7 7L4 11V4h7zM8 8h.01',
+  },
+  failed: {
+    tone: 'bg-danger-surface text-danger-ink',
+    path: 'M12 3 2 20h20zM12 9v4m0 3h.01',
+  },
+  processing: {
+    tone: 'bg-card-muted text-ink-soft',
+    path: 'M12 7v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
+  },
+} as const
+
+type ActionableStatus = keyof typeof GARMENT_STATUS_BADGES
+
+function GarmentStatusBadge({ status }: { status: ActionableStatus }) {
+  const { t } = useTranslation()
+  const { tone, path } = GARMENT_STATUS_BADGES[status]
+  return (
+    <span
+      data-testid={`garment-status-${status}`}
+      className={`inline-flex w-fit max-w-full items-center gap-1 rounded-md border border-current px-1 py-0.5 text-xs font-semibold ${tone}`}
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        className="size-4 shrink-0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d={path} />
+      </svg>
+      <span className="min-w-0 [overflow-wrap:anywhere]">
+        {t(`wardrobe.hub.status.${status}`)}
+      </span>
+    </span>
+  )
 }
 
 /** The visible card label: localized category and material, or "Untagged garment". */
@@ -320,7 +357,7 @@ function WardrobeEmptyState({
  * "+ Add" so the title keeps its room in long locales; its accessible name stays the full label.
  */
 const ADD_GARMENT_CLASS =
-  'flex min-h-touch items-center justify-center whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary'
+  'flex min-h-touch items-center justify-center rounded-lg bg-primary px-2 py-1 text-sm font-semibold text-on-primary [overflow-wrap:anywhere]'
 
 /**
  * The Closet's one primary action. Adding a garment is a member action, so for a visitor who
@@ -498,7 +535,7 @@ function useGarmentDetailRoute(
  */
 type ClosetSnapshot = {
   garments: ClosetGarment[]
-  onboardingStatus: WardrobeOnboardingStatus | null
+  onboardingStep: WardrobeOnboardingStep | null
   onboardingStatusError: boolean
   userId: string | null
   userIdError: boolean
@@ -508,7 +545,7 @@ const CLOSET_SNAPSHOT_PART = 'closet'
 
 const EMPTY_CLOSET: ClosetSnapshot = {
   garments: [],
-  onboardingStatus: null,
+  onboardingStep: null,
   onboardingStatusError: false,
   userId: null,
   userIdError: false,
@@ -598,6 +635,20 @@ function ClosetAccountNotices({
   )
 }
 
+function useClosetCategories(garments: readonly ClosetGarment[]) {
+  const [category, setCategory] = useState<GarmentCategory | 'all'>('all')
+  const categories = garmentCategoryEnum.options.filter((option) =>
+    garments.some((garment) => garment.category === option)
+  )
+  const activeCategory =
+    category !== 'all' && categories.includes(category) ? category : 'all'
+  const filteredGarments =
+    activeCategory === 'all'
+      ? garments
+      : garments.filter((garment) => garment.category === activeCategory)
+  return { categories, activeCategory, filteredGarments, setCategory }
+}
+
 function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: boolean }) {
   const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language)
@@ -616,8 +667,9 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
   const loadAfterTags = useRef(false)
   const [garmentError, setGarmentError] = useState<string | null>(null)
   const [confirmedGarment, setConfirmedGarment] = useState(false)
-  const [onboardingStatus, setOnboardingStatus] =
-    useState<WardrobeOnboardingStatus | null>(start.onboardingStatus)
+  const [onboardingStep, setOnboardingStep] = useState<WardrobeOnboardingStep | null>(
+    start.onboardingStep
+  )
   /**
    * CodeRabbit r2 #10: one sequence for the automatic onboarding read and Retry. Each read takes
    * the next number when it starts, and only the latest one may set the onboarding state, so an
@@ -631,7 +683,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
   const [userIdError, setUserIdError] = useState(start.userIdError)
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
   const styleInvoker = useRef<HTMLButtonElement | null>(null)
-  const styleLabels = getStylePieceStrings(i18n.language)
   const [, updatePhotoClock] = useState(0)
   const photoExpiry = nextStylePiecePhotoExpiry(garments, Date.now())
   useEffect(
@@ -710,6 +761,8 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
   })
   // A piece inside its Undo window, or being sent, is hidden from the grid and the detail.
   const visibleGarments = withoutPendingDeletes(garments, pendingDeleteIds)
+  const { categories, activeCategory, filteredGarments, setCategory } =
+    useClosetCategories(visibleGarments)
 
   /**
    * D7: the detail closes to the grid at its saved scroll position, and focus moves to the next
@@ -791,7 +844,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     void getOnboardingStateFromWeb(controller.signal)
       .then((state) => {
         if (!controller.signal.aborted && latestOnboarding() && sameScope()) {
-          setOnboardingStatus(state.status)
+          setOnboardingStep(state.currentStep)
           setOnboardingStatusError(false)
         }
       })
@@ -811,7 +864,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     void getOnboardingStateFromWeb()
       .then((state) => {
         if (!latest()) return
-        if (scope === currentWebSessionScope()) setOnboardingStatus(state.status)
+        if (scope === currentWebSessionScope()) setOnboardingStep(state.currentStep)
         else setAccountReadAttempt((attempt) => attempt + 1)
       })
       .catch(() => {
@@ -990,7 +1043,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     // Under the scope its closet read started in; the store drops it once that scope left.
     screenSnapshot.remember(shownScopeRef.current, 'closet', CLOSET_SNAPSHOT_PART, {
       garments,
-      onboardingStatus,
+      onboardingStep,
       onboardingStatusError,
       userId,
       userIdError,
@@ -998,7 +1051,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
   }, [
     garments,
     hasLoaded,
-    onboardingStatus,
+    onboardingStep,
     onboardingStatusError,
     owner,
     userId,
@@ -1029,15 +1082,16 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
           // appears; Capsules moved to Looks, Silhouette and setup to More and Profile > Style.
           <AppTopBar
             titleKey="nav.closet"
+            wrapTitle
             trailing={
-              <>
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                 <AddGarmentAction
                   visitor={visitor}
                   buttonRef={addGarmentButtonRef}
                   onOpen={openCapture}
                 />
-                <ClosetMoreMenu setupDone={onboardingStatus === 'completed'} />
-              </>
+                <ClosetMoreMenu setupDone={onboardingStep === 'complete'} />
+              </div>
             }
           />
         )}
@@ -1100,7 +1154,31 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                   </Link>
                 )}
 
-                {visibleGarments.length === 0 ? (
+                {visibleGarments.length > 0 && (
+                  <div
+                    role="group"
+                    aria-label={t('wardrobe.hub.categoryFilters')}
+                    data-testid="closet-category-filters"
+                    className="mb-2 flex w-full gap-2 overflow-x-auto py-1"
+                  >
+                    {(['all', ...categories] as const).map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        aria-pressed={activeCategory === option}
+                        data-testid={`closet-category-${option}`}
+                        className={`min-h-touch max-w-full shrink-0 rounded-full border border-line-strong px-3 py-1 text-sm font-medium [overflow-wrap:anywhere] ${activeCategory === option ? 'bg-inverse text-on-inverse' : 'bg-page text-ink'}`}
+                        onClick={() => setCategory(option)}
+                      >
+                        {option === 'all'
+                          ? t('wardrobe.hub.categoryAll')
+                          : formatGarmentCategory(i18n.language, option)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {filteredGarments.length === 0 ? (
                   <WardrobeEmptyState
                     visitor={visitor}
                     isLoading={isLoading}
@@ -1117,7 +1195,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                     // 390 x 664.
                     className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4"
                   >
-                    {visibleGarments.map((garment) => (
+                    {filteredGarments.map((garment) => (
                       <div
                         key={garment.id}
                         data-testid={`garment-card-${garment.id}`}
@@ -1147,66 +1225,66 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                               390 px; the status chip leads the actions row below it. */}
                           <span
                             data-testid="garment-card-label"
-                            className="min-w-0 truncate text-sm font-medium text-ink-soft"
+                            className="min-w-0 text-sm font-medium text-ink-soft [overflow-wrap:anywhere]"
                           >
                             {garmentCardLabel(i18n.language, garment)}
                           </span>
-                          <div className="flex flex-wrap items-center gap-1">
-                            <span
-                              data-testid={`garment-status-${garment.status}`}
-                              className="shrink-0 rounded-sm bg-card-muted px-2 py-0.5 text-xs font-semibold text-ink-soft"
-                            >
-                              {garmentStatusLabel(t, garment.status)}
-                            </span>
-                            {garment.status === 'awaiting_tags' && (
-                              <button
-                                ref={(element) => {
-                                  if (element)
-                                    taggingButtonRefs.current.set(garment.id, element)
-                                  else taggingButtonRefs.current.delete(garment.id)
-                                }}
-                                onClick={(event) =>
-                                  openTagging(garment.id, event.currentTarget)
-                                }
-                                className="min-h-11 min-w-11 rounded-md border border-line-strong bg-page px-2 py-1 text-xs font-semibold text-ink"
-                              >
-                                {t('wardrobe.hub.needsTags')}
-                              </button>
-                            )}
-                            {garment.status === 'failed' && (
-                              <button
-                                type="button"
-                                className="min-h-11 px-2 text-left text-xs font-semibold text-ink underline"
-                                onClick={(event) => openCapture(event.currentTarget)}
-                              >
-                                {strings.firstUse.replaceGarment}
-                              </button>
-                            )}
-                            {garment.status === 'processing' && (
-                              <button
-                                type="button"
-                                onClick={() => pollCommittedGarment(garment.id)}
-                                className="min-h-11 px-2 text-xs font-semibold text-ink underline"
-                              >
-                                {strings.firstUse.checkGarment}
-                              </button>
-                            )}
-                            <StylePieceEntry
-                              garment={garment}
-                              owner={owner}
-                              unavailable={Boolean(loadError)}
-                              loading={isLoading}
-                              labels={styleLabels}
-                              onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
-                              onOpen={(selection, button) => {
-                                styleInvoker.current = button
-                                setStyleSelection(selection)
+                          {garment.status === 'awaiting_tags' && (
+                            <button
+                              type="button"
+                              ref={(element) => {
+                                if (element)
+                                  taggingButtonRefs.current.set(garment.id, element)
+                                else taggingButtonRefs.current.delete(garment.id)
                               }}
-                            />
-                          </div>
+                              onClick={(event) =>
+                                openTagging(garment.id, event.currentTarget)
+                              }
+                              className={STATUS_ACTION_CLASS}
+                            >
+                              <GarmentStatusBadge status="awaiting_tags" />
+                            </button>
+                          )}
+                          {garment.status === 'failed' && (
+                            <button
+                              type="button"
+                              className={STATUS_ACTION_CLASS}
+                              aria-label={`${t('wardrobe.hub.status.failed')}. ${strings.firstUse.replaceGarment}`}
+                              title={strings.firstUse.replaceGarment}
+                              onClick={(event) => openCapture(event.currentTarget)}
+                            >
+                              <GarmentStatusBadge status="failed" />
+                            </button>
+                          )}
+                          {garment.status === 'processing' && (
+                            <button
+                              type="button"
+                              className={STATUS_ACTION_CLASS}
+                              aria-label={`${t('wardrobe.hub.status.processing')}. ${strings.firstUse.checkGarment}`}
+                              title={strings.firstUse.checkGarment}
+                              onClick={() => pollCommittedGarment(garment.id)}
+                            >
+                              <GarmentStatusBadge status="processing" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+                {hasLoaded && onboardingStep && onboardingStep !== 'complete' && (
+                  <div className="mt-4" data-testid="closet-setup-progress">
+                    <NavRow
+                      href="/wardrobe/onboarding"
+                      label={t('wardrobe.menu.setup')}
+                      value={t('wardrobe.hub.setupProgress', {
+                        completed:
+                          wardrobeOnboardingStepEnum.options.indexOf(onboardingStep),
+                        total: wardrobeOnboardingStepEnum.options.length - 1,
+                      })}
+                      testId="closet-setup-progress-link"
+                      last
+                    />
                   </div>
                 )}
               </section>

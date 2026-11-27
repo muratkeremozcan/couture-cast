@@ -334,8 +334,24 @@ function RootLayoutNav() {
                     {/* Story CC-7.11 D7, D10: Profile > Style, and the guardian and teen
                       dashboards, whose bars name them (the bodies drop their second title). */}
                     <Stack.Screen
+                      name="settings-account"
+                      options={{ title: t('settings.profile.account') }}
+                    />
+                    <Stack.Screen
+                      name="settings-premium"
+                      options={{ title: t('settings.profile.premium') }}
+                    />
+                    <Stack.Screen
+                      name="settings-language"
+                      options={{ title: t('settings.profile.language') }}
+                    />
+                    <Stack.Screen
+                      name="settings-about"
+                      options={{ title: t('settings.profile.about') }}
+                    />
+                    <Stack.Screen
                       name="settings-style"
-                      options={{ title: t('settings.style.title') }}
+                      options={{ title: t('settings.profile.style') }}
                     />
                     <Stack.Screen
                       name="guardian-dashboard"
@@ -356,7 +372,7 @@ function RootLayoutNav() {
                     />
                     <Stack.Screen
                       name="locations"
-                      options={{ title: t('locations.title') }}
+                      options={{ title: t('settings.profile.places') }}
                     />
                     <Stack.Screen
                       name="preview"

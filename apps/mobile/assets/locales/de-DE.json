@@ -65,6 +65,32 @@
     "precipitation": "Niederschlag"
   },
   "settings": {
+    "profile": {
+      "account": "Konto",
+      "places": "Orte",
+      "style": "Stil",
+      "premium": "Premium",
+      "notifications": "Benachrichtigungen",
+      "language": "Sprache",
+      "about": "Über die App und Datenschutz",
+      "unavailable": "Nicht verfügbar",
+      "premiumActive": "Aktiv",
+      "premiumFree": "Kostenlos",
+      "on": "An",
+      "off": "Aus",
+      "learnMore": "Mehr erfahren",
+      "languageHelp": "Dein Browser legt die Sprache fest.",
+      "browserLanguageHelp": "Ändere die bevorzugte Sprache in den Browsereinstellungen und lade CoutureCast neu.",
+      "aboutHelp": "Plane Outfits passend zum Wetter und behalte deinen Kleiderschrank im Blick.",
+      "themeHelp": "Wähle die Farben der App.",
+      "privacy": "Datenschutzerklärung",
+      "terms": "Nutzungsbedingungen",
+      "setup": {
+        "not_started": "Nicht begonnen",
+        "in_progress": "In Bearbeitung",
+        "completed": "Abgeschlossen"
+      }
+    },
     "title": "Einstellungen",
     "account": {
       "label": "Konto"
@@ -415,15 +441,18 @@
       "deleteUsageFailed": "Wir konnten nicht prüfen, wo dieses Teil verwendet wird. Versuche es erneut."
     },
     "hub": {
+      "categoryAll": "Alle",
+      "categoryFilters": "Nach Kategorie filtern",
+      "setupProgress": "{{completed}} von {{total}} Schritten abgeschlossen",
       "loading": "Kleiderschrank wird geladen",
       "saved_looks_failed": "Deine gespeicherten Looks konnten nicht geladen werden.",
       "status": {
         "pending_upload": "Wird hochgeladen",
         "bytes_uploaded": "Wird hochgeladen",
         "processing": "Wird verarbeitet",
-        "awaiting_tags": "Wartet auf Tags",
+        "awaiting_tags": "Tags fehlen",
         "ready": "Fertig",
-        "failed": "Hochladen fehlgeschlagen",
+        "failed": "Fehlgeschlagen",
         "unknown": "In Bearbeitung"
       },
       "detailTitle": "Teil-Details"

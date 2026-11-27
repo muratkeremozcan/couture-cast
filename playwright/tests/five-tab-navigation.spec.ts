@@ -352,10 +352,10 @@ test.describe('CC-7.11 More menu and Profile > Style @local-lane', () => {
     await page.goto(SHELL_TABS.profile.path)
     await waitForShellSettled(page, router)
 
-    const account = await page.getByTestId('profile-account').boundingBox()
+    const account = await page.getByTestId('profile-account-row').boundingBox()
     const styleRow = page.getByTestId('profile-style-row')
     const row = await styleRow.boundingBox()
-    expect(row!.y, 'Style row below the account header').toBeGreaterThanOrEqual(
+    expect(row!.y, 'Style row below the Account row').toBeGreaterThanOrEqual(
       account!.y + account!.height - 1
     )
     await styleRow.click()
