@@ -1,30 +1,35 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { GarmentWithColor } from '@couture/api-client/contracts/http'
+import type { GarmentCategory } from '@couture/api-client/contracts/http'
 import { formatGarmentAlt, formatLocalizedList } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { isLiveScope } from '../../lib/use-web-session'
 import { listGarmentsFromWeb } from '../../lib/wardrobe'
 import { useScreenGateRead, useSectionSnapshot } from './screen-gate'
 
+const recentReadIntervalMs = 60_000
+
 export function HomeCloset({ owner, scope }: { owner: string; scope: string }) {
   const { t, i18n } = useTranslation(undefined, { i18n: getI18n() })
-  const { restored, beginRead, remember } = useSectionSnapshot<GarmentWithColor[] | null>(
+  const { restored, beginRead, remember } = useSectionSnapshot<boolean>(
     'recent-pieces',
     owner
   )
-  const [pieces, setPieces] = useState(restored)
-  useScreenGateRead('closet', pieces !== undefined)
+  const [pieces, setPieces] = useState<(GarmentCategory | null)[] | null>()
+  const [pending, setPending] = useState(true)
+  useScreenGateRead('closet', restored !== undefined || pieces !== undefined)
 
   useEffect(() => {
     let controller: AbortController | undefined
+    let refresh: ReturnType<typeof setTimeout> | undefined
     const read = () => {
-      if (!isLiveScope(scope)) return
+      if (!isLiveScope(scope) || document.visibilityState === 'hidden') return
       controller?.abort()
+      clearTimeout(refresh)
+      setPending(true)
       beginRead()
       const request = new AbortController()
       controller = request
@@ -34,28 +39,50 @@ export function HomeCloset({ owner, scope }: { owner: string; scope: string }) {
           const recent = [...garments]
             .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
             .slice(0, 3)
+            .map(({ category }) => category)
           setPieces(recent)
-          remember(recent)
+          remember(true)
         })
         .catch(() => {
           if (!request.signal.aborted && isLiveScope(scope)) {
             setPieces(null)
-            remember(null)
+            remember(false)
           }
         })
+        .finally(() => {
+          if (request.signal.aborted || !isLiveScope(scope)) return
+          setPending(false)
+          refresh = setTimeout(read, recentReadIntervalMs)
+        })
+    }
+    const onVisibility = () => {
+      if (document.visibilityState !== 'hidden') {
+        read()
+        return
+      }
+      controller?.abort()
+      clearTimeout(refresh)
+      setPending(true)
+      setPieces((current) => (current === undefined ? undefined : null))
     }
     read()
     window.addEventListener('focus', read)
+    document.addEventListener('visibilitychange', onVisibility)
     return () => {
       controller?.abort()
+      clearTimeout(refresh)
       window.removeEventListener('focus', read)
+      document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [beginRead, remember, scope])
 
+  if (pending) {
+    return restored || pieces ? <div className="min-h-touch" aria-hidden="true" /> : null
+  }
   if (!pieces) return null
   const recentLabel = t('home.today.recentPieces')
   const garments = formatLocalizedList(
-    pieces.map((piece) => formatGarmentAlt(i18n.language, piece)),
+    pieces.map((category) => formatGarmentAlt(i18n.language, { category })),
     i18n.language
   )
   if (!pieces.length) {
@@ -78,38 +105,13 @@ export function HomeCloset({ owner, scope }: { owner: string; scope: string }) {
       aria-label={`${recentLabel}. ${garments}`}
       className={rowClass}
     >
-      <span className="min-w-0 break-words">{recentLabel}</span>
-      <span className="flex shrink-0 gap-1" aria-hidden="true">
-        {pieces.map((piece) =>
-          piece.imageAccess ? (
-            <Image
-              key={piece.id}
-              src={piece.imageAccess.url}
-              alt=""
-              width={32}
-              height={32}
-              unoptimized
-              className="h-[32px] w-[32px] shrink-0 rounded-md bg-card-muted object-cover"
-            />
-          ) : (
-            <span
-              key={piece.id}
-              className="flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-md bg-card-muted"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <path d="M10 7a2 2 0 1 1 3 1.7l-1 .6v2m0 0-8 4.5a1 1 0 0 0 .5 1.9h15a1 1 0 0 0 .5-1.9l-8-4.5Z" />
-              </svg>
-            </span>
-          )
-        )}
-        <span className="self-center">›</span>
+      <span className="min-w-0 flex-1 break-words">
+        {recentLabel}
+        <span className="block text-xs font-normal text-ink-soft" aria-hidden="true">
+          {garments}
+        </span>
       </span>
+      <span aria-hidden="true">›</span>
     </Link>
   )
 }

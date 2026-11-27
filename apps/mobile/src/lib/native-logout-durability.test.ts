@@ -19,6 +19,7 @@ const device = vi.hoisted(() => ({
         removeItem: (key: string) => Promise<void>
       },
   removals: vi.fn(),
+  beforeSdkSignOut: undefined as (() => Promise<void>) | undefined,
 }))
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
@@ -70,6 +71,7 @@ vi.mock('expo-notifications', () => ({
     }),
 }))
 const SESSION_KEY = 'couturecast.auth-session'
+const LOGOUT_MARKER = `${SESSION_KEY}-logout-pending`
 // The SDK persists through the app's storage adapter, as Supabase does.
 vi.mock('@supabase/supabase-js', () => ({
   processLock: vi.fn(),
@@ -95,7 +97,10 @@ vi.mock('@supabase/supabase-js', () => ({
           await options.auth.storage.setItem(SESSION_KEY, JSON.stringify(session))
           return { data: { session }, error: null }
         },
-        signOut: () => options.auth.storage.removeItem(SESSION_KEY),
+        signOut: async () => {
+          await device.beforeSdkSignOut?.()
+          await options.auth.storage.removeItem(SESSION_KEY)
+        },
         signInWithOtp: () => Promise.resolve({ error: null }),
         startAutoRefresh: () => Promise.resolve(),
         stopAutoRefresh: () => Promise.resolve(),
@@ -106,6 +111,7 @@ vi.mock('@supabase/supabase-js', () => ({
 }))
 import {
   nativeSessionIdentity,
+  resolveNativeSessionToken,
   signOutNativeSession,
   startNativeSession,
   verifyNativeOtp,
@@ -123,10 +129,13 @@ const within = (work: Promise<unknown>, ms: number) =>
     new Promise<'stalled'>((resolve) => setTimeout(() => resolve('stalled'), ms)),
   ])
 const persistedSession = () =>
-  [...device.storage.keys()].filter((key) => key.startsWith(SESSION_KEY))
+  [...device.storage.keys()].filter(
+    (key) => key.startsWith(SESSION_KEY) && key !== LOGOUT_MARKER
+  )
 
 beforeEach(async () => {
   process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
+  device.beforeSdkSignOut = undefined
   await signOutNativeSession()
   device.storage.clear()
   device.tokens.length = 0
@@ -178,6 +187,51 @@ async function stalledRegistration() {
   await vi.waitFor(() => expect(device.tokens).toHaveLength(1))
   expect(persistedSession()).not.toEqual([])
 }
+
+it('CC-7.13 keeps logout durable while the provider call is stalled', async () => {
+  stopSession = await startNativeSession()
+  await verifyNativeOtp('a@synthetic.test', '123456')
+  expect(nativeSessionIdentity()).toBe('member-a')
+  await device.authStorage!.setItem(`${SESSION_KEY}-code-verifier`, 'synthetic-verifier')
+  const credentialKeys = persistedSession()
+  expect(credentialKeys).toHaveLength(2)
+
+  let markEntered: () => void = () => undefined
+  const entered = new Promise<void>((resolve) => {
+    markEntered = resolve
+  })
+  let releaseSdk: () => void = () => undefined
+  const heldLogout = new Promise<void>((resolve) => {
+    releaseSdk = resolve
+  })
+  device.beforeSdkSignOut = () => {
+    markEntered()
+    return heldLogout
+  }
+  const signingOut = signOutNativeSession()
+  try {
+    await entered
+    expect(nativeSessionIdentity()).toBeNull()
+    expect(await resolveNativeSessionToken()).toBeUndefined()
+    expect(persistedSession()).toEqual(credentialKeys)
+    expect(device.storage.get(LOGOUT_MARKER)).toBe('1')
+
+    vi.resetModules()
+    const fresh = await import('./native-session.js')
+    const stopFresh = await fresh.startNativeSession()
+    try {
+      expect(fresh.nativeSessionIdentity()).toBeNull()
+      expect(await fresh.resolveNativeSessionToken()).toBeUndefined()
+      expect(persistedSession()).toEqual([])
+      expect(device.storage.has(LOGOUT_MARKER)).toBe(false)
+    } finally {
+      stopFresh()
+    }
+  } finally {
+    releaseSdk()
+    await signingOut
+  }
+})
 
 describe('logout while push registration is stalled', () => {
   it('removes the persisted session within the logout bound, so a fresh process restores nobody', async () => {

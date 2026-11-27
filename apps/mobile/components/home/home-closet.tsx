@@ -1,8 +1,8 @@
-import { router } from 'expo-router'
-import { useEffect, useState } from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { router, useFocusEffect } from 'expo-router'
+import { useCallback, useState } from 'react'
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import type { GarmentWithColor } from '@couture/api-client/contracts/http'
+import type { GarmentCategory } from '@couture/api-client/contracts/http'
 import { formatGarmentAlt, formatLocalizedList } from '@couture/utils'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import {
@@ -14,64 +14,82 @@ import { listGarmentsFromMobile } from '@/src/lib/wardrobe'
 import { onWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { TAB_BODY_INSET } from '@/src/theme/tokens'
 
+const recentReadIntervalMs = 60_000
+
 export function useRecentHomePieces(owner: string | null, enabled: boolean) {
   const epoch = mobileIdentityEpoch()
   const [result, setResult] = useState<{
     epoch: number
-    pieces: GarmentWithColor[] | null
+    pieces: (GarmentCategory | null)[] | null
   } | null>(null)
-  useEffect(() => {
-    if (!enabled) {
-      setResult(null)
-      return
-    }
-    let controller: AbortController | undefined
-    const read = () => {
-      controller?.abort()
-      const request = new AbortController()
-      controller = request
-      const current = () =>
-        !request.signal.aborted &&
-        mobileApplicationUserId() === owner &&
-        mobileIdentityEpoch() === epoch
-      void resolveMobileAccessToken()
-        .then((token) =>
-          token && current() ? listGarmentsFromMobile(token, request.signal) : null
+  useFocusEffect(
+    useCallback(() => {
+      if (!enabled) return
+      let controller: AbortController | undefined
+      let refresh: ReturnType<typeof setTimeout> | undefined
+      const clear = () => {
+        controller?.abort()
+        clearTimeout(refresh)
+        setResult((current) =>
+          current?.epoch === epoch ? { epoch, pieces: null } : current
         )
-        .then((garments) => {
-          if (!current()) return
-          const pieces = garments
-            ? [...garments]
-                .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-                .slice(0, 3)
-            : null
-          setResult({ epoch, pieces })
-        })
-        .catch(() => {
-          if (current()) setResult({ epoch, pieces: null })
-        })
-    }
-    read()
-    const unsubscribe = onWardrobeChanged(read)
-    return () => {
-      controller?.abort()
-      unsubscribe()
-    }
-  }, [enabled, epoch, owner])
+      }
+      const read = () => {
+        clear()
+        const request = new AbortController()
+        controller = request
+        const current = () =>
+          !request.signal.aborted &&
+          mobileApplicationUserId() === owner &&
+          mobileIdentityEpoch() === epoch
+        void resolveMobileAccessToken()
+          .then((token) =>
+            token && current() ? listGarmentsFromMobile(token, request.signal) : null
+          )
+          .then((garments) => {
+            if (!current()) return
+            const pieces = garments
+              ? [...garments]
+                  .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+                  .slice(0, 3)
+                  .map(({ category }) => category)
+              : null
+            setResult({ epoch, pieces })
+          })
+          .catch(() => {
+            if (current()) setResult({ epoch, pieces: null })
+          })
+          .finally(() => {
+            if (current()) refresh = setTimeout(read, recentReadIntervalMs)
+          })
+      }
+      read()
+      const unsubscribe = onWardrobeChanged(read)
+      const appState = AppState.addEventListener('change', (state) => {
+        if (state === 'active') read()
+        else clear()
+      })
+      return () => {
+        clear()
+        unsubscribe()
+        appState.remove()
+      }
+    }, [enabled, epoch, owner])
+  )
   return enabled && result?.epoch === epoch ? result.pieces : undefined
 }
 
 export function HomeCloset({
   pieces,
 }: {
-  pieces: GarmentWithColor[] | null | undefined
+  pieces: (GarmentCategory | null)[] | null | undefined
 }) {
   const { t, i18n } = useTranslation()
   const palette = useHeroPalette()
   if (!pieces) return null
   const recentLabel = t('home.today.recentPieces')
   const garments = formatLocalizedList(
-    pieces.map((piece) => formatGarmentAlt(i18n.language, piece)),
+    pieces.map((category) => formatGarmentAlt(i18n.language, { category })),
     i18n.language
   )
   const populated = pieces.length > 0
@@ -85,28 +103,15 @@ export function HomeCloset({
       testID={populated ? 'home-closet-strip' : 'home-add-garment'}
       style={[styles.row, { borderBottomColor: palette.line }]}
     >
-      <Text style={[styles.label, { color: palette.ink }]}>
-        {populated ? recentLabel : t('home.today.addFirstPiece')}
-      </Text>
-      <View style={styles.previews} aria-hidden>
-        {pieces.map((piece) =>
-          piece.imageAccess ? (
-            <Image
-              key={piece.id}
-              source={{ uri: piece.imageAccess.url }}
-              style={[styles.thumbnail, { backgroundColor: palette.cardMuted }]}
-            />
-          ) : (
-            <View
-              key={piece.id}
-              style={[styles.thumbnail, { backgroundColor: palette.cardMuted }]}
-            >
-              <Text style={{ color: palette.inkMuted }}>◇</Text>
-            </View>
-          )
-        )}
-        <Text style={{ color: palette.inkMuted }}>›</Text>
+      <View style={styles.labelGroup}>
+        <Text style={[styles.label, { color: palette.ink }]}>
+          {populated ? recentLabel : t('home.today.addFirstPiece')}
+        </Text>
+        {populated && <Text style={{ color: palette.inkMuted }}>{garments}</Text>}
       </View>
+      <Text aria-hidden style={{ color: palette.inkMuted }}>
+        ›
+      </Text>
     </Pressable>
   )
 }
@@ -123,13 +128,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
-  label: { flexShrink: 1, fontSize: 14, fontWeight: '600' },
-  previews: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  thumbnail: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  labelGroup: { flex: 1, minWidth: 0 },
+  label: { fontSize: 14, fontWeight: '600' },
 })

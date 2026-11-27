@@ -181,7 +181,6 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     render(<LookbookPrismLayout />)
 
     const link = await screen.findByTestId('home-spotlight-teaser-link')
-    await screen.findByTestId('spotlight-lookbook-card-look-1')
     expect(link).toHaveAccessibleName(LINK_NAME)
     expect(screen.queryByTestId('home-spotlight-teaser-sponsored')).toBeNull()
     expect(screen.queryAllByRole('button', { name: /Shop this look/ })).toEqual([])
@@ -266,33 +265,22 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     expect(clicks.bodies).toHaveLength(2)
   })
 
-  it('6.7b-WEB-034 reports the teaser block once with the strict community payload', async () => {
+  it('6.7b-WEB-034 reports one Today teaser impression with the strict payload', async () => {
     signIn()
     useSpotlight(spotlightItem({ sponsorship: SPONSORSHIP }))
     render(<LookbookPrismLayout />)
 
     await screen.findByTestId('home-spotlight-teaser-sponsored-cta-look-1')
-    await screen.findByTestId('spotlight-sponsored-cta-look-1')
-
-    const events = shownEvents()
-    // The teaser and the spotlight module are two blocks on two surfaces.
-    expect(events.map((event) => event.properties)).toEqual(
-      expect.arrayContaining([
+    await waitFor(() =>
+      expect(shownEvents().map((event) => event.properties)).toEqual([
         {
           partner_id: SPONSORSHIP.partnerId,
           offer_id: SPONSORSHIP.offerId,
           surface: 'home_teaser',
           locale_region: 'US',
         },
-        {
-          partner_id: SPONSORSHIP.partnerId,
-          offer_id: SPONSORSHIP.offerId,
-          surface: 'community_spotlight',
-          locale_region: 'US',
-        },
       ])
     )
-    expect(events).toHaveLength(2)
   })
 
   it('6.7b-WEB-036 the CTA is its own Tab stop after the teaser link, and Enter mints', async () => {

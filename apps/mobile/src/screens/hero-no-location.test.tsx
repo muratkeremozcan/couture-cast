@@ -134,7 +134,7 @@ describe('TabOneScreen without a saved location', () => {
     // WCAG 2.5.8 and the platform guidance: a 44pt minimum touch target.
     expect(action.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)
     await userEvent.click(action)
-    expect(routerPush).toHaveBeenCalledWith('/locations')
+    expect(routerPush).toHaveBeenCalledWith('/locations?guided=1')
   })
 
   it('1.2b-MOB-HERO-02 shows a ritual as soon as a location is saved, with no manual reload', async () => {

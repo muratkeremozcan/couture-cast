@@ -81,7 +81,7 @@ describe('MemberSampleOutfit (mobile)', () => {
     )
 
     fireEvent.click(screen.getByTestId('home-set-city'))
-    expect(routerMock.push).toHaveBeenCalledWith('/locations')
+    expect(routerMock.push).toHaveBeenCalledWith('/locations?guided=1')
     fireEvent.click(screen.getByTestId('home-edit-sample'))
 
     // Shuffle -> Undo restores prior look.

@@ -707,7 +707,7 @@ export function MemberSampleOutfit({
         label={strings.firstUse.setCity}
         testID="home-set-city"
         palette={palette}
-        onPress={() => router.push('/locations')}
+        onPress={() => router.push('/locations?guided=1')}
         primary
         todayPrimary
       />

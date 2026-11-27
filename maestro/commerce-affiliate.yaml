@@ -253,6 +253,12 @@ tags:
     stopApp: true
 
 - runFlow: subflows/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'today-primary-action'
+    timeout: 30000
+- tapOn:
+    id: 'today-primary-action'
 
 - scrollUntilVisible:
     element:

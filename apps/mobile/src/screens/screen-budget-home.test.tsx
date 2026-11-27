@@ -26,7 +26,7 @@ import {
   tabHeader,
 } from '@/src/test-utils/screen-budget'
 import React, { type ReactElement, type ReactNode } from 'react'
-import { configure, render, screen, waitFor, within } from '@testing-library/react'
+import { act, configure, render, screen, waitFor, within } from '@testing-library/react'
 import {
   afterEach,
   beforeAll,
@@ -135,6 +135,7 @@ import { server } from '@/src/test-utils/msw/server'
 import { http, HttpResponse } from 'msw'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import { press } from '@/src/test-utils/press'
+import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import {
   hasSavedLocation,
   serveScreenBudgetFixture,
@@ -373,7 +374,7 @@ describe('Screen budget: native Today', () => {
     expectNativeMeasureFloors(measurement, 'today')
     expect(measurement.todayHeight).toBeLessThanOrEqual(1688)
     press(screen.getByTestId('home-set-city'))
-    expect(routerMock.push).toHaveBeenCalledWith('/locations')
+    expect(routerMock.push).toHaveBeenCalledWith('/locations?guided=1')
   }, 30_000)
 
   it('[P0] [7.13-NAT-001/002] identical periods hide the selector and the weather line toggles the hourly ribbon', async () => {
@@ -410,6 +411,42 @@ describe('Screen budget: native Today', () => {
       'true'
     )
     expect(screen.getByTestId('outfit-comfort-notes').textContent).toMatch(/light tee/i)
+  }, 30_000)
+
+  it('[P0] [7.13-NAT-004] a wardrobe change removes old categories until the current closet is verified', async () => {
+    serveScreenBudgetFixture('populated', MEMBER)
+    renderToday()
+    await todaySettled('populated')
+    const recent = screen.getByTestId('home-closet-strip')
+    expect(recent).toHaveAccessibleName(/recent.*top.*bottom.*outerwear/i)
+    expect(recent.querySelectorAll('img')).toHaveLength(0)
+
+    let markRequested: () => void = () => undefined
+    const requested = new Promise<void>((resolve) => {
+      markRequested = resolve
+    })
+    let releaseGarments: () => void = () => undefined
+    const heldGarments = new Promise<void>((resolve) => {
+      releaseGarments = resolve
+    })
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        markRequested()
+        await heldGarments
+        return HttpResponse.json({ data: [] })
+      })
+    )
+    try {
+      act(() => notifyWardrobeChanged())
+      await requested
+      expect(screen.queryByTestId('home-closet-strip')).toBeNull()
+      expect(screen.queryByTestId('home-add-garment')).toBeNull()
+    } finally {
+      releaseGarments()
+    }
+    expect(await screen.findByTestId('home-add-garment')).toHaveAccessibleName(
+      'Add your first piece'
+    )
   }, 30_000)
 
   for (const [id, fixture] of PROBES) {

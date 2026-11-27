@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { mockCommunityFeedItem } from '../../test-utils/msw/handlers'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import CommunityPage from '../community/page'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 
 const captureMock = vi.fn()
@@ -17,13 +18,6 @@ function signIn() {
   window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
 }
 
-/**
- * Story 6.1: a community deep link now resolves against the server. Its target
- * has to exist on both sides: `GET /api/v1/community/posts/{postId}`, which
- * the default handler answers for `mockCommunityFeedItem.id` and 404s for every
- * other id, and the feed the grid renders the highlighted card from. The
- * default feed is empty, so a test that wants a card serves one.
- */
 vi.mock('posthog-js', () => ({
   default: {
     capture: (...args: unknown[]): void => {
@@ -36,6 +30,7 @@ const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
   useRouter: () => router,
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }))
 
 describe('Web Deep-Link Handling (Story 3.7)', () => {
@@ -202,22 +197,28 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
     })
   })
 
-  it('treats a community card that no longer exists as an invalid link', async () => {
-    // Signed in, so the 404 from `GET /community/posts/{postId}` is the reason
-    // the target is unreachable rather than the missing bearer token.
-    signIn()
-    setLocationSearch('?source=notification&type=community&cardId=look-does-not-exist')
-    render(<LookbookPrismLayout />)
+  it.each([404, 403])(
+    'the Community destination reports an unavailable card (%i) after an authenticated target read',
+    async (status) => {
+      signIn()
+      const authorizations: (string | null)[] = []
+      useMswHandlers(
+        http.get('/api/v1/community/posts/unavailable-look', ({ request }) => {
+          authorizations.push(request.headers.get('authorization'))
+          return new HttpResponse(null, { status })
+        })
+      )
+      setLocationSearch('?source=notification&type=community&cardId=unavailable-look')
+      render(<CommunityPage />)
 
-    // A card that was removed since the notification was sent must not silently
-    // land the user on an unrelated filter. The probe is asynchronous, so the
-    // banner arrives with the server's answer.
-    expect(await screen.findByTestId('deep-link-info-banner')).toBeInTheDocument()
-    expect(captureMock).toHaveBeenCalledWith(
-      'deep_link_invalid',
-      expect.objectContaining({ reason: 'Community card target was not found' })
-    )
-  })
+      expect(await screen.findByTestId('deep-link-info-banner')).toHaveTextContent(
+        'This link is invalid, expired, or no longer available.'
+      )
+      expect(authorizations).toEqual(['Bearer test-access-token'])
+      expect(screen.queryByTestId('lookbook-card-unavailable-look')).toBeNull()
+      expect(router.replace).not.toHaveBeenCalled()
+    }
+  )
 
   it('reports a weather alert link opened while signed out without reading the feed', async () => {
     let polls = 0

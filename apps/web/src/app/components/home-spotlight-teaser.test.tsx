@@ -222,7 +222,7 @@ describe('6.7 web Home spotlight teaser', () => {
     await answer(2, cityPage([spotlightItem('look-member-3')]))
     expect(await screen.findByTestId('home-spotlight-teaser-link')).toHaveAttribute(
       'href',
-      '#spotlight-lookbook-card-look-member-3'
+      /^\/community\?.*cardId=look-member-3&focus=spotlight&focusToken=/
     )
 
     act(() => {

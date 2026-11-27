@@ -115,14 +115,6 @@ tags:
     id: 'location-save-button'
     label: 'Save the location'
 
-- extendedWaitUntil:
-    visible:
-      id: 'location-label-0'
-      text: 'Home'
-    timeout: 15000
-- tapOn:
-    id: 'app-top-bar-back'
-
 # --- Today shows a ritual based on the saved forecast ---
 - extendedWaitUntil:
     visible:
