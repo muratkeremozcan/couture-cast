@@ -7,8 +7,10 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common'
 import { BaseExceptionFilter, HttpAdapterHost } from '@nestjs/core'
+import { STATUS_CODES } from 'node:http'
 import { TelemetryService } from '../modules/telemetry/telemetry.service'
 import { createBaseLogger } from '../logger/pino.config'
+import { isLookIdeasRoute } from '../logger/request-context.js'
 
 interface AuthenticatedRequest {
   url?: string
@@ -51,6 +53,20 @@ function normalizeRoute(route: string): string {
   return (withoutTrailingSlashes || '/').toLowerCase()
 }
 
+function privateHttpException(error: unknown): HttpException {
+  if (error instanceof HttpException) return error
+  const status =
+    error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : null
+  if (
+    typeof status !== 'number' ||
+    status < 400 ||
+    status >= 600 ||
+    !STATUS_CODES[status]
+  )
+    return new InternalServerErrorException()
+  return new HttpException(STATUS_CODES[status], status)
+}
+
 function getErrorCodeForStatus(statusCode: HttpStatus): string {
   if (statusCode === HttpStatus.BAD_REQUEST) return 'BAD_REQUEST'
   if (statusCode === HttpStatus.UNAUTHORIZED) return 'UNAUTHORIZED'
@@ -78,6 +94,13 @@ export class ApiExceptionFilter extends BaseExceptionFilter {
   }
 
   override catch(exception: unknown, host: ArgumentsHost): void {
+    const request = host.switchToHttp().getRequest<AuthenticatedRequest | undefined>()
+    const route = request?.path || request?.url?.split('?')[0] || 'unknown'
+    if (isLookIdeasRoute(route)) {
+      // Nest's unknown-error handler logs the original object, including parser metadata.
+      super.catch(privateHttpException(exception), host)
+      return
+    }
     const unexpected =
       !(exception instanceof HttpException) && !this.isHttpError(exception)
     const responseException = unexpected
@@ -92,14 +115,9 @@ export class ApiExceptionFilter extends BaseExceptionFilter {
     }
 
     try {
-      const ctx = host.switchToHttp()
-      const request = ctx.getRequest<AuthenticatedRequest | undefined>()
-
       if (!request) {
         return
       }
-
-      const route = request.path || request.url?.split('?')[0] || 'unknown'
 
       if (TELEMETRY_EXCLUDED_ROUTES.has(normalizeRoute(route))) {
         // The response has already been sent by `super.catch` above. Only the

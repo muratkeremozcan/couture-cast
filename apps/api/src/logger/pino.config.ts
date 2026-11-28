@@ -20,6 +20,8 @@ type TraceRuntime = {
 type CreateBaseLoggerOptions = {
   destination?: DestinationStream
   env?: EnvVars
+  includeRequestMetadata?: boolean
+  productionLevel?: LevelWithSilent
   traceRuntime?: TraceRuntime
 }
 
@@ -74,7 +76,10 @@ function removeUndefined<T extends Record<string, unknown>>(value: T) {
   ) as Partial<T>
 }
 
-export function resolveLogLevel(env: EnvVars = process.env): LevelWithSilent {
+export function resolveLogLevel(
+  env: EnvVars = process.env,
+  productionLevel: LevelWithSilent = 'warn'
+): LevelWithSilent {
   // 1) resolve environment-driven log level policy.
   const explicitLevel = env.LOG_LEVEL
   if (explicitLevel) {
@@ -90,7 +95,7 @@ export function resolveLogLevel(env: EnvVars = process.env): LevelWithSilent {
   ).toLowerCase()
 
   if (runtime === 'production' || runtime === 'prod') {
-    return 'warn'
+    return productionLevel
   }
 
   if (runtime === 'development' || runtime === 'dev') {
@@ -141,7 +146,7 @@ export function createBaseLogger(options: CreateBaseLoggerOptions = {}) {
 
   return pino(
     {
-      level: resolveLogLevel(env),
+      level: resolveLogLevel(env, options.productionLevel),
       messageKey: 'message',
       formatters: {
         level: (label) => ({ level: label }),
@@ -167,6 +172,7 @@ export function createBaseLogger(options: CreateBaseLoggerOptions = {}) {
       // Flow ref S0.7/T5/2: inject request + trace context via Pino mixins so
       // call sites do not have to repeat those fields manually.
       mixin() {
+        if (options.includeRequestMetadata === false) return {}
         const requestContext = getRequestContext()
         return removeUndefined({
           feature: requestContext?.feature,

@@ -108,11 +108,17 @@ const pixel =
 export function readKey(url: string, method: string) {
   const { pathname, searchParams } = new URL(url)
   const path = pathname.replace(/^.*\/api\/v1\//, '')
-  if (method === 'POST' && path === 'community/targets/resolve')
-    return 'community-resolve'
-  // Story CC-7.11 D12: opening a post detail layer records the open and reads its comments.
-  if (method === 'POST' && /^community\/posts\/[^/]+\/opened$/.test(path))
-    return 'community-opened'
+  if (method === 'POST') {
+    const commands: Record<string, string> = {
+      'community/targets/resolve': 'community-resolve',
+      'personalization/look-ideas': 'look-ideas',
+    }
+    // Story CC-7.11 D12: opening a post detail layer records the open.
+    return (
+      commands[path] ??
+      (/^community\/posts\/[^/]+\/opened$/.test(path) ? 'community-opened' : null)
+    )
+  }
   if (method === 'GET' && /^community\/posts\/[^/]+\/comments$/.test(path))
     return 'community-comments'
   if (method === 'GET' && /^community\/posts\/[^/]+\/comment-submissions$/.test(path))
@@ -754,6 +760,7 @@ export function createShellRouter(options: {
   /** The fixture answer for one known read. */
   const answerFor = (key: string, request: Request): Parameters<Route['fulfill']>[0] => {
     if (key === 'style-profile') return styleAnswer(request)
+    if (key === 'look-ideas') return { json: { data: null } }
     const { json, resolve } = bodiesFor(request)
     if (key === 'community-resolve') return { json: resolve(request) }
     if (key === 'ritual' && !populated) return { status: 400, json: NO_CITY }

@@ -137,7 +137,8 @@ export class GuardianConsentStateService {
     return allowed
   }
 
-  async canTeenViewPrivateGarmentPhotos(userId: string): Promise<boolean> {
+  /** Checks current account state for surfaces that require an active teen account. */
+  async canTeenAccessActiveSurface(userId: string): Promise<boolean> {
     const profile = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { profile: { select: { preferences: true } } },
@@ -145,6 +146,10 @@ export class GuardianConsentStateService {
     return (
       extractComplianceState(profile?.profile?.preferences).accountStatus === 'active'
     )
+  }
+
+  canTeenViewPrivateGarmentPhotos(userId: string): Promise<boolean> {
+    return this.canTeenAccessActiveSurface(userId)
   }
 
   markTeenAccessGranted(userId: string) {

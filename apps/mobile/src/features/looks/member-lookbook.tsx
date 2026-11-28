@@ -1,4 +1,4 @@
-import { withRequestDeadline } from '@couture/api-client'
+import { requestLookIdeas, withRequestDeadline } from '@couture/api-client'
 import {
   resolveSupportedLocale,
   ritualResponseSchema,
@@ -10,27 +10,40 @@ import {
   canShuffleMemberLookbook,
   createIdempotencyKey,
   createMemberLookbook,
+  createMemberLookbookRanking,
   getGuestPreviewStrings,
   getMemberLookbookStrings,
   getStyleProfileStrings,
   isMemberLookbookDraftEdited,
   memberLookbookDraftKey,
   memberLookbookOutfitDraft,
+  memberLookbookRankingCandidates,
+  memberLookbookRankingInput,
   memberLookbookWeatherReason,
+  presentMemberLookbookRanking,
   readMemberLookbookDraft,
   resolveMemberLookbookDraft,
   sampleGarmentText,
   sampleLookText,
   shuffleMemberLookbook,
   styleForecastSampleWeather,
+  validateMemberLookbookRanking,
   type MemberLookbookDraft,
+  type MemberLookbookRankingInput,
   type SampleWeatherKey,
 } from '@couture/utils'
 import { router, useFocusEffect } from 'expo-router'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator,
   AppState,
   Pressable,
   StyleSheet,
@@ -166,6 +179,58 @@ function Choice({
   )
 }
 
+function useLookbookIdeas(
+  weather: SampleWeatherKey | undefined,
+  style: ReturnType<typeof useMobileStyleProfile>,
+  draft: MemberLookbookDraft | null | undefined,
+  isCurrent: () => boolean
+) {
+  const { profile, day, status } = style
+  // Equivalent weather and profile reads share one request identity.
+  const inputKey = JSON.stringify(
+    memberLookbookRankingInput(weather ?? 'mild-dry', { profile, day })
+  )
+  const input = useMemo(
+    () => JSON.parse(inputKey) as MemberLookbookRankingInput,
+    [inputKey]
+  )
+  const ideas = useMemo(() => createMemberLookbook(input.weather, input), [input])
+  const [stylist] = useState(createMemberLookbookRanking)
+  const requestKey =
+    draft !== undefined && weather && (status === 'ready' || status === 'failed')
+      ? inputKey
+      : null
+  const ranking = useSyncExternalStore(stylist.subscribe, stylist.read)
+  useLayoutEffect(() => {
+    if (draft) stylist.markEdited()
+  }, [draft, stylist])
+  useLayoutEffect(() => {
+    if (!requestKey) return
+    return stylist.request(requestKey, isCurrent, async (signal) => {
+      const accessToken = await resolveMobileAccessToken()
+      if (!accessToken || signal.aborted || !isCurrent()) return null
+      const data = await requestLookIdeas(
+        createMobileApiClient({ accessToken }),
+        input,
+        signal
+      )
+      return validateMemberLookbookRanking(
+        data,
+        memberLookbookRankingCandidates(ideas),
+        input.weather
+      )
+    })
+  }, [ideas, input, isCurrent, requestKey, stylist])
+
+  const currentRanking =
+    ranking && ranking.key === requestKey && isCurrent() ? ranking : null
+  return {
+    ...presentMemberLookbookRanking(ideas, draft?.mood, currentRanking),
+    markEdited: stylist.markEdited,
+    apply: () => stylist.apply(currentRanking, isCurrent),
+  }
+}
+
 export function MemberLookbook({
   owner,
   epoch,
@@ -224,16 +289,14 @@ export function MemberLookbook({
     }
   }, [isCurrent, owner])
 
-  if (
-    draft === undefined ||
-    !weather ||
-    style.status === 'idle' ||
-    style.status === 'loading'
-  )
-    return <ActivityIndicator color={colors.ink} testID="lookbook-loading" />
-
-  const ideas = createMemberLookbook(weather, { profile: style.profile, day: style.day })
-  const choice = ideas.find(({ mood }) => mood === draft?.mood) ?? ideas[0]
+  const {
+    orderedIdeas,
+    selected: choice,
+    pending: newIdeas,
+    description,
+    markEdited,
+    apply,
+  } = useLookbookIdeas(weather, style, draft, isCurrent)
   if (!choice) return null
   const { mood, result: base } = choice
   const { result, pinned } = resolveMemberLookbookDraft(base, draft?.looks[mood])
@@ -241,15 +304,18 @@ export function MemberLookbook({
   const signature = JSON.stringify(payload)
   const canShuffle = canShuffleMemberLookbook(result, pinned)
   const edited = isMemberLookbookDraftEdited(base, result, pinned)
+  const busy = mutating || draft === undefined
   const singleColumn = fontScale >= 1.5 && width <= 400
 
   const commit = (next: MemberLookbookDraft) => {
     if (!isCurrent()) return
+    markEdited()
     draftRef.current = next
     storage.current?.write(JSON.stringify(next))
     setDraft(next)
   }
   const updateLook = (outfit: typeof result, pins: typeof pinned) => {
+    markEdited()
     const looks = { ...draftRef.current?.looks }
     if (isMemberLookbookDraftEdited(base, outfit, pins)) {
       looks[mood] = memberLookbookOutfitDraft(outfit, pins)
@@ -266,6 +332,7 @@ export function MemberLookbook({
     perform: (accessToken: string, signal: AbortSignal) => Promise<T>
   ): Promise<T | false> {
     if (!isCurrent() || activeMutation.current) return false
+    markEdited()
     const request = new AbortController()
     const { signal } = request
     activeMutation.current = request
@@ -345,13 +412,13 @@ export function MemberLookbook({
         accessibilityLabel={styleCopy.mood}
         style={[styles.moodRow, { gap: space[2] }]}
       >
-        {ideas.map(({ mood: value }) => (
+        {orderedIdeas.map(({ mood: value }) => (
           <Choice
             key={value}
             id={`lookbook-mood-${value}`}
             label={styleCopy[value]}
             selected={mood === value}
-            disabled={mutating}
+            disabled={busy}
             pill
             onPress={() => {
               if (!activeMutation.current && value !== mood)
@@ -391,6 +458,15 @@ export function MemberLookbook({
         >
           {memberLookbookWeatherReason(result, locale)}
         </Text>
+        {description && (
+          <Text
+            testID="lookbook-ai-description"
+            accessibilityLanguage="en"
+            style={{ color: colors.inkMuted, fontSize: type.sm.fontSize }}
+          >
+            {description}
+          </Text>
+        )}
 
         <View style={[styles.rows, { gap: space[2] }]}>
           {result.garments.map((garment) => {
@@ -421,7 +497,7 @@ export function MemberLookbook({
                   label={copy.pin}
                   accessibilityLabel={`${copy.pin}: ${name}`}
                   selected={isPinned}
-                  disabled={mutating}
+                  disabled={busy}
                   onPress={() => {
                     if (activeMutation.current) return
                     updateLook(
@@ -442,7 +518,7 @@ export function MemberLookbook({
             testID="lookbook-shuffle"
             label={strings.firstRun.shuffle}
             palette={colors}
-            disabled={mutating || !canShuffle}
+            disabled={busy || !canShuffle}
             onPress={() => {
               if (!activeMutation.current)
                 updateLook(shuffleMemberLookbook(result, pinned), pinned)
@@ -452,13 +528,27 @@ export function MemberLookbook({
             testID="lookbook-reset"
             label={copy.reset}
             palette={colors}
-            disabled={mutating || !edited}
+            disabled={busy || !edited}
             onPress={() => {
               if (!activeMutation.current && edited) updateLook(base, [])
             }}
           />
         </View>
-        <StyleDayControls style={style} showMood={false} disabled={mutating} />
+        <StyleDayControls
+          style={style}
+          showMood={false}
+          disabled={busy}
+          onInteract={markEdited}
+        />
+        {newIdeas && (
+          <PreviewButton
+            testID="lookbook-new-ideas"
+            label={copy.newIdeas}
+            palette={colors}
+            disabled={busy}
+            onPress={apply}
+          />
+        )}
       </View>
 
       <SaveActionButton
@@ -466,7 +556,7 @@ export function MemberLookbook({
         idleLabel={strings.firstRun.save}
         primary
         requiresNetwork
-        disabled={!payload || mutating}
+        disabled={!payload || busy}
         ownerKey={style.scope}
         resetKey={signature}
         onSave={onSave}

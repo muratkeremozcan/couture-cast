@@ -4642,6 +4642,175 @@
         "additionalProperties": false,
         "description": "The authenticated account’s style preferences."
       },
+      "LookIdeasInput": {
+        "type": "object",
+        "properties": {
+          "weather": {
+            "type": "string",
+            "enum": [
+              "cool-windy",
+              "mild-dry",
+              "warm-rainy",
+              "cool-rainy",
+              "mild-rainy",
+              "warm-dry"
+            ]
+          },
+          "profile": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "mood": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "active",
+                  "chic",
+                  "cozy",
+                  "classic",
+                  null
+                ]
+              },
+              "palette": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "neutral",
+                  "colorful",
+                  null
+                ]
+              },
+              "texture": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "smooth",
+                  "textured",
+                  null
+                ]
+              },
+              "fit": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "fitted",
+                  "relaxed",
+                  null
+                ]
+              },
+              "avoid": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "crop-top",
+                    "mini-skirt",
+                    "leggings"
+                  ]
+                },
+                "maxItems": 3,
+                "description": "The pieces the member prefers to avoid. Each choice may appear once.",
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "mood",
+              "palette",
+              "texture",
+              "fit",
+              "avoid"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "weather",
+          "profile"
+        ],
+        "additionalProperties": false
+      },
+      "LookIdeasResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "lookId": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "pattern": "^sample:l:[a-z0-9-]+$"
+                },
+                "description": {
+                  "type": "string",
+                  "enum": [
+                    "A polished mix for the day.",
+                    "A simple mix for the day.",
+                    "A cozy mix for the day.",
+                    "A sporty mix for the day.",
+                    "A classic mix for the day.",
+                    "A casual mix for the day.",
+                    "A relaxed mix for the day.",
+                    "A polished mix for a cool day.",
+                    "A polished mix for a mild day.",
+                    "A polished mix for a warm day.",
+                    "A polished mix for a rainy day.",
+                    "A simple mix for a cool day.",
+                    "A simple mix for a mild day.",
+                    "A simple mix for a warm day.",
+                    "A simple mix for a rainy day.",
+                    "A cozy mix for a cool day.",
+                    "A cozy mix for a mild day.",
+                    "A cozy mix for a warm day.",
+                    "A cozy mix for a rainy day.",
+                    "A sporty mix for a cool day.",
+                    "A sporty mix for a mild day.",
+                    "A sporty mix for a warm day.",
+                    "A sporty mix for a rainy day.",
+                    "A classic mix for a cool day.",
+                    "A classic mix for a mild day.",
+                    "A classic mix for a warm day.",
+                    "A classic mix for a rainy day.",
+                    "A casual mix for a cool day.",
+                    "A casual mix for a mild day.",
+                    "A casual mix for a warm day.",
+                    "A casual mix for a rainy day.",
+                    "A relaxed mix for a cool day.",
+                    "A relaxed mix for a mild day.",
+                    "A relaxed mix for a warm day.",
+                    "A relaxed mix for a rainy day."
+                  ]
+                }
+              },
+              "required": [
+                "lookId",
+                "description"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 3,
+            "maxItems": 3
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
       "CreateGarmentUploadUrlInput": {
         "type": "object",
         "properties": {
@@ -24759,6 +24928,136 @@
           },
           "503": {
             "description": "Account verification is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/personalization/look-ideas": {
+      "post": {
+        "tags": [
+          "personalization"
+        ],
+        "summary": "Rank and describe weather-eligible catalog outfits",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LookIdeasInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Catalog outfit ranking if available.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookIdeasResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid outfit preferences.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access restricted.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Account verification temporarily unavailable.",
             "headers": {
               "Cache-Control": {
                 "schema": {

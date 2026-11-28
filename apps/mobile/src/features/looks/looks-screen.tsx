@@ -107,9 +107,7 @@ function MemberLooks({ epoch }: { epoch: number }) {
   const allEmpty = useAllEmpty(feed, filter)
 
   const segment = addressSegment ?? defaultSegment
-  // TEA M2: Saved and Ideas both wait for the first reads, so Ideas' first-save line never
-  // lands above a grid already on screen (a CC-7.7 shift).
-  const ready = segment !== null && (segment === 'plan' || feed.settled)
+  const ready = segment !== null && (segment !== 'saved' || feed.settled)
 
   // A tag edit or a garment delete elsewhere changes a look's state line.
   const { reload } = feed
@@ -186,10 +184,11 @@ function MemberLooks({ epoch }: { epoch: number }) {
                 />
               ) : null}
               {segment === 'ideas' ? (
-                <IdeasSegment
+                <IdeasPanel
                   owner={owner}
                   epoch={epoch}
-                  pending={owner !== null && !feed.settled}
+                  // An explicit Ideas visit paints before Saved loads. A late line stays below it.
+                  emptyLineBelow={Boolean(owner && addressSegment === 'ideas')}
                   showEmptyLine={!owner || allEmpty === true}
                 />
               ) : null}
@@ -208,31 +207,6 @@ function MemberLooks({ epoch }: { epoch: number }) {
           )}
         </ScrollView>
       </ScreenGate>
-    </View>
-  )
-}
-
-/**
- * Codex round 3 #2: when the gate's deadline opens Ideas before the first reads answer, it shows
- * progress, so the first-save line never lands above a grid already on screen.
- */
-function IdeasSegment({
-  owner,
-  epoch,
-  pending,
-  showEmptyLine,
-}: {
-  owner: string | null
-  epoch: number
-  pending: boolean
-  showEmptyLine: boolean
-}) {
-  const { colors, space } = useTokens()
-  if (!pending)
-    return <IdeasPanel owner={owner} epoch={epoch} showEmptyLine={showEmptyLine} />
-  return (
-    <View testID="looks-first-content" style={{ paddingVertical: space[6] }}>
-      <ActivityIndicator testID="looks-feed-loading" color={colors.ink} />
     </View>
   )
 }
@@ -549,24 +523,27 @@ function IdeasPanel({
   owner,
   epoch,
   showEmptyLine,
+  emptyLineBelow,
 }: {
   owner: string | null
   epoch: number
   showEmptyLine: boolean
+  emptyLineBelow: boolean
 }) {
   const { t } = useTranslation()
   const { colors, space, type } = useTokens()
   const style = useMobileStyleProfile()
+  const emptyLine = showEmptyLine && (
+    <Text
+      testID="looks-ideas-empty-line"
+      style={{ color: colors.inkMuted, fontSize: type.base.fontSize }}
+    >
+      {t('looks.empty')}
+    </Text>
+  )
   return (
     <View testID="looks-first-content" style={{ gap: space[3] }}>
-      {showEmptyLine ? (
-        <Text
-          testID="looks-ideas-empty-line"
-          style={{ color: colors.inkMuted, fontSize: type.base.fontSize }}
-        >
-          {t('looks.empty')}
-        </Text>
-      ) : null}
+      {!emptyLineBelow && emptyLine}
       {owner ? (
         <MemberLookbook owner={owner} epoch={epoch} style={style} />
       ) : (
@@ -576,6 +553,7 @@ function IdeasPanel({
           ))}
         </LooksTileGrid>
       )}
+      {emptyLineBelow && emptyLine}
     </View>
   )
 }

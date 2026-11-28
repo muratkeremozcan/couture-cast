@@ -8,6 +8,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
@@ -16,6 +17,7 @@ import { AccessTokenIdentityService } from './access-token-identity.service.js'
 import { GuardianConsentStateService } from './guardian-consent-state.service'
 import {
   API_ALLOW_PENDING_GUARDIAN_TEEN_KEY,
+  API_REQUIRE_ACTIVE_TEEN_KEY,
   API_ROLES_KEY,
   API_TRANSACTIONAL_CONSENT_KEY,
 } from './security.decorators'
@@ -58,31 +60,42 @@ export class RequestAuthGuard implements CanActivate {
     private readonly accessTokenIdentityService: AccessTokenIdentityService
   ) {}
 
-  private isPendingGuardianTeenAllowed(
+  private teenAccessMode(
     reflector: Reflector,
     context: ExecutionContext
-  ): boolean {
+  ): 'active' | 'non-upload' | 'default' {
     const targets = [
       context.getHandler(),
       ...(typeof context.getClass === 'function' ? [context.getClass()] : []),
     ]
-    return (
-      reflector.getAllAndOverride<boolean>(
-        API_ALLOW_PENDING_GUARDIAN_TEEN_KEY,
-        targets
-      ) === true
+    if (reflector.getAllAndOverride<boolean>(API_REQUIRE_ACTIVE_TEEN_KEY, targets))
+      return 'active'
+    return reflector.getAllAndOverride<boolean>(
+      API_ALLOW_PENDING_GUARDIAN_TEEN_KEY,
+      targets
     )
+      ? 'non-upload'
+      : 'default'
   }
 
   private async verifyTeenAccess(
     userId: string,
-    allowPendingGuardianTeen: boolean,
+    mode: ReturnType<RequestAuthGuard['teenAccessMode']>,
     budget?: CommunityAuthorizationBudget
   ): Promise<void> {
-    const checkTeenAccess = () =>
-      allowPendingGuardianTeen
+    const checkTeenAccess = () => {
+      if (mode === 'active')
+        return this.guardianConsentStateService
+          .canTeenAccessActiveSurface(userId)
+          .catch(() => {
+            throw new ServiceUnavailableException(
+              'Account verification is temporarily unavailable'
+            )
+          })
+      return mode === 'non-upload'
         ? this.guardianConsentStateService.canTeenAccessNonUploadSurface(userId)
         : this.guardianConsentStateService.canTeenAccess(userId)
+    }
     const allowed = await (budget ? budget.run(checkTeenAccess) : checkTeenAccess())
     if (!allowed) {
       throw new ForbiddenException('Guardian consent required before continuing')
@@ -123,11 +136,7 @@ export class RequestAuthGuard implements CanActivate {
     const consentCheckedInTransaction =
       reflector.get<boolean>(API_TRANSACTIONAL_CONSENT_KEY, context.getHandler()) === true
     if (role === 'teen' && !consentCheckedInTransaction) {
-      const allowPendingGuardianTeen = this.isPendingGuardianTeenAllowed(
-        reflector,
-        context
-      )
-      await this.verifyTeenAccess(userId, allowPendingGuardianTeen, budget)
+      await this.verifyTeenAccess(userId, this.teenAccessMode(reflector, context), budget)
     }
 
     budget?.check()

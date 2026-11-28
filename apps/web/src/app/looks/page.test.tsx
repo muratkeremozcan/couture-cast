@@ -9,6 +9,8 @@
 // are carried here under the 7.12 layout: the saved looks row and the Capsules and Plan rows
 // became the Saved grid, the Capsules filter and the Plan segment.
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
+// Step 80 verifies that explicit Ideas opens while Saved is still loading.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-80-ai-written-look-ideas
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { useSyncExternalStore } from 'react'
@@ -196,6 +198,9 @@ beforeEach(() => {
         { statusCode: 400, message: 'No location preferences found for user' },
         { status: 400 }
       )
+    ),
+    http.post('/api/v1/personalization/look-ideas', () =>
+      HttpResponse.json({ data: null })
     )
   )
   list.mockReset()
@@ -214,6 +219,27 @@ afterEach(() => {
 })
 
 describe('7.12 Looks tab default segment (D1, P1)', () => {
+  it('7.23-APPLY explicit Ideas paints before the Saved feed and the later empty line appears below the card', async () => {
+    signInFixtureMember()
+    const saved = deferred<SavedLookPageResult>()
+    list.mockReturnValueOnce(saved.promise)
+    moveAddress('/looks?segment=ideas')
+
+    render(<LooksPage />)
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1))
+    const card = await screen.findByTestId('member-lookbook')
+    expect(card).toBeVisible()
+    expect(screen.queryByTestId('looks-ideas-empty-line')).toBeNull()
+
+    await act(async () => {
+      saved.resolve(page([]))
+      await saved.promise
+    })
+    const line = await screen.findByTestId('looks-ideas-empty-line')
+    expectInOrder(card, line)
+    expect(card).toBeVisible()
+  })
+
   it('7.12-UNIT-020a signed out opens on Ideas at once, titled Looks with no back, and reads nothing', () => {
     render(<LooksPage />)
 

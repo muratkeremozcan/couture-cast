@@ -17,6 +17,10 @@ import { RITUAL_CACHE_INVALIDATOR } from './ritual-cache.js'
 import { ComfortController } from './comfort.controller.js'
 import { ComfortService } from './comfort.service.js'
 import { StyleProfileController } from './style-profile.controller.js'
+import { DatabaseLookIdeaBudget, LOOK_IDEA_BUDGET } from './look-ideas.budget.js'
+import { LookIdeasController } from './look-ideas.controller.js'
+import { GatewayLookIdeaProvider, LOOK_IDEA_PROVIDER } from './look-ideas.provider.js'
+import { LookIdeasService } from './look-ideas.service.js'
 import { PlannerController } from './planner.controller.js'
 import { PlannerService } from './planner.service.js'
 import Redis from 'ioredis'
@@ -42,12 +46,16 @@ import { getRedisConfig, redisOptionsFromConfig } from '../../config/redis.js'
     ComfortController,
     PlannerController,
     StyleProfileController,
+    LookIdeasController,
   ],
   providers: [
     RitualService,
     RitualGarmentPhotoService,
     ComfortService,
     PlannerService,
+    LookIdeasService,
+    { provide: LOOK_IDEA_BUDGET, useClass: DatabaseLookIdeaBudget },
+    { provide: LOOK_IDEA_PROVIDER, useClass: GatewayLookIdeaProvider },
     // Story 5.5: also provided directly by CommerceModule and WardrobeModule,
     // which each register their own instance of this stateless, self-
     // configuring (env-var-only constructor) adapter rather than exporting

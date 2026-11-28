@@ -11,6 +11,8 @@
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 // Learning path Step 79: Lookbook with shuffle and pinned pieces.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-79-lookbook-with-shuffle-and-pinned-pieces
+// Step 80 verifies that explicit Ideas opens while Saved is still loading.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-80-ai-written-look-ideas
 import { memberLookbookDraftKey } from '@couture/utils'
 import {
   act,
@@ -77,7 +79,6 @@ import {
 import LooksRoute from '@/app/(tabs)/looks'
 import { SaveFeedbackProvider } from '@/components/save-feedback'
 import { AppTopBar } from '@/src/components/app-top-bar'
-import { SCREEN_GATE_DEADLINE_MS } from '@/src/components/screen-gate'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import {
@@ -272,55 +273,21 @@ function renderLooks(onCommit?: () => void) {
   )
 }
 
-/** One committed DOM state that holds the Ideas grid. */
-type IdeasCommit = { line: boolean; laidOut: boolean; top: number; lineBottom: number }
-
 /**
- * TEA round 4 #1: records, for every commit where `member-lookbook` exists, whether
- * `looks-ideas-empty-line` exists in that same commit and where the grid sits. A
- * MutationObserver samples later and can miss an intermediate commit; this cannot.
+ * Record every laid-out lookbook commit so an intermediate shift cannot hide between
+ * the held Saved read and the later empty-state line.
  */
 function ideasCommitProbe() {
-  const commits: IdeasCommit[] = []
+  const commits: { top: number; bottom: number; lineTop?: number }[] = []
   const onCommit = () => {
     const grid = document.querySelector('[data-testid="member-lookbook"]')
     if (!grid) return
     const line = document.querySelector('[data-testid="looks-ideas-empty-line"]')
-    const rect = grid.getBoundingClientRect()
-    commits.push({
-      line: line !== null,
-      laidOut: rect.height > 0,
-      top: rect.top,
-      lineBottom: line ? line.getBoundingClientRect().bottom : Number.NaN,
-    })
+    const { top, bottom, height } = grid.getBoundingClientRect()
+    if (height > 0)
+      commits.push({ top, bottom, lineTop: line?.getBoundingClientRect().top })
   }
-  /** On an empty feed: the line is in the first grid commit and every later one, and the grid
-   * never moves once laid out. */
-  const expectLineWithGridFromFirstCommit = () => {
-    expect(commits.length, 'a commit held the Ideas grid').toBeGreaterThan(0)
-    expect(
-      commits[0]!.line,
-      'the very first commit with the Ideas grid already holds the first-save line'
-    ).toBe(true)
-    expect(
-      commits.filter((commit) => !commit.line),
-      'no commit holds the Ideas grid without the first-save line'
-    ).toEqual([])
-    const laidOut = commits.filter((commit) => commit.laidOut)
-    expect(laidOut.length, 'the Ideas grid was laid out').toBeGreaterThan(0)
-    const firstTop = laidOut[0]!.top
-    for (const commit of laidOut) {
-      expect(
-        commit.top,
-        'the Ideas grid top stays where it was first laid out'
-      ).toBeCloseTo(firstTop, 0)
-      expect(commit.lineBottom, 'the line sits above the grid').toBeLessThanOrEqual(
-        commit.top
-      )
-    }
-    return firstTop
-  }
-  return { commits, onCommit, expectLineWithGridFromFirstCommit }
+  return { commits, onCommit }
 }
 
 async function openLooks() {
@@ -352,6 +319,7 @@ function gridOrder() {
 
 describe('Native Looks tab (Story CC-7.12)', () => {
   let restoreToken: (() => void) | undefined
+  let lookIdeasRequests = 0
 
   beforeAll(async () => {
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
@@ -368,6 +336,13 @@ describe('Native Looks tab (Story CC-7.12)', () => {
     )
     restoreToken = setMobileAccessTokenResolver(() => 'member-token')
     setMobileApplicationUserId(MEMBER)
+    lookIdeasRequests = 0
+    server.use(
+      http.post('*/api/v1/personalization/look-ideas', () => {
+        lookIdeasRequests += 1
+        return HttpResponse.json({ data: null })
+      })
+    )
   })
 
   afterEach(() => {
@@ -587,9 +562,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       expect(screen.queryByTestId('saved-look-card-first-save')).toBeNull()
     })
 
-    // Fable review M2 (expected red until the Ideas panel waits on the first reads): Ideas from
-    // the address opens before the reads settle, and the empty line then lands above the grid.
-    it('[P1] [TEA P1] [M2] Ideas in the address: the Ideas grid does not move between its first paint and the first reads settling', async () => {
+    it('[P0] [7.23-APPLY] explicit Ideas paints before Saved and the later empty line stays beneath it', async () => {
       tabParams.set({ segment: 'ideas' })
       serveFeed({})
       let release!: () => void
@@ -611,106 +584,31 @@ describe('Native Looks tab (Story CC-7.12)', () => {
           )
         })
       )
-      // Every commit that holds the Ideas grid, intermediate ones included (TEA round 4 #1).
       const probe = ideasCommitProbe()
       try {
         renderLooks(probe.onCommit)
         await waitFor(() => expect(looksReadSeen).toBe(true))
-        expect(probe.commits, 'no Ideas grid committed while the read is held').toEqual(
-          []
-        )
-
-        release()
-        // The All feed settled empty: the line for an empty Saved shows.
-        expect(await screen.findByTestId('looks-ideas-empty-line')).toBeVisible()
-        await screen.findByTestId('member-lookbook')
+        expect(await screen.findByTestId('member-lookbook')).toBeVisible()
         expectOpenSegment('ideas')
-        const firstTop = probe.expectLineWithGridFromFirstCommit()
-        expect(
-          screen.getByTestId('member-lookbook').getBoundingClientRect().top
-        ).toBeCloseTo(firstTop, 0)
-      } finally {
-        release()
-      }
-    })
-
-    // Codex round 3 #2: the gate's deadline (SCREEN_GATE_DEADLINE_MS) can open an explicit Ideas
-    // before the saved looks read answers. Ideas then shows progress in its first block, and the
-    // grid it paints once the reads settle stays where it first painted.
-    it('[P1] [TEA P1] [M2] [Codex r3 #2] Ideas in the address past the gate deadline: progress, then a grid that does not move', async () => {
-      tabParams.set({ segment: 'ideas' })
-      serveFeed({})
-      let release!: () => void
-      const held = new Promise<void>((resolve) => {
-        release = resolve
-      })
-      let looksReadSeen = false
-      server.use(
-        http.get('*/api/v1/wardrobe/saved-looks', async () => {
-          looksReadSeen = true
-          await held
-          return HttpResponse.json(
-            savedLookListResponseSchema.parse({
-              data: [],
-              total: 0,
-              limit: 50,
-              offset: 0,
-            }) as unknown as Record<string, unknown>
-          )
-        })
-      )
-      // Every commit that holds the Ideas grid, intermediate ones included (TEA round 4 #1).
-      const probe = ideasCommitProbe()
-      // Only the timers are faked, so the gate's deadline is reached without a real 10 s wait.
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-      try {
-        renderLooks(probe.onCommit)
-        // RTL's waitFor would run on the faked timers, so the read is awaited on real frames.
-        for (let frames = 0; frames < 600 && !looksReadSeen; frames += 1) {
-          await act(async () => {
-            await vi.advanceTimersByTimeAsync(0)
-          })
-          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-        }
-        expect(looksReadSeen, 'the saved looks read started').toBe(true)
-        expect(screen.getByTestId('screen-gate')).not.toHaveAttribute('data-ready')
-
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(SCREEN_GATE_DEADLINE_MS)
-        })
-        vi.useRealTimers()
-
-        // The deadline opened Ideas with the read still held: the tabs, then progress alone.
-        expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
-        expectOpenSegment('ideas')
-        const pending = screen.getByTestId('looks-first-content')
-        expect(within(pending).getByTestId('looks-feed-loading')).toBeVisible()
-        expect(screen.queryByTestId('member-lookbook')).toBeNull()
         expect(screen.queryByTestId('looks-ideas-empty-line')).toBeNull()
-        expect(
-          screen.getByTestId('looks-segments').compareDocumentPosition(pending) &
-            Node.DOCUMENT_POSITION_FOLLOWING,
-          'progress sits below the segment tabs'
-        ).toBeTruthy()
-        expect(probe.commits, 'no Ideas grid committed while the read is held').toEqual(
-          []
-        )
+        expect(probe.commits.length).toBeGreaterThan(0)
+        const firstTop = probe.commits[0]!.top
+        expect(probe.commits[0]!.lineTop).toBeUndefined()
 
         release()
-        // The All feed settled empty: the line for an empty Saved shows above the grid.
-        expect(await screen.findByTestId('looks-ideas-empty-line')).toBeVisible()
-        const grid = await screen.findByTestId('member-lookbook')
-        expect(screen.queryByTestId('looks-feed-loading')).toBeNull()
-        expectOpenSegment('ideas')
-        // The first commit with the grid already holds the line, and the grid never moves.
-        const firstTop = probe.expectLineWithGridFromFirstCommit()
-        expect(grid).toBeVisible()
-        expect(grid.getBoundingClientRect().top).toBeCloseTo(firstTop, 0)
-        expect(
-          screen.getByTestId('looks-ideas-empty-line').getBoundingClientRect().bottom
-        ).toBeLessThanOrEqual(grid.getBoundingClientRect().top)
+        const line = await screen.findByTestId('looks-ideas-empty-line')
+        const card = screen.getByTestId('member-lookbook')
+        expect(line).toBeVisible()
+        expect(line.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+          card.getBoundingClientRect().bottom
+        )
+        for (const commit of probe.commits) {
+          expect(commit.top).toBeCloseTo(firstTop, 0)
+          if (commit.lineTop !== undefined) {
+            expect(commit.lineTop).toBeGreaterThanOrEqual(commit.bottom)
+          }
+        }
       } finally {
-        vi.useRealTimers()
         release()
       }
     })
@@ -1361,11 +1259,18 @@ describe('Native Looks tab (Story CC-7.12)', () => {
   })
 
   describe('[7.22-NAT] Ideas', () => {
+    async function openEditableLookbook() {
+      await openLooks()
+      const lookbook = await screen.findByTestId('member-lookbook')
+      // The request starts once forecast, profile, and draft restoration have settled.
+      await waitFor(() => expect(lookIdeasRequests).toBeGreaterThan(0))
+      return within(lookbook)
+    }
+
     it('[P0] [7.22-SCOPE] restores a member’s pin on return and opens another member’s draft unpinned', async () => {
       tabParams.set({ segment: 'ideas' })
       serveFeed({ looks: [look('look-1', at(20))] })
-      await openLooks()
-      const card = within(await screen.findByTestId('member-lookbook'))
+      const card = await openEditableLookbook()
       expect(card.getAllByTestId('looks-idea-card-current')).toHaveLength(1)
       expect(card.getByTestId('lookbook-weather-reason').textContent).toMatch(/\S/)
       const pin = card.getByTestId('lookbook-pin-shoes')
@@ -1381,7 +1286,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       await screen.findByTestId('saved-look-card-look-1')
       await userEvent.click(segmentTab('ideas'))
       const restored = await screen.findByTestId('lookbook-pin-shoes')
-      expect(restored).toHaveAttribute('aria-pressed', 'true')
+      await waitFor(() => expect(restored).toHaveAttribute('aria-pressed', 'true'))
       expect(restored).toHaveAttribute('aria-label', shoe)
 
       serveFeed({ looks: [look('other-look', at(20), { ownerUserId: OTHER_MEMBER })] })
@@ -1392,9 +1297,11 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       )
       serveFeed({ looks: [look('look-1', at(20))] })
       act(() => setMobileApplicationUserId(MEMBER))
-      expect(await screen.findByTestId('lookbook-pin-shoes')).toHaveAttribute(
-        'aria-pressed',
-        'true'
+      await waitFor(() =>
+        expect(screen.getByTestId('lookbook-pin-shoes')).toHaveAttribute(
+          'aria-pressed',
+          'true'
+        )
       )
     })
 
@@ -1408,8 +1315,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
           return HttpResponse.json({ message: 'Unavailable' }, { status: 503 })
         })
       )
-      await openLooks()
-      const card = within(await screen.findByTestId('member-lookbook'))
+      const card = await openEditableLookbook()
       const pin = card.getByTestId('lookbook-pin-shoes')
       const name = pin.getAttribute('aria-label')
       await userEvent.click(pin)
@@ -1437,8 +1343,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
           : null
       server.use(...handlers)
 
-      await openLooks()
-      const card = within(await screen.findByTestId('member-lookbook'))
+      const card = await openEditableLookbook()
       await userEvent.click(card.getByTestId('lookbook-pin-shoes'))
       await userEvent.click(card.getByTestId('lookbook-save'))
       await userEvent.click(await screen.findByTestId('status-bar-action-retry'))
@@ -1466,8 +1371,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
         removes.push(request.headers.get('if-match'))
       }
       server.use(...handlers)
-      await openLooks()
-      const save = await screen.findByTestId('lookbook-save')
+      const save = (await openEditableLookbook()).getByTestId('lookbook-save')
       await userEvent.click(save)
       const undo = await screen.findByTestId('status-bar-action-undo')
       expect(store.items).toHaveLength(1)
@@ -1488,8 +1392,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
         keys.push(request.headers.get('idempotency-key'))
       }
       server.use(...handlers)
-      await openLooks()
-      const save = await screen.findByTestId('lookbook-save')
+      const save = (await openEditableLookbook()).getByTestId('lookbook-save')
       await userEvent.click(save)
       expect(await screen.findByTestId('status-bar-action-undo')).toBeVisible()
       await userEvent.click(save)
@@ -1502,8 +1405,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
     it('[7.22-SHUFFLE] native switches mood, disables Shuffle when all pieces are pinned and resets', async () => {
       tabParams.set({ segment: 'ideas' })
       serveFeed({})
-      await openLooks()
-      const card = within(await screen.findByTestId('member-lookbook'))
+      const card = await openEditableLookbook()
       const active = card.getByTestId('lookbook-mood-active')
       const reset = card.getByTestId('lookbook-reset')
       const shuffle = card.getByTestId('lookbook-shuffle')
@@ -1552,6 +1454,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       await openLooks()
       const reason = await screen.findByTestId('lookbook-weather-reason')
       expect(reason.textContent).toMatch(/mild|skip an outer layer/i)
+      await waitFor(() => expect(reads).toBe(1))
       act(() => {
         for (const listener of appStateListeners) listener('background')
       })

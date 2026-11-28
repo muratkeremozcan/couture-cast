@@ -9,6 +9,7 @@ import type { ApiRole, AuthenticatedRequest, RequestAuthContext } from './securi
 export const API_ROLES_KEY = 'api_roles'
 export const API_TRANSACTIONAL_CONSENT_KEY = 'api_transactional_consent'
 export const API_ALLOW_PENDING_GUARDIAN_TEEN_KEY = 'api_allow_pending_guardian_teen'
+export const API_REQUIRE_ACTIVE_TEEN_KEY = 'api_require_active_teen'
 /** The marked handler checks authoritative consent under its transaction lock. */
 export const ConsentCheckedInTransaction = () =>
   SetMetadata(API_TRANSACTIONAL_CONSENT_KEY, true)
@@ -19,6 +20,10 @@ export const ConsentCheckedInTransaction = () =>
  */
 export const AllowPendingGuardianTeen = () =>
   SetMetadata(API_ALLOW_PENDING_GUARDIAN_TEEN_KEY, true)
+
+/** The handler requires a fresh active teen account before using an external processor. */
+export const RequireActiveTeenAccount = () =>
+  SetMetadata(API_REQUIRE_ACTIVE_TEEN_KEY, true)
 
 export const Roles = (...roles: ApiRole[]) => SetMetadata(API_ROLES_KEY, roles)
 

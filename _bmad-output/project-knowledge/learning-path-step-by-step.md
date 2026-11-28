@@ -22577,3 +22577,37 @@ With up to two pieces in your closet, Today starts with the top outfit from Idea
 - [Web lookbook editor](../../apps/web/src/app/components/looks/member-lookbook.test.tsx) and
   [native lookbook editor](../../apps/mobile/src/screens/looks-screen.test.tsx).
 - [Step 77](#step-77-account-style-profile) covers style settings and day overrides.
+
+## Step 80: AI-written look ideas
+
+Open Looks > Ideas with the fixture ranking held. A complete catalog outfit appears while the
+request is pending. The stylist ranks three catalog outfits and chooses a short clothing description
+for each.
+
+### Sequence to follow
+
+1. Release a valid ranking before touching the editor. Check that the top-ranked outfit and its
+   description appear.
+2. Open Ideas again. Pin a piece and shuffle while the ranking is held. Release it, then tap
+   **New ideas ready**. Check that the description appears and the mood, pieces and pins hold.
+3. Repeat with an expired request or switch accounts before the answer. Check that the editor keeps
+   its current outfit and that a stale answer adds no notice.
+4. Follow the request from the POST contract through the generation service. The service validates
+   the catalog IDs and description, reserves quota before dispatch, and records only the outcome and
+   elapsed time. CI runs this flow with synthetic responses.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-23-ai-written-look-ideas.md) and
+  [acceptance plan](../test-artifacts/test-design-7-23-ai-written-look-ideas.md).
+- [Request and output contract](../../packages/api-client/src/contracts/http/look-ideas.ts),
+  [generation service](../../apps/api/src/modules/personalization/look-ideas.service.ts), and
+  [database budget](../../apps/api/src/modules/personalization/look-ideas.budget.ts).
+- [API acceptance](../../apps/api/src/modules/personalization/look-ideas.controller.spec.ts),
+  [web journey](../../playwright/tests/member-lookbook-ai.spec.ts), and
+  [native editor](../../apps/mobile/src/features/looks/member-lookbook-ai.test.tsx).
+- [Gateway adapter](../../apps/api/src/modules/personalization/look-ideas.provider.spec.ts),
+  [concurrent budget](../../apps/api/integration/look-ideas-budget.integration.spec.ts), and
+  [shared ranking](../../packages/utils/src/sample-wardrobe/member-lookbook-ranking.spec.ts).
+- [API client](../../packages/api-client/testing/look-ideas-client.spec.ts) and
+  [web lookbook editor](../../apps/web/src/app/components/looks/member-lookbook.test.tsx).

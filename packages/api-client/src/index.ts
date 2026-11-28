@@ -111,3 +111,4 @@ export type {
 export * from './share-cards-client'
 export * from './share-card-png'
 export { requestStyleProfile } from './style-profile-client'
+export { requestLookIdeas } from './look-ideas-client'
