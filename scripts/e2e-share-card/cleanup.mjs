@@ -49,11 +49,16 @@ export async function cleanup(directory) {
       auth: { persistSession: false, autoRefreshToken: false },
     })
     for (const object of resources.storageObjects) {
-      if (
-        object.bucket !== 'community-images' ||
-        !/^community\/cc68-native-[a-f0-9-]+\/[a-f0-9-]+\.png$/.test(object.objectPath)
-      )
-        throw new Error('owned_object_required')
+      const communityImage =
+        object.bucket === 'community-images' &&
+        /^community\/cc68-native-[a-f0-9-]+\/[a-f0-9-]+\.png$/.test(object.objectPath)
+      const wardrobeImage =
+        object.bucket === 'wardrobe-images' &&
+        /^wardrobe\/cc68-native-[a-f0-9-]+\/[a-f0-9-]+\.png$/.test(object.objectPath) &&
+        resources.createdIdentities.some(({ appUserId }) =>
+          object.objectPath.startsWith(`wardrobe/${appUserId}/`)
+        )
+      if (!communityImage && !wardrobeImage) throw new Error('owned_object_required')
       const result = await admin.storage.from(object.bucket).remove([object.objectPath])
       if (result.error) throw result.error
     }

@@ -5,6 +5,7 @@ import {
   createSavedLookInputSchema,
   savedLookListResponseSchema,
   savedLookResponseSchema,
+  styleProfileResponseSchema,
   type SavedLookContract,
 } from '@couture/api-client/contracts/http'
 import type { Locator, Page } from '@playwright/test'
@@ -299,6 +300,21 @@ test.describe('CC-7.18 sample picker @local-lane', () => {
     const { router } = await openFixtureShell(page, interceptNetworkCall, {
       mode: 'empty',
       screen: 'home',
+    })
+    void interceptNetworkCall({
+      url: '**/api/v1/personalization/style-profile',
+      method: 'GET',
+      fulfillResponse: {
+        body: styleProfileResponseSchema.parse({
+          data: {
+            mood: 'classic',
+            palette: 'neutral',
+            texture: 'smooth',
+            fit: 'fitted',
+            avoid: [],
+          },
+        }),
+      },
     })
     const saved = stubSavedLook(interceptNetworkCall)
     await page.goto('/')

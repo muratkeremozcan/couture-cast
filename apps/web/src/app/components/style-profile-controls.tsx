@@ -115,15 +115,23 @@ export function StyleMoodRow({
 export function StyleDayControls({
   style,
   showTune = false,
+  showMood = true,
+  nested = false,
 }: {
   style: StyleState
   showTune?: boolean
+  showMood?: boolean
+  nested?: boolean
 }) {
   const copy = useStyleCopy()
   const { scope, day, store } = style
   if (!scope) return null
   return (
-    <details className="rounded-lg border border-line bg-card px-3">
+    <details
+      className={
+        nested ? 'border-t border-line' : 'rounded-lg border border-line bg-card px-3'
+      }
+    >
       <summary
         data-testid="style-day-open"
         className="cursor-pointer py-3 text-sm font-semibold text-ink"
@@ -152,13 +160,15 @@ export function StyleDayControls({
             ))}
           </div>
         </fieldset>
-        <StyleMoodRow
-          day
-          selected={day?.mood}
-          onSelect={(mood) =>
-            store.updateDay(scope, { mood: day?.mood === mood ? null : mood })
-          }
-        />
+        {showMood && (
+          <StyleMoodRow
+            day
+            selected={day?.mood}
+            onSelect={(mood) =>
+              store.updateDay(scope, { mood: day?.mood === mood ? null : mood })
+            }
+          />
+        )}
         <button
           type="button"
           className={secondary}

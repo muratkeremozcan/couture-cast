@@ -617,24 +617,24 @@ it('shows the city and garment entry links beside an editable sample when the me
   const rotated = look()
   expect(rotated).not.toBe(initial)
 
-  const editorTop = () =>
+  const editorShoes = () =>
     within(screen.getByTestId('guest-preview-outfit')).getByRole('button', {
-      name: /^Swap top:/i,
+      name: /^Swap shoes:/i,
     })
-  const originalName = editorTop().getAttribute('aria-label')
-  await user.click(editorTop())
-  expect(screen.getByRole('dialog', { name: /swap the top/i })).toBeVisible()
+  const originalName = editorShoes().getAttribute('aria-label')
+  await user.click(editorShoes())
+  expect(screen.getByRole('dialog', { name: /swap the shoes/i })).toBeVisible()
   await user.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).toBeNull()
-  expect(editorTop()).toHaveFocus()
-  await user.click(editorTop())
+  expect(editorShoes()).toHaveFocus()
+  await user.click(editorShoes())
   const [option] = within(screen.getByRole('dialog')).getAllByRole('radio', {
     checked: false,
   })
   await user.click(option!)
-  expect(editorTop()).not.toHaveAttribute('aria-label', originalName)
+  expect(editorShoes()).not.toHaveAttribute('aria-label', originalName)
   await user.click(screen.getByRole('button', { name: 'Undo swaps' }))
-  expect(editorTop()).toHaveAttribute('aria-label', originalName)
+  expect(editorShoes()).toHaveAttribute('aria-label', originalName)
 
   view.unmount()
   renderHome()
@@ -754,12 +754,14 @@ it('shows the starter wardrobe entry even when saved-city lookup fails', async (
   publishMember('starter-member')
   renderHome()
 
-  expect(await screen.findByTestId('today-outfit-catalog-0')).toBeVisible()
+  const topLook = await screen.findByTestId('member-sample-outfit')
+  expect(within(topLook).getByTestId('today-outfit-catalog-0')).toBeVisible()
+  expect(within(topLook).getByTestId('today-outfit-weather-reason')).toBeVisible()
+  expect(screen.queryByTestId('home-live-outfit')).toBeNull()
   expect(await screen.findByTestId('home-add-garment')).toHaveAttribute(
     'href',
     '/wardrobe?entry=add'
   )
-  expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(/swap.*top/i)
   expect(screen.queryByTestId('home-outfit-retry')).toBeNull()
   await waitFor(() =>
     expect(reads).toHaveBeenCalledExactlyOnceWith('Bearer bearer-starter-member')

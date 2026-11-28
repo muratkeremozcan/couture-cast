@@ -3,21 +3,13 @@
 // (`segment`, `filter`; a change is `setParams`). With no segment, Looks opens on Saved when the
 // member has a saved look or capsule and on Ideas otherwise, decided once per entry after both
 // first reads settle (TEA P1). Saved is one newest-first tile grid with All, Today and Capsules,
-// each read from the server (P2); Ideas shows the sample looks; Plan holds the planner, whose
+// each read from the server (P2); Ideas hosts the member lookbook; Plan holds the planner, whose
 // locked states show the free preview. `looks-first-content` marks the open segment's first block.
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 import { useMobileStyleProfile } from '@/src/lib/style-profile'
-import { StyleDayControls } from '@/src/features/preview/style-profile-controls'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
@@ -49,6 +41,7 @@ import { onWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { TAB_BODY_INSET, useTokens } from '@/src/theme/tokens'
 import { savedLookRoute } from './looks-routes'
 import { CapsuleTile, IdeaTile, LooksTileGrid, SavedLookTile } from './looks-tile'
+import { MemberLookbook } from './member-lookbook'
 import { useLooksFeed, type LooksFeedState } from './use-looks-feed'
 
 /**
@@ -194,6 +187,8 @@ function MemberLooks({ epoch }: { epoch: number }) {
               ) : null}
               {segment === 'ideas' ? (
                 <IdeasSegment
+                  owner={owner}
+                  epoch={epoch}
                   pending={owner !== null && !feed.settled}
                   showEmptyLine={!owner || allEmpty === true}
                 />
@@ -222,14 +217,19 @@ function MemberLooks({ epoch }: { epoch: number }) {
  * progress, so the first-save line never lands above a grid already on screen.
  */
 function IdeasSegment({
+  owner,
+  epoch,
   pending,
   showEmptyLine,
 }: {
+  owner: string | null
+  epoch: number
   pending: boolean
   showEmptyLine: boolean
 }) {
   const { colors, space } = useTokens()
-  if (!pending) return <IdeasPanel showEmptyLine={showEmptyLine} />
+  if (!pending)
+    return <IdeasPanel owner={owner} epoch={epoch} showEmptyLine={showEmptyLine} />
   return (
     <View testID="looks-first-content" style={{ paddingVertical: space[6] }}>
       <ActivityIndicator testID="looks-feed-loading" color={colors.ink} />
@@ -545,13 +545,18 @@ function SavedPanel({
   )
 }
 
-/** D9: the sample looks as picture tiles; with nothing saved, the one line comes first. */
-function IdeasPanel({ showEmptyLine }: { showEmptyLine: boolean }) {
+function IdeasPanel({
+  owner,
+  epoch,
+  showEmptyLine,
+}: {
+  owner: string | null
+  epoch: number
+  showEmptyLine: boolean
+}) {
   const { t } = useTranslation()
   const { colors, space, type } = useTokens()
   const style = useMobileStyleProfile()
-  const { profile, day } = style
-  const ideas = useMemo(() => looksIdeas({ profile, day }), [profile, day])
   return (
     <View testID="looks-first-content" style={{ gap: space[3] }}>
       {showEmptyLine ? (
@@ -562,12 +567,15 @@ function IdeasPanel({ showEmptyLine }: { showEmptyLine: boolean }) {
           {t('looks.empty')}
         </Text>
       ) : null}
-      <StyleDayControls key={style.scope} style={style} />
-      <LooksTileGrid testID="looks-ideas-grid">
-        {ideas.map((idea) => (
-          <IdeaTile key={idea.look.id} idea={idea} />
-        ))}
-      </LooksTileGrid>
+      {owner ? (
+        <MemberLookbook owner={owner} epoch={epoch} style={style} />
+      ) : (
+        <LooksTileGrid testID="looks-ideas-grid">
+          {looksIdeas().map((idea) => (
+            <IdeaTile key={idea.look.id} idea={idea} />
+          ))}
+        </LooksTileGrid>
+      )}
     </View>
   )
 }

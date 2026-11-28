@@ -22,9 +22,10 @@
 import type { RitualResponse, SavedLocation } from '@couture/api-client/contracts/http'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
+import { createReadyGarmentFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { http, HttpResponse } from 'msw'
 import { useLayoutEffect } from 'react'
-import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import * as webSession from '../../lib/web-session'
 import { currentWebSessionScope, useWebSessionScope } from '../../lib/use-web-session'
@@ -137,6 +138,20 @@ function renderHomeGate(seen?: string[]) {
 
 describe('7.7 Home screen gate', () => {
   setupHomeTeaserSuite()
+
+  beforeEach(() => {
+    useMswHandlers(
+      http.get('/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({
+          data: [
+            createReadyGarmentFixture({ id: 'jacket-id', category: 'outerwear' }),
+            createReadyGarmentFixture({ id: 'top-id', category: 'top' }),
+            createReadyGarmentFixture({ id: 'shoes-id', category: 'shoes' }),
+          ],
+        })
+      )
+    )
+  })
 
   afterEach(() => {
     document.documentElement.removeAttribute('data-session')

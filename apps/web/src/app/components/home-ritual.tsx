@@ -24,6 +24,7 @@ import {
   buildHomeSampleSavedLookInput,
   createAnnouncementToken,
   createIdempotencyKey,
+  createMemberLookbook,
   createMemberSampleOutfit,
   getGuestPreviewStrings,
   getStyleProfileStrings,
@@ -116,7 +117,7 @@ let retainedSample:
 
 function sampleSelectionKey(result: SampleOutfitResult) {
   const { weather, preferences, avoid } = result.input
-  return JSON.stringify([weather, preferences, avoid])
+  return JSON.stringify([result.look?.id, weather, preferences, avoid])
 }
 
 function buildHomeSampleAttemptKey(
@@ -197,6 +198,7 @@ type SampleOutfitProps = {
   style: ReturnType<typeof useWebStyleProfile>
   sampleWeather: SampleWeatherKey
   preview: boolean
+  useLookbookTop: boolean
 }
 
 function SampleOutfit(props: SampleOutfitProps) {
@@ -217,14 +219,18 @@ function SampleOutfitInner({
   style,
   sampleWeather,
   preview,
+  useLookbookTop,
 }: SampleOutfitProps) {
   const { t } = useTranslation(undefined, { i18n: getI18n() })
   const router = useRouter()
   const statusBar = useStatusBar()
   const { profile, day, scope } = style
   const base = useMemo(
-    () => createMemberSampleOutfit(sampleWeather, { profile, day }),
-    [sampleWeather, profile, day]
+    () =>
+      (useLookbookTop &&
+        createMemberLookbook(sampleWeather, { profile, day })[0]?.result) ||
+      createMemberSampleOutfit(sampleWeather, { profile, day }),
+    [sampleWeather, profile, day, useLookbookTop]
   )
   const selection = sampleSelectionKey(base)
   const [sample, setSample] = useState(() =>
@@ -951,7 +957,7 @@ function MemberRitual({
     }
   })
   const snapshot = start.snapshot
-  const { pieces, wardrobe } = useHomeWardrobe(owner, start.scope)
+  const { pieces, wardrobe, smallCloset } = useHomeWardrobe(owner, start.scope)
   const [ritual, setRitual] = useState<LiveRitual | null>(snapshot?.ritual ?? null)
   const [readAt, setReadAt] = useState(() => snapshot?.readAt ?? Date.now())
   const [city, setCity] = useState<string | undefined>(snapshot?.city)
@@ -1084,12 +1090,13 @@ function MemberRitual({
     </button>
   )
   const liveOutfit = ritual?.outfits.some(usableOutfit) ? ritual : null
+  const outfitReady = settled && pieces !== undefined
   const firstLook = !liveOutfit?.outfits.some(({ garmentIds }) =>
     garmentIds.some((id) => !id.startsWith('default-'))
   )
   return (
     <>
-      {settled && (
+      {outfitReady && (
         <div className={firstLook ? 'flex min-h-dvh flex-col gap-4' : 'contents'}>
           <TodayWeather ritual={ritual} city={city} locale={locale} />
           <MemberRitualOutfit
@@ -1101,6 +1108,7 @@ function MemberRitual({
             owner={owner}
             scope={start.scope}
             wardrobe={wardrobe}
+            smallCloset={smallCloset}
             readAt={readAt}
             scenario={scenario}
             failure={failure}
@@ -1136,7 +1144,7 @@ function MemberRitual({
         {t('home.today.planWeek')}
         <span aria-hidden="true">›</span>
       </Link>
-      {settled && (
+      {outfitReady && (
         <StyleDayControls key={style.scope} style={style} showTune={!firstLook} />
       )}
     </>
@@ -1152,6 +1160,7 @@ function MemberRitualOutfit({
   owner,
   scope,
   wardrobe,
+  smallCloset,
   readAt,
   scenario,
   failure,
@@ -1165,19 +1174,20 @@ function MemberRitualOutfit({
   owner: string
   scope: string | null
   wardrobe: ReturnType<typeof useHomeWardrobe>['wardrobe']
+  smallCloset: boolean
   readAt: number
   scenario?: ScenarioName
   failure: RitualFailure | null
   retry: ReactNode
 }) {
   const preview = Boolean(liveOutfit && style.day)
-  const showSample = shouldShowStyleSample(liveOutfit?.outfits, style)
+  const showSample = smallCloset || shouldShowStyleSample(liveOutfit?.outfits, style)
   useLayoutEffect(() => {
     if (!showSample && retainedSample?.scope === style.scope) retainedSample = undefined
   }, [showSample, style.scope])
   return (
     <>
-      {liveOutfit && (
+      {liveOutfit && !smallCloset && (
         <section
           data-testid={showSample ? undefined : 'today-first-content'}
           data-surface="card"
@@ -1207,6 +1217,7 @@ function MemberRitualOutfit({
             style={style}
             sampleWeather={styleForecastSampleWeather(ritual?.weather.current)}
             preview={preview}
+            useLookbookTop={smallCloset}
             actions={
               ritual ? null : (
                 <SetCityAction

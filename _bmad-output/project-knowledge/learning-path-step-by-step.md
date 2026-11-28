@@ -22553,3 +22553,27 @@ Open Today as a guest. See a sample outfit before you pick a style or create an 
 - [Web preview controls](../../apps/web/src/app/components/guest-preview/guest-preview.test.tsx),
   [native preview controls](../../apps/mobile/src/features/preview/guest-preview-screen.test.tsx), and
   [Android OTP confirmation](../../maestro/guest-preview/guest-preview-conversion-verify.yaml).
+
+## Step 79: Lookbook with shuffle and pinned pieces
+
+Open Looks > Ideas to see an outfit for your mood and weather.
+With up to two pieces in your closet, Today starts with the top outfit from Ideas.
+
+### Sequence to follow
+
+1. Open Looks > Ideas. Select each mood and check that you see one outfit and one weather reason.
+2. Pin one piece and tap Shuffle. Check that the other pieces change. Reload and shuffle again.
+   The pinned piece stays.
+3. Save the outfit in one tap and reopen it in Looks > Saved. Check that the pieces match.
+   Return to Ideas and check that the pins cleared.
+4. Pin another piece and tap Reset outfit. The top outfit for the current mood returns.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-22-lookbook-shuffle-pinned-pieces.md) and
+  [acceptance plan](../test-artifacts/test-design-7-22-lookbook-shuffle-pinned-pieces.md).
+- [Member lookbook journey](../../playwright/tests/member-lookbook.spec.ts) and
+  [shared catalog lookbook rules](../../packages/utils/src/sample-wardrobe/member-lookbook.spec.ts).
+- [Web lookbook editor](../../apps/web/src/app/components/looks/member-lookbook.test.tsx) and
+  [native lookbook editor](../../apps/mobile/src/screens/looks-screen.test.tsx).
+- [Step 77](#step-77-account-style-profile) covers style settings and day overrides.

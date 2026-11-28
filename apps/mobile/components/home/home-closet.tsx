@@ -3,7 +3,12 @@ import { useCallback, useState } from 'react'
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { GarmentCategory, GarmentWithTags } from '@couture/api-client/contracts/http'
-import { formatGarmentAlt, formatLocalizedList } from '@couture/utils'
+import {
+  formatGarmentAlt,
+  formatLocalizedList,
+  isSmallLookbookCloset,
+  TODAY_WARDROBE_READ_TIMEOUT_MS,
+} from '@couture/utils'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import {
   mobileApplicationUserId,
@@ -20,6 +25,7 @@ export function useHomeWardrobe(owner: string | null, enabled: boolean) {
     epoch: number
     pieces: (GarmentCategory | null)[] | null
     wardrobe: GarmentWithTags[]
+    smallCloset: boolean
   } | null>(null)
   useFocusEffect(
     useCallback(() => {
@@ -33,6 +39,22 @@ export function useHomeWardrobe(owner: string | null, enabled: boolean) {
           !request.signal.aborted &&
           mobileApplicationUserId() === owner &&
           mobileIdentityEpoch() === epoch
+        const unavailable = () => {
+          if (!current()) return
+          setResult((previous) => ({
+            epoch,
+            pieces: null,
+            wardrobe: [],
+            smallCloset: previous?.epoch === epoch && previous.smallCloset,
+          }))
+        }
+        // Token resolution can outlive this screen and has no AbortSignal.
+        const deadline = setTimeout(() => {
+          unavailable()
+          request.abort()
+        }, TODAY_WARDROBE_READ_TIMEOUT_MS)
+        const clearDeadline = () => clearTimeout(deadline)
+        request.signal.addEventListener('abort', clearDeadline, { once: true })
         void resolveMobileAccessToken()
           .then((token) =>
             token && current()
@@ -41,22 +63,28 @@ export function useHomeWardrobe(owner: string | null, enabled: boolean) {
           )
           .then((garments) => {
             if (!current()) return
-            const pieces = garments
-              ? [...garments]
-                  .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-                  .slice(0, 3)
-                  .map(({ category }) => category)
-              : null
-            setResult({ epoch, pieces, wardrobe: garments ?? [] })
+            if (!garments) return unavailable()
+            const pieces = [...garments]
+              .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+              .slice(0, 3)
+              .map(({ category }) => category)
+            setResult({
+              epoch,
+              pieces,
+              wardrobe: garments,
+              smallCloset: isSmallLookbookCloset(pieces),
+            })
           })
-          .catch(() => {
-            if (current()) setResult({ epoch, pieces: null, wardrobe: [] })
+          .catch(unavailable)
+          .finally(() => {
+            clearDeadline()
+            request.signal.removeEventListener('abort', clearDeadline)
           })
       }
       read()
       const unsubscribe = onWardrobeChanged(() => {
         setResult((current) =>
-          current?.epoch === epoch ? { epoch, pieces: null, wardrobe: [] } : current
+          current?.epoch === epoch ? { ...current, pieces: null, wardrobe: [] } : current
         )
         read()
       })

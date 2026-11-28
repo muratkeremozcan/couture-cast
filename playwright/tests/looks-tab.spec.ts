@@ -6,7 +6,6 @@
 // orders and pages like the API, so each order check fails if the page drops `sort`.
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 import type { Page } from '@playwright/test'
-import { looksIdeas } from '@couture/utils'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { waitForShellSettled } from '../support/helpers/app-shell'
 import { FOLD_VIEWPORT, foldBand, visibleInBand } from '../support/helpers/five-tab'
@@ -196,7 +195,7 @@ test.describe('CC-7.12 each segment opens within the fold @local-lane', () => {
                 ? page.getByTestId('saved-look-card-look-c')
                 : page.getByTestId('looks-filter-empty')
               : id === 'ideas'
-                ? page.locator('[data-testid^="looks-idea-card-"]').first()
+                ? page.getByTestId('lookbook-weather-reason')
                 : page.getByTestId('plan-upgrade')
           const probeBox = (await probe.boundingBox())!
           expect(probeBox, `${id} first item`).not.toBeNull()
@@ -423,7 +422,7 @@ test.describe('CC-7.12 Saved grid, order and state lines @local-lane', () => {
 })
 
 test.describe('CC-7.12 Ideas @local-lane', () => {
-  test('[P0] [7.12-E2E-014] Ideas shows every sample look as a picture tile with no control', async ({
+  test('[P0] [7.12-E2E-014] Ideas opens the member lookbook even when Saved has looks', async ({
     page,
     interceptNetworkCall,
   }) => {
@@ -433,17 +432,8 @@ test.describe('CC-7.12 Ideas @local-lane', () => {
     await page.goto('/looks?segment=ideas')
     await waitForShellSettled(page, router)
 
-    const ideas = looksIdeas()
-    const tiles = page.locator('[data-testid^="looks-idea-card-"]')
-    await expect(tiles).toHaveCount(ideas.length)
-    await expect(tiles.first()).toHaveAttribute(
-      'data-testid',
-      `looks-idea-card-${ideas[0]!.look.id}`
-    )
-    // Until CC-7.22 Ideas holds no dead control.
-    await expect(
-      page.getByTestId('looks-ideas-grid').locator('button, a, [role="button"]')
-    ).toHaveCount(0)
+    await expect(page.getByTestId('member-lookbook')).toBeVisible()
+    await expect(page.getByTestId('looks-saved-grid')).toHaveCount(0)
     // A member with saved looks gets no empty line on Ideas.
     await expect(page.getByTestId('looks-ideas-empty-line')).toHaveCount(0)
   })
@@ -461,6 +451,7 @@ test.describe('CC-7.12 Ideas @local-lane', () => {
     await expect(page.getByTestId('looks-ideas-empty-line')).toBeVisible()
 
     await segment(page, 'saved').click()
+    await expect(page.getByTestId('member-lookbook')).toHaveCount(0)
     await expect(page.getByTestId('looks-first-content')).toBeVisible()
     await expect(page.getByTestId('looks-sign-in')).toHaveAttribute('href', '/signin')
     await segment(page, 'plan').click()
