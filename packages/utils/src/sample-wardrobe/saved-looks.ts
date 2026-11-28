@@ -901,7 +901,8 @@ function stylePieceComposition(
 
 function sameOrderedComposition(
   stored: readonly SavedLookCompositionSlotPayload[],
-  expected: readonly SavedLookCompositionSlotPayload[]
+  expected: readonly SavedLookCompositionSlotPayload[],
+  swaps?: StylePieceRecipe['swaps']
 ) {
   const ordered = [...stored].sort((a, b) => a.slotIndex - b.slotIndex)
   return (
@@ -910,9 +911,9 @@ function sameOrderedComposition(
       const previous = ordered[index]
       return (
         previous?.slotIndex === slot.slotIndex &&
-        previous.kind === slot.kind &&
         previous.category === slot.category &&
-        previous.itemId === slot.itemId
+        ((previous.kind === slot.kind && previous.itemId === slot.itemId) ||
+          (slot.slotIndex > 0 && swaps?.[slot.category] === slot.itemId))
       )
     })
   )
@@ -1020,11 +1021,12 @@ export function savedStylePieceEditorRecipe(
   }
 }
 
-/** Confirm the editor can restore the saved slots in order with the current inventory. */
+/** Confirm that saved slots and any explicit edits still resolve in the current inventory. */
 export function reopenStylePieceRecipe(
   saved: StylePieceEditorSavedLook,
   anchor: StylePieceSelection,
-  owned: readonly StylePieceOwnedCompanion[]
+  owned: readonly StylePieceOwnedCompanion[],
+  draftSwaps?: StylePieceRecipe['swaps']
 ): StylePieceRecipe | null {
   if (saved.availabilityStatus !== 'ready' || saved.anchorGarmentId !== anchor.id)
     return null
@@ -1034,12 +1036,18 @@ export function reopenStylePieceRecipe(
     (look) => look.recipe.lookId === recipe.lookId
   )
   if (!base) return null
-  const restored = applyStylePieceRecipe(base, recipe, SAMPLE_CATALOG, owned)
+  const restored = applyStylePieceRecipe(
+    base,
+    draftSwaps ? { ...recipe, swaps: draftSwaps } : recipe,
+    SAMPLE_CATALOG,
+    owned
+  )
   return sameOrderedComposition(
     saved.composition,
-    stylePieceComposition(anchor, restored)
+    stylePieceComposition(anchor, restored),
+    restored.recipe.swaps
   )
-    ? recipe
+    ? restored.recipe
     : null
 }
 

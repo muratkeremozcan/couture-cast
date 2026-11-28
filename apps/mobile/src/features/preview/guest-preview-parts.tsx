@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
   type ComponentRef,
-  type ReactNode,
+  type ReactElement,
   type Ref,
 } from 'react'
 import {
@@ -147,7 +147,7 @@ export function PreviewButton({
   selected?: boolean
   accessibilityLabel?: string
   buttonRef?: Ref<ComponentRef<typeof Pressable>>
-  leading?: ReactNode
+  leading?: ReactElement
 }) {
   return (
     <Pressable

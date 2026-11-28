@@ -95,6 +95,27 @@ function hasChangedStylePieceCompanion(
   })
 }
 
+function hasInvalidStylePieceCompanion(
+  slots: readonly StoredSlot[],
+  anchorId: string,
+  garments: ReadonlyMap<string, Pick<GarmentProjection, 'category' | 'comfort_range'>>,
+  weather: string
+): boolean {
+  const seen = new Set([anchorId])
+  for (const slot of slots) {
+    if (slot.kind !== 'garment') continue
+    if (slot.slotIndex === 0 && slot.itemId === anchorId) continue
+    if (
+      seen.has(slot.itemId) ||
+      !matchesStylePieceCompanion(slot, garments.get(slot.itemId), weather)
+    ) {
+      return true
+    }
+    seen.add(slot.itemId)
+  }
+  return false
+}
+
 const storedCompositionSchema = z.array(savedLookCompositionSlotInputSchema)
 const storedSwapsSchema = z.record(z.string(), z.string())
 
@@ -604,18 +625,17 @@ export class WardrobeSavedLookService {
       return null
     }
     const byId = new Map(ownedGarments.map((item) => [item.id, item]))
-    const seen = new Set([input.anchorGarmentId])
-    for (const slot of input.composition) {
-      if (slot.kind !== 'garment' || slot.slotIndex === 0) continue
-      if (
-        seen.has(slot.itemId) ||
-        !matchesStylePieceCompanion(slot, byId.get(slot.itemId), input.weather)
-      ) {
-        throw new NotFoundException('GARMENT_NOT_FOUND')
-      }
-      seen.add(slot.itemId)
+    if (
+      hasInvalidStylePieceCompanion(
+        input.composition,
+        input.anchorGarmentId,
+        byId,
+        input.weather
+      )
+    ) {
+      throw new NotFoundException('GARMENT_NOT_FOUND')
     }
-    const anchorRow = ownedGarments.find((item) => item.id === input.anchorGarmentId)
+    const anchorRow = byId.get(input.anchorGarmentId)
     if (!anchorRow || !anchorRow.category || !anchorRow.comfort_range) {
       throw new NotFoundException('GARMENT_NOT_FOUND')
     }

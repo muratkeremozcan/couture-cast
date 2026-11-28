@@ -565,10 +565,12 @@ export function applyStylePieceRecipe(
         ? options[0]
         : garment
     const swap = options.find((item) => item.id === swapId)
+    const defaultKind =
+      saved?.kind ?? (isStylePieceOwnedCompanion(fallback) ? 'garment' : 'catalog')
     if (
       swap &&
-      (swap.id !== fallback.id ||
-        isStylePieceOwnedCompanion(swap) !== isStylePieceOwnedCompanion(fallback))
+      (swap.id !== (saved?.itemId ?? fallback.id) ||
+        (isStylePieceOwnedCompanion(swap) ? 'garment' : 'catalog') !== defaultKind)
     ) {
       swaps[category] = swap.id
     }

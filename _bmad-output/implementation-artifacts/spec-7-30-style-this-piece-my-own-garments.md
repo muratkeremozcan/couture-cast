@@ -108,6 +108,10 @@ paths and reported zero findings.
 | P2-3    | Recheck companion photo expiry on read as well as at the scheduled expiry.                      |
 | P3-1    | Add Step 87, test cross-links, and the done status to the PR.                                   |
 
+CodeRabbit reviewed the opening head once. The repair validates owned companions in every slot
+and restricts native leading content to elements. The editor keeps valid edits when an original
+saved piece leaves the closet, and Undo restores the prior occasion selection.
+
 ## Verification
 
 Use the Epic 7 CI workflows and the companion acceptance plan. Locally check types, formatting,

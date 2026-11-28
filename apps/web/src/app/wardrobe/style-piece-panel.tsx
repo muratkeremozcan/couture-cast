@@ -392,7 +392,12 @@ function StylePieceIdeas({
   const weatherRef = useRef<HTMLButtonElement | null>(null)
   const currentLookHeading = useRef<HTMLHeadingElement | null>(null)
   const savedSectionRef = useRef<HTMLElement | null>(null)
-  const swapUndoStackRef = useRef<Record<string, StylePieceRecipe>[]>([])
+  const swapUndoStackRef = useRef<
+    {
+      edits: Record<string, StylePieceRecipe>
+      latestEdit: string | undefined
+    }[]
+  >([])
   const swapRevisionRef = useRef(0)
   const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
   const lastCreatedRef = useRef<Record<string, SavedLookContract>>({})
@@ -534,7 +539,13 @@ function StylePieceIdeas({
   const result = stylePieceLooks(piece, weather)
   const selection = { ...piece, id: garmentId }
   const staleReopen =
-    reopenedSaved && !reopenStylePieceRecipe(reopenedSaved, selection, owned)
+    reopenedSaved &&
+    !reopenStylePieceRecipe(
+      reopenedSaved,
+      selection,
+      owned,
+      edits[reopenedSaved.lookId]?.swaps
+    )
   const looks = stylePieceOccasionLooks(result.looks, edits, {
     owned,
     reopenedLookId: reopened,
@@ -730,10 +741,10 @@ function StylePieceIdeas({
             onSwap={(category, id) => {
               draftRevision.current += 1
               swapRevisionRef.current += 1
-              swapUndoStackRef.current = pushLookUndoSnapshot(
-                swapUndoStackRef.current,
-                edits
-              )
+              swapUndoStackRef.current = pushLookUndoSnapshot(swapUndoStackRef.current, {
+                edits,
+                latestEdit,
+              })
               setLatestEdit(look.recipe.lookId)
               setEdits((current) => ({
                 ...current,
@@ -761,7 +772,8 @@ function StylePieceIdeas({
                       if (snapshot !== undefined) {
                         draftRevision.current += 1
                         swapRevisionRef.current += 1
-                        setEdits(snapshot)
+                        setEdits(snapshot.edits)
+                        setLatestEdit(snapshot.latestEdit)
                         const undoSeq = ++noticeSeqRef.current
                         statusBarRef.current.showNotice({
                           id: `style-piece-swap-undo-${undoSeq}`,
