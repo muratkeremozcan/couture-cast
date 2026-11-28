@@ -4801,7 +4801,9 @@
                 "description"
               ],
               "additionalProperties": false
-            }
+            },
+            "minItems": 3,
+            "maxItems": 3
           }
         },
         "required": [

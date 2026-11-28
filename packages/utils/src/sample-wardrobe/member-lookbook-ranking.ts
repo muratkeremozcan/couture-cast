@@ -28,7 +28,8 @@ export const memberLookbookRankingSchema = z
       description: z.enum(MEMBER_LOOKBOOK_DESCRIPTION_CHOICES),
     })
   )
-  .length(3)
+  .min(3)
+  .max(3)
 
 export type MemberLookbookRanking = z.infer<typeof memberLookbookRankingSchema>
 export type MemberLookbookRankingInput = {

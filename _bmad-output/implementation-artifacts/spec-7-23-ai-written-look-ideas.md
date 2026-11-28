@@ -159,6 +159,9 @@ Independent review and Codex Security inspected base
 | P3-1 Closeout                    | Mark the story built, set sprint status to done and link the acceptance evidence from Step 80.                                                                  |
 | P3-2 Eligibility availability    | Return a sanitized 503 when the active-teen lookup fails.                                                                                                       |
 
+CodeRabbit's single round found that generated OpenAPI omitted the ranking length constraint.
+The shared schema now publishes a minimum and maximum of three and still allows a null fallback.
+
 ## Verification
 
 Run type checks and targeted lint locally. The
