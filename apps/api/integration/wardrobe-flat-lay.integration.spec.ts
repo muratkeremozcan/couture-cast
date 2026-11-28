@@ -412,7 +412,13 @@ describe('CC-7.29 flat-lay review and confirmation over HTTP', () => {
     expect(staged.status).toBe(200)
     const { items } = flatLayReviewResponseSchema.parse(staged.body)
     expect(items).toHaveLength(3)
-    const kept = [confirmation(items[0]!, 'outerwear'), confirmation(items[1]!, 'bottom')]
+    const kept: Confirmation[] = [
+      confirmation(items[0]!, 'outerwear'),
+      {
+        ...confirmation(items[1]!, 'bottom'),
+        tags: { category: 'bottom', comfortRange: 'mild' },
+      },
+    ]
     expect(Buffer.byteLength(JSON.stringify({ items: kept }))).toBeGreaterThan(
       JSON_BODY_LIMIT_BYTES
     )
@@ -420,9 +426,18 @@ describe('CC-7.29 flat-lay review and confirmation over HTTP', () => {
 
     const first = await confirm(owner.auth, kept)
     expect(first.status).toBe(200)
-    const firstIds = flatLayConfirmResponseSchema
-      .parse(first.body)
-      .garments.map(({ id }) => id)
+    const { garments } = flatLayConfirmResponseSchema.parse(first.body)
+    expect(garments).toMatchObject([
+      {
+        category: 'outerwear',
+        comfortRange: null,
+        status: 'awaiting_tags',
+        tagsConfirmedAt: null,
+      },
+      { category: 'bottom', comfortRange: 'mild', status: 'ready' },
+    ])
+    expect(garments[1]?.tagsConfirmedAt).toEqual(expect.any(String))
+    const firstIds = garments.map(({ id }) => id)
     expect(new Set(firstIds).size).toBe(2)
     const replay = await confirm(owner.auth, kept)
     expect(replay.status).toBe(200)

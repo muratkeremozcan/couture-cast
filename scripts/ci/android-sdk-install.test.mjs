@@ -2,6 +2,8 @@
 // sdkmanager call ran 33.5 minutes and the shard hit its job timeout. The emulator jobs
 // (pr-mobile-e2e.yml) and every Gradle build of the app (android-gradle-sdk-workflows.test.mjs)
 // install through scripts/ci/android-sdk-install.sh, so these cases drive that script.
+// Learning path Step 86: Several garments from one flat-lay photo.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-86-several-garments-from-one-flat-lay-photo
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import {
@@ -27,8 +29,15 @@ const step = workflow.jobs['mobile-e2e-android'].steps.find(
   (candidate) => candidate.name === 'Install Android SDK packages for the emulator'
 )
 
-test('the emulator SDK step has its own timeout', () => {
-  assert.ok(step['timeout-minutes'] > 0 && step['timeout-minutes'] <= 8)
+test('the emulator image watchdog leaves room inside the step and job timeouts', () => {
+  const stepLimit = step['timeout-minutes'] * 60
+  const installBudget = Number(step.env.SDK_INSTALL_BUDGET_SECONDS)
+  const imageLimit = Number(step.env.SDK_SYSTEM_IMAGE_ATTEMPT_SECONDS)
+  const jobLimit = workflow.jobs['mobile-e2e-android']['timeout-minutes'] * 60
+
+  assert.equal(imageLimit, 540)
+  assert.equal(installBudget, 660)
+  assert.ok(installBudget + 10 < stepLimit && stepLimit < jobLimit)
 })
 
 test('the emulator SDK step installs its list through the shared script', () => {
@@ -120,6 +129,14 @@ test('the system image has a longer attempt limit within the shared deadline', (
   const normal = runStep(t, unpack, { SDK_PACKAGES: `emulator ${image}` })
   assert.equal(normal.status, 0, normal.stdout + normal.stderr)
   assert.deepEqual(normal.attemptLimits, [180, 300])
+
+  const maestro = runStep(t, unpack, {
+    SDK_PACKAGES: `emulator ${image}`,
+    SDK_INSTALL_BUDGET_SECONDS: step.env.SDK_INSTALL_BUDGET_SECONDS,
+    SDK_SYSTEM_IMAGE_ATTEMPT_SECONDS: step.env.SDK_SYSTEM_IMAGE_ATTEMPT_SECONDS,
+  })
+  assert.equal(maestro.status, 0, maestro.stdout + maestro.stderr)
+  assert.deepEqual(maestro.attemptLimits, [180, 540])
 
   const nearDeadline = runStep(t, unpack, {
     SDK_PACKAGES: image,
