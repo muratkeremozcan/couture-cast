@@ -131,6 +131,7 @@ export {
   GARMENT_COLOR_FAMILIES,
 } from './garment-color'
 export type { GarmentColorFamily } from './garment-color'
+export { maskGarmentBackground } from './garment-background'
 
 export * from './sample-wardrobe'
 export * from './federated-signin'

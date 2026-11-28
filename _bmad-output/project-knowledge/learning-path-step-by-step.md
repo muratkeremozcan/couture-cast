@@ -22676,3 +22676,31 @@ with a sentence about the colors in the photo.
 - [Caption response validation](../../packages/api-client/testing/community-publication-contract.spec.ts)
   and [request deadline](../../packages/api-client/testing/request-deadline.spec.ts).
 - [Step 81](#step-81-photo-ai-consent-and-processor-approval) covers the external processing policy.
+
+## Step 83: Clean garment cutouts
+
+Open Wardrobe and add a piece. Choose a garment photo with a plain background.
+Wait for the crop preview and check that the garment keeps its edges and fabric detail.
+
+### Sequence to follow
+
+1. Try the plain and patterned fixtures. Use their labels to count garment pixels kept and
+   backdrop pixels removed from each accepted mask.
+2. Try the cluttered and pale-on-pale fixtures. Check that the preview keeps the background and
+   that **Use This Image** still saves the crop. Switch cleanup off to keep the original crop for
+   a scene that does qualify.
+3. Save an accepted cutout and an unmasked crop. Reopen each garment and compare its decoded
+   pixels with the preview.
+4. Change the aspect ratio or switch accounts while a preview is preparing. Check that only the
+   current photo can be confirmed. The local mask is available with Photo AI off.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-26-clean-garment-cutouts.md)
+  and [acceptance plan](../test-artifacts/test-design-7-26-clean-garment-cutouts.md).
+- [Labeled scene fixtures](../../playwright/fixtures/wardrobe/cutouts/README.md),
+  [shared mask tests](../../packages/utils/src/garment-background.spec.ts), and
+  [phone browser capture](../../playwright/tests/wardrobe-garment-capture-phone.spec.ts).
+- [Web encoding fallback](../../apps/web/src/lib/wardrobe.test.ts),
+  [native capture](../../apps/mobile/components/wardrobe/garment-capture-modal.test.tsx),
+  and [Step 81](#step-81-photo-ai-consent-and-processor-approval) for the external processing policy.

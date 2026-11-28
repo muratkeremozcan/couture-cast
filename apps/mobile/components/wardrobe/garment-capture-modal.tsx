@@ -8,7 +8,6 @@ import { useCallback, useEffect, useRef, useState, type ElementRef } from 'react
 import { useTranslation } from 'react-i18next'
 import { getGuestPreviewStrings } from '@couture/utils'
 import { File, Paths } from 'expo-file-system'
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
 import {
   AccessibilityInfo,
@@ -20,6 +19,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text as NativeText,
   View,
 } from 'react-native'
@@ -39,6 +39,13 @@ import {
 import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
 import { sha256Hex } from '@/src/lib/expo-native-helpers'
+import {
+  prepareGarmentCaptureImage,
+  releaseGarmentCaptureFile,
+  type GarmentCaptureSource,
+  type GarmentCropRatio,
+  type PreparedGarmentImage,
+} from '@/src/lib/garment-capture-image'
 import {
   createUploadAttempts,
   currentUploadSession,
@@ -69,10 +76,60 @@ const garmentUploadAttempts = createUploadAttempts<{
   uploadUrl: string
   uploadToken: string
 }>()
-type AspectRatio = '1:1' | '4:3'
-type SelectedImage = { uri: string; width: number; height: number }
 /** A picked photo, bound to the session captured before its camera or picker opened. */
-type PickedImage = SelectedImage & { session: UploadAttemptSession }
+type PickedImage = GarmentCaptureSource & { session: UploadAttemptSession }
+
+type CropResult = {
+  source: PickedImage
+  aspectRatio: GarmentCropRatio
+  useBgCleanup: boolean
+  image: PreparedGarmentImage | null
+}
+
+function usePreparedCrop(
+  visible: boolean,
+  source: PickedImage | null,
+  aspectRatio: GarmentCropRatio,
+  useBgCleanup: boolean
+) {
+  const [result, setResult] = useState<CropResult | null>(null)
+
+  useEffect(() => {
+    if (!visible || !source) return
+    const controller = new AbortController()
+    let currentImage: PreparedGarmentImage | null = null
+    const publish = (image: PreparedGarmentImage | null) => {
+      if (controller.signal.aborted || !isUploadSessionCurrent(source.session)) {
+        if (image) releaseGarmentCaptureFile(image.file)
+        return
+      }
+      currentImage = image
+      setResult({ source, aspectRatio, useBgCleanup, image })
+    }
+    void prepareGarmentCaptureImage(
+      source,
+      aspectRatio,
+      useBgCleanup,
+      controller.signal
+    ).then(publish, () => publish(null))
+    return () => {
+      controller.abort()
+      if (currentImage) releaseGarmentCaptureFile(currentImage.file)
+      setResult(null)
+    }
+  }, [visible, source, aspectRatio, useBgCleanup])
+
+  if (
+    !visible ||
+    !result ||
+    result.source !== source ||
+    result.aspectRatio !== aspectRatio ||
+    result.useBgCleanup !== useBgCleanup
+  ) {
+    return null
+  }
+  return result
+}
 
 async function responseError(response: Response): Promise<Error> {
   try {
@@ -80,19 +137,6 @@ async function responseError(response: Response): Promise<Error> {
     return new Error(body.message ?? `Wardrobe request failed with ${response.status}`)
   } catch {
     return new Error(`Wardrobe request failed with ${response.status}`)
-  }
-}
-
-function cropForAspect(image: SelectedImage, aspectRatio: AspectRatio) {
-  const targetRatio = aspectRatio === '1:1' ? 1 : 3 / 4
-  const sourceRatio = image.width / image.height
-  const width = sourceRatio > targetRatio ? image.height * targetRatio : image.width
-  const height = sourceRatio > targetRatio ? image.height : image.width / targetRatio
-  return {
-    originX: Math.round((image.width - width) / 2),
-    originY: Math.round((image.height - height) / 2),
-    width: Math.round(width),
-    height: Math.round(height),
   }
 }
 
@@ -127,7 +171,9 @@ export function MobileGarmentCaptureModal({
   const insets = useModalInsets()
   const [step, setStep] = useState<CaptureStep>('source')
   const [selectedImage, setSelectedImage] = useState<PickedImage | null>(null)
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1')
+  const [aspectRatio, setAspectRatio] = useState<GarmentCropRatio>('1:1')
+  const [useBgCleanup, setUseBgCleanup] = useState(true)
+  const preparedCrop = usePreparedCrop(visible, selectedImage, aspectRatio, useBgCleanup)
   const [uploadStatus, setUploadStatus] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const uploadAbortRef = useRef<AbortController | null>(null)
@@ -157,6 +203,7 @@ export function MobileGarmentCaptureModal({
     uploadAbortRef.current = null
     setStep('source')
     setSelectedImage(null)
+    setUseBgCleanup(true)
     setUploadStatus('')
     setErrorMessage(null)
   }, [])
@@ -271,7 +318,8 @@ export function MobileGarmentCaptureModal({
   }
 
   const uploadSelectedImage = async () => {
-    if (!selectedImage) return
+    if (!preparedCrop?.image || uploadAbortRef.current) return
+    const { image: prepared, source } = preparedCrop
     const controller = new AbortController()
     uploadAbortRef.current = controller
     setStep('uploading')
@@ -279,24 +327,7 @@ export function MobileGarmentCaptureModal({
 
     try {
       setUploadStatus(t('wardrobe.upload.preparing'))
-      const crop = cropForAspect(selectedImage, aspectRatio)
-      const maxDimension = Math.max(crop.width, crop.height)
-      const resizeScale = Math.min(1, 2048 / maxDimension)
-      const prepared = await manipulateAsync(
-        selectedImage.uri,
-        [
-          { crop },
-          {
-            resize: {
-              width: Math.round(crop.width * resizeScale),
-              height: Math.round(crop.height * resizeScale),
-            },
-          },
-        ],
-        // JPEG: nothing here is transparent, and a 12 MP photo saved as PNG came to 5 MB or more.
-        { compress: 0.9, format: SaveFormat.JPEG }
-      )
-      const file = new File(prepared.uri)
+      const { file, mimeType, backgroundRemoved } = prepared
       const bytes = await file.bytes()
       if (bytes.byteLength > 10 * 1024 * 1024) {
         throw new Error(t('wardrobe.error.image_too_large'))
@@ -304,7 +335,7 @@ export function MobileGarmentCaptureModal({
       // The session captured when the photo was picked: its account's bearer is resolved now
       // (refused once the account changed), and an account change from here on fences this run,
       // so its answers never reach the next account's attempts.
-      const uploadSession = selectedImage.session
+      const uploadSession = source.session
       const accessToken = await resolveUploadBearer(
         uploadSession,
         resolveMobileAccessToken
@@ -320,10 +351,10 @@ export function MobileGarmentCaptureModal({
       const attemptId = `${preparedImageFingerprint({
         sha256,
         fileSizeBytes: bytes.byteLength,
-        mimeType: 'image/jpeg',
+        mimeType,
         widthPx: prepared.width,
         heightPx: prepared.height,
-      })}:original`
+      })}:${backgroundRemoved ? 'cleanup' : 'original'}`
       const garment = await runTrackedUpload(
         garmentUploadAttempts,
         uploadSession,
@@ -342,7 +373,7 @@ export function MobileGarmentCaptureModal({
                 },
                 body: JSON.stringify({
                   fileSizeBytes: bytes.byteLength,
-                  mimeType: 'image/jpeg',
+                  mimeType,
                   sha256,
                   widthPx: prepared.width,
                   heightPx: prepared.height,
@@ -366,7 +397,7 @@ export function MobileGarmentCaptureModal({
               uploadUrl: allocation.uploadUrl,
               uploadToken: allocation.uploadToken,
               bearerToken: accessToken,
-              mimeType: 'image/jpeg',
+              mimeType,
               body: bytes.buffer,
               signal: controller.signal,
             })
@@ -386,7 +417,7 @@ export function MobileGarmentCaptureModal({
                   garmentId: allocation.garmentId,
                   uploadSessionId: allocation.uploadSessionId,
                   hasCropping: true,
-                  hasBgCleanup: false,
+                  hasBgCleanup: backgroundRemoved,
                 }),
                 signal: controller.signal,
               }
@@ -398,7 +429,9 @@ export function MobileGarmentCaptureModal({
           },
         }
       )
+      if (controller.signal.aborted) return
       onGarmentCommitted?.(garment, accessToken)
+      setSelectedImage(null)
       setUploadStatus(t('wardrobe.upload.processing'))
       setStep('complete')
     } catch (error) {
@@ -508,14 +541,24 @@ export function MobileGarmentCaptureModal({
         {step === 'crop' && selectedImage ? (
           <ScrollView contentContainerStyle={styles.cropContent}>
             <Text style={styles.sectionTitle}>{t('wardrobe.crop.title')}</Text>
-            <Image
-              source={{ uri: selectedImage.uri }}
-              resizeMode="cover"
-              testID="garment-crop-preview"
+            <View
               style={
                 aspectRatio === '1:1' ? styles.squarePreview : styles.portraitPreview
               }
-            />
+            >
+              {preparedCrop?.image ? (
+                <Image
+                  source={{ uri: preparedCrop.image.file.uri }}
+                  resizeMode="contain"
+                  testID="garment-crop-preview"
+                  style={StyleSheet.absoluteFill}
+                />
+              ) : preparedCrop ? (
+                <Text accessibilityRole="alert">{t('wardrobe.error.invalid_image')}</Text>
+              ) : (
+                <ActivityIndicator accessibilityLabel={t('wardrobe.upload.preparing')} />
+              )}
+            </View>
             <View style={styles.row}>
               <Pressable
                 testID="garment-aspect-square"
@@ -532,10 +575,32 @@ export function MobileGarmentCaptureModal({
                 <Text>{t('wardrobe.crop.aspect_four_three')}</Text>
               </Pressable>
             </View>
+            <View style={styles.cleanupRow}>
+              <Text>{t('wardrobe.cleanup.title')}</Text>
+              <Switch
+                accessibilityLabel={t('wardrobe.cleanup.title')}
+                testID="garment-cleanup-switch"
+                value={useBgCleanup}
+                onValueChange={setUseBgCleanup}
+              />
+            </View>
+            {useBgCleanup &&
+            preparedCrop?.image &&
+            !preparedCrop.image.backgroundRemoved ? (
+              <Text accessibilityLiveRegion="polite">
+                {t('wardrobe.cleanup.unavailable')}
+              </Text>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               testID="garment-confirm-image"
-              style={[styles.primaryButton, themed.inverse]}
+              disabled={!preparedCrop?.image}
+              accessibilityState={{ disabled: !preparedCrop?.image }}
+              style={[
+                styles.primaryButton,
+                themed.inverse,
+                !preparedCrop?.image && styles.disabled,
+              ]}
               onPress={() => void uploadSelectedImage()}
             >
               <Text style={[styles.primaryButtonText, themed.onInverse]}>
@@ -608,9 +673,28 @@ const styles = StyleSheet.create({
   fixtureButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   cropContent: { gap: 20, alignItems: 'stretch' },
   sectionTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
-  squarePreview: { width: '100%', aspectRatio: 1, borderRadius: 16 },
-  portraitPreview: { width: '100%', aspectRatio: 0.75, borderRadius: 16 },
+  squarePreview: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    justifyContent: 'center',
+  },
+  portraitPreview: {
+    width: '100%',
+    aspectRatio: 0.75,
+    borderRadius: 16,
+    overflow: 'hidden',
+    justifyContent: 'center',
+  },
   row: { flexDirection: 'row', gap: 12 },
+  cleanupRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 44,
+  },
+  disabled: { opacity: 0.5 },
   optionButton: {
     flex: 1,
     minHeight: 44,
