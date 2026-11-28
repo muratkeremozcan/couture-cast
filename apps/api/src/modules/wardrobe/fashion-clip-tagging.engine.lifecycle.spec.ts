@@ -1,10 +1,15 @@
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 84: Suggested tags that are right.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- the ONNX runtime session and tokenizer are stubbed with untyped test doubles, which is the established pattern for these suites. */
 import fs from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { GarmentTaggingOutputError } from './garment-tagging.engine'
+import {
+  GARMENT_DETAIL_PROMPTS,
+  GarmentTaggingOutputError,
+} from './garment-tagging.engine'
 // vi.mock is hoisted above this import, so the faked node:worker_threads
 // module is already in place when the engine module is evaluated. A
 // top-level `await import` is not an option: this workspace compiles specs
@@ -71,11 +76,14 @@ type FakeWorker = InstanceType<typeof workerHarness.FakeWorker>
 
 const MODEL_DIR = '/models/fashion-clip'
 const ANALYSIS_VERSION =
-  'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1'
+  'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v2'
 
 /** Six category prompts, dominated by `top`; nine material prompts by `cotton`. */
 const CONFIDENT_CATEGORY_LOGITS = [9, 0, 0, 0, 0, 0]
 const CONFIDENT_MATERIAL_LOGITS = [9, 0, 0, 0, 0, 0, 0, 0, 0]
+const CONFIDENT_DETAIL_LOGITS = GARMENT_DETAIL_PROMPTS.map(({ subtype }) =>
+  subtype === 'tank' ? 9 : 0
+)
 
 function workers(): FakeWorker[] {
   return workerHarness.FakeWorker.instances
@@ -188,6 +196,7 @@ describe('FashionClipTaggingEngine worker supervision', () => {
         id: 'stray',
         categoryLogits: CONFIDENT_CATEGORY_LOGITS,
         materialLogits: CONFIDENT_MATERIAL_LOGITS,
+        detailLogits: CONFIDENT_DETAIL_LOGITS,
       })
       send(worker, { type: 'ready' })
 
@@ -311,11 +320,13 @@ describe('FashionClipTaggingEngine worker supervision', () => {
         id: lastRequestId(worker),
         categoryLogits: CONFIDENT_CATEGORY_LOGITS,
         materialLogits: CONFIDENT_MATERIAL_LOGITS,
+        detailLogits: CONFIDENT_DETAIL_LOGITS,
       })
 
       await expect(pending).resolves.toEqual({
         analysisVersion: ANALYSIS_VERSION,
         category: { value: 'top', confidence: expect.any(Number), isConfident: true },
+        subtype: { value: 'tank', confidence: expect.any(Number), isConfident: true },
         material: { value: 'cotton', confidence: expect.any(Number), isConfident: true },
         comfortRange: {
           value: 'mild',
@@ -339,12 +350,14 @@ describe('FashionClipTaggingEngine worker supervision', () => {
         id: 'req-someone-else',
         categoryLogits: CONFIDENT_CATEGORY_LOGITS,
         materialLogits: CONFIDENT_MATERIAL_LOGITS,
+        detailLogits: CONFIDENT_DETAIL_LOGITS,
       })
       send(worker, {
         type: 'result',
         id: lastRequestId(worker),
         categoryLogits: CONFIDENT_CATEGORY_LOGITS,
         materialLogits: CONFIDENT_MATERIAL_LOGITS,
+        detailLogits: CONFIDENT_DETAIL_LOGITS,
       })
 
       await expect(pending).resolves.toMatchObject({ category: { value: 'top' } })
@@ -366,6 +379,7 @@ describe('FashionClipTaggingEngine worker supervision', () => {
         id: lastRequestId(worker),
         categoryLogits: [1, 2],
         materialLogits: CONFIDENT_MATERIAL_LOGITS,
+        detailLogits: CONFIDENT_DETAIL_LOGITS,
       })
 
       await expect(pending).rejects.toBeInstanceOf(GarmentTaggingOutputError)

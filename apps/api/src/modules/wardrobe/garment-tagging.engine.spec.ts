@@ -1,18 +1,25 @@
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 84: Suggested tags that are right.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  ANALYSIS_VERSION,
   CATEGORY_KEYS,
   CATEGORY_PROMPTS,
+  GARMENT_DETAIL_PROMPTS,
   MATERIAL_KEYS,
   MATERIAL_PROMPTS,
   classifyCategory,
   classifyMaterial,
+  classifyTagSuggestions,
   deriveComfort,
   softmax,
 } from './garment-tagging.engine'
-import type { GarmentCategory, GarmentMaterial } from '@couture/api-client/contracts/http'
+import {
+  GARMENT_SUBTYPE_ANALYSIS_VERSION,
+  type GarmentCategory,
+  type GarmentMaterial,
+} from '@couture/api-client/contracts/http'
 import { FixtureGarmentTaggingEngine } from './fixture-garment-tagging.engine'
 
 describe('GarmentTaggingEngine Core Logic', () => {
@@ -78,6 +85,44 @@ describe('GarmentTaggingEngine Core Logic', () => {
     expect(matLowConf.isConfident).toBe(false)
   })
 
+  it('treats a clear ordinary T-shirt as a confident top with no listed subtype', () => {
+    const result = classifyTagSuggestions({
+      categoryLogits: CATEGORY_KEYS.map(() => 0),
+      materialLogits: MATERIAL_KEYS.map((key) => (key === 'cotton' ? 8 : 0)),
+      detailLogits: GARMENT_DETAIL_PROMPTS.map(({ category, text }) =>
+        category === 'top' && text === 'a photo of a T-shirt' ? 9 : 0
+      ),
+    })
+
+    expect(result.category).toMatchObject({ value: 'top', isConfident: true })
+    expect(result.subtype).toMatchObject({ value: null, isConfident: true })
+  })
+
+  it('withholds subtype confirmation when two category leaders are tied', () => {
+    const result = classifyTagSuggestions({
+      categoryLogits: CATEGORY_KEYS.map(() => 0),
+      materialLogits: MATERIAL_KEYS.map(() => 0),
+      detailLogits: GARMENT_DETAIL_PROMPTS.map(({ subtype }) =>
+        subtype === 'tank' || subtype === 'mini-skirt' ? 9 : 0
+      ),
+    })
+    expect(result.category.isConfident).toBe(false)
+    expect(result.subtype?.isConfident).toBe(false)
+    expect(result.comfortRange.isConfident).toBe(false)
+  })
+
+  it('rejects non-finite detail logits as an invalid inference result', () => {
+    expect(() =>
+      classifyTagSuggestions({
+        categoryLogits: CATEGORY_KEYS.map(() => 0),
+        materialLogits: MATERIAL_KEYS.map(() => 0),
+        detailLogits: GARMENT_DETAIL_PROMPTS.map(({ subtype }) =>
+          subtype === 'tank' ? Number.NaN : 0
+        ),
+      })
+    ).toThrow('Invalid garment prompt logits')
+  })
+
   it('evaluates comfort derivation rules in strict order', () => {
     const cat = (val: GarmentCategory, conf = 0.8, isConf = true) => ({
       value: val,
@@ -140,8 +185,9 @@ describe('GarmentTaggingEngine Core Logic', () => {
       Buffer.from('synthetic-garment-image')
     )
 
-    expect(suggestions.analysisVersion).toBe(ANALYSIS_VERSION)
+    expect(suggestions.analysisVersion).toBe(GARMENT_SUBTYPE_ANALYSIS_VERSION)
     expect(suggestions.category).toMatchObject({ value: 'top', isConfident: true })
+    expect(suggestions.subtype).toMatchObject({ value: 'tank', isConfident: true })
     expect(suggestions.material).toMatchObject({ value: 'cotton', isConfident: true })
     expect(suggestions.comfortRange).toMatchObject({
       value: 'mild',

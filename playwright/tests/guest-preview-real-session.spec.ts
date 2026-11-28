@@ -211,7 +211,7 @@ test.describe('Guest preview and first garment with verified auth', () => {
 
       const tagging = page.getByRole('dialog', { name: 'Organize Garment Tags' })
       await tagging.getByRole('radio', { name: 'Top', exact: true }).click()
-      await tagging.getByRole('button', { name: 'Save tags' }).click()
+      await tagging.getByRole('button', { name: 'Looks right' }).click()
       await expect(tagging).toBeHidden()
 
       const garments = await prisma.garmentItem.findMany({ where: { user_id: userId } })

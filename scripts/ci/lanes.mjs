@@ -204,6 +204,22 @@ export const LANES = {
     workspaces: ['api'],
     inputs: [SUPABASE],
   },
+  'garment-tagging-model': {
+    title: 'Garment tagging model accuracy',
+    workflow: 'pr-checks.yml',
+    jobs: ['garment-tagging-model'],
+    inputs: [
+      'apps/api/src/modules/wardrobe/*tagging*',
+      'apps/api/src/modules/wardrobe/fashion-clip-inference.worker.ts',
+      'apps/api/src/logger/**',
+      'apps/api/model-manifests/fashion-clip-*.json',
+      'apps/api/test/fixtures/garment-tagging/**',
+      'apps/api/package.json',
+      'apps/api/vitest.config.ts',
+      'packages/api-client/src/contracts/http/wardrobe.ts',
+      'packages/utils/src/sample-wardrobe/garment-subtypes.ts',
+    ],
+  },
   contract: {
     title: 'Local schema and Pact contracts',
     workflow: 'contract-testing.yml',

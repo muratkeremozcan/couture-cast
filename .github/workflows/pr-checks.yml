@@ -573,7 +573,7 @@ jobs:
   tests:
     name: Workspace tests with coverage
     # The quality gate, its own job until 2026-11-12, is this job's last step.
-    needs: [lanes, tests-shard, typecheck, lint, lighthouse]
+    needs: [lanes, tests-shard, typecheck, lint, lighthouse, garment-tagging-model]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -650,6 +650,7 @@ jobs:
           RESULTS: >-
             tests-shard=${{ needs.tests-shard.result }} lighthouse=${{ needs.lighthouse.result }}
             lint=${{ needs.lint.result }} typecheck=${{ needs.typecheck.result }}
+            garment-tagging-model=${{ needs.garment-tagging-model.result }}
           PLAN: ${{ needs.lanes.outputs.plan }}
           COVERAGE_SHARDS: ${{ needs.lanes.outputs.coverage_shards }}
         run: |
@@ -666,7 +667,7 @@ jobs:
               skip=false
               case "$job" in
                 tests-shard) if [ "$COVERAGE_SHARDS" = '[]' ]; then skip=true; fi ;;
-                lighthouse | typecheck) if [ "$(planned "$job")" = false ]; then skip=true; fi ;;
+                lighthouse | typecheck | garment-tagging-model) if [ "$(planned "$job")" = false ]; then skip=true; fi ;;
               esac
               if [ "$skip" = true ]; then
                 echo "$job: skipped by the lane plan (see the Lanes job summary)"
@@ -680,6 +681,29 @@ jobs:
             exit 1
           fi
           echo "Quality gate passed: $RESULTS"
+
+  garment-tagging-model:
+    name: Garment tagging model accuracy
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['garment-tagging-model']
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: ./.github/actions/setup-node-env
+      - name: Restore the pinned FashionCLIP snapshot
+        uses: actions/cache@v4
+        with:
+          path: apps/api/.cache/garment-tagging-model
+          key: fashion-clip-${{ runner.os }}-${{ hashFiles('apps/api/model-manifests/fashion-clip-7e3ba62.json') }}
+      - name: Build garment tagging dependencies
+        run: npm run prepare:shared-deps --workspace api
+      - name: Enforce accuracy on the fixed wardrobe holdout
+        run: npm run test:tagging-model:smoke --workspace api
 
   community-realtime-budget:
     name: Community realtime cold-handshake budget
@@ -901,7 +925,7 @@ jobs:
           eligible=$(node -e "const l=require('./test/fixtures/community-text-corpus/holdout-retirements.json');console.log(Object.keys(l.eligible??{}).length)")
           if [ "$eligible" = "0" ]; then
             echo "development" > .cache/community-screening/corpus-ci-mode
-            COMMUNITY_SCREENING_RUN_PRODUCT_DIR= COMMUNITY_SCREENING_DEVELOPMENT_DIR=.cache/community-screening npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
+            COMMUNITY_SCREENING_RUN_PRODUCT_DIR='' COMMUNITY_SCREENING_DEVELOPMENT_DIR=.cache/community-screening npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
           else
             echo "release" > .cache/community-screening/corpus-ci-mode
             npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json

@@ -1,0 +1,125 @@
+{
+  "name": "wardrobe-tagging-holdout-v1",
+  "images": [
+    {
+      "file": "ivory-camisole.jpg",
+      "sha256": "a6599a09d0359b0f859010f69aeff98786641b2b5d7b0371c94adc817d9c3f1a",
+      "category": "top",
+      "subtype": "camisole"
+    },
+    {
+      "file": "navy-tank.jpg",
+      "sha256": "369514735fcc759458669244946e1fbba3756c9c78df1d34a997962752cf42df",
+      "category": "top",
+      "subtype": "tank"
+    },
+    {
+      "file": "orange-crop.jpg",
+      "sha256": "c1bca9360d4c268cca90f1f25f0df198ff3aacd6df92ed45485220d6a13f1c2f",
+      "category": "top",
+      "subtype": "crop-top"
+    },
+    {
+      "file": "red-fitted-skirt.jpg",
+      "sha256": "b7b9f75e02494d9f0369c8183b0495b7e3d0e52ecb6a27b37aa94a4820b8a432",
+      "category": "bottom",
+      "subtype": "mini-skirt"
+    },
+    {
+      "file": "green-pleated-skirt.jpg",
+      "sha256": "69f6e5640d2bad45f58ea7026c3cd98a135b84117b2c79714129769872ead407",
+      "category": "bottom",
+      "subtype": "midi-skirt"
+    },
+    {
+      "file": "blue-full-skirt.jpg",
+      "sha256": "b7553aff3fdefcec16f2d622c7bee19a2de44cf8abf9a10c1412415682981200",
+      "category": "bottom",
+      "subtype": "maxi-skirt"
+    },
+    {
+      "file": "black-leggings.jpg",
+      "sha256": "d2dab1066dcbc9119dfbf8439d8ec5dc5a21b46e90abf77849a0a7928d0af2cb",
+      "category": "bottom",
+      "subtype": "leggings"
+    },
+    {
+      "file": "single-breasted-blazer.jpg",
+      "sha256": "7bea2c0be3b7f07f8d625631d32c655155ee6251a1aba260f1ede6329b21528c",
+      "category": "outerwear",
+      "subtype": "blazer"
+    },
+    {
+      "file": "black-moto-jacket.jpg",
+      "sha256": "214ee8158a48a188676190a2301a10ae2a96b7604fea4efaabe5180cd8813610",
+      "category": "outerwear",
+      "subtype": "moto-jacket"
+    },
+    {
+      "file": "purple-floral-dress.jpg",
+      "sha256": "05e41a52aace534694d22bd827dc9c7b3f468c28482377d9981513a7bbf012e2",
+      "category": "dress",
+      "subtype": null
+    },
+    {
+      "file": "yellow-sleeveless-dress.jpg",
+      "sha256": "0ad2420dea93afd62babd703480b1f1f148c6e926c8ffb86bb5caeb8004fe047",
+      "category": "dress",
+      "subtype": null
+    },
+    {
+      "file": "red-ankle-boots.jpg",
+      "sha256": "278831f6c92d917618a9234f39950bb32fdddf620312ec922bc9156f082be5ea",
+      "category": "shoes",
+      "subtype": "ankle-boots"
+    },
+    {
+      "file": "brown-riding-boots.jpg",
+      "sha256": "04b4779b4e958cde9abd6e59fe82ab25f19a6f4e98963e76eb324cb7a061b551",
+      "category": "shoes",
+      "subtype": "knee-boots"
+    },
+    {
+      "file": "black-harness-boots.jpg",
+      "sha256": "7ebb2db881c9e737407d04c62d191bdbe35978cb9a17161ce5ff891d7fed8678",
+      "category": "shoes",
+      "subtype": "moto-boots"
+    },
+    {
+      "file": "plum-footed-tights.jpg",
+      "sha256": "da8ba8961024523de710efe0bc9dc29a01f0403213edf2113f7f7255ed00fc06",
+      "category": "accessory",
+      "subtype": "tights"
+    },
+    {
+      "file": "teal-striped-socks.jpg",
+      "sha256": "91aa97da59a54f5fdae36c30e2c93c94c02c88b405a1a801ec7bd85905f19470",
+      "category": "accessory",
+      "subtype": "socks"
+    },
+    {
+      "file": "gray-lace-camisole.jpg",
+      "sha256": "2817f7abf3a795dcaa848bcd26a48a4da0938d3e97a1d1c655dedd01b36a9b1b",
+      "category": "top",
+      "subtype": "camisole"
+    },
+    {
+      "file": "cream-crop.jpg",
+      "sha256": "f43edbb351902fdcdc709dd094b6f1bb1a096a900e6fc560b1761cb37dfcd5fb",
+      "category": "top",
+      "subtype": "crop-top"
+    },
+    {
+      "file": "double-breasted-blazer.jpg",
+      "sha256": "a6ed9607d06c7f6ca0f56c78cea343a8f24db26ff1df7669922140ccd589c1a2",
+      "category": "outerwear",
+      "subtype": "blazer"
+    },
+    {
+      "file": "burgundy-crew-socks.jpg",
+      "sha256": "12c20cb3bd1f51fd26cba23ab1925056821d3a61cab5e654dcc6d21898949af7",
+      "category": "accessory",
+      "subtype": "socks"
+    }
+  ]
+}

@@ -3,6 +3,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 // Learning path Step 76: Garment subtypes.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
+// Learning path Step 84: Suggested tags that are right.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 import path from 'node:path'
 import {
   createSavedLocationResponseSchema,
@@ -10,7 +12,9 @@ import {
   ritualResponseSchema,
   signupResponseSchema,
   suggestGarmentTagsResponseSchema,
+  WARDROBE_GARMENT_SUBTYPE_HEADER,
 } from '@couture/api-client/contracts/http'
+import { createSuggestGarmentTagsWireFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { resolveEnvironmentConfig } from '../config/environments'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
@@ -150,7 +154,25 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
           return garment!
         })
 
-      await test.step('Cancel and resume the accessible tagging flow', async () => {
+      const suggestionPath = `/api/v1/wardrobe/garments/${awaitingGarment.id}/suggest-tags`
+      const suggestionUrl = `**${suggestionPath}`
+      await test.step('Keep the legacy strict response usable without the subtype header', async () => {
+        const originalClient = await apiRequest({
+          method: 'POST',
+          path: suggestionPath,
+          baseUrl: environment.apiBaseUrl,
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        expect(originalClient.status).toBe(200)
+        const result = suggestGarmentTagsResponseSchema.parse(originalClient.body).data
+        expect(result).toMatchObject({
+          mode: 'suggested',
+          garmentId: awaitingGarment.id,
+          suggestions: { category: { value: 'top', isConfident: true } },
+        })
+        expect(result).not.toHaveProperty('suggestions.subtype')
+      })
+      await test.step('Resume with the capture and confident chips on the same screen', async () => {
         const dialog = page.getByRole('dialog', { name: 'Organize Garment Tags' })
         await expect(dialog).toBeVisible()
         await checkA11y(page, {
@@ -166,25 +188,82 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
         // mode; `manual` is what a hosted worker without a model answers).
         const resumedSuggestions = interceptNetworkCall({
           method: 'POST',
-          url: '**/api/v1/wardrobe/garments/*/suggest-tags',
+          url: suggestionUrl,
         })
         await resumeButton.click()
         await expect(dialog).toBeVisible()
         const suggestCall = await resumedSuggestions
         expect(suggestCall.status).toBe(200)
         expect(
+          await suggestCall.request?.headerValue(WARDROBE_GARMENT_SUBTYPE_HEADER)
+        ).toBe('1')
+        expect(
           suggestGarmentTagsResponseSchema.parse(suggestCall.responseJson).data
-        ).toMatchObject({ mode: 'suggested', garmentId: awaitingGarment.id })
+        ).toMatchObject({
+          mode: 'suggested',
+          garmentId: awaitingGarment.id,
+          suggestions: { subtype: { value: 'tank', isConfident: true } },
+        })
+        const preview = dialog.getByRole('img', { name: 'Garment preview' })
+        await expect(preview).toBeVisible()
+        await expect(preview).toHaveJSProperty('complete', true)
+        const displayed = await preview.evaluate((image: HTMLImageElement) => ({
+          width: image.naturalWidth,
+          url: image.currentSrc,
+        }))
+        expect(displayed.width).toBeGreaterThan(0)
+        const asset = awaitingGarment.imageAccess
+        expect(asset, 'the added piece has a private image').not.toBeNull()
+        expect(new URL(displayed.url).pathname).toBe(new URL(asset!.url).pathname)
+        await expect(
+          dialog.getByRole('radio', { name: 'Top', exact: true })
+        ).toBeChecked()
+        await expect(dialog.getByTestId('garment-tagging-subtype-tank')).toBeChecked()
+        await expect(
+          dialog.getByRole('radio', { name: 'Cotton', exact: true })
+        ).toBeChecked()
+        await expect(
+          dialog
+            .getByRole('radiogroup', { name: 'Target Comfort Range' })
+            .getByRole('radio', { name: /^Mild/ })
+        ).toBeChecked()
+        await expect(dialog.getByRole('button', { name: 'Looks right' })).toBeEnabled()
       })
 
-      await test.step('Override the suggestion with the keyboard and save', async () => {
+      await test.step('Resolve an uncertain subtype before saving a keyboard override', async () => {
+        const dialog = page.getByRole('dialog', { name: 'Organize Garment Tags' })
+        await dialog.getByRole('button', { name: 'Cancel' }).click()
+        const suggested = createSuggestGarmentTagsWireFixture({
+          garmentId: awaitingGarment.id,
+        })
+        const uncertainSuggestions = interceptNetworkCall({
+          method: 'POST',
+          url: suggestionUrl,
+          fulfillResponse: {
+            status: 200,
+            body: {
+              data: {
+                ...suggested,
+                suggestions: {
+                  ...suggested.suggestions,
+                  subtype: { value: 'tank', confidence: 0.25, isConfident: false },
+                },
+              },
+            },
+          },
+        })
+        await page.getByRole('button', { name: 'Needs tags' }).click()
+        expect((await uncertainSuggestions).status).toBe(200)
+        const confirm = dialog.getByRole('button', { name: 'Looks right' })
+        await expect(dialog.getByText('Pick one', { exact: true })).toBeVisible()
         await expect(
-          page
-            .getByRole('radiogroup', { name: 'Target Comfort Range' })
+          dialog
+            .getByTestId('garment-tagging-subtype-picker')
             .getByRole('radio', { checked: true })
-        ).toBeVisible()
+        ).toHaveCount(0)
+        await expect(confirm).toBeDisabled()
 
-        const categoryGroup = page.getByRole('radiogroup', {
+        const categoryGroup = dialog.getByRole('radiogroup', {
           name: 'Garment Category',
         })
         const topChip = categoryGroup.getByRole('radio', { name: 'Top', exact: true })
@@ -202,9 +281,23 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
         const subtypes = page.getByTestId('garment-tagging-subtype-picker')
         await expect(subtypes).toBeVisible()
         await expect(subtypes.getByTestId('garment-tagging-subtype-tank')).toHaveCount(0)
+        await expect(confirm).toBeDisabled()
         await subtypes.getByTestId('garment-tagging-subtype-mini-skirt').click()
 
-        await page.getByRole('button', { name: 'Save tags' }).click()
+        await expect(confirm).toBeEnabled()
+        const saved = interceptNetworkCall({
+          method: 'PATCH',
+          url: `**/api/v1/wardrobe/garments/${awaitingGarment.id}/tags`,
+        })
+        await confirm.click()
+        const confirmation = await saved
+        expect(confirmation.status).toBe(200)
+        expect(confirmation.requestJson).toMatchObject({
+          category: 'bottom',
+          subtype: 'mini-skirt',
+          material: 'cotton',
+          comfortRange: 'mild',
+        })
         await expect(
           page.getByRole('dialog', { name: 'Organize Garment Tags' })
         ).not.toBeVisible()

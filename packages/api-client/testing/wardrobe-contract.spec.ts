@@ -10,6 +10,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 // Learning path Step 76: Garment subtypes.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
+// Learning path Step 84: Suggested tags that are right.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import {
@@ -23,6 +25,8 @@ import {
   garmentListClientResponseSchema,
   garmentListResponseSchema,
   garmentListWithColorResponseSchema,
+  garmentTagSuggestionSnapshotSchema,
+  GARMENT_SUBTYPE_ANALYSIS_VERSION,
   GARMENT_TAGGING_ANALYSIS_VERSION,
   generateHttpOpenApiDocument,
   parseGarmentListWithColorResponse,
@@ -350,6 +354,13 @@ describe('Wardrobe HTTP Contracts', () => {
       expect(spec.paths?.['/api/v1/wardrobe/garments']?.post?.requestBody).toBeDefined()
       const suggestions =
         spec.paths?.['/api/v1/wardrobe/garments/{garmentId}/suggest-tags']?.post
+      expect(suggestions?.parameters).toContainEqual(
+        expect.objectContaining({
+          in: 'header',
+          name: WARDROBE_GARMENT_SUBTYPE_HEADER,
+          required: false,
+        })
+      )
       expect(suggestions?.responses?.['409']).toHaveProperty(
         'content.application/json.schema'
       )
@@ -719,6 +730,48 @@ describe('suggest-tags wire compatibility (mixed deployments)', () => {
     expect(suggestGarmentTagsResponseSchema.parse(suggestedWire)).toEqual({
       data: { ...suggestedWire.data, mode: 'suggested' },
     })
+  })
+
+  it.each([
+    { value: 'tank', confidence: 0.9, isConfident: true },
+    { value: null, confidence: 0.9, isConfident: true },
+    { value: 'camisole', confidence: 0.3, isConfident: false },
+  ])(
+    'preserves the opted-in subtype score ($value, confident: $isConfident)',
+    (subtype) => {
+      const optedIn = {
+        data: {
+          ...suggestedWire.data,
+          suggestions: { ...suggestedWire.data.suggestions, subtype },
+        },
+      }
+      expect(suggestGarmentTagsResponseSchema.parse(optedIn).data).toEqual({
+        ...optedIn.data,
+        mode: 'suggested',
+      })
+      expect(legacyClientSchema.safeParse(optedIn).success).toBe(false)
+    }
+  )
+
+  it('reads stored v1 and v2 snapshots and rejects a subtype from another category', () => {
+    const originalSnapshot = {
+      analysisVersion: GARMENT_TAGGING_ANALYSIS_VERSION,
+      ...suggestedWire.data.suggestions,
+    }
+    expect(garmentTagSuggestionSnapshotSchema.parse(originalSnapshot)).toEqual(
+      originalSnapshot
+    )
+    const v2 = {
+      ...originalSnapshot,
+      analysisVersion: GARMENT_SUBTYPE_ANALYSIS_VERSION,
+      subtype: { value: 'tank', confidence: 0.85, isConfident: true },
+    }
+    expect(garmentTagSuggestionSnapshotSchema.parse(v2)).toEqual(v2)
+    expectIssuePath(
+      garmentTagSuggestionSnapshotSchema,
+      { ...v2, subtype: { ...v2.subtype, value: 'mini-skirt' } },
+      'subtype.value'
+    )
   })
 
   it('passes a manual answer through unchanged and refuses one that carries suggestions', () => {

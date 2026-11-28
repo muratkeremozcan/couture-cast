@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
 // Learning path Step 76: Garment subtypes.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
+// Learning path Step 84: Suggested tags that are right.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 // @vitest-environment jsdom
 import React from 'react'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
@@ -74,7 +76,7 @@ describe('GarmentTaggingModal Component', () => {
     // The options render before the suggestions arrive, so their presence proves
     // nothing. The confident suggestions are applied once the category is checked
     // and the form can be confirmed.
-    const confirmBtn = screen.getByRole('button', { name: 'Save tags' })
+    const confirmBtn = await screen.findByRole('button', { name: 'Looks right' })
     await waitFor(() => {
       expect(screen.getByRole('radio', { name: /Top/ })).toHaveAttribute(
         'aria-checked',
@@ -136,6 +138,38 @@ describe('GarmentTaggingModal Component', () => {
     expect(bottom).toHaveAttribute('aria-checked', 'true')
     expect(clearMaterial).toHaveAttribute('aria-checked', 'true')
     expect(hot).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('keeps an explicit None when a confident subtype arrives after the member chooses it', async () => {
+    const user = userEvent.setup()
+    const pending = Promise.withResolvers<typeof mockSuggestions>()
+    const updateTagsFn = vi.fn().mockResolvedValue(mockUpdatedGarment)
+    renderModal({ suggestTagsFn: () => pending.promise, updateTagsFn })
+
+    await user.click(screen.getByRole('radio', { name: /^Top$/ }))
+    const none = screen.getByRole('radio', { name: /^None$/ })
+    await user.click(none)
+
+    pending.resolve({
+      ...mockSuggestions,
+      suggestions: {
+        ...mockSuggestions.suggestions,
+        subtype: { value: 'tank', confidence: 0.91, isConfident: true },
+      },
+    })
+
+    const confirm = await screen.findByRole('button', { name: 'Looks right' })
+    expect(none).toBeChecked()
+    expect(screen.getByRole('radio', { name: /^Cotton$/ })).toBeChecked()
+    await user.click(confirm)
+
+    await waitFor(() =>
+      expect(updateTagsFn).toHaveBeenCalledExactlyOnceWith(
+        'garment-1',
+        { category: 'top', subtype: null, material: 'cotton', comfortRange: 'mild' },
+        expect.any(AbortSignal)
+      )
+    )
   })
 })
 
@@ -256,18 +290,16 @@ describe('GarmentTaggingModal degraded suggestion paths', () => {
     )
   })
 
-  it('labels low-confidence suggestions as needing review and preselects nothing', async () => {
+  it('asks the member to pick each unresolved field and preselects nothing', async () => {
     renderModal({ suggestTagsFn: vi.fn().mockResolvedValue(lowConfidenceSuggestions) })
 
-    await waitFor(() =>
-      expect(screen.getAllByText(/Needs review suggested:/)).toHaveLength(3)
-    )
+    await waitFor(() => expect(screen.getAllByText('Pick one')).toHaveLength(3))
     // An unconfident guess is shown but never applied on the user's behalf.
     expect(screen.getByRole('radio', { name: /Top/ })).toHaveAttribute(
       'aria-checked',
       'false'
     )
-    expect(screen.getByRole('button', { name: 'Save tags' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Looks right' })).toBeDisabled()
   })
 
   it('ignores a stale suggestion response after the user moves to another garment', async () => {
@@ -342,7 +374,7 @@ describe('GarmentTaggingModal degraded suggestion paths', () => {
 
     // An error banner for a garment the user left would be unexplainable.
     expect(screen.queryByText('garment-1 lookup failed')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save tags' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Looks right' })).toBeEnabled()
   })
 })
 
@@ -397,9 +429,7 @@ describe('GarmentTaggingModal keyboard radiogroup navigation', () => {
   it('starts from the first option when nothing is selected yet', async () => {
     const user = userEvent.setup()
     renderModal({ suggestTagsFn: vi.fn().mockResolvedValue(lowConfidenceSuggestions) })
-    await waitFor(() =>
-      expect(screen.getAllByText(/Needs review suggested:/)).toHaveLength(3)
-    )
+    await waitFor(() => expect(screen.getAllByText('Pick one')).toHaveLength(3))
 
     screen.getByRole('radio', { name: /Top/ }).focus()
     await user.keyboard('{ArrowRight}')
@@ -446,9 +476,7 @@ describe('GarmentTaggingModal keyboard radiogroup navigation', () => {
   it('navigates materials from an option that is not the selected one', async () => {
     const user = userEvent.setup()
     renderModal({ suggestTagsFn: vi.fn().mockResolvedValue(lowConfidenceSuggestions) })
-    await waitFor(() =>
-      expect(screen.getAllByText(/Needs review suggested:/)).toHaveLength(3)
-    )
+    await waitFor(() => expect(screen.getAllByText('Pick one')).toHaveLength(3))
 
     // With no material chosen, only "Not sure / Clear" is in the tab order, but
     // assistive tech can still land focus on any option. Movement is measured
@@ -485,7 +513,7 @@ describe('GarmentTaggingModal save failures', () => {
     })
     await waitForConfidentPreselection()
 
-    await user.click(screen.getByRole('button', { name: 'Save tags' }))
+    await user.click(screen.getByRole('button', { name: 'Looks right' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Tag service unavailable')
     // Closing on failure would discard the choices the user just made.
@@ -499,7 +527,7 @@ describe('GarmentTaggingModal save failures', () => {
     renderModal({ updateTagsFn: vi.fn().mockRejectedValue('gateway reset') })
     await waitForConfidentPreselection()
 
-    await user.click(screen.getByRole('button', { name: 'Save tags' }))
+    await user.click(screen.getByRole('button', { name: 'Looks right' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Failed to save tags. Please try again.'
@@ -517,7 +545,7 @@ describe('GarmentTaggingModal save failures', () => {
     const { rerender, onClose, onTagsConfirmed } = renderModal({ updateTagsFn })
     await waitForConfidentPreselection()
 
-    await user.click(screen.getByRole('button', { name: 'Save tags' }))
+    await user.click(screen.getByRole('button', { name: 'Looks right' }))
     await waitFor(() => expect(updateTagsFn).toHaveBeenCalledOnce())
 
     rerender(
@@ -556,7 +584,7 @@ describe('GarmentTaggingModal save failures', () => {
     })
     await waitForConfidentPreselection()
 
-    await user.click(screen.getByRole('button', { name: 'Save tags' }))
+    await user.click(screen.getByRole('button', { name: 'Looks right' }))
     await waitFor(() => expect(updateTagsFn).toHaveBeenCalledOnce())
 
     const closed = (
@@ -590,7 +618,7 @@ describe('GarmentTaggingModal save failures', () => {
     // Regression: the abandoned request never cleared `isSaving`, so every later
     // open of the tagging dialog rendered a permanently disabled "Saving..."
     // button and the garment could never be tagged again.
-    const confirm = screen.getByRole('button', { name: 'Save tags' })
+    const confirm = screen.getByRole('button', { name: 'Looks right' })
     expect(confirm).toBeEnabled()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })

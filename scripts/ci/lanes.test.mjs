@@ -165,6 +165,12 @@ const STARTS = {
     'packages/config/src/flags.ts',
   ],
   community: ['apps/api/src/main.ts', 'supabase/migrations/20260101000000_x.sql'],
+  'garment-tagging-model': [
+    'apps/api/src/modules/wardrobe/fashion-clip-inference.worker.ts',
+    'apps/api/test/fixtures/garment-tagging/holdout-v1/manifest.json',
+    'apps/api/model-manifests/fashion-clip-7e3ba62.json',
+    'packages/utils/src/sample-wardrobe/garment-subtypes.ts',
+  ],
   contract: [
     'apps/api/src/main.ts',
     'pact/consumer.pact.spec.ts',
@@ -239,6 +245,7 @@ const EXPECTED_SKIPS = {
   // #199 changed the deployment guide, which the api unit suite reads since Story 6.17.
   'year-ahead': [204, 192, 148],
   community: [204, 199, 192, 148],
+  'garment-tagging-model': [209, 208, 204, 199, 192, 180, 148],
   contract: [204, 199, 192, 148],
   'web-e2e': [204, 199, 192],
   preview: [204, 199, 192],

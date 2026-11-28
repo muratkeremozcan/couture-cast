@@ -119,6 +119,15 @@ tags:
 - tapOn:
     id: 'garment-tag-category-bottom'
 
+# Step 84: an override to a different category needs its own subtype decision.
+- scrollUntilVisible:
+    element:
+      id: 'garment-tagging-subtype-none'
+    direction: DOWN
+
+- tapOn:
+    id: 'garment-tagging-subtype-none'
+
 - scrollUntilVisible:
     element:
       id: 'garment-tag-comfort-mild'
