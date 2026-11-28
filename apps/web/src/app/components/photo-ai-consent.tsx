@@ -113,7 +113,7 @@ function MemberPhotoAiConsent({ scope }: { scope: string }) {
                     feature: featureName,
                     provider,
                   })}
-                  className="min-h-11 rounded px-2 text-sm font-medium text-ink underline disabled:opacity-50"
+                  className="min-h-11 rounded-md px-2 text-sm font-medium text-ink underline disabled:opacity-50"
                   data-testid={`photo-ai-revoke-${id}`}
                   disabled={pending}
                   onClick={() => void load(id)}

@@ -3,15 +3,17 @@ title: 'Story CC-7.24: Photo AI consent and processor approval'
 type: feature
 ticket: '7-24-photo-ai-consent-processor-approval'
 created: '2026-11-27'
-status: in-review
+status: built
 baseline_revision: 'f62155d23e568c9485c897dfdd92c45ef486b837'
 route: full
 route_source: auto
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
-review_loop_iteration: 0
+lenses_ran:
+  - 'independent-correctness'
+  - 'codex-security'
+review_loop_iteration: 1
 context:
   - '_bmad-output/planning-artifacts/epics.md'
   - '_bmad-output/implementation-artifacts/epic-7-context.md'
@@ -68,7 +70,7 @@ This release keeps external photo processing off for every account.
 
 - [x] Implement the matrix, server gate, revocation and authorized photo reads.
 - [x] Wire authenticated permission listing and revocation to Profile > Account on both clients.
-- [ ] Complete fixture-based acceptance coverage, full review and Step 81.
+- [x] Complete fixture-based acceptance coverage, full review and Step 81.
 
 - Given a member opens Account, when external photo AI is disabled, then the page shows the
   disabled state. Each existing Community or Closet workflow stays available with manual input.
@@ -101,7 +103,9 @@ Batch import can use the individual cutout and tag policies for each image if ap
 | Observability                                | No photo input, output, object keys, grant IDs or linked account identity from the photo AI routes.                                     |
 
 Photo inputs, outputs, object keys, grant IDs and account IDs stay out of photo AI logging.
-Revocation marks the grant immediately. Work running on the same instance is aborted. Other
+Revocation marks the grant immediately. Guardian revocation also marks the linked photo
+grants, or all of the teen's grants when the last active guardian is lost. Work running on the
+same instance is aborted after commit. Other
 instances recheck the shared grant before dispatch or delivery. Working buffers are cleared
 when the attempt ends. No photo AI jobs, assets, or outputs are stored. Original account
 photos stay under their existing deletion controls. A future external processor must prove
@@ -138,6 +142,25 @@ There is no grant creation UI or live processor adapter in this release.
 ## Plan Change Log
 
 ## Review Triage Log
+
+The independent review and Codex Security inspected
+`f62155d23e568c9485c897dfdd92c45ef486b837..868c22e0aaeace5fb20c51475a2dca291301d015`.
+Codex Security accounted for all 68 paths and reported CC724-SEC-001 below.
+
+| Finding                          | Resolution                                                                                                                                       |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P1-1 Design tokens               | Use a named web radius and on-scale native padding.                                                                                              |
+| P1-2 Storage fixture             | Assert no-store and redirect refusal, pass the signal, and cover abort while reading.                                                            |
+| P1-3 Locale contract             | Include the new English keys in the exact Profile locale check.                                                                                  |
+| P1-4 Disabled copy               | Assert the launch wording on web and native.                                                                                                     |
+| P1-5 Acceptance gaps             | Extend fixtures for guardian and source changes, unsafe or late completion, and scoped Profile feedback.                                         |
+| P2-1 Private logs, CC724-SEC-001 | Omit direct teen refusal logs on private routes. Isolate photo execution from account and trace context. Skip storage warnings for cancellation. |
+| P2-2 Guardian withdrawal         | Share the member privacy lock with guardian changes. Invalidate affected photo grants in the same commit and abort local attempts afterward.     |
+| P2-3 Storage cancellation        | Cancel the wardrobe reader on abort, reject aborted results, and clear read buffers in both adapters.                                            |
+| P2-4 Native sign-out             | Mount the panel only for a verified member and key it to the identity epoch.                                                                     |
+| P3-1 Closeout                    | Link Step 81 to the policy and acceptance tests and set sprint status to done.                                                                   |
+| P3-2 HTTP contract               | Cover validation, deadline and published authentication, cache and response behavior.                                                            |
+| P3-3 Verification outage         | Return the documented 503 for private teen verification failures.                                                                                |
 
 ## Verification
 

@@ -12,7 +12,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { updateRequestContext } from '../../logger/request-context'
+import {
+  isPrivateAccountRequest,
+  updateRequestContext,
+} from '../../logger/request-context'
 import { AccessTokenIdentityService } from './access-token-identity.service.js'
 import { GuardianConsentStateService } from './guardian-consent-state.service'
 import {
@@ -81,20 +84,22 @@ export class RequestAuthGuard implements CanActivate {
   private async verifyTeenAccess(
     userId: string,
     mode: ReturnType<RequestAuthGuard['teenAccessMode']>,
-    budget?: CommunityAuthorizationBudget
+    budget: CommunityAuthorizationBudget | undefined,
+    privateRequest: boolean
   ): Promise<void> {
     const checkTeenAccess = () => {
-      if (mode === 'active')
-        return this.guardianConsentStateService
-          .canTeenAccessActiveSurface(userId)
-          .catch(() => {
-            throw new ServiceUnavailableException(
-              'Account verification is temporarily unavailable'
-            )
-          })
-      return mode === 'non-upload'
-        ? this.guardianConsentStateService.canTeenAccessNonUploadSurface(userId)
-        : this.guardianConsentStateService.canTeenAccess(userId)
+      const lookup =
+        mode === 'active'
+          ? this.guardianConsentStateService.canTeenAccessActiveSurface(userId)
+          : mode === 'non-upload'
+            ? this.guardianConsentStateService.canTeenAccessNonUploadSurface(userId)
+            : this.guardianConsentStateService.canTeenAccess(userId)
+      if (mode !== 'active' && !privateRequest) return lookup
+      return lookup.catch(() => {
+        throw new ServiceUnavailableException(
+          'Account verification is temporarily unavailable'
+        )
+      })
     }
     const allowed = await (budget ? budget.run(checkTeenAccess) : checkTeenAccess())
     if (!allowed) {
@@ -136,7 +141,12 @@ export class RequestAuthGuard implements CanActivate {
     const consentCheckedInTransaction =
       reflector.get<boolean>(API_TRANSACTIONAL_CONSENT_KEY, context.getHandler()) === true
     if (role === 'teen' && !consentCheckedInTransaction) {
-      await this.verifyTeenAccess(userId, this.teenAccessMode(reflector, context), budget)
+      await this.verifyTeenAccess(
+        userId,
+        this.teenAccessMode(reflector, context),
+        budget,
+        isPrivateAccountRequest(request)
+      )
     }
 
     budget?.check()

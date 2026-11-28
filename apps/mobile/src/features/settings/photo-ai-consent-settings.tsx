@@ -1,15 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Pressable, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { requestPhotoAiConsent } from '@couture/api-client'
 import type { PhotoAiConsentResponse } from '@couture/api-client/contracts/http'
 import { Text, View } from '@/components/themed'
 import { createMobileApiClient } from '@/src/lib/api-client'
-import { mobileIdentityEpoch, resolveMobileAccessToken } from '@/src/lib/mobile-auth'
+import {
+  mobileApplicationUserId,
+  mobileIdentityEpoch,
+  resolveMobileAccessToken,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
 
-export function PhotoAiConsentSettings({ signedIn }: { signedIn: boolean | null }) {
-  if (!signedIn) return null
-  return <MemberPhotoAiConsentSettings epoch={mobileIdentityEpoch()} />
+function currentMemberEpoch(): number | null {
+  return mobileApplicationUserId() ? mobileIdentityEpoch() : null
+}
+
+export function PhotoAiConsentSettings() {
+  const epoch = useSyncExternalStore(subscribeMobileApplicationUser, currentMemberEpoch)
+  return epoch === null ? null : (
+    <MemberPhotoAiConsentSettings key={epoch} epoch={epoch} />
+  )
 }
 
 function MemberPhotoAiConsentSettings({ epoch }: { epoch: number }) {
@@ -21,12 +32,12 @@ function MemberPhotoAiConsentSettings({ epoch }: { epoch: number }) {
 
   const load = useCallback(
     async (grantId?: string) => {
-      if (epoch !== mobileIdentityEpoch() || requestRef.current) return
+      if (epoch !== currentMemberEpoch() || requestRef.current) return
 
       const controller = new AbortController()
       requestRef.current = controller
       const { signal } = controller
-      const stillCurrent = () => !signal.aborted && epoch === mobileIdentityEpoch()
+      const stillCurrent = () => !signal.aborted && epoch === currentMemberEpoch()
       setPending(true)
       setFeedback(null)
       try {
@@ -139,7 +150,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
     alignSelf: 'flex-start',
-    padding: 6,
+    padding: 8,
   },
   actionLabel: { textDecorationLine: 'underline' },
   disabled: { opacity: 0.5 },

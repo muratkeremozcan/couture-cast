@@ -217,12 +217,11 @@ function OwnerSettings({ children }: { children: ReactNode }) {
 }
 
 export function AccountSettingsScreen() {
-  const signedIn = useMemberSignedIn()
   return (
     <TopicBody testID="settings-account-screen">
       <OwnerSettings>
-        <ProfileAccountHeader signedIn={signedIn} />
-        <PhotoAiConsentSettings signedIn={signedIn} />
+        <ProfileAccountHeader />
+        <PhotoAiConsentSettings />
         <AccountDiagnostics />
       </OwnerSettings>
     </TopicBody>
@@ -1687,9 +1686,10 @@ function PaletteCard({
   )
 }
 
-function ProfileAccountHeader({ signedIn }: { signedIn: boolean | null }) {
+function ProfileAccountHeader() {
   const { t } = useTranslation()
   const tone = useSettingsTone()
+  const signedIn = useMemberSignedIn()
   const [account, setAccount] = useState<{
     displayName: string | null
     email: string

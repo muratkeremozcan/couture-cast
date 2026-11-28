@@ -22640,3 +22640,8 @@ description, keep the original garment photo, choose tags or add garments one at
   and [HTTP log privacy](../../apps/api/src/logger/request-logger.middleware.spec.ts).
 - [Persisted grant and revocation races](../../apps/api/integration/photo-ai-consent.integration.spec.ts)
   and [source reads](../../apps/api/src/modules/photo-ai/photo-ai-source.service.ts).
+- [Age and feature policy](../../apps/api/src/modules/photo-ai/photo-ai-policy.spec.ts)
+  and [OpenAPI](../../packages/api-client/testing/http-openapi.spec.ts).
+- [Guardian revocation](../../apps/api/src/modules/guardian/guardian.service.spec.ts),
+  [bounded wardrobe reads](../../apps/api/src/modules/wardrobe/wardrobe-storage.adapter.spec.ts),
+  and [private API errors](../../apps/api/src/filters/api-exception.filter.spec.ts).

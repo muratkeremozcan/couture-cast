@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { context } from '@opentelemetry/api'
+import { context, ROOT_CONTEXT } from '@opentelemetry/api'
 import { suppressTracing } from '@opentelemetry/core'
+import { resolveRequestId, runWithRequestContext } from '../../logger/request-context.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { verifyAndNormalizeCommunityImage } from '../community/community-image-validation.js'
 import {
@@ -73,9 +74,12 @@ export class PhotoAiExecutionService {
   ): Promise<T | null> {
     const attempt = { ...request }
     if (processor.provider !== attempt.provider) return Promise.resolve(null)
-    // Storage instrumentation can capture an object path. The entire attempt is private.
-    return context.with(suppressTracing(context.active()), () =>
-      this.run(actor.userId, attempt, processor)
+    // Isolate storage and processor telemetry from the caller's identity and trace.
+    return context.with(suppressTracing(ROOT_CONTEXT), () =>
+      runWithRequestContext(
+        { requestId: resolveRequestId(), suppressAccountContext: true },
+        () => this.run(actor.userId, attempt, processor)
+      )
     )
   }
 

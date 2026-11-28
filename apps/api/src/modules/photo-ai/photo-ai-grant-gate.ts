@@ -11,6 +11,7 @@ import {
 } from '../../prisma/prisma-client.js'
 import { isActiveAccount } from '../auth/guardian-consent-state.service.js'
 import { activeGuardianConsentWhere } from '../guardian/guardian-participation.js'
+import { PhotoAiAttemptRegistry } from './photo-ai-attempt-registry.js'
 import {
   PHOTO_AI_POLICY,
   type PhotoAiAgeBand,
@@ -27,6 +28,11 @@ export type PhotoAiGrantScope = Readonly<{
 type VerifiedGrant = {
   tx: Prisma.TransactionClient
   expiresAt: Date
+}
+
+async function lockMemberBeforePhotoRows(tx: Prisma.TransactionClient, memberId: string) {
+  // GuardianService and Community photo writers take this key exclusively before their row locks.
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(hashtext('community_member:' || ${memberId}))`
 }
 
 async function lockOwnedGrant(
@@ -68,11 +74,11 @@ function matchesGrant(
 
 @Injectable()
 export class PhotoAiGrantGate {
-  private readonly activeAttempts = new Map<string, Set<AbortController>>()
-
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @Inject(PHOTO_AI_POLICY) private readonly policy: PhotoAiPolicy
+    @Inject(PHOTO_AI_POLICY) private readonly policy: PhotoAiPolicy,
+    @Inject(PhotoAiAttemptRegistry)
+    private readonly attempts = new PhotoAiAttemptRegistry()
   ) {}
 
   list(memberId: string) {
@@ -92,6 +98,7 @@ export class PhotoAiGrantGate {
 
   async revoke(memberId: string, grantId: string): Promise<void> {
     const owned = await interactiveTransaction(this.prisma, async (tx) => {
+      await lockMemberBeforePhotoRows(tx, memberId)
       const grant = await lockOwnedGrant(tx, memberId, grantId)
       if (!grant) return false
       if (!grant.revoked_at) {
@@ -102,21 +109,11 @@ export class PhotoAiGrantGate {
       }
       return true
     })
-    if (owned) {
-      const key = this.attemptKey(memberId, grantId)
-      for (const attempt of this.activeAttempts.get(key) ?? []) attempt.abort()
-    }
+    if (owned) this.attempts.abort(memberId, grantId)
   }
 
   trackAttempt(memberId: string, grantId: string, attempt: AbortController): () => void {
-    const key = this.attemptKey(memberId, grantId)
-    const attempts = this.activeAttempts.get(key) ?? new Set<AbortController>()
-    attempts.add(attempt)
-    this.activeAttempts.set(key, attempts)
-    return () => {
-      attempts.delete(attempt)
-      if (attempts.size === 0) this.activeAttempts.delete(key)
-    }
+    return this.attempts.track(memberId, grantId, attempt)
   }
 
   /** The callback holds the grant, account and any applicable guardian relationship locks. */
@@ -140,63 +137,71 @@ export class PhotoAiGrantGate {
       return null
 
     // Dispatch can start inside the transaction. Replaying it could send a second photo.
-    return singleRunTransaction(this.prisma, async (tx) => {
-      const grant = await lockOwnedGrant(tx, memberId, scope.grantId)
-      if (!matchesGrant(grant, scope, feature.policyVersion)) return null
+    return singleRunTransaction(
+      this.prisma,
+      async (tx) => {
+        await lockMemberBeforePhotoRows(tx, memberId)
+        const grant = await lockOwnedGrant(tx, memberId, scope.grantId)
+        if (!matchesGrant(grant, scope, feature.policyVersion)) return null
 
-      const [profile] = await tx.$queryRaw<
-        { birthdate: Date | null; preferences: Prisma.JsonValue | null }[]
-      >`
+        const relationship = await this.lockActiveGuardianConsent(tx, grant)
+        const [profile] = await tx.$queryRaw<
+          { birthdate: Date | null; preferences: Prisma.JsonValue | null }[]
+        >`
         SELECT "birthdate", "preferences" FROM "UserProfile" WHERE "user_id" = ${memberId}
         FOR SHARE
       `
-      const now = new Date()
-      if (
-        !profile?.birthdate ||
-        !isActiveAccount(profile.preferences) ||
-        grant.granted_at > now ||
-        grant.expires_at <= now
-      )
-        return null
+        const now = new Date()
+        if (
+          !profile?.birthdate ||
+          !isActiveAccount(profile.preferences) ||
+          grant.granted_at > now ||
+          grant.expires_at <= now
+        )
+          return null
 
-      const age = calculateAge(profile.birthdate, now)
-      if (age < 13 || !feature.ageBands[ageBand(age)]) return null
-      if (age >= 18) {
-        if (calculateAge(profile.birthdate, grant.granted_at) < 18) return null
-      } else if (!(await this.hasTeenApproval(tx, grant, profile.birthdate, now))) {
-        return null
-      }
+        const age = calculateAge(profile.birthdate, now)
+        if (age < 13 || !feature.ageBands[ageBand(age)]) return null
+        const ageAtGrant = calculateAge(profile.birthdate, grant.granted_at)
+        if (age >= 18) {
+          if (ageAtGrant < 18) return null
+        } else if (
+          !relationship ||
+          ageAtGrant < 13 ||
+          !currentDecision(
+            grant.teen_assented_at,
+            relationship.consent_granted_at,
+            now
+          ) ||
+          !currentDecision(
+            grant.guardian_approved_at,
+            relationship.consent_granted_at,
+            now
+          )
+        ) {
+          return null
+        }
 
-      return work({ tx, expiresAt: grant.expires_at })
-    })
+        return work({ tx, expiresAt: grant.expires_at })
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }
+    )
   }
 
-  private async hasTeenApproval(
+  private async lockActiveGuardianConsent(
     tx: Prisma.TransactionClient,
-    grant: PhotoAiGrant,
-    birthdate: Date,
-    now: Date
-  ): Promise<boolean> {
-    if (!grant.guardian_consent_id || calculateAge(birthdate, grant.granted_at) < 13)
-      return false
+    grant: PhotoAiGrant
+  ) {
     const id = grant.guardian_consent_id
+    if (!id) return null
     const [relationship] = await tx.$queryRaw<{ id: string }[]>`
       SELECT "id" FROM "GuardianConsent" WHERE "id" = ${id} AND "teen_id" = ${grant.user_id}
       FOR SHARE
     `
-    if (!relationship) return false
-    const active = await tx.guardianConsent.findUnique({
+    if (!relationship) return null
+    return tx.guardianConsent.findUnique({
       where: { id, ...activeGuardianConsentWhere },
       select: { consent_granted_at: true },
     })
-    return (
-      active !== null &&
-      currentDecision(grant.teen_assented_at, active.consent_granted_at, now) &&
-      currentDecision(grant.guardian_approved_at, active.consent_granted_at, now)
-    )
-  }
-
-  private attemptKey(memberId: string, grantId: string) {
-    return JSON.stringify([memberId, grantId])
   }
 }
