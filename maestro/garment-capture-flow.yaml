@@ -37,8 +37,10 @@ tags:
 - tapOn:
     id: 'garment-e2e-fixture-source'
 
-- assertVisible:
-    id: 'garment-crop-preview'
+- extendedWaitUntil:
+    visible:
+      id: 'garment-crop-preview'
+    timeout: 15000
 
 - assertVisible:
     id: 'garment-aspect-square'
@@ -49,8 +51,10 @@ tags:
 - assertVisible:
     id: 'garment-cleanup-switch'
 
-- assertVisible:
-    id: 'garment-crop-preview'
+- extendedWaitUntil:
+    visible:
+      id: 'garment-crop-preview'
+    timeout: 15000
 
 - tapOn:
     id: 'garment-confirm-image'

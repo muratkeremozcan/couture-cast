@@ -22701,7 +22701,8 @@ Wait for the crop preview and check that the garment keeps its edges and fabric 
 - [Labeled scene fixtures](../../playwright/fixtures/wardrobe/cutouts/README.md),
   [shared mask tests](../../packages/utils/src/garment-background.spec.ts), and
   [phone browser capture](../../playwright/tests/wardrobe-garment-capture-phone.spec.ts).
-- [Web encoding fallback](../../apps/web/src/lib/wardrobe.test.ts),
+- [Web mask rendering](../../apps/web/src/lib/garment-background.test.ts),
+  [web encoding fallback](../../apps/web/src/lib/wardrobe.test.ts),
   [native crop preparation](../../apps/mobile/src/lib/garment-capture-image.test.ts), and
   [native capture](../../apps/mobile/components/wardrobe/garment-capture-modal.test.tsx).
 - Android Maestro covers

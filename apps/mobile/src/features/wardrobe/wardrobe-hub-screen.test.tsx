@@ -140,7 +140,7 @@ vi.mock('expo-image-manipulator', () => ({
     width: 512,
     height: 512,
   }),
-  SaveFormat: { PNG: 'png' },
+  SaveFormat: { PNG: 'png', JPEG: 'jpeg' },
 }))
 
 vi.mock('expo-file-system', () => ({

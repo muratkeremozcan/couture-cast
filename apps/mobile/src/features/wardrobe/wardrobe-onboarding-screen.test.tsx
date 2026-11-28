@@ -27,7 +27,7 @@ vi.mock('expo-image-picker', () => imagePicker)
 
 const imageManipulator = vi.hoisted(() => ({
   manipulateAsync: vi.fn(),
-  SaveFormat: { PNG: 'png' },
+  SaveFormat: { PNG: 'png', JPEG: 'jpeg' },
 }))
 vi.mock('expo-image-manipulator', () => imageManipulator)
 
