@@ -168,9 +168,9 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
       expect(ritualRequestCount).toBe(1)
     })
     await waitForRitualSavedAfter(staleTimestamp)
-    // A successful refresh is not a degraded read, so the offline notice must
-    // stay hidden even though a stale entry existed.
-    expect(screen.getByTestId('weather-header')).toBeTruthy()
+    // The cache write can finish while React still shows the loading shell.
+    // Wait for the refreshed screen before checking its offline notice.
+    expect(await screen.findByTestId('weather-header')).toBeVisible()
     expect(screen.queryByTestId('stale-cache-banner')).toBeNull()
   })
 
