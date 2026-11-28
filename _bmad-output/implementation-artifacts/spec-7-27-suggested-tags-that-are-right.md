@@ -3,15 +3,17 @@ title: 'Story CC-7.27: Suggested tags that are right'
 type: feature
 ticket: '7-27-suggested-tags-that-are-right'
 created: '2026-11-28'
-status: in-review
+status: built
 baseline_revision: '6eb89657a78913630136c4228cb79763ee08b1da'
 route: full
 route_source: auto
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
-review_loop_iteration: 0
+lenses_ran:
+  - 'independent-correctness'
+  - 'codex-security'
+review_loop_iteration: 1
 context:
   - '_bmad-output/implementation-artifacts/epic-7-context.md'
   - '_bmad-output/test-artifacts/test-design-7-27-suggested-tags-that-are-right.md'
@@ -57,10 +59,10 @@ They can confirm the selected chips in one action or supply any choice the model
 
 ## Tasks & Acceptance
 
-- [ ] Add subtype scoring to the private FashionCLIP worker and fixture engine.
-- [ ] Expose and consume opt-in suggestions without breaking legacy responses.
-- [ ] Add the crop and confirmation state to the web and native tag screens.
-- [ ] Cover the production entry points and complete the sprint status and Step 84.
+- [x] Add subtype scoring to the private FashionCLIP worker and fixture engine.
+- [x] Expose and consume opt-in suggestions without breaking legacy responses.
+- [x] Add the crop and confirmation state to the web and native tag screens.
+- [x] Cover the production entry points and complete the sprint status and Step 84.
 
 Given the frozen `wardrobe-tagging-holdout-v1` set of garment-only images, when the pinned
 FashionCLIP model runs with production prompts and thresholds, the confident top prediction is
@@ -79,10 +81,30 @@ measurement on an appropriately licensed set of representative photos.
 
 Deploy API readers that accept `prompts-v2` snapshots before starting model-capable workers.
 Clients explicitly request subtype scores with `x-couture-garment-subtype: 1`.
+The worker scores 48 prompts in a pass and caches their tokens. Measure peak memory and CPU on the
+intended host before turning on model assistance. The corpus has 18 named subtype cases and two
+dresses. A separate smoke case checks a plain shirt with no listed subtype.
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+The independent review and Codex Security scan covered
+`6eb89657a78913630136c4228cb79763ee08b1da..55a92a8110f62f5275ea0ed9b27a5400a9886486`.
+Scan `55a92a8_20261128T094120Z` covered 61 changed paths and reported one low finding.
+
+| Finding                                    | Resolution                                                                                                                        |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| P0-1 Shared utility coverage               | Exercise confidence, category compatibility, explicit None, and localized fallback.                                               |
+| P0-2 Fixture snapshot revision             | Stamp the fixture snapshot with v2. The wire version remains v1.                                                                  |
+| P0-3 Stale screen assertions               | Assert the selected chips and current confirmation label on web and native.                                                       |
+| P0-4, P0-5 Accuracy workflow               | Build the benchmark dependencies on a clean runner and cover the new quality-gate dependency.                                     |
+| P1-1 Private preview after identity change | Key web and native setup by the live identity. Regressions exercise late responses after an account change.                       |
+| P1-2 Missing edge cases and output errors  | Cover uncertain and legacy choices, opt-in transport, and malformed logits. Throw the same output error for each malformed group. |
+| P2-1 Native journey timing                 | Wait for tagging to settle before confirming in Maestro.                                                                          |
+| P2-2 Preview and selection transitions     | Hide an unreadable image, clear loading on close, and wait for the response before selecting an untouched chip.                   |
+| P2-3 Inference assumptions                 | Clarify the weights manifest identity and document model capacity and benchmark scope.                                            |
+| P3-1 Story closeout                        | Link Step 84, update sprint status and describe the suggestion header in the generated contract.                                  |
 
 ## Verification
 

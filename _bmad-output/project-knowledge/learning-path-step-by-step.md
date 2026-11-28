@@ -22737,3 +22737,8 @@ subtype, material, and comfort chips. Tap **Looks right** to confirm the suggest
   [native tag review](../../apps/mobile/components/wardrobe/garment-tagging-modal.test.tsx).
 - [Legacy wire compatibility](../../apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts)
   and [suggestion scoring](../../apps/api/src/modules/wardrobe/garment-tagging.engine.ts).
+- [Web tag review](../../apps/web/src/app/components/garment-tagging-modal.test.tsx),
+  [Android capture through tagging](../../maestro/garment-smart-tagging-flow.yaml), and
+  [shared selection and copy tests](../../packages/utils/src/sample-wardrobe/garment-tag-selection.spec.ts).
+- [Web setup session change](../../apps/web/src/app/wardrobe/onboarding/page.test.tsx) and
+  [native setup session change](../../apps/mobile/src/features/wardrobe/wardrobe-onboarding-screen.test.tsx).

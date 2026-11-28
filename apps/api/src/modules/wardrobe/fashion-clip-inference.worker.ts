@@ -153,6 +153,7 @@ export async function verifyModelSnapshot(modelDir: string): Promise<void> {
   if (
     manifest.modelId !== 'patrickjohncyh/fashion-clip' ||
     manifest.revision !== '7e3ba62ce16b379a1ab479346b66f192e76f51b7' ||
+    // The weights manifest retains its original identity. The scorer versions its prompts separately.
     manifest.analysisVersion !==
       'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1' ||
     !Array.isArray(manifest.files) ||

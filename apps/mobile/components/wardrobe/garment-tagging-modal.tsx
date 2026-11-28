@@ -146,6 +146,7 @@ export function MobileGarmentTaggingModal({
   const [chosenComfort, setChosenComfort] = useState<GarmentComfortRange>()
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [isSaving, setIsSaving] = useState<boolean>(false)
+  const [failedPreviewUrl, setFailedPreviewUrl] = useState<string | null>(null)
   const [suggestionError, setSuggestionError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [isAnalysisPending, setIsAnalysisPending] = useState(false)
@@ -206,6 +207,7 @@ export function MobileGarmentTaggingModal({
     setSuggestionError(null)
     setSaveError(null)
     setIsLoading(false)
+    setFailedPreviewUrl(null)
     setIsAnalysisPending(false)
   }, [accessToken, garmentId, visible])
 
@@ -275,6 +277,8 @@ export function MobileGarmentTaggingModal({
     storedGarment?.subtype
   )
   const scoredTags = suggestions?.suggestions
+  const awaitingInitialSuggestions = isLoading && !scoredTags
+  const previewUrl = storedGarment?.imageAccess?.url
   const selectedCategory =
     chosenCategory ??
     (storedSubtype ? storedCategory : null) ??
@@ -283,8 +287,8 @@ export function MobileGarmentTaggingModal({
   const selectedMaterial =
     chosenMaterial !== undefined
       ? chosenMaterial
-      : scoredTags
-        ? confidentGarmentTag(scoredTags.material)
+      : scoredTags || awaitingInitialSuggestions
+        ? confidentGarmentTag(scoredTags?.material)
         : null
   const selectedComfort = chosenComfort ?? confidentGarmentTag(scoredTags?.comfortRange)
   const subtype = resolveGarmentSubtypeSelection(
@@ -293,6 +297,10 @@ export function MobileGarmentTaggingModal({
     storedGarment,
     scoredTags
   )
+  const displayedSubtype =
+    awaitingInitialSuggestions && chosenSubtype === undefined && subtype.selected === null
+      ? undefined
+      : subtype.selected
   const tagsToSave: UpdateGarmentTagsInput | null =
     selectedCategory &&
     selectedComfort &&
@@ -414,9 +422,10 @@ export function MobileGarmentTaggingModal({
           )}
           {!isAnalysisPending && (
             <ScrollView keyboardShouldPersistTaps="handled" style={styles.content}>
-              {storedGarment?.imageAccess && (
+              {previewUrl && previewUrl !== failedPreviewUrl && (
                 <Image
-                  source={{ uri: storedGarment.imageAccess.url }}
+                  source={{ uri: previewUrl }}
+                  onError={() => setFailedPreviewUrl(previewUrl)}
                   accessible
                   accessibilityRole="image"
                   accessibilityLabel={copy.preview}
@@ -486,7 +495,7 @@ export function MobileGarmentTaggingModal({
                     style={styles.chipGrid}
                   >
                     {([null, ...subtype.options] as const).map((value) => {
-                      const selected = subtype.selected === value
+                      const selected = displayedSubtype === value
                       const label = value
                         ? subtypeStrings.values[value]
                         : subtypeStrings.none

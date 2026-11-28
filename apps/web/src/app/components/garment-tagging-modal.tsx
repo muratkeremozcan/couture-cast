@@ -140,6 +140,7 @@ export function GarmentTaggingModal({
   const [chosenComfort, setChosenComfort] = useState<GarmentComfortRange>()
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState<boolean>(false)
   const [isSaving, setIsSaving] = useState<boolean>(false)
+  const [failedPreviewUrl, setFailedPreviewUrl] = useState<string | null>(null)
   const [suggestionError, setSuggestionError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [isAnalysisPending, setIsAnalysisPending] = useState(false)
@@ -167,6 +168,8 @@ export function GarmentTaggingModal({
     setIsManualMode(false)
     setSuggestionError(null)
     setSaveError(null)
+    setFailedPreviewUrl(null)
+    setIsLoadingSuggestions(false)
     setIsAnalysisPending(false)
     saveRequestIdRef.current += 1
     saveAbortRef.current?.abort()
@@ -259,6 +262,8 @@ export function GarmentTaggingModal({
     storedGarment?.subtype
   )
   const scoredTags = suggestions?.suggestions
+  const awaitingInitialSuggestions = isLoadingSuggestions && !scoredTags
+  const previewUrl = storedGarment?.imageAccess?.url
   const selectedCategory =
     chosenCategory ??
     (storedSubtype ? storedCategory : null) ??
@@ -267,8 +272,8 @@ export function GarmentTaggingModal({
   const selectedMaterial =
     chosenMaterial !== undefined
       ? chosenMaterial
-      : scoredTags
-        ? confidentGarmentTag(scoredTags.material)
+      : scoredTags || awaitingInitialSuggestions
+        ? confidentGarmentTag(scoredTags?.material)
         : null
   const selectedComfort = chosenComfort ?? confidentGarmentTag(scoredTags?.comfortRange)
   const subtype = resolveGarmentSubtypeSelection(
@@ -277,6 +282,10 @@ export function GarmentTaggingModal({
     storedGarment,
     scoredTags
   )
+  const displayedSubtype =
+    awaitingInitialSuggestions && chosenSubtype === undefined && subtype.selected === null
+      ? undefined
+      : subtype.selected
   const tagsToSave: UpdateGarmentTagsInput | null =
     selectedCategory &&
     selectedComfort &&
@@ -325,7 +334,7 @@ export function GarmentTaggingModal({
   }
 
   const subtypeOptions = ['none', ...subtype.options] as const
-  const selectedSubtypeOption = subtype.selected === null ? 'none' : subtype.selected
+  const selectedSubtypeOption = displayedSubtype === null ? 'none' : displayedSubtype
   const subtypeStrings = garmentSubtypeStrings(i18n.language)
   const selectSubtype = (value: (typeof subtypeOptions)[number]) => {
     setChosenCategory(selectedCategory)
@@ -359,10 +368,11 @@ export function GarmentTaggingModal({
       errorMessage={saveError}
     >
       <div className="mt-4 flex flex-col gap-6">
-        {storedGarment?.imageAccess && (
+        {previewUrl && previewUrl !== failedPreviewUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={storedGarment.imageAccess.url}
+            src={previewUrl}
+            onError={() => setFailedPreviewUrl(previewUrl)}
             alt={copy.preview}
             referrerPolicy="no-referrer"
             className="h-32 w-full rounded-lg bg-card-muted object-contain"
@@ -450,7 +460,7 @@ export function GarmentTaggingModal({
                   className="text-sm font-semibold text-ink"
                 >
                   {subtypeStrings.label}
-                  {selectedSubtypeOption === undefined && (
+                  {subtype.selected === undefined && (
                     <span className="ml-2 text-xs font-normal text-ink-muted">
                       {copy.pickOne}
                     </span>

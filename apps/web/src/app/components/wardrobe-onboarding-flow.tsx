@@ -36,6 +36,7 @@ import {
   isStaleRevisionError,
 } from '../../lib/wardrobe'
 import { useRetryOnVerifiedSession } from '../../lib/session-retry'
+import { useWebSessionOwner } from '../../lib/use-web-session'
 
 /**
  * `garmentPollIntervalsMs` exists only so tests can replace the real
@@ -47,9 +48,10 @@ export function WardrobeOnboardingFlow({
 }: {
   garmentPollIntervalsMs?: readonly number[]
 } = {}) {
+  const owner = useWebSessionOwner()
   return (
     <I18nextProvider i18n={getI18n()}>
-      <OnboardingFlow garmentPollIntervalsMs={garmentPollIntervalsMs} />
+      <OnboardingFlow key={owner} garmentPollIntervalsMs={garmentPollIntervalsMs} />
     </I18nextProvider>
   )
 }

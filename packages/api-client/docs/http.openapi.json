@@ -25827,10 +25827,10 @@
               "enum": [
                 "1"
               ],
-              "description": "Opt in to subtype on each garment independently of colorFamily."
+              "description": "Include the subtype score when the stored suggestion has one."
             },
             "required": false,
-            "description": "Opt in to subtype on each garment independently of colorFamily.",
+            "description": "Include the subtype score when the stored suggestion has one.",
             "name": "x-couture-garment-subtype",
             "in": "header"
           }

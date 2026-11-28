@@ -1580,8 +1580,10 @@ export function registerWardrobeContracts(
     security: [{ bearerAuth: [] }],
     request: {
       params: garmentIdPathParamsSchema,
-      headers: garmentMetadataHeaderSchema.pick({
-        [WARDROBE_GARMENT_SUBTYPE_HEADER]: true,
+      headers: z.object({
+        [WARDROBE_GARMENT_SUBTYPE_HEADER]: z.enum(['1']).optional().openapi({
+          description: 'Include the subtype score when the stored suggestion has one.',
+        }),
       }),
     },
     responses: {

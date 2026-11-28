@@ -171,15 +171,19 @@ export type GarmentTagLogits = {
   detailLogits: number[]
 }
 
+function validLogitGroup(logits: number[], count: number) {
+  return logits.length === count && logits.every(Number.isFinite)
+}
+
 export function classifyTagSuggestions({
   categoryLogits,
   materialLogits,
   detailLogits,
 }: GarmentTagLogits): GarmentTagSuggestionSnapshot {
   if (
-    categoryLogits.length !== CATEGORY_KEYS.length ||
-    detailLogits.length !== GARMENT_DETAIL_PROMPTS.length ||
-    detailLogits.some((logit) => !Number.isFinite(logit))
+    !validLogitGroup(categoryLogits, CATEGORY_KEYS.length) ||
+    !validLogitGroup(materialLogits, MATERIAL_KEYS.length) ||
+    !validLogitGroup(detailLogits, GARMENT_DETAIL_PROMPTS.length)
   ) {
     throw new GarmentTaggingOutputError('Invalid garment prompt logits')
   }
