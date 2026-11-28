@@ -22603,6 +22603,9 @@ for each.
 - [Request and output contract](../../packages/api-client/src/contracts/http/look-ideas.ts),
   [generation service](../../apps/api/src/modules/personalization/look-ideas.service.ts), and
   [database budget](../../apps/api/src/modules/personalization/look-ideas.budget.ts).
-- [API acceptance](../../apps/api/src/modules/personalization/look-ideas.acceptance.spec.ts),
+- [API acceptance](../../apps/api/src/modules/personalization/look-ideas.controller.spec.ts),
   [web journey](../../playwright/tests/member-lookbook-ai.spec.ts), and
   [native editor](../../apps/mobile/src/features/looks/member-lookbook-ai.test.tsx).
+- [Gateway adapter](../../apps/api/src/modules/personalization/look-ideas.provider.spec.ts),
+  [concurrent budget](../../apps/api/integration/look-ideas-budget.integration.spec.ts), and
+  [shared ranking](../../packages/utils/src/sample-wardrobe/member-lookbook-ranking.spec.ts).
