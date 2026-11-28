@@ -486,7 +486,11 @@ describe('CommunityPostSheet (Story 6.1)', () => {
         expect(suggest).toHaveAttribute('aria-disabled', 'true')
         act(() => setMobileApplicationUserId('second-member'))
         release.resolve()
-        await waitFor(() => expect(suggest).toHaveAttribute('aria-disabled', 'false'))
+        expect(
+          await screen.findByRole('button', {
+            name: 'Suggest a description',
+          })
+        ).not.toHaveAttribute('aria-disabled', 'true')
         expect(screen.getByTestId('community-caption-input')).toHaveValue('')
         expect(screen.queryByTestId('community-description-suggested')).toBeNull()
         expect(screen.queryByText(/could not suggest a description/i)).toBeNull()
@@ -559,10 +563,9 @@ describe('CommunityPostSheet (Story 6.1)', () => {
       }
       expect(screen.getByTestId('community-caption-input')).toHaveValue('')
       expect(screen.queryByTestId('community-description-suggested')).toBeNull()
-      expect(screen.getByTestId('community-suggest-description')).toHaveAttribute(
-        'aria-disabled',
-        'false'
-      )
+      expect(
+        screen.getByRole('button', { name: 'Suggest a description' })
+      ).not.toHaveAttribute('aria-disabled', 'true')
     }
   )
 
