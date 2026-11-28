@@ -150,7 +150,15 @@ test.describe('CC-7.13 Calm Today @local-lane', () => {
         const fallback = mode === 'empty' || mode === 'ritual-503'
         const emptyCloset = mode === 'empty' || mode === 'empty-closet'
         await expect(outfitCard(page)).toHaveCount(1)
-        await expect(fallback ? setCity(page) : primary(page)).toBeVisible()
+        if (mode === 'empty-closet') {
+          await expect(outfitCard(page).getByTestId('home-edit-sample')).toBeVisible()
+          await expect(
+            outfitCard(page).getByTestId('today-outfit-weather-reason')
+          ).toBeVisible()
+          await expect(primary(page)).toHaveCount(0)
+        } else {
+          await expect(fallback ? setCity(page) : primary(page)).toBeVisible()
+        }
         await expect(fallback ? primary(page) : setCity(page)).toHaveCount(0)
         await topToBottom(
           outfitCard(page),

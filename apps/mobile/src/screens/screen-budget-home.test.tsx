@@ -139,6 +139,7 @@ import { screenFocus } from '@/src/test-utils/focus-effect'
 import { press } from '@/src/test-utils/press'
 import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { createSavedLooksMswHandlers } from '@/src/test-utils/saved-looks-msw'
+import { createReadyGarmentFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import {
   hasSavedLocation,
   serveScreenBudgetFixture,
@@ -416,6 +417,17 @@ describe('Screen budget: native Today', () => {
           : null
       server.use(
         ...handlers,
+        http.get('*/api/v1/wardrobe/garments', () =>
+          HttpResponse.json({
+            data: (['top', 'bottom', 'shoes'] as const).map((category) =>
+              createReadyGarmentFixture({
+                id: `pending-${category}`,
+                category,
+                imageAccess: null,
+              })
+            ),
+          })
+        ),
         http.get('*/api/v1/ritual', () =>
           HttpResponse.json({
             data: {

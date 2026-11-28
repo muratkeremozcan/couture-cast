@@ -190,6 +190,14 @@ function tileIds() {
 const startUrl = window.location.href
 
 beforeEach(() => {
+  useMswHandlers(
+    http.get('/api/v1/ritual', () =>
+      HttpResponse.json(
+        { statusCode: 400, message: 'No location preferences found for user' },
+        { status: 400 }
+      )
+    )
+  )
   list.mockReset()
   capsules.mockReset().mockResolvedValue(capsulePage([]))
   userId.mockReset().mockResolvedValue('member-1')

@@ -25,6 +25,7 @@ import { userEvent } from 'vitest/browser'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { Profiler } from 'react'
+import { AppState, type AppStateStatus } from 'react-native'
 
 const routerMock = vi.hoisted(() => ({
   push: vi.fn(),
@@ -86,7 +87,9 @@ import {
 import { notifyMobileSavedLooksChanged } from '@/src/lib/saved-looks'
 import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { screenFocus } from '@/src/test-utils/focus-effect'
+import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
 import { server } from '@/src/test-utils/msw/server'
+import { createSavedLooksMswHandlers } from '@/src/test-utils/saved-looks-msw'
 import { WithTabHeader, setBudgetViewport } from '@/src/test-utils/screen-budget'
 import { AppThemeProvider } from '@/src/theme/theme-context'
 
@@ -1418,6 +1421,146 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       expect(requests[0]).toMatchObject({ source: 'home_sample' })
       expect(pin).toHaveAttribute('aria-pressed', 'true')
       expect(pin).toHaveAttribute('aria-label', name)
+    })
+
+    it('[P0] [7.22-SAVE] native rotates a conflicting key and View opens the confirmed look', async () => {
+      tabParams.set({ segment: 'ideas' })
+      serveFeed({})
+      const { store, handlers } = createSavedLooksMswHandlers()
+      const keys: (string | null)[] = []
+      store.onPost = (request) => {
+        keys.push(request.headers.get('idempotency-key'))
+      }
+      store.nextPostError = () =>
+        keys.length === 1
+          ? HttpResponse.json({ message: 'SAVED_LOOK_ALREADY_REMOVED' }, { status: 409 })
+          : null
+      server.use(...handlers)
+
+      await openLooks()
+      const card = within(await screen.findByTestId('member-lookbook'))
+      await userEvent.click(card.getByTestId('lookbook-pin-shoes'))
+      await userEvent.click(card.getByTestId('lookbook-save'))
+      await userEvent.click(await screen.findByTestId('status-bar-action-retry'))
+      const view = await screen.findByTestId('status-bar-action-view')
+      expect(keys).toEqual([expect.any(String), expect.any(String)])
+      expect(keys[0]).not.toBe(keys[1])
+      expect(store.items).toHaveLength(1)
+      expect(card.getByTestId('lookbook-pin-shoes')).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      )
+      await userEvent.click(view)
+      expect(routerMock.push).toHaveBeenCalledExactlyOnceWith({
+        pathname: '/saved-look/[savedLookId]',
+        params: { savedLookId: store.items[0]!.id },
+      })
+    })
+
+    it('[P0] [7.22-SAVE] native Undo tolerates a look removed on another device', async () => {
+      tabParams.set({ segment: 'ideas' })
+      serveFeed({})
+      const { store, handlers } = createSavedLooksMswHandlers()
+      const removes: (string | null)[] = []
+      store.onDelete = (request) => {
+        removes.push(request.headers.get('if-match'))
+      }
+      server.use(...handlers)
+      await openLooks()
+      const save = await screen.findByTestId('lookbook-save')
+      await userEvent.click(save)
+      const undo = await screen.findByTestId('status-bar-action-undo')
+      expect(store.items).toHaveLength(1)
+      const saved = store.items[0]!
+      store.items = []
+      await userEvent.click(undo)
+      await waitFor(() => expect(save).toHaveTextContent('Save look'))
+      expect(removes).toEqual([`"saved-look:${saved.id}:${saved.revision}"`])
+      expect(screen.queryByTestId('status-bar-action-undo')).toBeNull()
+    })
+
+    it('[7.22-SAVE] native reuses the saved record and omits Undo on an idempotent replay', async () => {
+      tabParams.set({ segment: 'ideas' })
+      serveFeed({})
+      const { store, handlers } = createSavedLooksMswHandlers()
+      const keys: (string | null)[] = []
+      store.onPost = (request) => {
+        keys.push(request.headers.get('idempotency-key'))
+      }
+      server.use(...handlers)
+      await openLooks()
+      const save = await screen.findByTestId('lookbook-save')
+      await userEvent.click(save)
+      expect(await screen.findByTestId('status-bar-action-undo')).toBeVisible()
+      await userEvent.click(save)
+      expect(await screen.findByTestId('status-bar-action-view')).toBeVisible()
+      expect(screen.queryByTestId('status-bar-action-undo')).toBeNull()
+      expect(keys).toEqual([expect.any(String), keys[0]])
+      expect(store.items).toHaveLength(1)
+    })
+
+    it('[7.22-SHUFFLE] native switches mood, disables Shuffle when all pieces are pinned and resets', async () => {
+      tabParams.set({ segment: 'ideas' })
+      serveFeed({})
+      await openLooks()
+      const card = within(await screen.findByTestId('member-lookbook'))
+      const active = card.getByTestId('lookbook-mood-active')
+      const reset = card.getByTestId('lookbook-reset')
+      const shuffle = card.getByTestId('lookbook-shuffle')
+      await userEvent.click(active)
+      expect(active).toHaveAttribute('aria-pressed', 'true')
+      expect(reset).toHaveAttribute('aria-disabled', 'true')
+      const pins = card.getAllByTestId(/^lookbook-pin-/)
+      expect(pins.length).toBeGreaterThanOrEqual(3)
+      for (const piecePin of pins) await userEvent.click(piecePin)
+      expect(shuffle).toHaveAttribute('aria-disabled', 'true')
+      await userEvent.click(card.getByTestId('lookbook-pin-shoes'))
+      expect(shuffle).not.toHaveAttribute('aria-disabled', 'true')
+      await userEvent.click(shuffle)
+      await userEvent.click(reset)
+      for (const piecePin of card.getAllByTestId(/^lookbook-pin-/)) {
+        expect(piecePin).toHaveAttribute('aria-pressed', 'false')
+      }
+      expect(reset).toHaveAttribute('aria-disabled', 'true')
+    })
+
+    it('[7.22-IDEAS] native starts mild and dry when the forecast fails and refreshes on foreground return', async () => {
+      tabParams.set({ segment: 'ideas' })
+      serveFeed({})
+      const appStateListeners: ((state: AppStateStatus) => void)[] = []
+      vi.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
+        appStateListeners.push(listener)
+        return { remove: vi.fn() } as ReturnType<typeof AppState.addEventListener>
+      })
+      let reads = 0
+      server.use(
+        http.get('*/api/v1/ritual', () => {
+          reads += 1
+          if (reads === 1)
+            return HttpResponse.json({ message: 'Unavailable' }, { status: 503 })
+          return HttpResponse.json({
+            data: {
+              ...mockRitualResponse.data,
+              weather: {
+                ...mockRitualResponse.data.weather,
+                current: { temperature: 16, condition: 'rain' },
+              },
+            },
+          })
+        })
+      )
+      await openLooks()
+      const reason = await screen.findByTestId('lookbook-weather-reason')
+      expect(reason.textContent).toMatch(/mild|skip an outer layer/i)
+      act(() => {
+        for (const listener of appStateListeners) listener('background')
+      })
+      expect(reads).toBe(1)
+      act(() => {
+        for (const listener of appStateListeners) listener('active')
+      })
+      await waitFor(() => expect(reason.textContent).toMatch(/rain/i))
+      expect(reads).toBe(2)
     })
   })
 

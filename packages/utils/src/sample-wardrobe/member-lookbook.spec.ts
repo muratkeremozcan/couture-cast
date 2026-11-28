@@ -1,9 +1,11 @@
 // Learning path Step 79: Lookbook with shuffle and pinned pieces.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-79-lookbook-with-shuffle-and-pinned-pieces
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { getMemberLookbookStrings } from './member-lookbook-strings'
 import {
   canShuffleMemberLookbook,
   createMemberLookbook,
+  isMemberLookbookDraftEdited,
   isSmallLookbookCloset,
   memberLookbookDraftKey,
   memberLookbookOutfitDraft,
@@ -13,6 +15,7 @@ import {
   shuffleMemberLookbook,
 } from './member-lookbook'
 import { garmentSuitsRange, type SampleWeatherKey } from './selector'
+import * as selector from './selector'
 import { styleLocalDay, type StyleProfileAnswers } from './style-profile'
 import type { SampleGarmentCategory } from './types'
 
@@ -163,5 +166,82 @@ describe('CC-7.22 member lookbook', () => {
     expect(isSmallLookbookCloset([{}, {}, {}])).toBe(false)
     expect(isSmallLookbookCloset(null)).toBe(false)
     expect(isSmallLookbookCloset(undefined)).toBe(false)
+  })
+
+  it('keeps a complete weather-appropriate base when a slot has no replacement', () => {
+    const candidates = selector.sampleSwapCandidates
+    const constrained = vi
+      .spyOn(selector, 'sampleSwapCandidates')
+      .mockImplementation((...options) => candidates(...options).slice(0, 1))
+    try {
+      const [idea] = createMemberLookbook('mild-rainy', { profile: classic })
+      expect(idea?.mood).toBe('classic')
+      const { result } = idea!
+      expect(result.look?.id).toMatch(/^sample:l:/)
+      expect(result.garments.map(({ category }) => category)).toEqual(
+        expect.arrayContaining(['shoes', 'outerwear'])
+      )
+      expect(
+        result.garments.find(({ category }) => category === 'outerwear')
+      ).toMatchObject({ waterResistant: true })
+      expect(constrained).toHaveBeenCalled()
+    } finally {
+      constrained.mockRestore()
+    }
+  })
+
+  it('creates an empty draft and ignores pins if no eligible outfit exists', () => {
+    const { result } = createMemberLookbook('mild-dry')[0]!
+    const empty = { ...result, look: null, garments: [] }
+    const draft = memberLookbookOutfitDraft(result, ['shoes'])
+    expect(memberLookbookOutfitDraft(empty, [])).toEqual({
+      lookId: null,
+      pieces: {},
+      pinned: [],
+    })
+    expect(resolveMemberLookbookDraft(empty, draft)).toEqual({
+      result: empty,
+      pinned: [],
+    })
+    expect(resolveMemberLookbookDraft(result)).toEqual({ result, pinned: [] })
+  })
+
+  it('gives a dry-weather reason and falls back to the weather label without an explanation', () => {
+    const { result } = createMemberLookbook('mild-dry')[0]!
+    expect(memberLookbookWeatherReason(result, 'en-US')).toMatch(/skip an outer layer/i)
+    expect(memberLookbookWeatherReason({ ...result, explanation: [] }, 'en-US')).toBe(
+      'Mild and dry'
+    )
+  })
+
+  it('enables Reset for actual swaps and pins', () => {
+    const [first, second] = createMemberLookbook('mild-dry')
+    const base = first!.result
+    expect(isMemberLookbookDraftEdited(base, base, [])).toBe(false)
+    expect(isMemberLookbookDraftEdited(base, base, ['shoes'])).toBe(true)
+    expect(isMemberLookbookDraftEdited(base, shuffleMemberLookbook(base, []), [])).toBe(
+      true
+    )
+    expect(isMemberLookbookDraftEdited(base, second!.result, [])).toBe(true)
+    expect(isMemberLookbookDraftEdited(base, { ...base, garments: [] }, [])).toBe(true)
+  })
+
+  it.each([
+    ['en-US', 'Pin'],
+    ['de-DE', 'Anheften'],
+    ['es-ES', 'Fijar'],
+    ['fr-FR', 'Épingler'],
+    ['it-IT', 'Fissa'],
+    ['ja-JP', '固定'],
+    ['ko-KR', '고정'],
+    ['pt-BR', 'Fixar'],
+    ['tr-TR', 'Sabitle'],
+    ['zh-CN', '固定'],
+    ['unknown', 'Pin'],
+    [undefined, 'Pin'],
+  ])('localizes the pin and reset controls for %s', (locale, pin) => {
+    const labels = getMemberLookbookStrings(locale)
+    expect(labels.pin).toBe(pin)
+    expect(labels.reset).toMatch(/\S/)
   })
 })

@@ -754,12 +754,14 @@ it('shows the starter wardrobe entry even when saved-city lookup fails', async (
   publishMember('starter-member')
   renderHome()
 
-  expect(await screen.findByTestId('today-outfit-catalog-0')).toBeVisible()
+  const topLook = await screen.findByTestId('member-sample-outfit')
+  expect(within(topLook).getByTestId('today-outfit-catalog-0')).toBeVisible()
+  expect(within(topLook).getByTestId('today-outfit-weather-reason')).toBeVisible()
+  expect(screen.queryByTestId('home-live-outfit')).toBeNull()
   expect(await screen.findByTestId('home-add-garment')).toHaveAttribute(
     'href',
     '/wardrobe?entry=add'
   )
-  expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(/swap.*top/i)
   expect(screen.queryByTestId('home-outfit-retry')).toBeNull()
   await waitFor(() =>
     expect(reads).toHaveBeenCalledExactlyOnceWith('Bearer bearer-starter-member')

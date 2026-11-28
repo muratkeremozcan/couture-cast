@@ -76,7 +76,7 @@ test.afterEach(async ({ cleanupState }) => {
 
 test.describe('Member Home and Planner recovery', () => {
   test(
-    '[P1] Home keeps the changed sample through city Cancel and shows a live outfit after city save @local-lane',
+    '[P1] Home keeps the changed sample through city Cancel and shows a weather-based look after city save @local-lane',
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ apiRequest, cleanupState, interceptNetworkCall, page }, testInfo) => {
       await signUpAndAuthenticate(
@@ -119,10 +119,11 @@ test.describe('Member Home and Planner recovery', () => {
       })
       await label.press('Enter')
       expect((await saved).status).toBe(201)
-      const live = page.getByTestId('home-live-outfit')
-      await expect(live).toBeVisible()
       await expect(page.getByTestId('weather-header')).toContainText('First use city')
-      await expect(sample).toHaveCount(0)
+      await expect(sample.getByTestId('today-outfit-weather-reason')).toBeVisible()
+      await expect(sample).toHaveCount(1)
+      await expect(city).toHaveCount(0)
+      await expect(page.getByTestId('home-live-outfit')).toHaveCount(0)
     }
   )
 
@@ -214,7 +215,7 @@ test.describe('Member Home and Planner recovery', () => {
   )
 
   test(
-    '[P0] Home retains the example until Retry supplies a real outfit and its share action @local-lane',
+    '[P0] Home retains the example until Retry restores the forecast and weather-based look @local-lane',
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ apiRequest, cleanupState, interceptNetworkCall, page }, testInfo) => {
       const token = await signUpAndAuthenticate(
@@ -252,10 +253,10 @@ test.describe('Member Home and Planner recovery', () => {
       expect(response.status).toBe(200)
       const { outfits } = ritualResponseSchema.parse(response.responseJson).data
       expect(outfits.some((item) => item.garmentIds.length > 0)).toBe(true)
-      const live = page.getByTestId('home-live-outfit')
-      await live.getByTestId('today-outfit-details').click()
-      await expect(live.getByTestId('share-card-open')).toBeVisible()
-      await expect(sample).toHaveCount(0)
+      await expect(page.getByTestId('weather-header')).toContainText('Chicago')
+      await expect(sample.getByTestId('today-outfit-weather-reason')).toBeVisible()
+      await expect(sample).toHaveCount(1)
+      await expect(page.getByTestId('home-live-outfit')).toHaveCount(0)
       await expect(page.getByTestId('home-outfit-retry')).toHaveCount(0)
     }
   )
