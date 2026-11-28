@@ -119,6 +119,7 @@ export const workerOnlyTables = [
   'WardrobeMaintenanceState',
   'LookIdeaDailyQuota',
   'LookIdeaBudget',
+  'PhotoAiGrant',
 ] as const
 
 export const selfOnlyTables = [

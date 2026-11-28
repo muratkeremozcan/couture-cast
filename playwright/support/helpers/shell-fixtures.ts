@@ -10,6 +10,7 @@ import {
   garmentListResponseSchema,
   listSavedLocationsResponseSchema,
   outfitCapsuleListResponseSchema,
+  photoAiConsentResponseSchema,
   plannerResponseSchema,
   resolveCommunityTargetsResponseSchema,
   ritualResponseSchema,
@@ -140,6 +141,7 @@ export function readKey(url: string, method: string) {
     'community/feed': 'community-feed',
     'community/events': 'community-events',
     'community/notification-preferences': 'notification-preferences',
+    'privacy/photo-ai-consent': 'photo-ai-consent',
     'user/profile': 'profile',
     'wardrobe/onboarding': 'onboarding',
     'wardrobe/garments': 'garments',
@@ -587,6 +589,9 @@ export function bodies(
     'home-teaser': { data: spotlight },
     'community-events': checked(communityEventsResponseSchema, {
       data: { events: [], nextCursor: 'fixture', hasMore: false, resyncRequired: false },
+    }),
+    'photo-ai-consent': checked(photoAiConsentResponseSchema, {
+      data: { externalProcessingEnabled: false, grants: [] },
     }),
     'notification-preferences': checked(communityNotificationPreferencesResponseSchema, {
       data: {
