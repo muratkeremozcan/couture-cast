@@ -260,7 +260,7 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
         file_size_bytes: image.length,
         content_sha256: createHash('sha256').update(image).digest('hex'),
         committed_at: grantedAt,
-        upload_status: 'ready',
+        upload_status: 'awaiting_tags',
       })),
     })
     await prisma.lookbookPost.create({
