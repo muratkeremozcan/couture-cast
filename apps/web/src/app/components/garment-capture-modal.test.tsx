@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Learning path Step 85: Add several photos at once.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-85-add-several-photos-at-once
+// Learning path Step 86: Several garments from one flat-lay photo.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-86-several-garments-from-one-flat-lay-photo
 // Story 4.1 Task 8 step 3 owner: unit-test web garment capture behavior
 // @vitest-environment jsdom
 import React from 'react'
@@ -21,6 +23,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nextProvider } from 'react-i18next'
 import {
+  FLAT_LAY_MAX_PHOTO_BYTES,
+  flatLayConfirmInputSchema,
   UploadSessionChangedError,
   type GarmentItemContract,
 } from '@couture/api-client/contracts/http'
@@ -1328,4 +1332,188 @@ describe('GarmentCaptureModal Use This Image retry through the real upload', () 
     expect(keys.commit[0]).toMatch(UUID_V4)
     expect(keys.commit[1]).toBe(keys.commit[0])
   })
+})
+
+describe('CC-7.29 flat-lay capture in Closet', () => {
+  const top = {
+    id: 'a5e5d098-ca6a-4222-a01e-171824992f38',
+    mask: 'UklGRh4AAABXRUJQVlA4TBEAAAAvA8AAAAfQn7JWqv+BiOh/AAA=',
+    token: 'synthetic-top-token',
+  }
+  const bottom = {
+    id: 'aa72d0a9-bad6-47a4-aa99-5be296e3e0f2',
+    mask: 'UklGRh4AAABXRUJQVlA4TBEAAAAvA8AAAAdQns50sP+BiOh/AAA=',
+    token: 'synthetic-bottom-token',
+  }
+
+  function openWithFetch() {
+    const fetch = vi.fn<typeof globalThis.fetch>()
+    vi.stubGlobal('fetch', fetch)
+    setUploadAttemptAccount('flat-lay-member')
+    window.sessionStorage.setItem(
+      WEB_ACCESS_TOKEN_STORAGE_KEY,
+      'synthetic-flat-lay-bearer'
+    )
+    const onClose = vi.fn()
+    const onBatchGarmentCommitted = vi.fn()
+    render(<GarmentCaptureModal isOpen {...{ onClose, onBatchGarmentCommitted }} />)
+    const input = screen.getByTestId('flat-lay-photo-input')
+    const choose = screen.getByRole('button', { name: 'Add from flat-lay photo' })
+    return { fetch, input, choose, onClose, onBatchGarmentCommitted }
+  }
+
+  function photo() {
+    return new File(['synthetic-flat-lay'], 'private-filename.jpg', {
+      type: 'image/jpeg',
+    })
+  }
+
+  function review() {
+    return Response.json({
+      items: [
+        { ...top, category: 'top' },
+        { ...bottom, category: 'bottom' },
+      ],
+      expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+    })
+  }
+
+  afterEach(() => {
+    setUploadAttemptAccount(null)
+    window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+  })
+
+  it('[P0] [7.29-REVIEW] scans one photo, edits tags, and retries the exact kept selection', async () => {
+    const user = userEvent.setup()
+    const { fetch, input, choose, onClose, onBatchGarmentCommitted } = openWithFetch()
+    let finishReview!: (response: Response) => void
+    const pending = new Promise<Response>((resolve) => {
+      finishReview = resolve
+    })
+    fetch
+      .mockReturnValueOnce(pending)
+      .mockResolvedValueOnce(Response.json({ message: 'UNAVAILABLE' }, { status: 503 }))
+      .mockResolvedValueOnce(Response.json({ garments: [mockCommittedGarment] }))
+
+    await user.click(choose)
+    await user.upload(input, photo())
+    expect(
+      screen.getByText('Checking photo…', { selector: '[role="status"]' })
+    ).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Add 2 pieces' })).toBeNull()
+    await act(async () => {
+      finishReview(review())
+      await pending
+    })
+
+    const editFirst = () => screen.getAllByRole('button', { name: 'Edit tags' })[0]!
+    const field = (name: string) => screen.getByRole('combobox', { name })
+    expect(await screen.findByRole('button', { name: 'Add 2 pieces' })).toBeEnabled()
+    expect(screen.getAllByRole('img')).toHaveLength(2)
+    await user.click(editFirst())
+    expect(field('Category')).toHaveFocus()
+    await user.selectOptions(field('Subtype'), 'camisole')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(editFirst())
+    expect(field('Subtype')).toHaveValue('')
+    await user.selectOptions(field('Subtype'), 'camisole')
+    await user.selectOptions(field('Category'), 'outerwear')
+    expect(field('Subtype')).toHaveValue('')
+    await user.selectOptions(field('Subtype'), 'blazer')
+    await user.selectOptions(field('Material'), 'wool')
+    await user.selectOptions(field('Comfort range'), 'cold')
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    expect(editFirst()).toHaveFocus()
+
+    await user.click(screen.getAllByRole('button', { name: 'Remove' })[1]!)
+    expect(screen.getAllByRole('img')).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Add 1 piece' }))
+    await user.click(await screen.findByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce())
+
+    const [reviewCall, confirmCall, retryCall] = fetch.mock.calls
+    expect(reviewCall?.[0]).toEqual(expect.stringContaining('/flat-lay/review'))
+    const form = reviewCall?.[1]?.body
+    expect(form).toBeInstanceOf(FormData)
+    expect((form as FormData).get('photo')).toHaveProperty('name', 'photo')
+    const confirmationBody = confirmCall?.[1]?.body
+    expect(typeof confirmationBody).toBe('string')
+    expect(
+      flatLayConfirmInputSchema.parse(JSON.parse(confirmationBody as string))
+    ).toEqual({
+      items: [
+        {
+          ...top,
+          tags: {
+            category: 'outerwear',
+            subtype: 'blazer',
+            material: 'wool',
+            comfortRange: 'cold',
+          },
+        },
+      ],
+    })
+    expect(retryCall?.[1]?.body).toBe(confirmationBody)
+    expect(onBatchGarmentCommitted).toHaveBeenCalledExactlyOnceWith(mockCommittedGarment)
+  })
+
+  it('[P0] [7.29-PURGE] clears the prior batch warning and keeps canceled or large photos local', async () => {
+    const user = userEvent.setup()
+    const { fetch, input, choose } = openWithFetch()
+    const batch = Array.from(
+      { length: 6 },
+      (_, i) => new File(['photo'], `batch-${i}.jpg`, { type: 'image/jpeg' })
+    )
+    await user.click(screen.getByTestId('garment-batch-picker'))
+    await user.upload(screen.getByTestId('garment-batch-input'), batch)
+    expect(await screen.findByText('Choose up to 5 photos.')).toBeVisible()
+
+    await user.click(choose)
+    fireEvent(input, new Event('cancel'))
+    expect(screen.queryByText('Choose up to 5 photos.')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+
+    await user.click(choose)
+    const large = new File(
+      [new Uint8Array(FLAT_LAY_MAX_PHOTO_BYTES + 1)],
+      'oversized.jpg',
+      { type: 'image/jpeg' }
+    )
+    await user.upload(input, large)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'two to five pieces spaced apart'
+    )
+    expect(fetch).not.toHaveBeenCalled()
+    expect(screen.queryByRole('img')).toBeNull()
+  })
+
+  it.each([
+    { status: 422, code: 'FLAT_LAY_PERSON', message: 'only clothing laid flat' },
+    {
+      status: 422,
+      code: 'FLAT_LAY_UNCERTAIN',
+      message: 'two to five pieces spaced apart',
+    },
+    { status: 429, code: 'FLAT_LAY_BUSY', message: 'Choose it again to retry' },
+    { status: 401, code: 'SIGNED_OUT', message: 'Sign in' },
+    { status: 403, code: 'GUARDIAN_CONSENT_REQUIRED', message: 'guardian' },
+  ])(
+    '[P0] [7.29-REJECT] shows the member guidance for $code',
+    async ({ status, code, message }) => {
+      const user = userEvent.setup()
+      const { fetch, input, choose } = openWithFetch()
+      fetch.mockResolvedValueOnce(Response.json({ message: code }, { status }))
+
+      await user.click(choose)
+      await user.upload(input, photo())
+
+      expect((await screen.findByRole('alert')).textContent?.toLowerCase()).toContain(
+        message.toLowerCase()
+      )
+      expect(screen.queryByRole('img')).toBeNull()
+      expect(
+        screen.getByRole('button', { name: 'Add from flat-lay photo' })
+      ).toBeVisible()
+    }
+  )
 })

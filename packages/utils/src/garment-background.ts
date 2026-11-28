@@ -225,12 +225,8 @@ function isOpaqueRaster(pixels: RgbaPixels, width: number, height: number) {
  * Cut out a centered subject from a continuous backdrop. The caller owns the crop.
  * Only a confident result changes the raster, and only the background alpha is changed.
  */
-export function maskGarmentBackground(
-  pixels: RgbaPixels,
-  width: number,
-  height: number
-): boolean {
-  if (!isOpaqueRaster(pixels, width, height)) return false
+function findBackdrop(pixels: RgbaPixels, width: number, height: number) {
+  if (!isOpaqueRaster(pixels, width, height)) return null
   const count = width * height
   const corners = [0, width - 1, count - width, count - 1]
   const reference = backdropReference(pixels, width, height)
@@ -239,11 +235,11 @@ export function maskGarmentBackground(
       (corner) => colorDistance(pixels, reference, corner * 4) > CORNER_TOLERANCE ** 2
     )
   )
-    return false
+    return null
 
   const matches = (index: number) =>
     colorDistance(pixels, reference, index * 4) <= BACKGROUND_TOLERANCE ** 2
-  if (!hasContinuousBackdrop(matches, width, height)) return false
+  if (!hasContinuousBackdrop(matches, width, height)) return null
   const visited = new Uint8Array(count)
   const queue = new Uint32Array(count)
   const size = fillBackdrop(visited, queue, width, corners, matches)
@@ -251,12 +247,24 @@ export function maskGarmentBackground(
   if (
     size < count * 0.12 ||
     size > count * 0.94 ||
-    !hasCenteredSubject(visited, width, height) ||
     hasAmbiguousBackgroundTone(pixels, queue, size, width, reference)
   ) {
-    return false
+    return null
   }
+  return { visited, queue, size, reference }
+}
+
+export function maskGarmentBackground(
+  pixels: RgbaPixels,
+  width: number,
+  height: number
+): boolean {
+  const backdrop = findBackdrop(pixels, width, height)
+  if (!backdrop) return false
+  const { visited, queue, size, reference } = backdrop
+  const count = visited.length
   if (
+    !hasCenteredSubject(visited, width, height) ||
     !hasConfidentForeground(
       pixels,
       visited,
@@ -274,4 +282,142 @@ export function maskGarmentBackground(
     if (visited[index] === BACKGROUND) pixels[index * 4 + 3] = 0
   }
   return true
+}
+
+type CutoutBounds = { left: number; top: number; width: number; height: number }
+type FlatLayRaster = { pixels: RgbaPixels; width: number; height: number; gap: number }
+
+function nearPreviousPiece(
+  labels: Uint8Array,
+  index: number,
+  width: number,
+  gap: number,
+  label: number
+) {
+  // Compare silhouette edges even where the pieces' rectangular bounds overlap.
+  for (let row = -gap; row <= gap; row++) {
+    for (let column = -gap; column <= gap; column++) {
+      const neighbor = labels[index + row * width + column]!
+      if (neighbor > BACKGROUND && neighbor < label) return true
+    }
+  }
+  return false
+}
+
+function traceFlatLayPiece(
+  { pixels, width, height, gap }: FlatLayRaster,
+  { visited: labels, queue, reference }: NonNullable<ReturnType<typeof findBackdrop>>,
+  start: number,
+  label: number
+) {
+  let count = 0
+  let edges = 0
+  let strongEdges = 0
+  let enclosedBackdrop = 0
+  let clipped = false
+  let tooClose = false
+  let left = width
+  let top = height
+  let right = 0
+  let bottom = 0
+  const enqueue = (index: number) => {
+    if (labels[index]) return
+    labels[index] = label
+    queue[count++] = index
+  }
+  enqueue(start)
+  for (let cursor = 0; cursor < count; cursor++) {
+    const index = queue[cursor]!
+    const x = index % width
+    const y = Math.floor(index / width)
+    clipped = clipped || nearFrameEdge(x, y, width, height, gap)
+    left = Math.min(left, x)
+    right = Math.max(right, x)
+    top = Math.min(top, y)
+    bottom = Math.max(bottom, y)
+    const distance = colorDistance(pixels, reference, index * 4)
+    if (distance <= BACKGROUND_TOLERANCE ** 2) enclosedBackdrop++
+    const neighbors = safeFlatLayNeighbors(index, x, y, width, height)
+    if (neighbors.some((neighbor) => labels[neighbor] === BACKGROUND)) {
+      edges++
+      if (distance > STRONG_SUBJECT_TOLERANCE ** 2) strongEdges++
+      if (!clipped && nearPreviousPiece(labels, index, width, gap, label)) tooClose = true
+    }
+    neighbors.forEach(enqueue)
+  }
+  return {
+    count,
+    // A border flood leaves enclosed background inside the piece. A broad patch
+    // of that color could also be fabric, so refuse the ambiguous cutout.
+    uncertain:
+      clipped ||
+      tooClose ||
+      strongEdges < edges * MIN_STRONG_BOUNDARY_FRACTION ||
+      enclosedBackdrop > Math.max(4, count * MAX_AMBIGUOUS_AREA),
+    bounds: { label, left, top, width: right - left + 1, height: bottom - top + 1 },
+  }
+}
+
+function nearFrameEdge(x: number, y: number, width: number, height: number, gap: number) {
+  return x < gap || y < gap || x >= width - gap || y >= height - gap
+}
+
+function safeFlatLayNeighbors(
+  index: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+) {
+  const neighbors: number[] = []
+  if (x > 0) neighbors.push(index - 1)
+  if (x + 1 < width) neighbors.push(index + 1)
+  if (y > 0) neighbors.push(index - width)
+  if (y + 1 < height) neighbors.push(index + width)
+  return neighbors
+}
+
+/** Label separate foreground pieces on an opaque, continuous, contrasting backdrop. */
+export function findFlatLayComponents(
+  pixels: RgbaPixels,
+  width: number,
+  height: number,
+  limit: number
+) {
+  const backdrop = findBackdrop(pixels, width, height)
+  if (!backdrop) return null
+  const { visited: labels, queue } = backdrop
+  const pieces: (CutoutBounds & { label: number })[] = []
+  const gap = Math.max(3, Math.round(Math.min(width, height) * 0.012))
+  const minLength = Math.min(width, height) * 0.08
+  const minArea = labels.length * 0.015
+  const raster = { pixels, width, height, gap }
+  let speckArea = 0
+
+  for (let start = 0; start < labels.length; start++) {
+    if (labels[start]) continue
+    const { count, bounds, uncertain } = traceFlatLayPiece(
+      raster,
+      backdrop,
+      start,
+      pieces.length + 2
+    )
+    if (count <= 4) {
+      speckArea += count
+      if (speckArea > labels.length * 0.001) return null
+      for (let cursor = 0; cursor < count; cursor++) labels[queue[cursor]!] = BACKGROUND
+      continue
+    }
+    if (
+      uncertain ||
+      pieces.length === limit ||
+      count < minArea ||
+      bounds.width < minLength ||
+      bounds.height < minLength
+    )
+      return null
+    pieces.push(bounds)
+  }
+
+  return pieces.length >= 2 ? { labels, pieces } : null
 }

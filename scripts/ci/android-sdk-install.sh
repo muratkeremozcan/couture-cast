@@ -43,16 +43,21 @@ fi
 : "${ANDROID_HOME:?ANDROID_HOME must name the SDK (android-actions/setup-android sets it)}"
 
 budget="${SDK_INSTALL_BUDGET_SECONDS:-420}"
+system_image_attempt_limit="${SDK_SYSTEM_IMAGE_ATTEMPT_SECONDS:-300}"
+if ! [[ "$system_image_attempt_limit" =~ ^[1-9][0-9]{0,3}$ ]]; then
+  echo '::error::SDK_SYSTEM_IMAGE_ATTEMPT_SECONDS must be a positive number of seconds.'
+  exit 2
+fi
 backoff=(15 30 45 60 60)
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
 for package in "${packages[@]}"; do
   dir="$ANDROID_HOME/${package//;//}"
   attempt_limit=180
-  # Run 46059613976 reached system.img extraction before its watchdog fired.
-  # Give large system images more time within the same whole-install budget.
+  # A cold system image can need longer than the other packages. The whole-install budget
+  # still limits every attempt, including callers that allow a longer image attempt.
   case "$package" in
-    system-images\;*) attempt_limit=300 ;;
+    system-images\;*) attempt_limit="$system_image_attempt_limit" ;;
   esac
   for attempt in 1 2 3 4 5 6; do
     remaining=$(( budget - SECONDS ))

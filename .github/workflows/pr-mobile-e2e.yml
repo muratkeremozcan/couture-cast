@@ -211,7 +211,7 @@ jobs:
     # p95 with nine shards). Twelve shards saved about a minute a shard for three
     # more jobs against the account's 20-job concurrency limit, so the suite stays at
     # nine and the fixed cost is cut instead. The slow paths that used to hold a
-    # shard for 45 minutes now stop on their own limits: the SDK install at 8
+    # shard for 45 minutes now stop on their own limits: the SDK install at 12
     # minutes, the Supabase start at 10.
     timeout-minutes: 20
     services:
@@ -269,10 +269,13 @@ jobs:
       # or platform version, that package is simply downloaded unguarded again
       # until this list catches up.
       - name: Install Android SDK packages for the emulator
-        # Normal 0.8 minutes (p95 1.0, 555 runs); an sdkmanager that stalled ran 33.5
-        # minutes in run 43083368586. Each install attempt is limited in the script.
-        timeout-minutes: 8
+        # p95 is one minute. In run 46153250991 a cold image was still extracting
+        # after the image watchdog expired. Keep both absolute limits and reserve
+        # time inside the step for the watchdog to terminate its process.
+        timeout-minutes: 12
         env:
+          SDK_INSTALL_BUDGET_SECONDS: '660'
+          SDK_SYSTEM_IMAGE_ATTEMPT_SECONDS: '540'
           SDK_PACKAGES: >-
             build-tools;37.0.0
             platform-tools

@@ -32,8 +32,11 @@ import {
 import { WardrobeObjectDeletionOutbox } from './wardrobe-object-deletion.outbox'
 import { isOwnGarmentObject, objectExtensionFor } from './wardrobe-upload-paths'
 import {
+  FLAT_LAY_RESERVATION_PREFIX,
   ambiguousPublicationHorizon,
+  isFlatLayReservation,
   publicationCleanupHorizon,
+  staleClaimCutoff,
 } from './wardrobe-publication'
 import {
   WARDROBE_PROCESSING_HANDOFFS,
@@ -226,6 +229,16 @@ export class WardrobeRetentionService {
   async purgeExpiredAndDeletedGarments(): Promise<void> {
     const now = new Date()
     const abandonedBefore = new Date(now.getTime() - ABANDONED_UPLOAD_RETENTION_MS)
+    const expiredFlatLay: Prisma.GarmentItemWhereInput = {
+      upload_status: 'pending_upload',
+      upload_idempotency_key: { startsWith: FLAT_LAY_RESERVATION_PREFIX },
+      upload_expires_at: { lte: now },
+      OR: [
+        { publish_attempt_id: null },
+        { publish_started_at: null },
+        { publish_started_at: { lte: staleClaimCutoff(now) } },
+      ],
+    }
     const candidates = await this.prisma.garmentItem.findMany({
       where: {
         retention_status: { not: 'legal_hold' },
@@ -237,6 +250,7 @@ export class WardrobeRetentionService {
             created_at: { lte: abandonedBefore },
             upload_expires_at: { lte: now },
           },
+          expiredFlatLay,
         ],
       },
       orderBy: { created_at: 'asc' },
@@ -244,14 +258,24 @@ export class WardrobeRetentionService {
     })
 
     for (const garment of candidates) {
+      const flatLay = isFlatLayReservation(garment.upload_idempotency_key)
       const claimed = await this.prisma.garmentItem.updateMany({
-        where: { id: garment.id, retention_status: { not: 'legal_hold' } },
+        where: {
+          id: garment.id,
+          retention_status: { not: 'legal_hold' },
+          // A flat-lay publish may have succeeded since the candidate read.
+          ...(flatLay && {
+            retention_purged_at: null,
+            OR: [{ retention_status: 'deletion_pending' }, expiredFlatLay],
+          }),
+        },
         data: {
           retention_status: 'deletion_pending',
           retention_trigger: garment.retention_trigger ?? 'abandoned_upload',
           deletion_requested_at: garment.deletion_requested_at ?? now,
         },
       })
+      if (flatLay && claimed.count === 0) continue
       if (claimed.count === 1) {
         await this.invalidateRitualCache(garment.user_id, garment.id)
       }
@@ -741,6 +765,7 @@ export class WardrobeRetentionService {
       }
     }
     if (
+      !isFlatLayReservation(garment.upload_idempotency_key) &&
       isWardrobePathSegment(garment.user_id) &&
       isWardrobeUuid(garment.upload_session_id) &&
       garment.mime_type &&

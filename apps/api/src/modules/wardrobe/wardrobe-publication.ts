@@ -1,5 +1,11 @@
 import { ConflictException } from '@nestjs/common'
 
+export const FLAT_LAY_RESERVATION_PREFIX = 'flat-lay:'
+
+export function isFlatLayReservation(key: string | null): boolean {
+  return key?.startsWith(FLAT_LAY_RESERVATION_PREFIX) === true
+}
+
 /**
  * The longest one API request can run: `maxDuration` of `api/index.ts` in `apps/api/vercel.json`.
  * Vercel stops the function there, so a storage write it started cannot land later than this

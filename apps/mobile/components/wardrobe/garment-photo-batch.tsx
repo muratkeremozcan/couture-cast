@@ -71,6 +71,7 @@ type Props = {
   children: ReactNode
   resetRef: RefObject<(() => void) | null>
   onClose: () => void
+  onInitialPickerOpen?: () => void
   onGarmentCommitted: (garment: GarmentItemContract, token: string) => void
 }
 
@@ -78,6 +79,7 @@ export function MobileGarmentPhotoBatch({
   children,
   resetRef,
   onClose,
+  onInitialPickerOpen,
   onGarmentCommitted,
 }: Props) {
   const { t, i18n } = useTranslation()
@@ -124,6 +126,7 @@ export function MobileGarmentPhotoBatch({
   }, [phase])
 
   const openPicker = async (id?: number) => {
+    if (id === undefined) onInitialPickerOpen?.()
     const pick =
       id === undefined ? batch.open(currentUploadSession()) : batch.openRetry(id)
     if (!pick) return

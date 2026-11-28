@@ -118,3 +118,8 @@ export * from './share-cards-client'
 export * from './share-card-png'
 export { requestStyleProfile } from './style-profile-client'
 export { requestLookIdeas } from './look-ideas-client'
+export {
+  createFlatLayClient,
+  FlatLayCapture,
+  type FlatLayCaptureState,
+} from './flat-lay-capture'

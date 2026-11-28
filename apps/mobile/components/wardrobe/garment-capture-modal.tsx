@@ -6,7 +6,12 @@
 // implementations across apps).
 import { useCallback, useEffect, useRef, useState, type ElementRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getGuestPreviewStrings } from '@couture/utils'
+import { flatLayStrings, getGuestPreviewStrings } from '@couture/utils'
+import {
+  createFlatLayClient,
+  FlatLayCapture,
+  type FlatLayCaptureState,
+} from '@couture/api-client'
 import { File, Paths } from 'expo-file-system'
 import * as ImagePicker from 'expo-image-picker'
 import {
@@ -39,6 +44,7 @@ import {
 import {
   prepareGarmentCaptureImage,
   releaseGarmentCaptureFile,
+  releaseImagePickerCopy,
   type GarmentCaptureSource,
   type GarmentCropRatio,
   type PreparedGarmentImage,
@@ -46,6 +52,7 @@ import {
 import {
   currentUploadSession,
   isUploadSessionCurrent,
+  resolveUploadBearer,
   useUploadSessionChange,
 } from '@/src/lib/upload-attempts'
 import {
@@ -56,6 +63,15 @@ import {
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 import { MobileGarmentPhotoBatch } from './garment-photo-batch'
+import { MobileFlatLayPicker, MobileFlatLayReview } from './flat-lay-capture'
+import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
+import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
+
+const flatLayClient = createFlatLayClient(
+  resolveMobileApiBaseUrl,
+  async (session) =>
+    (await resolveUploadBearer(session, resolveMobileAccessToken)) ?? null
+)
 
 type CaptureStep = 'source' | 'crop' | 'uploading' | 'complete'
 
@@ -142,6 +158,30 @@ export function MobileGarmentCaptureModal({
   const modalAnimation = useModalAnimation('slide')
   const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language).firstUse
+  const flatLayCopy = flatLayStrings(i18n.language)
+  const flatLayCallbacks = useRef({ onClose, onBatchGarmentCommitted })
+  flatLayCallbacks.current = { onClose, onBatchGarmentCommitted }
+  const [flatLayState, setFlatLayState] = useState<FlatLayCaptureState>()
+  const [flatLay] = useState(
+    () =>
+      new FlatLayCapture(
+        {
+          ...flatLayClient,
+          isCurrent: isUploadSessionCurrent,
+          onCommitted: (garment, token) =>
+            flatLayCallbacks.current.onBatchGarmentCommitted?.(garment, token),
+          onComplete: () => flatLayCallbacks.current.onClose(),
+        },
+        setFlatLayState
+      )
+  )
+  useEffect(() => () => flatLay.reset(false), [flatLay])
+  useEffect(() => {
+    if (!visible) flatLay.reset()
+  }, [visible, flatLay])
+  const flatLayMode = flatLayState?.phase !== undefined && flatLayState.phase !== 'source'
+  const flatLayError = flatLayState?.error
+  const sourceEpoch = useRef(0)
   const colors = useSchemeColors()
   const themed = useThemedStyles()
   const insets = useModalInsets()
@@ -188,6 +228,8 @@ export function MobileGarmentCaptureModal({
   }, [visible])
 
   const resetCapture = useCallback(() => {
+    sourceEpoch.current++
+    flatLay.reset()
     resetBatchRef.current?.()
     uploadAbortRef.current?.abort()
     uploadAbortRef.current = null
@@ -196,7 +238,7 @@ export function MobileGarmentCaptureModal({
     setUseBgCleanup(true)
     setUploadStatus('')
     setErrorMessage(null)
-  }, [])
+  }, [flatLay])
   // Round 5 account epoch: the picked photo and its upload belong to the account signed in when
   // the camera or picker opened; any account change drops them.
   useUploadSessionChange(resetCapture)
@@ -245,8 +287,11 @@ export function MobileGarmentCaptureModal({
   }
 
   const openCamera = async () => {
+    flatLay.reset()
+    const epoch = ++sourceEpoch.current
     const session = currentUploadSession()
     const permission = await ImagePicker.requestCameraPermissionsAsync()
+    if (epoch !== sourceEpoch.current || !isUploadSessionCurrent(session)) return
     if (!permission.granted) {
       setErrorMessage(
         permission.canAskAgain
@@ -260,13 +305,20 @@ export function MobileGarmentCaptureModal({
       quality: 1,
     })
     if (!result.canceled && result.assets[0]) {
+      if (epoch !== sourceEpoch.current || !isUploadSessionCurrent(session)) {
+        releaseImagePickerCopy(result.assets[0].uri)
+        return
+      }
       selectAsset(result.assets[0], session)
     }
   }
 
   const openLibrary = async () => {
+    flatLay.reset()
+    const epoch = ++sourceEpoch.current
     const session = currentUploadSession()
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (epoch !== sourceEpoch.current || !isUploadSessionCurrent(session)) return
     if (!permission.granted) {
       setErrorMessage(t('wardrobe.permission.library_denied'))
       return
@@ -276,11 +328,16 @@ export function MobileGarmentCaptureModal({
       quality: 1,
     })
     if (!result.canceled && result.assets[0]) {
+      if (epoch !== sourceEpoch.current || !isUploadSessionCurrent(session)) {
+        releaseImagePickerCopy(result.assets[0].uri)
+        return
+      }
       selectAsset(result.assets[0], session)
     }
   }
 
   const selectFixture = async () => {
+    flatLay.reset()
     // Required lazily (not at module scope) so importing this component in a Vite/
     // vitest environment, which has no Metro `require` for static assets, doesn't
     // throw; only pressing the __DEV__-only fixture button below ever runs it.
@@ -367,6 +424,16 @@ export function MobileGarmentCaptureModal({
       >
         <Text style={styles.sourceButtonText}>{t('wardrobe.capture.library')}</Text>
       </Pressable>
+      {onBatchGarmentCommitted && (
+        <MobileFlatLayPicker
+          capture={flatLay}
+          onOpen={() => {
+            resetBatchRef.current?.()
+            sourceEpoch.current++
+            setErrorMessage(null)
+          }}
+        />
+      )}
       {__DEV__ ? (
         <Pressable
           accessibilityRole="button"
@@ -408,7 +475,7 @@ export function MobileGarmentCaptureModal({
             accessible={true}
             accessibilityRole="header"
           >
-            {t('wardrobe.capture.title')}
+            {flatLayMode ? flatLayCopy.review : t('wardrobe.capture.title')}
           </NativeText>
           <Pressable
             accessibilityRole="button"
@@ -434,13 +501,39 @@ export function MobileGarmentCaptureModal({
             ) : null}
           </View>
         ) : null}
+        {flatLayError && (
+          <View accessibilityRole="alert" style={[styles.errorBox, themed.errorBox]}>
+            <Text style={themed.errorText}>
+              {flatLayError === 'signedOut'
+                ? t('wardrobe.error.sign_in_required')
+                : flatLayError === 'consentRequired'
+                  ? t('wardrobe.error.consent_required')
+                  : flatLayCopy[flatLayError]}
+            </Text>
+          </View>
+        )}
+
+        {visible && flatLayMode && flatLayState && (
+          <MobileFlatLayReview
+            state={flatLayState}
+            capture={flatLay}
+            onClose={handleClose}
+            title={titleRef}
+          />
+        )}
 
         {visible &&
+          !flatLayMode &&
           step === 'source' &&
           (onBatchGarmentCommitted ? (
             <MobileGarmentPhotoBatch
               resetRef={resetBatchRef}
               onClose={handleClose}
+              onInitialPickerOpen={() => {
+                sourceEpoch.current++
+                setErrorMessage(null)
+                flatLay.reset()
+              }}
               onGarmentCommitted={onBatchGarmentCommitted}
             >
               {sourceActions}

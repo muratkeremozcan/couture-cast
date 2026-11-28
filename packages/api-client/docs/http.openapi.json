@@ -7775,6 +7775,398 @@
         ],
         "additionalProperties": false
       },
+      "FlatLayReview": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "mask": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 327680
+                },
+                "token": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "category": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "top",
+                    "bottom",
+                    "outerwear",
+                    "dress",
+                    "shoes",
+                    "accessory",
+                    null
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "mask",
+                "token",
+                "category"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 2,
+            "maxItems": 5
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "FlatLaySelection": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "mask": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 327680
+                },
+                "token": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "tags": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "top",
+                        "bottom",
+                        "outerwear",
+                        "dress",
+                        "shoes",
+                        "accessory",
+                        null
+                      ]
+                    },
+                    "subtype": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "camisole",
+                        "tank",
+                        "crop-top",
+                        "mini-skirt",
+                        "midi-skirt",
+                        "maxi-skirt",
+                        "leggings",
+                        "blazer",
+                        "moto-jacket",
+                        "moto-boots",
+                        "ankle-boots",
+                        "knee-boots",
+                        "tights",
+                        "socks",
+                        null
+                      ]
+                    },
+                    "material": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "cotton",
+                        "wool",
+                        "linen",
+                        "leather",
+                        "denim",
+                        "fleece",
+                        "synthetic",
+                        "down",
+                        "silk",
+                        null
+                      ]
+                    },
+                    "comfortRange": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "cold",
+                        "cool",
+                        "mild",
+                        "warm",
+                        "hot",
+                        null
+                      ]
+                    }
+                  },
+                  "required": [
+                    "category"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A garment subtype must belong to the selected category when set."
+                }
+              },
+              "required": [
+                "id",
+                "mask",
+                "token",
+                "tags"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "FlatLayConfirmation": {
+        "type": "object",
+        "properties": {
+          "garments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending_upload",
+                    "bytes_uploaded",
+                    "processing",
+                    "awaiting_tags",
+                    "ready",
+                    "failed"
+                  ],
+                  "x-optic-exemptions": "request and response property enums",
+                  "description": "Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch."
+                },
+                "category": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "top",
+                    "bottom",
+                    "outerwear",
+                    "dress",
+                    "shoes",
+                    "accessory",
+                    null
+                  ]
+                },
+                "material": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "cotton",
+                    "wool",
+                    "linen",
+                    "leather",
+                    "denim",
+                    "fleece",
+                    "synthetic",
+                    "down",
+                    "silk",
+                    null
+                  ]
+                },
+                "comfortRange": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "cold",
+                    "cool",
+                    "mild",
+                    "warm",
+                    "hot",
+                    null
+                  ]
+                },
+                "tagsConfirmedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "fileSizeBytes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1,
+                  "maximum": 10485760
+                },
+                "mimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "image/jpeg",
+                    "image/png",
+                    "image/webp",
+                    null
+                  ],
+                  "x-optic-exemptions": "request and response property enums",
+                  "description": "Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error."
+                },
+                "retentionStatus": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "deletion_pending",
+                    "legal_hold"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "committedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "imageAccess": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "colorFamily": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "black",
+                    "gray",
+                    "white",
+                    "red",
+                    "orange",
+                    "yellow",
+                    "green",
+                    "blue",
+                    "purple",
+                    "pink",
+                    "brown",
+                    null
+                  ],
+                  "description": "Color family of the stored dominant garment color, null when none was computed. Present only when the request sends x-couture-garment-color: 1."
+                },
+                "subtype": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "camisole",
+                    "tank",
+                    "crop-top",
+                    "mini-skirt",
+                    "midi-skirt",
+                    "maxi-skirt",
+                    "leggings",
+                    "blazer",
+                    "moto-jacket",
+                    "moto-boots",
+                    "ankle-boots",
+                    "knee-boots",
+                    "tights",
+                    "socks",
+                    null
+                  ],
+                  "description": "Garment subtype, or null when unset. Present only when the request sends x-couture-garment-subtype: 1."
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "category",
+                "material",
+                "comfortRange",
+                "tagsConfirmedAt",
+                "fileSizeBytes",
+                "mimeType",
+                "retentionStatus",
+                "createdAt",
+                "committedAt",
+                "imageAccess"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "garments"
+        ],
+        "additionalProperties": false
+      },
       "CreateSavedLookInput": {
         "type": "object",
         "properties": {
@@ -27427,6 +27819,322 @@
                 "schema": {
                   "$ref": "#/components/schemas/SilhouettePreconditionRequiredError"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/flat-lay/review": {
+      "post": {
+        "tags": [
+          "wardrobe"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "reviewFlatLay",
+        "summary": "Screen a flat-lay photo locally and return cutouts for review",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "photo": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPEG, PNG or WebP photo up to 4 MiB."
+                  }
+                },
+                "required": [
+                  "photo"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Two to five cutouts with masks that expire in 15 minutes.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlatLayReview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account is restricted from wardrobe uploads.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Photo exceeds the upload limit.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            }
+          },
+          "422": {
+            "description": "FLAT_LAY_PERSON or FLAT_LAY_UNCERTAIN.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        422
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "enum": [
+                        "FLAT_LAY_PERSON",
+                        "FLAT_LAY_UNCERTAIN"
+                      ]
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "message",
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "FLAT_LAY_BUSY when a review slot is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/flat-lay/confirm": {
+      "post": {
+        "tags": [
+          "wardrobe"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "operationId": "confirmFlatLay",
+        "summary": "Save the selected flat-lay cutouts with the reviewed tags",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlatLaySelection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Garments saved from the selected cutouts.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlatLayConfirmation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "FLAT_LAY_INVALID for an invalid or stale selection.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account is restricted from wardrobe uploads.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A confirmation attempt is publishing a selected piece.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            }
+          },
+          "413": {
+            "description": "Selection exceeds the request limit.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
               }
             }
           }

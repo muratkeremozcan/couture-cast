@@ -22775,3 +22775,36 @@ you want in Closet. The **Add** button shows how many pieces you kept.
   [web upload attempt identity](../../apps/web/src/lib/wardrobe.test.ts).
 - [Native temporary photo cleanup](../../apps/mobile/src/lib/garment-capture-image.test.ts).
 - [Step 84](#step-84-suggested-tags-that-are-right) covers tag review after upload.
+
+## Step 86: Several garments from one flat-lay photo
+
+Open Closet and choose **Add from flat-lay photo**.
+Pick one photo of two to five pieces laid apart on a plain, contrasting surface.
+The review grid opens with each cutout kept.
+
+### Sequence to follow
+
+1. Check the cutout edges. Use **Edit tags** on one piece and **Remove** on another.
+   Confirm the remaining pieces in one action and find them in Closet with their reviewed tags.
+2. Pick a photo containing a person, then try one with ambiguous or overlapping pieces.
+   Check that the app refuses both and Closet stays unchanged.
+3. Cancel a review and reopen the picker. Start another review and let the 15-minute window
+   expire. Check that both paths release the previews.
+4. Hold the response to a successful confirmation, then tap **Try again**.
+   Compare garment IDs and verify that each kept piece appears once.
+5. Repeat on native and check that the library picker accepts one photo.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-29-several-garments-from-one-flat-lay-photo.md)
+  and [acceptance plan](../test-artifacts/test-design-7-29-several-garments-from-one-flat-lay-photo.md).
+- [Closet review and retry](../../playwright/tests/wardrobe-flat-lay.spec.ts)
+  and [private review and save](../../apps/api/integration/wardrobe-flat-lay.integration.spec.ts).
+- [Mask separation](../../packages/utils/src/garment-background.spec.ts) and
+  [person screening and encoding](../../apps/api/src/modules/wardrobe/flat-lay-detector.spec.ts).
+- [Native capture](../../apps/mobile/components/wardrobe/garment-capture-modal.test.tsx) and
+  [web capture](../../apps/web/src/app/components/garment-capture-modal.test.tsx).
+- [Localized review copy](../../packages/utils/src/wardrobe/flat-lay-strings.spec.ts) and
+  [review state and retry](../../packages/api-client/testing/flat-lay-capture.spec.ts).
+- [Step 81](#step-81-photo-ai-consent-and-processor-approval) covers external processing policy.
+- [Step 85](#step-85-add-several-photos-at-once) covers selecting multiple separate photos.

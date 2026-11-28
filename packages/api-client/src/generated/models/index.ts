@@ -8064,6 +8064,226 @@ export type FederatedSignupStatusResponseStatusEnum =
 /**
  *
  * @export
+ * @interface FlatLayConfirmation
+ */
+export interface FlatLayConfirmation {
+  /**
+   *
+   * @type {Array<GarmentListResponseDataInner>}
+   * @memberof FlatLayConfirmation
+   */
+  garments: Array<GarmentListResponseDataInner>
+}
+/**
+ *
+ * @export
+ * @interface FlatLayReview
+ */
+export interface FlatLayReview {
+  /**
+   *
+   * @type {Array<FlatLayReviewItemsInner>}
+   * @memberof FlatLayReview
+   */
+  items: Array<FlatLayReviewItemsInner>
+  /**
+   *
+   * @type {string}
+   * @memberof FlatLayReview
+   */
+  expiresAt: string
+}
+/**
+ *
+ * @export
+ * @interface FlatLayReviewItemsInner
+ */
+export interface FlatLayReviewItemsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof FlatLayReviewItemsInner
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof FlatLayReviewItemsInner
+   */
+  mask: string
+  /**
+   *
+   * @type {string}
+   * @memberof FlatLayReviewItemsInner
+   */
+  token: string
+  /**
+   *
+   * @type {FlatLayReviewItemsInnerCategoryEnum}
+   * @memberof FlatLayReviewItemsInner
+   */
+  category: FlatLayReviewItemsInnerCategoryEnum | null
+}
+
+/**
+ * @export
+ */
+export const FlatLayReviewItemsInnerCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type FlatLayReviewItemsInnerCategoryEnum =
+  (typeof FlatLayReviewItemsInnerCategoryEnum)[keyof typeof FlatLayReviewItemsInnerCategoryEnum]
+
+/**
+ *
+ * @export
+ * @interface FlatLaySelection
+ */
+export interface FlatLaySelection {
+  /**
+   *
+   * @type {Array<FlatLaySelectionItemsInner>}
+   * @memberof FlatLaySelection
+   */
+  items: Array<FlatLaySelectionItemsInner>
+}
+/**
+ *
+ * @export
+ * @interface FlatLaySelectionItemsInner
+ */
+export interface FlatLaySelectionItemsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof FlatLaySelectionItemsInner
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof FlatLaySelectionItemsInner
+   */
+  mask: string
+  /**
+   *
+   * @type {string}
+   * @memberof FlatLaySelectionItemsInner
+   */
+  token: string
+  /**
+   *
+   * @type {FlatLaySelectionItemsInnerTags}
+   * @memberof FlatLaySelectionItemsInner
+   */
+  tags: FlatLaySelectionItemsInnerTags
+}
+/**
+ * A garment subtype must belong to the selected category when set.
+ * @export
+ * @interface FlatLaySelectionItemsInnerTags
+ */
+export interface FlatLaySelectionItemsInnerTags {
+  /**
+   *
+   * @type {FlatLaySelectionItemsInnerTagsCategoryEnum}
+   * @memberof FlatLaySelectionItemsInnerTags
+   */
+  category: FlatLaySelectionItemsInnerTagsCategoryEnum | null
+  /**
+   *
+   * @type {FlatLaySelectionItemsInnerTagsSubtypeEnum}
+   * @memberof FlatLaySelectionItemsInnerTags
+   */
+  subtype?: FlatLaySelectionItemsInnerTagsSubtypeEnum | null
+  /**
+   *
+   * @type {FlatLaySelectionItemsInnerTagsMaterialEnum}
+   * @memberof FlatLaySelectionItemsInnerTags
+   */
+  material?: FlatLaySelectionItemsInnerTagsMaterialEnum | null
+  /**
+   *
+   * @type {FlatLaySelectionItemsInnerTagsComfortRangeEnum}
+   * @memberof FlatLaySelectionItemsInnerTags
+   */
+  comfortRange?: FlatLaySelectionItemsInnerTagsComfortRangeEnum | null
+}
+
+/**
+ * @export
+ */
+export const FlatLaySelectionItemsInnerTagsCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type FlatLaySelectionItemsInnerTagsCategoryEnum =
+  (typeof FlatLaySelectionItemsInnerTagsCategoryEnum)[keyof typeof FlatLaySelectionItemsInnerTagsCategoryEnum]
+
+/**
+ * @export
+ */
+export const FlatLaySelectionItemsInnerTagsSubtypeEnum = {
+  camisole: 'camisole',
+  tank: 'tank',
+  crop_top: 'crop-top',
+  mini_skirt: 'mini-skirt',
+  midi_skirt: 'midi-skirt',
+  maxi_skirt: 'maxi-skirt',
+  leggings: 'leggings',
+  blazer: 'blazer',
+  moto_jacket: 'moto-jacket',
+  moto_boots: 'moto-boots',
+  ankle_boots: 'ankle-boots',
+  knee_boots: 'knee-boots',
+  tights: 'tights',
+  socks: 'socks',
+} as const
+export type FlatLaySelectionItemsInnerTagsSubtypeEnum =
+  (typeof FlatLaySelectionItemsInnerTagsSubtypeEnum)[keyof typeof FlatLaySelectionItemsInnerTagsSubtypeEnum]
+
+/**
+ * @export
+ */
+export const FlatLaySelectionItemsInnerTagsMaterialEnum = {
+  cotton: 'cotton',
+  wool: 'wool',
+  linen: 'linen',
+  leather: 'leather',
+  denim: 'denim',
+  fleece: 'fleece',
+  synthetic: 'synthetic',
+  down: 'down',
+  silk: 'silk',
+} as const
+export type FlatLaySelectionItemsInnerTagsMaterialEnum =
+  (typeof FlatLaySelectionItemsInnerTagsMaterialEnum)[keyof typeof FlatLaySelectionItemsInnerTagsMaterialEnum]
+
+/**
+ * @export
+ */
+export const FlatLaySelectionItemsInnerTagsComfortRangeEnum = {
+  cold: 'cold',
+  cool: 'cool',
+  mild: 'mild',
+  warm: 'warm',
+  hot: 'hot',
+} as const
+export type FlatLaySelectionItemsInnerTagsComfortRangeEnum =
+  (typeof FlatLaySelectionItemsInnerTagsComfortRangeEnum)[keyof typeof FlatLaySelectionItemsInnerTagsComfortRangeEnum]
+
+/**
+ *
+ * @export
  * @interface ForbiddenHttpError
  */
 export interface ForbiddenHttpError {
@@ -18267,6 +18487,51 @@ export const ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum
 } as const
 export type ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum =
   (typeof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum)[keyof typeof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface ReviewFlatLay422Response
+ */
+export interface ReviewFlatLay422Response {
+  /**
+   *
+   * @type {ReviewFlatLay422ResponseStatusCodeEnum}
+   * @memberof ReviewFlatLay422Response
+   */
+  statusCode: ReviewFlatLay422ResponseStatusCodeEnum
+  /**
+   *
+   * @type {ReviewFlatLay422ResponseMessageEnum}
+   * @memberof ReviewFlatLay422Response
+   */
+  message: ReviewFlatLay422ResponseMessageEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ReviewFlatLay422Response
+   */
+  error: string
+}
+
+/**
+ * @export
+ */
+export const ReviewFlatLay422ResponseStatusCodeEnum = {
+  NUMBER_422: 422,
+} as const
+export type ReviewFlatLay422ResponseStatusCodeEnum =
+  (typeof ReviewFlatLay422ResponseStatusCodeEnum)[keyof typeof ReviewFlatLay422ResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const ReviewFlatLay422ResponseMessageEnum = {
+  FLAT_LAY_PERSON: 'FLAT_LAY_PERSON',
+  FLAT_LAY_UNCERTAIN: 'FLAT_LAY_UNCERTAIN',
+} as const
+export type ReviewFlatLay422ResponseMessageEnum =
+  (typeof ReviewFlatLay422ResponseMessageEnum)[keyof typeof ReviewFlatLay422ResponseMessageEnum]
 
 /**
  *

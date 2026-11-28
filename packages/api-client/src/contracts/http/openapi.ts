@@ -27,6 +27,7 @@ import { registerStyleProfileContracts } from './style-profile'
 import { registerLookIdeasContract } from './look-ideas'
 import { registerPhotoAiConsentContracts } from './photo-ai-consent'
 import { registerWardrobeContracts } from './wardrobe'
+import { registerFlatLayContracts } from './flat-lay'
 import { registerSavedLooksContracts } from './saved-looks'
 import { registerCommerceContracts } from './commerce'
 import { registerSubscriptionContracts } from './subscription'
@@ -89,6 +90,7 @@ export function createHttpOpenApiRegistry() {
   registerLookIdeasContract(registry, commonSchemas)
   registerPhotoAiConsentContracts(registry, commonSchemas)
   registerWardrobeContracts(registry, commonSchemas)
+  registerFlatLayContracts(registry, commonSchemas)
   registerSavedLooksContracts(registry, commonSchemas)
   registerCommerceContracts(registry, commonSchemas)
   registerSubscriptionContracts(registry, commonSchemas)
