@@ -2,7 +2,6 @@ import { router, useFocusEffect } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { withRequestDeadline } from '@couture/api-client'
 import type { GarmentCategory, GarmentWithTags } from '@couture/api-client/contracts/http'
 import {
   formatGarmentAlt,
@@ -49,16 +48,19 @@ export function useHomeWardrobe(owner: string | null, enabled: boolean) {
             smallCloset: previous?.epoch === epoch && previous.smallCloset,
           }))
         }
-        void withRequestDeadline(
-          TODAY_WARDROBE_READ_TIMEOUT_MS,
-          [request.signal],
-          async (signal) => {
-            const token = await resolveMobileAccessToken()
-            return token && current() && !signal.aborted
-              ? listGarmentsFromMobile(token, signal, { today: true })
+        // Token resolution can outlive this screen and has no AbortSignal.
+        const deadline = setTimeout(() => {
+          unavailable()
+          request.abort()
+        }, TODAY_WARDROBE_READ_TIMEOUT_MS)
+        const clearDeadline = () => clearTimeout(deadline)
+        request.signal.addEventListener('abort', clearDeadline, { once: true })
+        void resolveMobileAccessToken()
+          .then((token) =>
+            token && current()
+              ? listGarmentsFromMobile(token, request.signal, { today: true })
               : null
-          }
-        )
+          )
           .then((garments) => {
             if (!current()) return
             if (!garments) return unavailable()
@@ -74,6 +76,10 @@ export function useHomeWardrobe(owner: string | null, enabled: boolean) {
             })
           })
           .catch(unavailable)
+          .finally(() => {
+            clearDeadline()
+            request.signal.removeEventListener('abort', clearDeadline)
+          })
       }
       read()
       const unsubscribe = onWardrobeChanged(() => {
