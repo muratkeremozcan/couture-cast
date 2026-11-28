@@ -167,6 +167,7 @@ function loadImage(source: string): Promise<HTMLImageElement> {
 
 /** Quality for the lossy encodings below: no visible loss at garment-card sizes. */
 const PREPARED_IMAGE_QUALITY = 0.9
+const MAX_PREPARED_IMAGE_BYTES = 10 * 1024 * 1024
 
 /**
  * The format a prepared upload is encoded in. JPEG wherever nothing is transparent: a 12 MP
@@ -278,35 +279,46 @@ export async function prepareGarmentImage(
       'IMAGE_PREPARATION_UNAVAILABLE'
     )
   }
-  if (encodingChoice === 'compact' && encoding.mimeType === 'image/jpeg') {
-    // JPEG has no alpha: a transparent source would otherwise come out black.
-    context.fillStyle = '#ffffff'
-    context.fillRect(0, 0, outputWidth, outputHeight)
+  const drawCrop = (mimeType: string) => {
+    if (encodingChoice === 'compact' && mimeType === 'image/jpeg') {
+      // JPEG has no alpha: a transparent source would otherwise come out black.
+      context.fillStyle = '#ffffff'
+      context.fillRect(0, 0, outputWidth, outputHeight)
+    }
+    context.drawImage(
+      image,
+      (sourceWidth - cropWidth) / 2,
+      (sourceHeight - cropHeight) / 2,
+      cropWidth,
+      cropHeight,
+      0,
+      0,
+      outputWidth,
+      outputHeight
+    )
   }
-  context.drawImage(
-    image,
-    (sourceWidth - cropWidth) / 2,
-    (sourceHeight - cropHeight) / 2,
-    cropWidth,
-    cropHeight,
-    0,
-    0,
-    outputWidth,
-    outputHeight
-  )
-  const cleanup = useBgCleanup ? removePlainGarmentBackground(context) : null
-  const finalEncoding =
-    cleanup && !cleanup.hasTransparency && encodingChoice === 'compact'
-      ? preparedImageEncoding(false)
-      : encoding
-  const blob = await toBlob(canvas, finalEncoding.mimeType, finalEncoding.quality)
+  drawCrop(encoding.mimeType)
+  const cutout = useBgCleanup ? await prepareCanvasCutout(context, encoding) : null
+  let blob = cutout?.blob
+  if (!blob) {
+    const originalEncoding =
+      useBgCleanup && encodingChoice === 'compact'
+        ? preparedImageEncoding(false)
+        : encoding
+    if (useBgCleanup) {
+      // Restore the source alpha without compositing it over the previous draw.
+      context.clearRect(0, 0, outputWidth, outputHeight)
+      drawCrop(originalEncoding.mimeType)
+    }
+    blob = await toBlob(canvas, originalEncoding.mimeType, originalEncoding.quality)
+  }
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(blob.type)) {
     throw new WardrobeRequestError(
       'The prepared image format is unsupported.',
       'IMAGE_PREPARATION_UNAVAILABLE'
     )
   }
-  if (blob.size > 10 * 1024 * 1024) {
+  if (blob.size > MAX_PREPARED_IMAGE_BYTES) {
     throw new WardrobeRequestError(
       'The prepared image exceeds the 10 MiB limit.',
       'IMAGE_TOO_LARGE'
@@ -323,8 +335,28 @@ export async function prepareGarmentImage(
     heightPx: outputHeight,
     mimeType: blob.type as PreparedImage['mimeType'],
     sha256,
-    backgroundRemoved: Boolean(cleanup?.removed),
+    backgroundRemoved: cutout?.removed ?? false,
   }
+}
+
+async function prepareCanvasCutout(
+  context: CanvasRenderingContext2D,
+  encoding: { mimeType: string; quality: number }
+) {
+  try {
+    const { removed, hasTransparency } = removePlainGarmentBackground(context)
+    if (!hasTransparency) return null
+    const blob = await toBlob(context.canvas, encoding.mimeType, encoding.quality)
+    if (
+      blob.size <= MAX_PREPARED_IMAGE_BYTES &&
+      ['image/webp', 'image/png'].includes(blob.type)
+    ) {
+      return { blob, removed }
+    }
+  } catch {
+    // The original crop remains available when the browser cannot read or encode a cutout.
+  }
+  return null
 }
 
 async function readError(response: Response): Promise<Error> {

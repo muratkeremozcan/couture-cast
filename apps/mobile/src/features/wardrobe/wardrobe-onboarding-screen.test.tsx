@@ -1,6 +1,7 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 import React from 'react'
+import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
 import type * as NativeUtilsModule from '@/src/lib/native-utils'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -27,7 +28,7 @@ vi.mock('expo-image-picker', () => imagePicker)
 
 const imageManipulator = vi.hoisted(() => ({
   manipulateAsync: vi.fn(),
-  SaveFormat: { PNG: 'png' },
+  SaveFormat: { PNG: 'png', JPEG: 'jpeg' },
 }))
 vi.mock('expo-image-manipulator', () => imageManipulator)
 
@@ -742,7 +743,7 @@ describe('WardrobeOnboardingScreen', () => {
     await waitFor(() => screen.getByTestId('garment-source-library'))
     fireEvent.click(screen.getByTestId('garment-source-library'))
     await waitFor(() => screen.getByTestId('garment-crop-preview'))
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await browserUser.click(screen.getByTestId('garment-confirm-image'))
     await waitFor(() => screen.getByTestId('garment-capture-complete'))
     fireEvent.click(screen.getByTestId('garment-capture-done'))
 

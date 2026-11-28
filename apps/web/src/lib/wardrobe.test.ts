@@ -87,6 +87,13 @@ interface ImagePrepOverrides {
   encoded?: Blob | null
 }
 
+function fixtureCanvas({ width, height }: { width: number; height: number }) {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  return canvas
+}
+
 function installImagePrepMocks(overrides: ImagePrepOverrides = {}) {
   const failsToDecode = overrides.failsToDecode ?? false
   class FakeImage {
@@ -104,6 +111,7 @@ function installImagePrepMocks(overrides: ImagePrepOverrides = {}) {
       ? ({
           drawImage: vi.fn(),
           fillRect: vi.fn(),
+          clearRect: vi.fn(),
         } as unknown as CanvasRenderingContext2D)
       : overrides.context
   )
@@ -1920,10 +1928,10 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
   it('removes the connected background and preserves the garment and its light detail', async () => {
     authenticate()
     const imageData = plainBackgroundImageData()
-    const { width, height, data } = imageData
+    const { data } = imageData
     const putImageData = vi.fn()
     const context = {
-      canvas: { width, height },
+      canvas: fixtureCanvas(imageData),
       drawImage: vi.fn(),
       getImageData: vi.fn().mockReturnValue(imageData),
       putImageData,
@@ -2053,7 +2061,7 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     const fillRect = vi.fn()
     const imageData = plainBackgroundImageData()
     const context = {
-      canvas: { width: imageData.width, height: imageData.height },
+      canvas: fixtureCanvas(imageData),
       drawImage: vi.fn(),
       fillRect,
       getImageData: vi.fn().mockReturnValue(imageData),
@@ -2086,9 +2094,10 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     }
     const putImageData = vi.fn()
     const context = {
-      canvas: { width, height },
+      canvas: fixtureCanvas({ width, height }),
       drawImage: vi.fn(),
       fillRect: vi.fn(),
+      clearRect: vi.fn(),
       getImageData: vi.fn().mockReturnValue({ data: pixels, width, height }),
       putImageData,
     } as unknown as CanvasRenderingContext2D
@@ -2112,7 +2121,7 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     authenticate()
     const imageData = plainBackgroundImageData()
     const context = {
-      canvas: { width: imageData.width, height: imageData.height },
+      canvas: fixtureCanvas(imageData),
       drawImage: vi.fn(),
       fillRect: vi.fn(),
       getImageData: vi.fn().mockReturnValue(imageData),
@@ -2218,6 +2227,8 @@ describe('preparedImageEncoding', () => {
   })
 })
 
+// Learning path Step 83: Clean garment cutouts.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-83-clean-garment-cutouts
 describe('prepareGarmentImage source encoding', () => {
   /**
    * Community posts keep the picked file's own format (review round 1, 2026-11-19): the
@@ -2262,6 +2273,89 @@ describe('prepareGarmentImage source encoding', () => {
 
     expect(fetchMock).not.toHaveBeenCalled()
     expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', 0.9)
+  })
+
+  const oversizedEncoding = new Blob(['cutout'], { type: 'image/webp' })
+  Object.defineProperty(oversizedEncoding, 'size', { value: 10 * 1024 * 1024 + 1 })
+
+  it.each([
+    { reason: 'missing', encoded: null },
+    { reason: 'oversized', encoded: oversizedEncoding },
+    { reason: 'unsupported', encoded: new Blob(['cutout'], { type: 'image/jpeg' }) },
+  ])(
+    'CC-7.26 redraws the unmasked crop when the encoding is $reason',
+    async ({ encoded }) => {
+      const width = 5
+      const height = 5
+      const data = new Uint8ClampedArray(width * height * 4).fill(255)
+      for (const index of [6, 7, 8, 11, 12, 13, 16, 17, 18]) {
+        data.set([10, 20, 30, 255], index * 4)
+      }
+      const drawImage = vi.fn()
+      const fillRect = vi.fn()
+      const putImageData = vi.fn()
+      const context = {
+        canvas: fixtureCanvas({ width, height }),
+        drawImage,
+        fillRect,
+        clearRect: vi.fn(),
+        getImageData: vi.fn().mockReturnValue({ data, width, height }),
+        putImageData,
+      } as unknown as CanvasRenderingContext2D
+      const { toBlob } = installImagePrepMocks({ context })
+      toBlob.mockImplementationOnce((callback) => callback(encoded))
+
+      const prepared = await prepareGarmentImage(
+        'data:image/jpeg;base64,c2FtcGxl',
+        '1:1',
+        true,
+        'compact'
+      )
+
+      expect(putImageData).toHaveBeenCalledOnce()
+      expect(toBlob).toHaveBeenNthCalledWith(1, expect.any(Function), 'image/webp', 0.9)
+      expect(toBlob).toHaveBeenNthCalledWith(2, expect.any(Function), 'image/jpeg', 0.9)
+      expect(drawImage).toHaveBeenCalledTimes(2)
+      expect(fillRect.mock.invocationCallOrder[0]).toBeLessThan(
+        drawImage.mock.invocationCallOrder[1]!
+      )
+      expect(prepared).toMatchObject({ mimeType: 'image/jpeg', backgroundRemoved: false })
+    }
+  )
+
+  it('CC-7.26 clears the canvas before redrawing a translucent source after an encoder failure', async () => {
+    const width = 5
+    const height = 5
+    const data = new Uint8ClampedArray(width * height * 4).fill(255)
+    data[3] = 128
+    const drawImage = vi.fn()
+    const clearRect = vi.fn()
+    const putImageData = vi.fn()
+    const context = {
+      canvas: fixtureCanvas({ width, height }),
+      drawImage,
+      clearRect,
+      getImageData: vi.fn().mockReturnValue({ data, width, height }),
+      putImageData,
+    } as unknown as CanvasRenderingContext2D
+    const { toBlob } = installImagePrepMocks({ context })
+    toBlob.mockImplementationOnce((callback) => callback(null))
+
+    const prepared = await prepareGarmentImage(
+      'data:image/png;base64,c2FtcGxl',
+      '1:1',
+      true,
+      'source'
+    )
+
+    expect(putImageData).not.toHaveBeenCalled()
+    expect(drawImage).toHaveBeenCalledTimes(2)
+    expect(clearRect).toHaveBeenCalledWith(0, 0, 900, 900)
+    const beforeRedraw = clearRect.mock.invocationCallOrder.at(-1)!
+    expect(beforeRedraw).toBeGreaterThan(toBlob.mock.invocationCallOrder[0]!)
+    expect(beforeRedraw).toBeLessThan(drawImage.mock.invocationCallOrder[1]!)
+    expect(toBlob).toHaveBeenNthCalledWith(2, expect.any(Function), 'image/png', 0.92)
+    expect(prepared).toMatchObject({ mimeType: 'image/png', backgroundRemoved: false })
   })
 })
 

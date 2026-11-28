@@ -140,7 +140,7 @@ vi.mock('expo-image-manipulator', () => ({
     width: 512,
     height: 512,
   }),
-  SaveFormat: { PNG: 'png' },
+  SaveFormat: { PNG: 'png', JPEG: 'jpeg' },
 }))
 
 vi.mock('expo-file-system', () => ({
@@ -409,7 +409,7 @@ async function captureOneGarment() {
   await waitFor(() => screen.getByTestId('garment-source-library'))
   fireEvent.click(screen.getByTestId('garment-source-library'))
   await waitFor(() => screen.getByTestId('garment-crop-preview'))
-  fireEvent.click(screen.getByTestId('garment-confirm-image'))
+  await browserUser.click(screen.getByTestId('garment-confirm-image'))
   await waitFor(() => screen.getByTestId('garment-capture-complete'))
 }
 

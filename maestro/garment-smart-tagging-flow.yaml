@@ -2,6 +2,8 @@
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 # Learning path Step 76: Garment subtypes.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
+# Learning path Step 83: Clean garment cutouts.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-83-clean-garment-cutouts
 # Story 4.2 mobile E2E: worker-backed smart tagging and persisted confirmation
 appId: ${MAESTRO_APP_ID}
 name: 'Garment smart tagging flow'
@@ -82,8 +84,14 @@ tags:
 - tapOn:
     id: 'garment-e2e-fixture-source'
 
+- extendedWaitUntil:
+    visible:
+      id: 'garment-crop-preview'
+    timeout: 15000
+
 - tapOn:
     id: 'garment-confirm-image'
+    enabled: true
 
 - extendedWaitUntil:
     visible:
