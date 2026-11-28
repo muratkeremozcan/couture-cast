@@ -980,7 +980,10 @@ describe('upload attempts across retries', () => {
           uploadSession: currentUploadSession(),
         })
 
-      await expect(uploadRow('batch:1:1')).rejects.toThrow('Failed to fetch')
+      await expect(uploadRow('batch:1:1')).rejects.toMatchObject({
+        name: 'FetchError',
+        cause: { name: 'TypeError', message: 'Failed to fetch' },
+      })
       await uploadRow('batch:1:2')
       await uploadRow('batch:1:1')
 
