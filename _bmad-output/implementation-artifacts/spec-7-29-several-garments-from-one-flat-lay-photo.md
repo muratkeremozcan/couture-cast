@@ -156,6 +156,17 @@ The person score is objectness times the first COCO class probability. An asset 
 a fixed, bounded GET for public weights with zero member data and supports a warm cache.
 `onnxruntime-node` 1.21.0 is already locked transitively through Transformers.js.
 
+## CI repairs
+
+The web unit test now targets the visible scan message. The modal's live region also uses the
+status role.
+
+The save transition follows the database constraint that requires category and comfort range
+for a ready garment. Partial tags remain saved while the garment awaits tags.
+
+Maestro's SDK install budget gives a progressing system-image extraction more time.
+The failed shard was still extracting at 54 percent when its previous limit expired.
+
 ## Verification
 
 Run scoped TypeScript and lint checks locally under Node 24. Use PR CI to run the acceptance

@@ -407,6 +407,10 @@ type FlatLayCommit = {
 
 const FLAT_LAY_UNFINISHED_REASON = 'flat_lay_unfinished'
 
+function hasConfirmedFlatLayTags({ category, comfortRange }: Required<FlatLayTags>) {
+  return category !== null && comfortRange !== null
+}
+
 function assertMatchingFlatLayCommit(
   garment: GarmentItem,
   request: GarmentCommitRequest
@@ -1009,7 +1013,7 @@ export class WardrobeService {
     const results = await Promise.allSettled(
       requests.map((request) => this.commitGarmentRequest(request, role))
     )
-    if (review.pieces.some(({ tags }) => tags.category !== null)) {
+    if (review.pieces.some(({ tags }) => hasConfirmedFlatLayTags(tags))) {
       await this.ritualService.invalidateUserCache(userId).catch(() => undefined)
     }
     return {
@@ -1478,6 +1482,8 @@ export class WardrobeService {
     publishAttemptId: string,
     flatLayTags?: Required<FlatLayTags>
   ): Promise<GarmentItem> {
+    const tagsConfirmed =
+      flatLayTags !== undefined && hasConfirmedFlatLayTags(flatLayTags)
     for (
       let attempt = 1;
       attempt <= MAX_SERIALIZABLE_TRANSACTION_ATTEMPTS;
@@ -1526,7 +1532,7 @@ export class WardrobeService {
               },
               data: {
                 upload_status: flatLayTags
-                  ? flatLayTags.category
+                  ? tagsConfirmed
                     ? 'ready'
                     : 'awaiting_tags'
                   : 'processing',
@@ -1535,7 +1541,7 @@ export class WardrobeService {
                   subtype: flatLayTags.subtype,
                   material: flatLayTags.material,
                   comfort_range: flatLayTags.comfortRange,
-                  tags_confirmed_at: flatLayTags.category ? new Date() : null,
+                  tags_confirmed_at: tagsConfirmed ? new Date() : null,
                   tagging_failure_code: TAGGING_MANUAL_MODE_CODE,
                 }),
                 publish_attempt_id: null,
