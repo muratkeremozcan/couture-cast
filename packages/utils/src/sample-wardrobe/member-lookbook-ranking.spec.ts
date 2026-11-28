@@ -33,17 +33,21 @@ describe('CC-7.23 lookbook ranking lifecycle', () => {
     const state = createMemberLookbookRanking()
     const older = deferred<typeof ranking>()
     const newer = deferred<typeof ranking>()
-    const abandon = state.request(
+    let olderSignal: AbortSignal | undefined
+    state.request(
       'old-weather',
       () => true,
-      () => older.promise
+      (signal) => {
+        olderSignal = signal
+        return older.promise
+      }
     )
-    abandon()
     state.request(
       'new-weather',
       () => true,
       () => newer.promise
     )
+    expect(olderSignal?.aborted).toBe(true)
 
     newer.resolve(ranking)
     await newer.promise
@@ -90,6 +94,7 @@ describe('CC-7.23 lookbook ranking lifecycle', () => {
     state.apply(current, () => true)
     const chosenMood = ideas[1]!.mood
     expect(presentMemberLookbookRanking(ideas, chosenMood, state.read())).toEqual({
+      orderedIdeas: [...ideas].reverse(),
       selected: ideas[1],
       pending: false,
       description: ranking[1]!.description,
