@@ -254,11 +254,55 @@ describe('CC-7.29 flat-lay separation', () => {
       colorAt: (x, y) =>
         x >= 12 && x < 22 && y >= 51 && y < 57 ? denim : cleanScene(x, y),
     },
+    {
+      scene: 'a weak edge around a full-sized piece',
+      colorAt: (x, y) => (bottom(x, y) ? [215, 224, 224] : cleanScene(x, y)),
+    },
+    {
+      scene: 'an overly narrow component',
+      colorAt: (x, y) =>
+        x >= 73 && x < 76 && y >= 20 && y < 60 ? garment : cleanScene(x, y),
+    },
+    {
+      scene: 'an overly short component',
+      colorAt: (x, y) =>
+        y >= 70 && y < 73 && x >= 18 && x < 58 ? garment : cleanScene(x, y),
+    },
   ])('[P0] [7.29-REJECT] abstains for $scene', ({ colorAt }) => {
     expect(findFlatLayComponents(raster(colorAt), size, size, 5)).toBeNull()
   })
 
   it('[P0] [7.29-REJECT] refuses a scene exceeding the configured piece cap', () => {
     expect(findFlatLayComponents(raster(cleanScene), size, size, 1)).toBeNull()
+  })
+
+  it('[P0] [7.29-REJECT] refuses an input without an opaque backdrop', () => {
+    const pixels = raster(cleanScene)
+    pixels[3] = 0
+
+    expect(findFlatLayComponents(pixels, size, size, 5)).toBeNull()
+  })
+
+  it('[P1] [7.29-REJECT] ignores isolated sensor specks near the frame and a garment', () => {
+    const specks = [
+      [0, 68],
+      [3, 14],
+    ]
+    const pixels = raster((x, y) =>
+      specks.some(([dotX, dotY]) => x === dotX && y === dotY) ? denim : cleanScene(x, y)
+    )
+
+    const result = findFlatLayComponents(pixels, size, size, 5)
+
+    expect(result?.pieces).toHaveLength(2)
+    for (const [x, y] of specks) expect(result?.labels[y! * size + x!]).toBe(1)
+  })
+
+  it('[P1] [7.29-REJECT] rejects cumulative sensor specks above the tolerance', () => {
+    const pixels = raster((x, y) =>
+      y === 70 && x >= 8 && x <= 56 && x % 8 === 0 ? denim : cleanScene(x, y)
+    )
+
+    expect(findFlatLayComponents(pixels, size, size, 5)).toBeNull()
   })
 })

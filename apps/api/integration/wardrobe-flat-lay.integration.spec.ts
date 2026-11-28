@@ -39,6 +39,7 @@ import { FlatLayService } from '../src/modules/wardrobe/flat-lay.service.js'
 import { WardrobeProcessingQueue } from '../src/modules/wardrobe/wardrobe-processing.queue.js'
 import { PUBLISH_CLAIM_LEASE_MS } from '../src/modules/wardrobe/wardrobe-publication.js'
 import { SupabaseWardrobeStorageAdapter } from '../src/modules/wardrobe/wardrobe-storage.adapter.js'
+import { WardrobeRetentionService } from '../src/modules/wardrobe/wardrobe-retention.service.js'
 import { WardrobeService } from '../src/modules/wardrobe/wardrobe.service.js'
 import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
@@ -132,6 +133,14 @@ function confirmation(
   return { id, mask, token, tags: { category } }
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
 const saved = (userId: string) =>
   prisma.garmentItem.findMany({
     where: { user_id: userId },
@@ -214,6 +223,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  storage.publish.mockImplementation(publish)
   objects.clear()
   logLines.length = 0
   rawConfirmBodies.length = 0
@@ -240,6 +250,28 @@ afterAll(async () => {
 })
 
 describe('CC-7.29 flat-lay review and confirmation over HTTP', () => {
+  it('[P0] [7.29-REJECT] refuses missing, oversized, or malformed input before the detector or storage', async () => {
+    const owner = await member()
+    const missing = await api.post(`${path}/review`).set('Authorization', owner.auth)
+    const oversized = await api
+      .post(`${path}/review`)
+      .set('Authorization', owner.auth)
+      .attach('photo', Buffer.alloc(4 * 1024 * 1024 + 1), {
+        filename: 'oversized.jpg',
+        contentType: 'image/jpeg',
+      })
+    const missingItems = await confirm(owner.auth, [])
+
+    expect([missing.status, oversized.status, missingItems.status]).toEqual([
+      422, 413, 400,
+    ])
+    expect(missing.body).toMatchObject({ message: 'FLAT_LAY_UNCERTAIN' })
+    expect(missingItems.body).toMatchObject({ message: 'FLAT_LAY_INVALID' })
+    expect(detect).not.toHaveBeenCalled()
+    expect(objects.size).toBe(0)
+    expect(await saved(owner.id)).toEqual([])
+  })
+
   it.each([
     { kind: 'person', message: 'FLAT_LAY_PERSON' },
     { kind: 'uncertain', message: 'FLAT_LAY_UNCERTAIN' },
@@ -262,6 +294,58 @@ describe('CC-7.29 flat-lay review and confirmation over HTTP', () => {
     }
   )
 
+  it('[P1] [7.29-REJECT] gives the same member a retryable busy response while another member can review', async () => {
+    const owner = await member()
+    const other = await member()
+    const started = deferred<void>()
+    const release = deferred<FlatLayDetection>()
+    detect.mockImplementationOnce(() => {
+      started.resolve()
+      return release.promise
+    })
+    const first = review(owner.auth).then((response) => response)
+
+    try {
+      await Promise.race([
+        started.promise,
+        first.then(({ status }) => {
+          throw new Error(`Review ended before detection (${status})`)
+        }),
+      ])
+      const overlapping = await review(owner.auth)
+      const independent = await review(other.auth)
+
+      expect(overlapping.status).toBe(429)
+      expect(overlapping.body).toMatchObject({ message: 'FLAT_LAY_BUSY' })
+      expect(overlapping.headers['cache-control']).toContain('no-store')
+      expect(independent.status).toBe(200)
+      expect(flatLayReviewResponseSchema.parse(independent.body).items).toHaveLength(3)
+      expect(detect).toHaveBeenCalledTimes(2)
+      expect(objects.size).toBe(0)
+    } finally {
+      release.resolve({ kind: 'uncertain' })
+      await first
+    }
+
+    const retried = await review(owner.auth)
+    expect(retried.status).toBe(200)
+    expect(flatLayReviewResponseSchema.parse(retried.body).items).toHaveLength(3)
+    expect(detect).toHaveBeenCalledTimes(3)
+  })
+
+  it('[P1] [7.29-REJECT] surfaces detector saturation as 429 without publishing a photo', async () => {
+    const owner = await member()
+    detect.mockResolvedValueOnce({ kind: 'busy' })
+
+    const saturated = await review(owner.auth)
+
+    expect(saturated.status).toBe(429)
+    expect(saturated.body).toMatchObject({ message: 'FLAT_LAY_BUSY' })
+    expect(saturated.headers['cache-control']).toContain('no-store')
+    expect(objects.size).toBe(0)
+    expect(await saved(owner.id)).toEqual([])
+  })
+
   it('[P0] [7.29-PRIVATE] binds a mask to its member, item, and signed bytes', async () => {
     const owner = await member()
     const other = await member()
@@ -280,8 +364,22 @@ describe('CC-7.29 flat-lay review and confirmation over HTTP', () => {
       first,
       { ...confirmation(items[1]!, 'bottom'), mask: items[2]!.mask },
     ])
+    const duplicate = await confirm(owner.auth, [first, first])
+    const malformed = await confirm(owner.auth, [{ ...first, token: 'invalid-format' }])
+    const otherReview = flatLayReviewResponseSchema.parse((await review(owner.auth)).body)
+    const mixed = await confirm(owner.auth, [
+      first,
+      confirmation(otherReview.items[0]!, 'top'),
+    ])
 
-    for (const rejected of [wrongMember, wrongItem, wrongBytes]) {
+    for (const rejected of [
+      wrongMember,
+      wrongItem,
+      wrongBytes,
+      duplicate,
+      malformed,
+      mixed,
+    ]) {
       expect(rejected.status).toBe(400)
       expect(rejected.body).toMatchObject({ message: 'FLAT_LAY_INVALID' })
     }
@@ -339,6 +437,9 @@ describe('CC-7.29 flat-lay review and confirmation over HTTP', () => {
     ])
     expect(editedReplay.status).toBe(400)
     expect(editedReplay.body).toMatchObject({ message: 'FLAT_LAY_INVALID' })
+    const subsetReplay = await confirm(owner.auth, [kept[0]!])
+    expect(subsetReplay.status).toBe(400)
+    expect(subsetReplay.body).toMatchObject({ message: 'FLAT_LAY_INVALID' })
     const inventory = await saved(owner.id)
     expect(inventory.map(({ id }) => id).sort()).toEqual([...firstIds].sort())
     expect(inventory.every(({ committed_at }) => committed_at !== null)).toBe(true)
@@ -407,5 +508,56 @@ describe('CC-7.29 flat-lay review and confirmation over HTTP', () => {
       (await saved(owner.id)).filter(({ committed_at }) => committed_at !== null)
     ).toHaveLength(2)
     expect(objects.size).toBe(2)
+  })
+
+  it('[P0] [7.29-PURGE] durably schedules an ambiguous final write and purges it at review expiry', async () => {
+    const owner = await member()
+    const startedAt = new Date('2026-11-28T15:00:00.000Z')
+    vi.setSystemTime(startedAt)
+    const staged = await review(owner.auth)
+    expect(staged.status).toBe(200)
+    const { items, expiresAt } = flatLayReviewResponseSchema.parse(staged.body)
+    let obligationBeforeWrite: { reason: string; not_before: Date } | null = null
+    let unfinishedKey = ''
+    storage.publish.mockImplementation(async (objectPath, bytes, contentType) => {
+      if (!bytes.equals(bottomMask)) return publish(objectPath, bytes, contentType)
+      unfinishedKey = objectPath
+      obligationBeforeWrite = await prisma.wardrobeObjectDeletion.findUnique({
+        where: { object_path: objectPath },
+      })
+      await publish(objectPath, bytes, contentType)
+      throw new Error('Synthetic lost storage acknowledgement')
+    })
+    const result = await confirm(owner.auth, [
+      confirmation(items[0]!, null),
+      confirmation(items[1]!, 'bottom'),
+    ])
+    expect(result.status).toBe(500)
+    const savedPiece = await prisma.garmentItem.findUniqueOrThrow({
+      where: { id: items[0]!.id },
+    })
+    expect(savedPiece).toMatchObject({ category: null, upload_status: 'awaiting_tags' })
+    expect(obligationBeforeWrite).toMatchObject({
+      reason: 'flat_lay_unfinished',
+      not_before: new Date(expiresAt),
+    })
+    expect(
+      await prisma.wardrobeObjectDeletion.findUnique({
+        where: { object_path: savedPiece.object_path! },
+      })
+    ).toBeNull()
+    expect(objects.has(unfinishedKey)).toBe(true)
+
+    const retention = new WardrobeRetentionService(prisma, storage as never, {
+      invalidateUserCache: vi.fn().mockResolvedValue(true),
+    })
+    const justBeforeExpiry = new Date(Date.parse(expiresAt) - 1)
+    await retention.drainDeletions(justBeforeExpiry)
+    expect(objects.has(unfinishedKey)).toBe(true)
+    await retention.drainDeletions(new Date(expiresAt))
+
+    expect(objects.has(unfinishedKey)).toBe(false)
+    expect(objects.has(savedPiece.object_path!)).toBe(true)
+    expect(storage.remove).toHaveBeenCalledWith([unfinishedKey])
   })
 })

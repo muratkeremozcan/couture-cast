@@ -32,6 +32,7 @@ import { PNG } from 'pngjs/browser'
 import {
   createGarmentItemInputSchema,
   createGarmentUploadUrlInputSchema,
+  FLAT_LAY_MAX_PHOTO_BYTES,
   flatLayConfirmInputSchema,
   type FlatLaySelection,
   type CreateGarmentItemInput,
@@ -60,7 +61,10 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => {
       const labels: Record<string, string> = {
         'wardrobe.tagging.options.category.outerwear': 'Outerwear',
+        'wardrobe.tagging.options.material.wool': 'Wool',
+        'wardrobe.tagging.options.comfort.cold': 'Cold',
         'wardrobe.detail.done': 'Done',
+        'wardrobe.detail.cancel': 'Cancel',
       }
       return labels[key] ?? key
     },
@@ -614,6 +618,7 @@ describe('MobileGarmentCaptureModal', () => {
       }),
       http.post('*/api/v1/wardrobe/flat-lay/confirm', async ({ request }) => {
         submissions.push(flatLayConfirmInputSchema.parse(await request.json()))
+        if (submissions.length === 1) return HttpResponse.error()
         return HttpResponse.json({
           garments: [
             {
@@ -653,10 +658,16 @@ describe('MobileGarmentCaptureModal', () => {
     expect(submissions).toEqual([])
 
     await browserUser.click(screen.getAllByRole('button', { name: 'Edit tags' })[0]!)
+    await browserUser.click(screen.getByRole('button', { name: 'Cancel' }))
+    await browserUser.click(screen.getAllByRole('button', { name: 'Edit tags' })[0]!)
     await browserUser.click(screen.getByRole('button', { name: 'Outerwear' }))
+    await browserUser.click(screen.getByRole('button', { name: 'Blazer' }))
+    await browserUser.click(screen.getByRole('button', { name: 'Wool' }))
+    await browserUser.click(screen.getByRole('button', { name: 'Cold' }))
     await browserUser.click(screen.getByRole('button', { name: 'Done' }))
     await browserUser.click(screen.getAllByRole('button', { name: 'Remove' })[1]!)
     await browserUser.click(screen.getByRole('button', { name: 'Add 1 piece' }))
+    await browserUser.click(await screen.findByRole('button', { name: 'Try again' }))
 
     await waitFor(() =>
       expect(onBatchGarmentCommitted).toHaveBeenCalledExactlyOnceWith(
@@ -664,9 +675,20 @@ describe('MobileGarmentCaptureModal', () => {
         'test-access-token'
       )
     )
-    expect(submissions).toEqual([
-      { items: [{ ...first, tags: expect.objectContaining({ category: 'outerwear' }) }] },
-    ])
+    const expected = {
+      items: [
+        {
+          ...first,
+          tags: {
+            category: 'outerwear',
+            subtype: 'blazer',
+            material: 'wool',
+            comfortRange: 'cold',
+          },
+        },
+      ],
+    }
+    expect(submissions).toEqual([expected, expected])
     expect(onClose).toHaveBeenCalledOnce()
     expect(
       await screen.findByRole('button', { name: 'Add from flat-lay photo' })
@@ -698,6 +720,9 @@ describe('MobileGarmentCaptureModal', () => {
     await browserUser.click(
       screen.getByRole('button', { name: 'Add from flat-lay photo' })
     )
+    await browserUser.click(
+      screen.getByRole('button', { name: 'Add from flat-lay photo' })
+    )
     expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalledOnce()
     act(() => setMobileApplicationUserId('new-flat-lay-owner'))
     await act(async () => {
@@ -709,6 +734,80 @@ describe('MobileGarmentCaptureModal', () => {
     expect(reviewed).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Edit tags' })).toBeNull()
     expect(onBatchGarmentCommitted).not.toHaveBeenCalled()
+  })
+
+  it('[P1] [7.29-NATIVE] clears batch errors and releases native URI copies after a refused review', async () => {
+    const asset = {
+      ...libraryAsset,
+      uri: 'file:///cache/ImagePicker/flat-lay-native.jpg',
+      mimeType: 'image/jpeg',
+    }
+    fileSystem.files.set(asset.uri, fileSystem.state.bytes)
+    imagePicker.launchImageLibraryAsync
+      .mockResolvedValueOnce({
+        canceled: false,
+        assets: Array.from({ length: 6 }, () => libraryAsset),
+      })
+      .mockResolvedValueOnce({ canceled: false, assets: [asset] })
+    const append = vi.spyOn(FormData.prototype, 'append')
+    server.use(
+      http.post('*/api/v1/wardrobe/flat-lay/review', () =>
+        HttpResponse.json({ message: 'FLAT_LAY_PERSON' }, { status: 422 })
+      )
+    )
+    setMobileApplicationUserId('flat-lay-native-owner')
+    renderModal({ onBatchGarmentCommitted: vi.fn() })
+
+    await browserUser.click(screen.getByTestId('garment-batch-picker'))
+    expect(await screen.findByText('Choose up to 5 photos.')).toBeVisible()
+    await browserUser.click(
+      screen.getByRole('button', { name: 'Add from flat-lay photo' })
+    )
+
+    expect(
+      await screen.findByText('Choose a photo with only clothing laid flat.')
+    ).toBeVisible()
+    expect(screen.queryByText('Choose up to 5 photos.')).toBeNull()
+    expect(append).toHaveBeenCalledWith('photo', {
+      uri: asset.uri,
+      name: 'photo',
+      type: 'image/jpeg',
+    })
+    await waitFor(() => expect(fileSystem.files.has(asset.uri)).toBe(false))
+    expect(screen.queryByRole('button', { name: 'Edit tags' })).toBeNull()
+  })
+
+  it('[P1] [7.29-NATIVE] recovers from canceled, oversized and failed picks without posting a photo', async () => {
+    const tooLarge = {
+      ...libraryAsset,
+      fileSize: FLAT_LAY_MAX_PHOTO_BYTES + 1,
+      uri: 'file:///cache/ImagePicker/oversized.jpg',
+    }
+    fileSystem.files.set(tooLarge.uri, fileSystem.state.bytes)
+    imagePicker.launchImageLibraryAsync
+      .mockResolvedValueOnce({ canceled: true, assets: null })
+      .mockResolvedValueOnce({ canceled: false, assets: [tooLarge] })
+      .mockRejectedValueOnce(new Error('Synthetic picker failure'))
+    const reviewed = vi.fn()
+    server.use(
+      http.post('*/api/v1/wardrobe/flat-lay/review', () => {
+        reviewed()
+        return HttpResponse.error()
+      })
+    )
+    setMobileApplicationUserId('flat-lay-pick-owner')
+    renderModal({ onBatchGarmentCommitted: vi.fn() })
+    const choose = screen.getByRole('button', { name: 'Add from flat-lay photo' })
+
+    await browserUser.click(choose)
+    expect(screen.queryByRole('alert')).toBeNull()
+    await browserUser.click(choose)
+    expect(await screen.findByText(/two to five pieces spaced apart/)).toBeVisible()
+    await waitFor(() => expect(fileSystem.files.has(tooLarge.uri)).toBe(false))
+    await browserUser.click(choose)
+    expect(await screen.findByText(/Choose it again to retry/)).toBeVisible()
+    expect(reviewed).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Edit tags' })).toBeNull()
   })
 
   it('4.4-MOB-CAP-03 closes and resets through the close button', () => {

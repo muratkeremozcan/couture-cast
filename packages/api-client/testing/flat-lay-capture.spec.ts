@@ -6,6 +6,7 @@ import {
   flatLayConfirmInputSchema,
   flatLayConfirmResponseSchema,
   flatLayReviewResponseSchema,
+  flatLayTagsSchema,
 } from '../src/contracts/http'
 
 const source = { account: 'synthetic-flat-lay-owner', epoch: 1 }
@@ -107,6 +108,14 @@ afterEach(() => {
 })
 
 describe('CC-7.29 shared flat-lay capture', () => {
+  it('[P0] [7.29-REVIEW] keeps subtype with its compatible category', () => {
+    const correct = { category: 'top', subtype: 'camisole' }
+    const wrong = { category: 'outerwear', subtype: 'camisole' }
+
+    expect(flatLayTagsSchema.parse(correct)).toEqual(correct)
+    expect(flatLayTagsSchema.safeParse(wrong).success).toBe(false)
+  })
+
   it('[P0] [7.29-REVIEW] posts one multipart photo and commits only the kept mask with edited tags', async () => {
     const { capture, ticket, body, fetch, onCommitted, onComplete } = harness()
     fetch.mockResolvedValueOnce(accepted()).mockResolvedValueOnce(Response.json(saved))
@@ -276,5 +285,83 @@ describe('CC-7.29 shared flat-lay capture', () => {
     expect(capture.state).toMatchObject({ phase: 'source', pieces: [] })
     expect(notify).not.toHaveBeenCalled()
     expect(fetch).toHaveBeenCalledOnce()
+  })
+
+  it('[P0] [7.29-PURGE] discards a review response already expired when it arrives', async () => {
+    const { capture, ticket, body, fetch } = harness()
+    fetch.mockResolvedValueOnce(accepted(fixedTime))
+
+    await capture.review(ticket, body)
+
+    expect(capture.state).toEqual({ phase: 'source', pieces: [], error: 'expired' })
+    expect(ticket.abort.signal.aborted).toBe(true)
+  })
+
+  it.each(['remove', 'setTags', 'save'] as const)(
+    '[P0] [7.29-PURGE] clears an expired review on %s before timers fire',
+    async (action) => {
+      const { capture, ticket, body, fetch } = harness()
+      fetch.mockResolvedValueOnce(accepted())
+      await capture.review(ticket, body)
+      vi.setSystemTime(new Date(Date.parse(fixedTime) + lifetime))
+
+      const commands = {
+        remove: () => capture.remove(first.id),
+        setTags: () => capture.setTags(first.id, { category: 'outerwear' }),
+        save: () => capture.save(),
+      }
+      await commands[action]()
+
+      expect(capture.state).toEqual({ phase: 'source', pieces: [], error: 'expired' })
+      expect(fetch).toHaveBeenCalledOnce()
+    }
+  )
+
+  it('[P0] [7.29-PRIVATE] suppresses obsolete confirmation callbacks and aborts pending transport', async () => {
+    const { capture, ticket, body, fetch, onCommitted, onComplete } = harness()
+    const started = deferred<void>()
+    const confirmed = deferred<Response>()
+    fetch.mockResolvedValueOnce(accepted()).mockImplementationOnce(() => {
+      started.resolve()
+      return confirmed.promise
+    })
+    await capture.review(ticket, body)
+    const saving = capture.save()
+    await started.promise
+    await capture.save()
+
+    capture.open({ account: 'another-member', epoch: 2 })
+    capture.cancelPick(ticket, 'unavailable')
+    confirmed.resolve(Response.json(saved))
+    await saving
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch.mock.calls[1]?.[1].signal?.aborted).toBe(true)
+    expect(onCommitted).not.toHaveBeenCalled()
+    expect(onComplete).not.toHaveBeenCalled()
+    expect(capture.state).toMatchObject({ phase: 'source', pieces: [], error: undefined })
+  })
+
+  it('[P0] [7.29-REPLAY] retains reviewed pieces during transport loss and clears previews on an expired retry', async () => {
+    const { capture, ticket, body, fetch, onCommitted } = harness()
+    fetch.mockRejectedValueOnce(new TypeError('Synthetic review network error'))
+    await capture.review(ticket, body)
+    expect(capture.state).toMatchObject({
+      phase: 'source',
+      pieces: [],
+      error: 'unavailable',
+    })
+
+    const retryTicket = capture.open(source)
+    fetch
+      .mockResolvedValueOnce(accepted())
+      .mockRejectedValueOnce(new TypeError('Synthetic confirm network error'))
+    await capture.review(retryTicket, body)
+    await capture.save()
+    expect(capture.state).toMatchObject({ phase: 'retry', error: 'saveFailed' })
+    expect(capture.state.pieces).toHaveLength(2)
+    await vi.advanceTimersByTimeAsync(lifetime)
+    expect(capture.state).toEqual({ phase: 'source', pieces: [], error: 'expired' })
+    expect(onCommitted).not.toHaveBeenCalled()
   })
 })

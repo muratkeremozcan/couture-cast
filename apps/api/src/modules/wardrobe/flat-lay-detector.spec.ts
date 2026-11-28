@@ -2,7 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-86-several-garments-from-one-flat-lay-photo
 import { Tensor, type InferenceSession } from 'onnxruntime-node'
 import sharp from 'sharp'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { FlatLayDetector } from './flat-lay-detector'
 
 const edge = 416
@@ -33,11 +33,19 @@ function output(objectness = 0, person = 0, otherClass = 0) {
   return new Tensor('float32', data, [1, rows, columns])
 }
 
-function detector(result: Tensor) {
+function deferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
+function detector(modelOutput: () => Tensor | Promise<Tensor>) {
   let shape: readonly number[] | undefined
   let backdrop: number[] | undefined
   let padding: number[] | undefined
-  const run = vi.fn((feeds: InferenceSession.FeedsType) => {
+  const run = vi.fn(async (feeds: InferenceSession.FeedsType) => {
     const images = feeds.images as Tensor
     shape = [...images.dims]
     const values = images.data as Float32Array
@@ -49,7 +57,7 @@ function detector(result: Tensor) {
       values[plane + lastPixel]!,
       values[plane * 2 + lastPixel]!,
     ]
-    return Promise.resolve({ output: result })
+    return { output: await modelOutput() }
   })
   const session: InferenceSession = {
     run,
@@ -89,15 +97,17 @@ describe('CC-7.29 local flat-lay detector', () => {
     photo = await flatLayPhoto()
   })
 
+  afterEach(() => vi.unstubAllGlobals())
+
   it('[P0] [7.29-REJECT] returns person when the weighted person score crosses the threshold', async () => {
-    const { instance, run } = detector(output(0.5, 0.5))
+    const { instance, run } = detector(() => output(0.5, 0.5))
 
     expect(await instance.detect(photo)).toEqual({ kind: 'person' })
     expect(run).toHaveBeenCalledOnce()
   })
 
   it('[P0] [7.29-PRIVATE] emits two isolated WebP masks when the person score is low', async () => {
-    const { instance, input } = detector(output(0.9, 0.05, 0.95))
+    const { instance, input } = detector(() => output(0.9, 0.05, 0.95))
 
     const result = await instance.detect(photo)
 
@@ -131,9 +141,16 @@ describe('CC-7.29 local flat-lay detector', () => {
     { case: 'NaN objectness', tensor: () => output(NaN, 0.5) },
     { case: 'out-of-range probabilities', tensor: () => output(-0.5, -0.5) },
   ])('[P0] [7.29-REJECT] abstains on $case from the model', async ({ tensor }) => {
-    const { instance, run } = detector(tensor())
+    const { instance, run } = detector(tensor)
 
     expect(await instance.detect(photo)).toEqual({ kind: 'uncertain' })
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('[P0] [7.29-REJECT] accepts the observed float32 sigmoid rounding at zero', async () => {
+    const { instance, run } = detector(() => output(0.5, -5.96e-8))
+
+    expect(await instance.detect(photo)).toMatchObject({ kind: 'accepted' })
     expect(run).toHaveBeenCalledOnce()
   })
 
@@ -148,10 +165,86 @@ describe('CC-7.29 local flat-lay detector', () => {
   })
 
   it('[P0] [7.29-REJECT] rejects an undersized source before model inference', async () => {
-    const { instance, run } = detector(output())
+    const { instance, run } = detector(output)
     const undersized = await sharp(photo).resize(255, 255).png().toBuffer()
 
     expect(await instance.detect(undersized)).toEqual({ kind: 'uncertain' })
     expect(run).not.toHaveBeenCalled()
+  })
+
+  it('[P0] [7.29-REJECT] closes an unsuccessful public model download and backs off before fetching again', async () => {
+    const cancel = vi.fn()
+    const stream = new ReadableStream({ cancel })
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response(stream, { status: 503 }))
+    vi.stubGlobal('fetch', fetch)
+    const instance = new FlatLayDetector()
+
+    expect(await instance.detect(photo)).toEqual({ kind: 'uncertain' })
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(await instance.detect(photo)).toEqual({ kind: 'uncertain' })
+    expect(fetch).toHaveBeenCalledOnce()
+    const [url, init] = fetch.mock.calls[0]!
+    expect(url).toEqual(
+      expect.stringContaining('/YOLOX/releases/download/0.1.1rc0/yolox_tiny.onnx')
+    )
+    expect(init?.body).toBeUndefined()
+  })
+
+  it.each([
+    { case: 'a checksum mismatch', bytes: 32 },
+    { case: 'an oversized weight stream', bytes: 20 * 1024 * 1024 + 1 },
+  ])(
+    '[P0] [7.29-REJECT] refuses $case from the public model asset',
+    async ({ bytes }) => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(new Response(new Uint8Array(bytes)))
+      vi.stubGlobal('fetch', fetch)
+
+      expect(await new FlatLayDetector().detect(photo)).toEqual({ kind: 'uncertain' })
+      expect(fetch).toHaveBeenCalledOnce()
+    }
+  )
+
+  it('[P1] [7.29-REJECT] reports saturation and resumes after both local inference slots finish', async () => {
+    const release = deferred()
+    const started = deferred()
+    const exceededCap = deferred()
+    let active = 0
+    const { instance, run } = detector(async () => {
+      active++
+      if (active === 2) started.resolve()
+      if (active > 2) exceededCap.resolve()
+      await release.promise
+      return output()
+    })
+    const first = instance.detect(photo)
+    const second = instance.detect(photo)
+    const finished = Promise.all([first, second])
+
+    try {
+      await Promise.race([
+        started.promise,
+        Promise.race([first, second]).then(({ kind }) => {
+          throw new Error(`Detection ended before both model slots started (${kind})`)
+        }),
+      ])
+      const saturated = await Promise.race([
+        instance.detect(photo),
+        exceededCap.promise.then(() => {
+          throw new Error('A third local model job started')
+        }),
+      ])
+      expect(saturated).toEqual({ kind: 'busy' })
+      expect(run).toHaveBeenCalledTimes(2)
+    } finally {
+      release.resolve()
+      await finished
+    }
+    expect((await finished).map(({ kind }) => kind)).toEqual(['accepted', 'accepted'])
+    expect(await instance.detect(photo)).toMatchObject({ kind: 'accepted' })
+    expect(run).toHaveBeenCalledTimes(3)
   })
 })
