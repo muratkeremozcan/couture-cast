@@ -22698,7 +22698,7 @@ Wait for the crop preview and check that the garment keeps its edges and fabric 
 
 - [Story spec](../implementation-artifacts/spec-7-26-clean-garment-cutouts.md)
   and [acceptance plan](../test-artifacts/test-design-7-26-clean-garment-cutouts.md).
-- [Labeled scene fixtures](../../playwright/fixtures/wardrobe/cutouts/README.md),
+- [Labeled scene fixtures](../../packages/utils/test/fixtures/garment-cutouts/README.md),
   [shared mask tests](../../packages/utils/src/garment-background.spec.ts), and
   [phone browser capture](../../playwright/tests/wardrobe-garment-capture-phone.spec.ts).
 - [Web mask rendering](../../apps/web/src/lib/garment-background.test.ts),

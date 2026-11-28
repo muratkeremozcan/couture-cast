@@ -5,7 +5,7 @@ import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
 import { maskGarmentBackground } from './garment-background'
 
-const fixtures = path.resolve(__dirname, '../../../playwright/fixtures/wardrobe/cutouts')
+const fixtures = path.resolve(__dirname, '../test/fixtures/garment-cutouts')
 
 type Rgb = [red: number, green: number, blue: number]
 

@@ -472,7 +472,12 @@ phoneTest.describe('Garment capture on a phone', () => {
       await page.getByRole('button', { name: '+ Add Garment' }).click()
       await page
         .getByLabel('Garment image file')
-        .setInputFiles(path.resolve(__dirname, '../fixtures/wardrobe/cutouts/pale.jpg'))
+        .setInputFiles(
+          path.resolve(
+            __dirname,
+            '../../packages/utils/test/fixtures/garment-cutouts/pale.jpg'
+          )
+        )
 
       const dialog = page.getByRole('dialog')
       const preview = dialog.getByRole('img', { name: 'Garment preview' })
