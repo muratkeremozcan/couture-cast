@@ -189,7 +189,7 @@ export async function suggestGarmentTagsFromMobile(
       createMobileApiClient({
         accessToken,
       }).apiV1WardrobeGarmentsGarmentIdSuggestTagsPost(
-        { garmentId },
+        { garmentId, xCoutureGarmentSubtype: '1' },
         { signal: requestSignal }
       )
     )

@@ -122,7 +122,13 @@ test('the folded checks run as named steps of their neighbours', () => {
   runsRegardless(step(checks.typecheck, 'Typecheck workspaces'))
   const gate = step(checks.tests, 'Quality gate requires every quality check to pass')
   assert.match(gate.if, /always\(\)/)
-  for (const job of ['tests-shard', 'typecheck', 'lint', 'lighthouse']) {
+  for (const job of [
+    'tests-shard',
+    'typecheck',
+    'lint',
+    'lighthouse',
+    'garment-tagging-model',
+  ]) {
     assert.ok(needs(checks.tests).includes(job), job)
     assert.match(
       gate.env.RESULTS,

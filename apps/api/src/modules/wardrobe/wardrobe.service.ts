@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common'
 import { Prisma, PrismaClient, type GarmentItem } from '@prisma/client'
 import {
+  GARMENT_TAGGING_ANALYSIS_VERSION,
   GARMENT_TAGS_CHANGED_MESSAGE,
   garmentTagSuggestionSnapshotSchema,
   type GarmentCategory,
@@ -742,7 +743,8 @@ export class WardrobeService {
   async suggestGarmentTags(
     userId: string,
     role: ApiRole,
-    garmentId: string
+    garmentId: string,
+    includeSubtype = false
   ): Promise<SuggestGarmentTagsResponse> {
     await this.guardianService.assertWardrobeUploadAllowed(userId, role)
 
@@ -775,14 +777,15 @@ export class WardrobeService {
     }
 
     return {
-      // The original wire shape: no `mode`, so clients from before manual mode keep parsing it.
       data: {
         garmentId: garment.id,
-        analysisVersion: parsed.data.analysisVersion,
+        // The strict legacy contract pins this literal. Storage tracks the actual prompt revision.
+        analysisVersion: GARMENT_TAGGING_ANALYSIS_VERSION,
         suggestions: {
           category: parsed.data.category,
           material: parsed.data.material,
           comfortRange: parsed.data.comfortRange,
+          ...(includeSubtype && parsed.data.subtype && { subtype: parsed.data.subtype }),
         },
       },
     }

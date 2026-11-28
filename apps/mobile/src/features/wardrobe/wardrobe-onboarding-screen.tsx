@@ -7,7 +7,14 @@
 // src/features so it stays covered by the component test runner (see
 // wardrobe-silhouette-screen.tsx for why app/wardrobe-onboarding.tsx stays a
 // thin Stack.Screen wrapper instead).
-import { useCallback, useEffect, useRef, useState, type ElementRef } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ElementRef,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import {
@@ -30,7 +37,11 @@ import { MobileGarmentCaptureModal } from '@/components/wardrobe/garment-capture
 import { MobileGarmentTaggingModal } from '@/components/wardrobe/garment-tagging-modal'
 import { SilhouetteEditor } from '@/components/wardrobe/silhouette-editor'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
-import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
+import {
+  mobileIdentityEpoch,
+  resolveMobileAccessToken,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import {
   getWardrobeOnboardingStateFromMobile,
@@ -52,8 +63,17 @@ function uiPhaseFor(step: string): UiPhase {
   return 'complete'
 }
 
-// eslint-disable-next-line complexity
 export function WardrobeOnboardingScreen() {
+  const epoch = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileIdentityEpoch,
+    mobileIdentityEpoch
+  )
+  return <MemberWardrobeOnboardingScreen key={epoch} epoch={epoch} />
+}
+
+// eslint-disable-next-line complexity
+function MemberWardrobeOnboardingScreen({ epoch }: { epoch: number }) {
   const { t } = useTranslation()
   const colors = useSchemeColors()
   const themed = useThemedStyles()
@@ -86,11 +106,14 @@ export function WardrobeOnboardingScreen() {
     setLoadError(null)
     try {
       const token = await resolveMobileAccessToken()
+      if (epoch !== mobileIdentityEpoch()) return
       if (!token) throw new Error(t('wardrobe.error.sign_in_required'))
       setAccessToken(token)
       userIdRef.current = await resolveOwnerUserId(token)
+      if (epoch !== mobileIdentityEpoch()) return
 
       const state = await getWardrobeOnboardingStateFromMobile(token)
+      if (epoch !== mobileIdentityEpoch()) return
       revisionRef.current = state.revision
 
       if (state.status === 'completed') {
@@ -105,9 +128,10 @@ export function WardrobeOnboardingScreen() {
 
       if (nextPhase === 'capture') {
         const persisted = await listGarmentsFromMobile(token)
-        setGarments(persisted)
+        if (epoch === mobileIdentityEpoch()) setGarments(persisted)
       }
     } catch (error) {
+      if (epoch !== mobileIdentityEpoch()) return
       setLoadError(
         error instanceof Error && error.message === GUARDIAN_CONSENT_CODE
           ? t('wardrobe.error.consent_required')
@@ -116,9 +140,9 @@ export function WardrobeOnboardingScreen() {
             : t('wardrobe.onboarding.errors.load_failed')
       )
     } finally {
-      setIsLoading(false)
+      if (epoch === mobileIdentityEpoch()) setIsLoading(false)
     }
-  }, [t])
+  }, [epoch, t])
 
   useEffect(() => {
     void load()
@@ -152,6 +176,7 @@ export function WardrobeOnboardingScreen() {
       targetStep: 'capture' | 'silhouette' | 'complete',
       usedStarterWardrobe?: boolean
     ) => {
+      if (epoch !== mobileIdentityEpoch()) return
       lastAttemptRef.current = { targetStep, usedStarterWardrobe }
       setIsAdvancing(true)
       setAdvanceError(null)
@@ -163,9 +188,11 @@ export function WardrobeOnboardingScreen() {
             : { targetStep, usedStarterWardrobe },
           onboardingETag(userIdRef.current, revisionRef.current)
         )
+        if (epoch !== mobileIdentityEpoch()) return
         revisionRef.current = next.revision
         setPhase(uiPhaseFor(next.currentStep))
       } catch (error) {
+        if (epoch !== mobileIdentityEpoch()) return
         const message =
           error instanceof Error && error.message === GUARDIAN_CONSENT_CODE
             ? t('wardrobe.error.consent_required')
@@ -178,7 +205,7 @@ export function WardrobeOnboardingScreen() {
         setIsAdvancing(false)
       }
     },
-    [accessToken, announce, t]
+    [accessToken, announce, epoch, t]
   )
 
   /**
@@ -220,6 +247,7 @@ export function WardrobeOnboardingScreen() {
   }, [])
 
   const handleGarmentCommitted = (garment: GarmentItemContract, token: string) => {
+    if (epoch !== mobileIdentityEpoch()) return
     setAccessToken(token)
     setGarments((current) => [
       garment,

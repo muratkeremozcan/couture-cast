@@ -4,6 +4,8 @@
 // the real local OTP, and applies the preview's comfort settings through the verified API.
 // Runs only in the owned real-session lane (npm run test:pw-real-session).
 // CC-7.21: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-78-first-look-and-account-save
+// Learning path Step 84: Suggested tags that are right.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { PrismaClient } from '@prisma/client'
@@ -210,8 +212,14 @@ test.describe('Guest preview and first garment with verified auth', () => {
       await capture.getByRole('button', { name: 'Done', exact: true }).click()
 
       const tagging = page.getByRole('dialog', { name: 'Organize Garment Tags' })
-      await tagging.getByRole('radio', { name: 'Top', exact: true }).click()
-      await tagging.getByRole('button', { name: 'Save tags' }).click()
+      const confirm = tagging.getByRole('button', { name: 'Looks right' })
+      await expect(
+        confirm,
+        'The real-session fixture worker must return confident garment tags'
+      ).toBeEnabled()
+      await expect(tagging.getByRole('radio', { name: 'Top', exact: true })).toBeChecked()
+      await expect(tagging.getByTestId('garment-tagging-subtype-tank')).toBeChecked()
+      await confirm.click()
       await expect(tagging).toBeHidden()
 
       const garments = await prisma.garmentItem.findMany({ where: { user_id: userId } })

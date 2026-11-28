@@ -1,8 +1,10 @@
 // Story 4.2 Task 2 step 3 owner: implement FixtureGarmentTaggingEngine fallback engine in apps/api/src/modules/wardrobe/fixture-garment-tagging.engine.ts
-import type { GarmentTagSuggestionSnapshot } from '@couture/api-client/contracts/http'
+import {
+  GARMENT_SUBTYPE_ANALYSIS_VERSION,
+  type GarmentTagSuggestionSnapshot,
+} from '@couture/api-client/contracts/http'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import {
-  ANALYSIS_VERSION,
   classifyCategory,
   classifyMaterial,
   deriveComfort,
@@ -20,7 +22,7 @@ export class FixtureGarmentTaggingEngine implements GarmentTaggingEngine {
 
   inferTags(_imageBuffer: Buffer): Promise<GarmentTagSuggestionSnapshot> {
     void _imageBuffer
-    // Deterministic top/cotton/mild fixture logits
+    // Deterministic top/tank/cotton/mild fixture.
     const categoryLogits = [2.5, 0.1, 0.1, 0.1, 0.1, 0.1]
     const materialLogits = [2.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
 
@@ -29,8 +31,9 @@ export class FixtureGarmentTaggingEngine implements GarmentTaggingEngine {
     const comfortRange = deriveComfort(category, material)
 
     return Promise.resolve({
-      analysisVersion: ANALYSIS_VERSION,
+      analysisVersion: GARMENT_SUBTYPE_ANALYSIS_VERSION,
       category,
+      subtype: { value: 'tank', confidence: 1, isConfident: true },
       material,
       comfortRange,
     })

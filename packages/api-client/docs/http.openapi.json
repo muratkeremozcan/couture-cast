@@ -5427,6 +5427,48 @@
                   "suggestions": {
                     "type": "object",
                     "properties": {
+                      "subtype": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "camisole",
+                              "tank",
+                              "crop-top",
+                              "mini-skirt",
+                              "midi-skirt",
+                              "maxi-skirt",
+                              "leggings",
+                              "blazer",
+                              "moto-jacket",
+                              "moto-boots",
+                              "ankle-boots",
+                              "knee-boots",
+                              "tights",
+                              "socks",
+                              null
+                            ]
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "isConfident": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "confidence",
+                          "isConfident"
+                        ],
+                        "additionalProperties": false
+                      },
                       "category": {
                         "type": "object",
                         "properties": {
@@ -25778,6 +25820,19 @@
             "description": "Unique garment item ID.",
             "name": "garmentId",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ],
+              "description": "Include the subtype score when the stored suggestion has one."
+            },
+            "required": false,
+            "description": "Include the subtype score when the stored suggestion has one.",
+            "name": "x-couture-garment-subtype",
+            "in": "header"
           }
         ],
         "responses": {

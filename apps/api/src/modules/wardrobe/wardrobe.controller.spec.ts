@@ -10,6 +10,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 // Learning path Step 76: Garment subtypes.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
+// Learning path Step 84: Suggested tags that are right.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 /* eslint-disable @typescript-eslint/unbound-method -- assertions read the vi.fn() `status` member off the mocked Express response, which is the established pattern for these suites. */
 import { BadRequestException, RequestMethod } from '@nestjs/common'
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
@@ -379,9 +381,47 @@ describe('WardrobeController', () => {
       expect(mockSuggestGarmentTags).toHaveBeenCalledWith(
         'user_123',
         'teen',
-        'garment_99'
+        'garment_99',
+        false
       )
     })
+
+    it.each([
+      { header: '1', includeSubtype: true },
+      { header: '0', includeSubtype: false },
+      { header: ['1'], includeSubtype: false },
+    ])(
+      'forwards only exact subtype header opt-in ($header)',
+      async ({ header, includeSubtype }) => {
+        const snapshot = createGarmentTagSuggestionSnapshotFixture()
+        const subtype = { value: 'tank', confidence: 0.4, isConfident: false }
+        mockSuggestGarmentTags.mockResolvedValueOnce({
+          data: {
+            garmentId: 'garment_99',
+            analysisVersion: snapshot.analysisVersion,
+            suggestions: {
+              category: snapshot.category,
+              material: snapshot.material,
+              comfortRange: snapshot.comfortRange,
+              ...(includeSubtype && { subtype }),
+            },
+          },
+        })
+        const result = await controller.suggestGarmentTags(mockAuth, 'garment_99', header)
+        expect(mockSuggestGarmentTags).toHaveBeenCalledExactlyOnceWith(
+          'user_123',
+          'teen',
+          'garment_99',
+          includeSubtype
+        )
+        expect(result.data).toHaveProperty('suggestions', {
+          category: snapshot.category,
+          material: snapshot.material,
+          comfortRange: snapshot.comfortRange,
+          ...(includeSubtype && { subtype }),
+        })
+      }
+    )
 
     it('returns the manual-mode answer with no suggestions', async () => {
       mockSuggestGarmentTags.mockResolvedValueOnce({

@@ -1,5 +1,7 @@
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 84: Suggested tags that are right.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- the ONNX runtime session is stubbed with an untyped test double, which is the established pattern for these suites. */
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -7,6 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InferenceResponse } from './fashion-clip-inference.worker'
+import { GARMENT_DETAIL_PROMPTS } from './garment-tagging.engine'
 
 /**
  * `@huggingface/transformers` loads native ONNX bindings and a multi-hundred-
@@ -52,8 +55,11 @@ const MANIFEST_IDENTITY = {
   analysisVersion: 'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1',
 }
 
-/** Six category prompts plus nine material prompts. */
-const EXPECTED_LOGIT_COUNT = 15
+const DETAIL_PROMPT_OFFSET = 6 + 9
+const EXPECTED_LOGIT_COUNT = DETAIL_PROMPT_OFFSET + GARMENT_DETAIL_PROMPTS.length
+const detailLogits = GARMENT_DETAIL_PROMPTS.map(
+  (_prompt, index) => DETAIL_PROMPT_OFFSET + index
+)
 
 const CATEGORY_PROMPT_SAMPLE =
   'a photo of a shirt, blouse, sweater, or other upper-body garment'
@@ -249,10 +255,13 @@ describe('initializeInferenceWorker', () => {
       path.resolve(modelDir),
       { local_files_only: true }
     )
-    // All 15 prompts are tokenized once and reused for every later request.
+    // Prompt groups are tokenized once in their inference order.
     const prompts = transformers.tokenizer.mock.calls[0]?.[0] as string[] | undefined
     expect(prompts).toHaveLength(EXPECTED_LOGIT_COUNT)
     expect(prompts).toContain(CATEGORY_PROMPT_SAMPLE)
+    expect(prompts?.slice(DETAIL_PROMPT_OFFSET)).toEqual(
+      GARMENT_DETAIL_PROMPTS.map(({ text }) => text)
+    )
     expect(transformers.tokenizer).toHaveBeenCalledWith(expect.any(Array), {
       padding: true,
       truncation: true,
@@ -289,7 +298,7 @@ describe('runInferenceOnImage', () => {
     )
   })
 
-  it('splits the model logits into the category and material groups', async () => {
+  it('splits the model logits into category, material, and detail groups', async () => {
     const { runInferenceOnImage } = await initializedWorker()
     transformers.model.mockResolvedValue({
       logits_per_image: Float32Array.from(
@@ -301,6 +310,7 @@ describe('runInferenceOnImage', () => {
 
     expect(result.categoryLogits).toEqual([0, 1, 2, 3, 4, 5])
     expect(result.materialLogits).toEqual([6, 7, 8, 9, 10, 11, 12, 13, 14])
+    expect(result.detailLogits).toEqual(detailLogits)
     expect(transformers.RawImage.fromBlob).toHaveBeenCalledTimes(1)
   })
 
@@ -317,6 +327,7 @@ describe('runInferenceOnImage', () => {
 
     expect(result.categoryLogits).toHaveLength(6)
     expect(result.materialLogits).toHaveLength(9)
+    expect(result.detailLogits).toHaveLength(GARMENT_DETAIL_PROMPTS.length)
   })
 
   it('derives logits from embeddings when no logit head is exposed', async () => {
@@ -333,6 +344,7 @@ describe('runInferenceOnImage', () => {
 
     expect(result.categoryLogits).toEqual(new Array<number>(6).fill(1))
     expect(result.materialLogits).toEqual(new Array<number>(9).fill(1))
+    expect(result.detailLogits).toEqual(GARMENT_DETAIL_PROMPTS.map(() => 1))
   })
 
   it('rejects an output that exposes nothing usable', async () => {
@@ -444,6 +456,7 @@ describe('worker thread entrypoint', () => {
       id: 'req-1',
       categoryLogits: [0, 1, 2, 3, 4, 5],
       materialLogits: [6, 7, 8, 9, 10, 11, 12, 13, 14],
+      detailLogits,
     })
   })
 

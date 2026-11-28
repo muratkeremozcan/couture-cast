@@ -45,6 +45,7 @@ export interface ApiV1WardrobeGarmentsGarmentIdDeleteRequest {
 
 export interface ApiV1WardrobeGarmentsGarmentIdSuggestTagsPostRequest {
   garmentId: string
+  xCoutureGarmentSubtype?: ApiV1WardrobeGarmentsGarmentIdSuggestTagsPostXCoutureGarmentSubtypeEnum
 }
 
 export interface ApiV1WardrobeGarmentsGarmentIdTagsPatchRequest {
@@ -254,6 +255,12 @@ export class WardrobeApi extends runtime.BaseAPI {
     const queryParameters: any = {}
 
     const headerParameters: runtime.HTTPHeaders = {}
+
+    if (requestParameters['xCoutureGarmentSubtype'] != null) {
+      headerParameters['x-couture-garment-subtype'] = String(
+        requestParameters['xCoutureGarmentSubtype']
+      )
+    }
 
     if (this.configuration && this.configuration.accessToken) {
       const token = this.configuration.accessToken
@@ -2102,6 +2109,14 @@ export class WardrobeApi extends runtime.BaseAPI {
   }
 }
 
+/**
+ * @export
+ */
+export const ApiV1WardrobeGarmentsGarmentIdSuggestTagsPostXCoutureGarmentSubtypeEnum = {
+  _1: '1',
+} as const
+export type ApiV1WardrobeGarmentsGarmentIdSuggestTagsPostXCoutureGarmentSubtypeEnum =
+  (typeof ApiV1WardrobeGarmentsGarmentIdSuggestTagsPostXCoutureGarmentSubtypeEnum)[keyof typeof ApiV1WardrobeGarmentsGarmentIdSuggestTagsPostXCoutureGarmentSubtypeEnum]
 /**
  * @export
  */

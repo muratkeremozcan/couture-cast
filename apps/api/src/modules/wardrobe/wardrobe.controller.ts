@@ -163,7 +163,8 @@ export class WardrobeController {
   @Header('Cache-Control', 'private, no-store')
   async suggestGarmentTags(
     @AuthContext() auth: RequestAuthContext,
-    @Param('garmentId') garmentId: string
+    @Param('garmentId') garmentId: string,
+    @Headers(WARDROBE_GARMENT_SUBTYPE_HEADER) subtypeHeader?: string | string[]
   ) {
     const parsedPath = garmentIdPathParamsSchema.safeParse({ garmentId })
     if (!parsedPath.success) {
@@ -172,12 +173,12 @@ export class WardrobeController {
       )
     }
 
-    // Validate against the wire shape: a `suggested` answer stays the original, `mode`-free body.
     return suggestGarmentTagsWireResponseSchema.parse(
       await this.wardrobeService.suggestGarmentTags(
         auth.userId,
         auth.role,
-        parsedPath.data.garmentId
+        parsedPath.data.garmentId,
+        subtypeHeader === '1'
       )
     )
   }

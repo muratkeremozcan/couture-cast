@@ -4,12 +4,18 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Learning path Step 58: Hosted wardrobe workers and manual tagging.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
+// Learning path Step 84: Suggested tags that are right.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 import {
   ConflictException,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common'
 import type { PrismaClient } from '@prisma/client'
+import {
+  GARMENT_SUBTYPE_ANALYSIS_VERSION,
+  GARMENT_TAGGING_ANALYSIS_VERSION,
+} from '@couture/api-client/contracts/http'
 import { createGarmentTagSuggestionSnapshotFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GuardianService } from '../guardian/guardian.service'
@@ -133,31 +139,74 @@ describe('WardrobeService Smart Tagging Operations', () => {
     expect(mockUpdateMany).not.toHaveBeenCalled()
   })
 
-  it('returns structured suggestions when valid snapshot exists', async () => {
-    const validSnapshot = createGarmentTagSuggestionSnapshotFixture({
-      category: { confidence: 0.88 },
-    })
-    mockFindFirst.mockResolvedValueOnce({
+  it.each([false, true])(
+    'serves v1 snapshots without subtype (opt-in: %s)',
+    async (includeSubtype) => {
+      const validSnapshot = createGarmentTagSuggestionSnapshotFixture({
+        category: { confidence: 0.88 },
+      })
+      mockFindFirst.mockResolvedValueOnce({
+        id: 'g_1',
+        user_id: 'user_1',
+        upload_status: 'awaiting_tags',
+        retention_status: 'active',
+        tag_suggestions: validSnapshot,
+      })
+
+      const res = await service.suggestGarmentTags(
+        'user_1',
+        'teen',
+        'g_1',
+        includeSubtype
+      )
+      expect(res.data).toMatchObject({
+        garmentId: 'g_1',
+        analysisVersion: validSnapshot.analysisVersion,
+        suggestions: { category: { value: 'top' } },
+      })
+      // The original wire shape (R4): a client from before manual mode rejects an unknown key.
+      expect(res.data).not.toHaveProperty('mode')
+      expect(res.data).not.toHaveProperty('suggestions.subtype')
+      expect(Object.keys(res.data).toSorted()).toEqual([
+        'analysisVersion',
+        'garmentId',
+        'suggestions',
+      ])
+    }
+  )
+
+  it('serves a v2 subtype only to opted-in clients while keeping the legacy literal', async () => {
+    const { category, material, comfortRange } =
+      createGarmentTagSuggestionSnapshotFixture()
+    const subtype = { value: 'tank', confidence: 0.42, isConfident: false }
+    mockFindFirst.mockResolvedValue({
       id: 'g_1',
       user_id: 'user_1',
       upload_status: 'awaiting_tags',
       retention_status: 'active',
-      tag_suggestions: validSnapshot,
+      tag_suggestions: {
+        analysisVersion: GARMENT_SUBTYPE_ANALYSIS_VERSION,
+        category,
+        material,
+        comfortRange,
+        subtype,
+      },
     })
-
-    const res = await service.suggestGarmentTags('user_1', 'teen', 'g_1')
-    expect(res.data).toMatchObject({
+    const data = {
       garmentId: 'g_1',
-      analysisVersion: validSnapshot.analysisVersion,
-      suggestions: { category: { value: 'top' } },
+      analysisVersion: GARMENT_TAGGING_ANALYSIS_VERSION,
+      suggestions: { category, material, comfortRange },
+    }
+
+    await expect(service.suggestGarmentTags('user_1', 'teen', 'g_1')).resolves.toEqual({
+      data,
     })
-    // The original wire shape (R4): a client from before manual mode rejects an unknown key.
-    expect(res.data).not.toHaveProperty('mode')
-    expect(Object.keys(res.data).toSorted()).toEqual([
-      'analysisVersion',
-      'garmentId',
-      'suggestions',
-    ])
+    await expect(
+      service.suggestGarmentTags('user_1', 'teen', 'g_1', true)
+    ).resolves.toEqual({
+      data: { ...data, suggestions: { ...data.suggestions, subtype } },
+    })
+    expect(mockUpdateMany).not.toHaveBeenCalled()
   })
 
   it('answers manual mode, with no suggestions, for a garment a model-less worker processed', async () => {
@@ -170,7 +219,7 @@ describe('WardrobeService Smart Tagging Operations', () => {
       tagging_failure_code: 'TAGGING_MANUAL_MODE',
     })
 
-    const res = await service.suggestGarmentTags('user_1', 'teen', 'g_manual')
+    const res = await service.suggestGarmentTags('user_1', 'teen', 'g_manual', true)
 
     expect(res).toEqual({ data: { mode: 'manual', garmentId: 'g_manual' } })
   })
