@@ -68,6 +68,35 @@ export type StylePiecePhotoAnchor = NonNullable<ReturnType<typeof stylePieceAnch
 export type StylePieceSelection = StylePieceAnchor & { id: string }
 type InventoryItem = StylePieceItem & { id: string }
 
+export type StylePieceOwnedCompanion = StylePieceSelection & {
+  kind: 'garment'
+  photo: WardrobePhoto | null
+}
+
+export function stylePieceOwnedCompanions(
+  items: readonly InventoryItem[],
+  anchorId: string,
+  now = Date.now()
+): StylePieceOwnedCompanion[] {
+  return items.flatMap((item) =>
+    item.id !== anchorId && isStylePieceTagged(item)
+      ? [
+          {
+            id: item.id,
+            kind: 'garment' as const,
+            category: item.category,
+            comfortRange: item.comfortRange,
+            subtype: item.subtype,
+            photo:
+              item.imageAccess && Date.parse(item.imageAccess.expiresAt) > now
+                ? item.imageAccess
+                : null,
+          },
+        ]
+      : []
+  )
+}
+
 export function selectStylePieceAnchor(items: readonly InventoryItem[], id: string) {
   const item = items.find((entry) => entry.id === id)
   return item ? stylePieceAnchor(item) : null
@@ -136,10 +165,14 @@ export function createStylePieceRefresh({
   garmentId: string
   load: (signal: AbortSignal) => Promise<readonly InventoryItem[] | null>
   isCurrent: () => boolean
-  onAnchor: (anchor: StylePiecePhotoAnchor | null | undefined) => void
+  onAnchor: (
+    anchor: StylePiecePhotoAnchor | null | undefined,
+    owned: readonly StylePieceOwnedCompanion[]
+  ) => void
 }) {
   let stopped = false
   let latest: StylePiecePhotoAnchor | null = null
+  let owned: StylePieceOwnedCompanion[] = []
   let interval: ReturnType<typeof setInterval> | undefined
   let cancelExpiry: (() => void) | undefined
   let flight:
@@ -153,7 +186,38 @@ export function createStylePieceRefresh({
   const currentValidAnchor = () =>
     active() && latest && Date.parse(latest.photo.expiresAt) > Date.now() ? latest : null
 
-  const publish = (anchor: StylePiecePhotoAnchor | null, seq?: number) => {
+  const publishPhotos = () => {
+    cancelExpiry?.()
+    if (!latest) {
+      owned = []
+      cancelExpiry = undefined
+      onAnchor(null, owned)
+      return
+    }
+    const now = Date.now()
+    owned = owned.map((item) =>
+      item.photo && Date.parse(item.photo.expiresAt) <= now
+        ? { ...item, photo: null }
+        : item
+    )
+    const expiresAt = owned.reduce(
+      (expiry, item) =>
+        item.photo ? Math.min(expiry, Date.parse(item.photo.expiresAt)) : expiry,
+      Date.parse(latest.photo.expiresAt)
+    )
+    cancelExpiry = scheduleStylePiecePhotoExpiry(expiresAt, () => {
+      if (!active()) return
+      if (currentValidAnchor()) publishPhotos()
+      else publish(null)
+    })
+    onAnchor(latest, owned)
+  }
+
+  const publish = (
+    anchor: StylePiecePhotoAnchor | null,
+    seq?: number,
+    items: readonly InventoryItem[] = []
+  ) => {
     if (seq !== undefined) {
       if (seq < latestAuthoritativeSeq) return
       latestAuthoritativeSeq = seq
@@ -161,13 +225,8 @@ export function createStylePieceRefresh({
       latestAuthoritativeSeq = ++requestSeq
     }
     latest = anchor
-    cancelExpiry?.()
-    cancelExpiry = anchor
-      ? scheduleStylePiecePhotoExpiry(Date.parse(anchor.photo.expiresAt), () => {
-          if (active()) publish(null)
-        })
-      : undefined
-    onAnchor(anchor)
+    owned = anchor ? stylePieceOwnedCompanions(items, garmentId) : []
+    publishPhotos()
   }
 
   const refresh = () => {
@@ -184,7 +243,7 @@ export function createStylePieceRefresh({
           if (!valid()) return null
           if (seq < latestAuthoritativeSeq) return currentValidAnchor()
           const anchor = items ? selectStylePieceAnchor(items, garmentId) : null
-          publish(anchor, seq)
+          publish(anchor, seq, items ?? [])
           return anchor
         } catch {
           if (valid() && seq >= latestAuthoritativeSeq) publish(null, seq)
@@ -222,7 +281,7 @@ export function createStylePieceRefresh({
         publish(null, seq)
         return { status: 'revoked' }
       }
-      publish(anchor, seq)
+      publish(anchor, seq, items ?? [])
       return { status: 'ok', anchor }
     } catch (error) {
       if (!valid()) return { status: 'revoked' }
@@ -252,6 +311,7 @@ export function createStylePieceRefresh({
     cancelExpiry?.()
     cancelExpiry = undefined
     latest = null
+    owned = []
   }
 
   return {
@@ -260,6 +320,9 @@ export function createStylePieceRefresh({
     currentAnchor() {
       return currentValidAnchor()
     },
+    currentCompanions() {
+      return currentValidAnchor() ? owned : []
+    },
     setVisible(visible: boolean) {
       if (stopped || !isCurrent()) return
       if (visible && interval === undefined) {
@@ -267,7 +330,7 @@ export function createStylePieceRefresh({
         void refresh()
       } else if (!visible && interval !== undefined) {
         pause()
-        onAnchor(undefined)
+        onAnchor(undefined, [])
       }
     },
     stop() {
@@ -298,7 +361,11 @@ const savedStylePieceRecipeSchema = z
   })
   .strict()
 
-export type StylePieceRecipe = z.infer<typeof savedStylePieceRecipeSchema>
+type StylePieceSavedSlot = { kind: 'garment' | 'catalog'; itemId: string }
+
+export type StylePieceRecipe = z.infer<typeof savedStylePieceRecipeSchema> & {
+  savedCompanions?: Readonly<Partial<Record<SampleGarmentCategory, StylePieceSavedSlot>>>
+}
 
 function stylePieceInput(weather: StylePieceWeatherKey) {
   return { weather, collection: 'all', comfort: DEFAULT_SAMPLE_COMFORT } as const
@@ -332,10 +399,20 @@ function projectCatalog(catalog: SampleCatalog, anchor: SampleGarmentCategory) {
   return { ...catalog, looks }
 }
 
+export type StylePieceCompanion = SampleGarment | StylePieceOwnedCompanion
+
+export function isStylePieceOwnedCompanion(
+  item: StylePieceCompanion
+): item is StylePieceOwnedCompanion {
+  return 'kind' in item
+}
+
 export type StylePieceLook = {
   recipe: StylePieceRecipe
-  companions: SampleGarment[]
+  companions: StylePieceCompanion[]
 }
+
+type CatalogStylePieceLook = StylePieceLook & { companions: SampleGarment[] }
 
 export function stylePieceLooks(
   anchor: StylePieceAnchor,
@@ -384,7 +461,7 @@ export function stylePieceLooks(
     ...ranked.eligibleLookIds.filter((id) => matchingLooks.has(id)),
     ...ranked.eligibleLookIds.filter((id) => !matchingLooks.has(id)),
   ]
-  const looks: StylePieceLook[] = eligibleLookIds.map((lookId) => {
+  const looks: CatalogStylePieceLook[] = eligibleLookIds.map((lookId) => {
     const selected = selectSampleOutfit({ ...input, selectedLookId: lookId }, projected)
     const companions = selected.garments.filter(
       (item) => item.category !== anchor.category
@@ -416,41 +493,97 @@ export function stylePieceSwapOptions(
   return sampleSwapCandidates(catalog, category, stylePieceInput(look.recipe.weather))
 }
 
-function companionSignature(companions: readonly SampleGarment[]) {
+export function stylePieceCompanionSuitsWeather(
+  companion: Pick<StylePieceOwnedCompanion, 'category' | 'comfortRange'>,
+  weather: string
+) {
+  const selected = STYLE_PIECE_WEATHER_KEYS.find((option) => option === weather)
+  if (!selected) return false
+  const context = buildSampleContext(stylePieceInput(selected))
+  return (
+    garmentSuitsRange({ comfortRanges: [companion.comfortRange] }, context.range) &&
+    (companion.category !== 'outerwear' || (!context.windLayer && !context.rainReady))
+  )
+}
+
+export function stylePieceCompanionOptions(
+  look: StylePieceLook,
+  category: SampleGarmentCategory,
+  owned: readonly StylePieceOwnedCompanion[],
+  catalog = SAMPLE_CATALOG
+): StylePieceCompanion[] {
+  const current = look.companions.find((item) => item.category === category)
+  if (!current) return []
+  const weather = look.recipe.weather
+  const { range } = buildSampleContext(stylePieceInput(weather))
+  const eligible = owned.filter(
+    (item) => item.category === category && stylePieceCompanionSuitsWeather(item, weather)
+  )
+  eligible.sort(
+    (a, b) =>
+      Number(b.comfortRange === range) - Number(a.comfortRange === range) ||
+      Number(Boolean(b.subtype && b.subtype === current.subtype)) -
+        Number(Boolean(a.subtype && a.subtype === current.subtype)) ||
+      (a.id < b.id ? -1 : Number(a.id > b.id))
+  )
+  return [...eligible, ...stylePieceSwapOptions(look, category, catalog)]
+}
+
+function companionSignature(companions: readonly StylePieceCompanion[]) {
   return companions
     .map(({ id }) => id)
     .sort()
     .join('|')
 }
 
-function applyStylePieceRecipe(
-  base: StylePieceLook,
+export function applyStylePieceRecipe(
+  base: CatalogStylePieceLook,
   recipe: StylePieceRecipe,
-  catalog: SampleCatalog
+  catalog: SampleCatalog,
+  owned: readonly StylePieceOwnedCompanion[] = []
 ): StylePieceLook {
   const swaps: StylePieceRecipe['swaps'] = {}
   const companions = base.companions.map((garment) => {
     const { category } = garment
-    const id = recipe.swaps[category]
-    if (id === undefined || id === garment.id) return garment
-    const replacement = stylePieceSwapOptions(base, category, catalog).find(
-      (candidate) => candidate.id === id
-    )
-    if (!replacement) return garment
-    swaps[category] = replacement.id
-    return replacement
+    const saved = recipe.savedCompanions?.[category]
+    const swapId = recipe.swaps[category]
+    const options = stylePieceCompanionOptions(base, category, owned, catalog)
+    const swap = options.find((item) => item.id === swapId)
+    if (swap) {
+      if (swap.id !== garment.id || owned.some((item) => item.category === category)) {
+        swaps[category] = swap.id
+      }
+      return swap
+    }
+    if (saved) {
+      return (
+        options.find(
+          (item) =>
+            item.id === saved.itemId &&
+            (isStylePieceOwnedCompanion(item) ? 'garment' : 'catalog') === saved.kind
+        ) ?? garment
+      )
+    }
+    const first = options[0]
+    return first && isStylePieceOwnedCompanion(first) ? first : garment
   })
-  return { recipe: { ...base.recipe, swaps }, companions }
+  return { recipe: { ...recipe, swaps }, companions }
 }
 
-export function visibleStylePieceLooks(
-  bases: readonly StylePieceLook[],
+function renderedStylePieceLooks(
+  bases: readonly CatalogStylePieceLook[],
   edits: Readonly<Record<string, StylePieceRecipe>>,
   {
     reopenedLookId,
     editedLookId,
     catalog = SAMPLE_CATALOG,
-  }: { reopenedLookId?: string; editedLookId?: string; catalog?: SampleCatalog } = {}
+    owned = [],
+  }: {
+    reopenedLookId?: string
+    editedLookId?: string
+    catalog?: SampleCatalog
+    owned?: readonly StylePieceOwnedCompanion[]
+  }
 ) {
   const reopened = bases.find(({ recipe }) => recipe.lookId === reopenedLookId)
   const ordered = reopened
@@ -458,14 +591,14 @@ export function visibleStylePieceLooks(
     : bases
   const rendered = ordered.map((base) => {
     const edit = edits[base.recipe.lookId]
-    const look =
-      edit?.weather === base.recipe.weather
-        ? applyStylePieceRecipe(base, edit, catalog)
-        : base
+    const recipe = edit?.weather === base.recipe.weather ? edit : base.recipe
+    const look = applyStylePieceRecipe(base, recipe, catalog, owned)
     return { look, signature: companionSignature(look.companions) }
   })
   // The member's last edit owns its combination, even when an earlier idea already had it.
-  const latestEdit = rendered.find(({ look }) => look.recipe.lookId === editedLookId)
+  const latestEdit = rendered.find(
+    ({ look }) => look.recipe.lookId === (editedLookId ?? reopenedLookId)
+  )
   const seen = new Set<string>()
   const visible: StylePieceLook[] = []
   for (const entry of rendered) {
@@ -474,10 +607,69 @@ export function visibleStylePieceLooks(
     seen.add(entry.signature)
     visible.push(entry.look)
   }
+  return {
+    visible,
+    rendered: rendered.map(({ look }) => look),
+    latestEdit: latestEdit?.look,
+  }
+}
+
+export function visibleStylePieceLooks(
+  bases: readonly CatalogStylePieceLook[],
+  edits: Readonly<Record<string, StylePieceRecipe>>,
+  options: Parameters<typeof renderedStylePieceLooks>[2] = {}
+) {
+  const { visible, latestEdit } = renderedStylePieceLooks(bases, edits, options)
   const ideas = visible.slice(0, MAX_IDEAS)
-  return latestEdit && !ideas.includes(latestEdit.look)
-    ? [...ideas.slice(0, MAX_IDEAS - 1), latestEdit.look]
+  return latestEdit && !ideas.includes(latestEdit)
+    ? [...ideas.slice(0, MAX_IDEAS - 1), latestEdit]
     : ideas
+}
+
+const OCCASION_STYLES = {
+  school: ['classic', 'cozy', 'active', 'chic'],
+  weekend: ['active', 'cozy', 'classic', 'chic'],
+  goingOut: ['chic', 'classic', 'cozy', 'active'],
+} as const
+
+export type StylePieceOccasion = keyof typeof OCCASION_STYLES
+export type StylePieceOccasionLook = StylePieceLook & { occasion: StylePieceOccasion }
+
+export function stylePieceOccasionLooks(
+  bases: readonly CatalogStylePieceLook[],
+  edits: Readonly<Record<string, StylePieceRecipe>>,
+  options: Parameters<typeof renderedStylePieceLooks>[2] = {}
+): StylePieceOccasionLook[] {
+  const { visible, rendered, latestEdit } = renderedStylePieceLooks(bases, edits, options)
+  const catalog = options.catalog ?? SAMPLE_CATALOG
+  const styles = new Map(catalog.looks.map((item) => [item.id, item.preferences?.style]))
+  const used = new Set<StylePieceLook>()
+  const ideas = (Object.keys(OCCASION_STYLES) as StylePieceOccasion[]).flatMap(
+    (occasion) => {
+      const preference: readonly (string | undefined)[] = OCCASION_STYLES[occasion]
+      const rank = (look: StylePieceLook) => {
+        const index = preference.indexOf(styles.get(look.recipe.lookId))
+        return index === -1 ? preference.length : index
+      }
+      const best = (looks: StylePieceLook[]) =>
+        looks
+          .filter((look) => !used.has(look))
+          .reduce<
+            StylePieceLook | undefined
+          >((choice, look) => (!choice || rank(look) < rank(choice) ? look : choice), undefined)
+      const look = best(visible) ?? best(rendered)
+      if (!look) return []
+      used.add(look)
+      return [{ look, occasion }]
+    }
+  )
+  if (latestEdit && !used.has(latestEdit) && ideas.length > 0) {
+    const last = ideas[ideas.length - 1]!
+    last.look = latestEdit
+  }
+  return ideas
+    .sort((a, b) => rendered.indexOf(a.look) - rendered.indexOf(b.look))
+    .map(({ look, occasion }) => ({ ...look, occasion }))
 }
 
 export function stylePieceRecipeKey({ weather, lookId }: StylePieceRecipe) {
@@ -489,7 +681,7 @@ function keepStylePieceRecipes(
   anchor: StylePieceAnchor,
   catalog: SampleCatalog
 ) {
-  const basesByWeather = new Map<StylePieceWeatherKey, StylePieceLook[]>()
+  const basesByWeather = new Map<StylePieceWeatherKey, CatalogStylePieceLook[]>()
   const seen = new Set<string>()
   return recipes.flatMap((recipe) => {
     const key = stylePieceRecipeKey(recipe)

@@ -13,6 +13,7 @@ import {
   PreconditionFailedException,
 } from '@nestjs/common'
 import {
+  garmentComfortRangeEnum,
   savedLookAnchorSnapshotSchema,
   savedLookComfortSchema,
   savedLookCompositionSlotInputSchema,
@@ -27,6 +28,7 @@ import {
 import {
   doesSavedLookResolve,
   SAMPLE_CATALOG,
+  stylePieceCompanionSuitsWeather,
   type ComfortRange,
   type SampleGarmentCategory,
 } from '@couture/utils'
@@ -54,7 +56,40 @@ type GarmentProjection = {
   comfort_range: string | null
   upload_status: string
   retention_status: string
+  deletion_requested_at: Date | null
   object_path: string | null
+}
+
+function matchesStylePieceCompanion(
+  slot: StoredSlot,
+  garment: Pick<GarmentProjection, 'category' | 'comfort_range'> | undefined,
+  weather: string
+): boolean {
+  if (!garment || garment.category !== slot.category) return false
+  const comfortRange = garmentComfortRangeEnum.safeParse(garment.comfort_range)
+  return (
+    comfortRange.success &&
+    stylePieceCompanionSuitsWeather(
+      { category: slot.category, comfortRange: comfortRange.data },
+      weather
+    )
+  )
+}
+
+function hasChangedStylePieceCompanion(
+  row: Pick<SavedLook, 'source' | 'anchor_garment_id' | 'weather'>,
+  slots: readonly StoredSlot[],
+  garments: ReadonlyMap<string, GarmentProjection>
+): boolean {
+  return (
+    row.source === 'style_piece' &&
+    slots.some(
+      (slot) =>
+        slot.kind === 'garment' &&
+        slot.itemId !== row.anchor_garment_id &&
+        !matchesStylePieceCompanion(slot, garments.get(slot.itemId), row.weather)
+    )
+  )
 }
 
 const storedCompositionSchema = z.array(savedLookCompositionSlotInputSchema)
@@ -230,7 +265,8 @@ export class WardrobeSavedLookService {
     return (
       garment !== undefined &&
       garment.upload_status === 'ready' &&
-      garment.retention_status === 'active'
+      garment.retention_status === 'active' &&
+      !garment.deletion_requested_at
     )
   }
 
@@ -303,6 +339,7 @@ export class WardrobeSavedLookService {
               comfort_range: true,
               upload_status: true,
               retention_status: true,
+              deletion_requested_at: true,
               object_path: true,
             },
           })
@@ -414,19 +451,20 @@ export class WardrobeSavedLookService {
 
       const isUnresolved =
         missingGarmentIds.size === 0 &&
-        !doesSavedLookResolve({
-          source: row.source,
-          lookId: row.look_id,
-          weather: row.weather,
-          anchorCategory:
-            (anchorLive?.category as SampleGarmentCategory | null | undefined) ?? null,
-          anchorComfortRange:
-            (anchorLive?.comfort_range as ComfortRange | null | undefined) ?? null,
-          swaps: storedSwaps.success ? storedSwaps.data : {},
-          collection: row.collection,
-          comfort: parsedComfort,
-          composition: storedSlots,
-        })
+        (hasChangedStylePieceCompanion(row, storedSlots, garmentById) ||
+          !doesSavedLookResolve({
+            source: row.source,
+            lookId: row.look_id,
+            weather: row.weather,
+            anchorCategory:
+              (anchorLive?.category as SampleGarmentCategory | null | undefined) ?? null,
+            anchorComfortRange:
+              (anchorLive?.comfort_range as ComfortRange | null | undefined) ?? null,
+            swaps: storedSwaps.success ? storedSwaps.data : {},
+            collection: row.collection,
+            comfort: parsedComfort,
+            composition: storedSlots,
+          }))
 
       const availabilityStatus: SavedLookAvailabilityStatus =
         missingGarmentIds.size > 0
@@ -537,7 +575,7 @@ export class WardrobeSavedLookService {
         id: { in: ids },
         upload_status: 'ready',
         retention_status: 'active',
-        ...(input.source === 'today' ? { deletion_requested_at: null } : {}),
+        deletion_requested_at: null,
       },
       select: {
         id: true,
@@ -561,6 +599,17 @@ export class WardrobeSavedLookService {
     }
     if (input.source !== 'style_piece' || !input.anchorGarmentId) {
       return null
+    }
+    const byId = new Map(ownedGarments.map((item) => [item.id, item]))
+    if (
+      input.composition.some(
+        (slot) =>
+          slot.kind === 'garment' &&
+          slot.itemId !== input.anchorGarmentId &&
+          !matchesStylePieceCompanion(slot, byId.get(slot.itemId), input.weather)
+      )
+    ) {
+      throw new NotFoundException('GARMENT_NOT_FOUND')
     }
     const anchorRow = ownedGarments.find((item) => item.id === input.anchorGarmentId)
     if (!anchorRow || !anchorRow.category || !anchorRow.comfort_range) {

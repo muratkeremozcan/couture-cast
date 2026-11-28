@@ -1,5 +1,6 @@
 // Story CC-7.12 D7: a save confirmation's View closes the panel and opens the saved look's screen.
 import { router } from 'expo-router'
+import { Image as ExpoImage } from 'expo-image'
 import {
   useEffect,
   useLayoutEffect,
@@ -36,22 +37,27 @@ import {
   getStylePieceStrings,
   initialStylePieceWeather,
   isOfflineError,
+  isStylePieceOwnedCompanion,
   isStylePieceTagged,
   popLookUndoSnapshot,
   pushLookUndoSnapshot,
   SAMPLE_CATALOG,
   sampleGarmentText,
   SAMPLE_WEATHER,
-  savedLookToStylePieceRecipe,
+  reopenStylePieceRecipe,
+  savedStylePieceEditorRecipe,
   STYLE_PIECE_WEATHER_KEYS,
   stylePieceAnchor,
+  stylePieceCompanionOptions,
+  stylePieceLookHasCurrentCompanions,
   stylePieceLooks,
+  stylePieceOccasionLooks,
   stylePieceRecipeKey,
-  stylePieceSwapOptions,
-  visibleStylePieceLooks,
   type SampleGarmentCategory,
   type StylePieceWeatherKey,
-  type StylePieceLook,
+  type StylePieceOccasionLook,
+  type StylePieceOwnedCompanion,
+  type StylePieceCompanion,
   type StylePieceAnchor,
   type StylePiecePhotoAnchor,
   type StylePieceSelection,
@@ -201,11 +207,12 @@ export function StylePiecePanel({
   const palette = useHeroPalette()
   const insets = useModalInsets()
   const closeButton = useRef<ComponentRef<typeof Pressable> | null>(null)
-  const [{ anchor, piece, restoreWeatherFocus }, setInventoryView] = useState<{
+  const [{ anchor, owned, piece, restoreWeatherFocus }, setInventoryView] = useState<{
     anchor?: StylePiecePhotoAnchor | null
+    owned: readonly StylePieceOwnedCompanion[]
     piece: StylePieceAnchor
     restoreWeatherFocus: boolean
-  }>({ piece: selection, restoreWeatherFocus: false })
+  }>({ owned: [], piece: selection, restoreWeatherFocus: false })
   const refreshRef = useRef<InventoryRefresh | null>(null)
   const dismissRef = useRef(onDismiss)
   dismissRef.current = onDismiss
@@ -218,9 +225,10 @@ export function StylePiecePanel({
       garmentId: selection.id,
       load: loadInventory,
       isCurrent,
-      onAnchor: (next) => {
+      onAnchor: (next, nextOwned) => {
         setInventoryView((view) => ({
           anchor: next,
+          owned: nextOwned,
           piece: next
             ? {
                 category: next.category,
@@ -242,7 +250,10 @@ export function StylePiecePanel({
       if (active) void inventory.refresh()
     })
     const unsubscribe = subscribeMobileApplicationUser(() => {
-      if (!isCurrent()) inventory.stop()
+      if (!isCurrent()) {
+        inventory.stop()
+        setInventoryView((view) => ({ ...view, anchor: undefined, owned: [] }))
+      }
     })
     inventory.setVisible(
       AppState.currentState == null || AppState.currentState === 'active'
@@ -331,6 +342,7 @@ export function StylePiecePanel({
               initialSavedLook?.id ?? null,
             ])}
             anchor={inWardrobe ? anchor : null}
+            owned={inWardrobe ? owned : []}
             piece={piece}
             initialSavedLook={initialSavedLook}
             restoreWeatherFocus={restoreWeatherFocus}
@@ -391,6 +403,7 @@ function StylePieceUnavailable({
 
 function StylePieceIdeas({
   anchor,
+  owned,
   piece,
   initialSavedLook,
   restoreWeatherFocus,
@@ -407,6 +420,7 @@ function StylePieceIdeas({
   onViewSavedLook,
 }: {
   anchor: StylePiecePhotoAnchor | null | undefined
+  owned: readonly StylePieceOwnedCompanion[]
   piece: StylePieceAnchor
   initialSavedLook?: SavedLookContract | null
   restoreWeatherFocus: boolean
@@ -427,7 +441,7 @@ function StylePieceIdeas({
   const { category, comfortRange, subtype } = piece
   const photo = anchor?.photo
   const initialRecipe = initialSavedLook
-    ? savedLookToStylePieceRecipe(initialSavedLook)
+    ? savedStylePieceEditorRecipe(initialSavedLook)
     : null
   const [weather, setWeather] = useState<StylePieceWeatherKey>(
     () => initialRecipe?.weather ?? initialStylePieceWeather(piece)
@@ -569,7 +583,11 @@ function StylePieceIdeas({
     if (!(await inventory?.refresh()) || reopenAction.current !== action) return
     const fresh = currentPiece(inventory)
     if (!fresh) return
-    const recipe = savedLookToStylePieceRecipe(entry)
+    const recipe = reopenStylePieceRecipe(
+      entry,
+      { ...fresh, id: garmentId },
+      inventory?.currentCompanions() ?? []
+    )
     if (!recipe) return
     swapUndoStackRef.current = []
     statusBar.dismissNotice()
@@ -603,7 +621,8 @@ function StylePieceIdeas({
     )
 
   const result = stylePieceLooks(piece, weather)
-  const looks = visibleStylePieceLooks(result.looks, edits, {
+  const looks = stylePieceOccasionLooks(result.looks, edits, {
+    owned,
     reopenedLookId: reopened,
     editedLookId: latestEdit,
   })
@@ -665,7 +684,7 @@ function StylePieceIdeas({
         </View>
       )}
 
-      {looks.map((look, index) => {
+      {looks.map((look) => {
         const recipeKey = stylePieceRecipeKey(look.recipe)
         const compositionKey = look.companions
           .map((item) => `${item.category}=${item.id}`)
@@ -674,7 +693,8 @@ function StylePieceIdeas({
           <StylePieceCard
             key={recipeKey}
             look={look}
-            index={index}
+            owned={owned}
+            photoUnavailable={t('savedLooks.photoUnavailable')}
             owner={owner}
             compositionKey={compositionKey}
             resetNonce={savedResetNonce}
@@ -686,7 +706,14 @@ function StylePieceIdeas({
             onSave={async () => {
               const startSwapRevision = swapRevisionRef.current
               const fresh = await verifyAnchorForAction()
-              if (!fresh) return false
+              if (
+                !fresh ||
+                !stylePieceLookHasCurrentCompanions(
+                  look,
+                  refreshRef.current?.currentCompanions() ?? []
+                )
+              )
+                return false
               const payload = buildStylePieceSavedLookInput(
                 {
                   id: garmentId,
@@ -859,11 +886,11 @@ function StylePieceIdeas({
       {saved.length > 0 && (
         <View style={styles.group}>
           <Text accessibilityRole="header" style={[styles.label, text]}>
-            {labels.saved}
+            {t('savedLooks.title')}
           </Text>
           {saved.map((entry) => {
             const companionNames = entry.composition
-              .filter((slot) => slot.kind === 'catalog')
+              .filter((slot) => slot.slotIndex !== 0)
               .map((slot) => {
                 const item = CATALOG_BY_ID.get(slot.itemId)
                 return item
@@ -1091,9 +1118,42 @@ function StylePieceIdeas({
   )
 }
 
+function OwnedCompanionPhoto({
+  item,
+  unavailable,
+  palette,
+}: {
+  item: StylePieceOwnedCompanion
+  unavailable: string
+  palette: PreviewPalette
+}) {
+  const [failed, setFailed] = useState(false)
+  return item.photo && !failed ? (
+    <ExpoImage
+      source={{ uri: item.photo.url }}
+      cachePolicy="none"
+      contentFit="cover"
+      accessible={false}
+      style={styles.companionPhoto}
+      onError={() => setFailed(true)}
+    />
+  ) : (
+    <Text
+      testID="style-piece-companion-placeholder"
+      style={[
+        styles.companionPlaceholder,
+        { color: palette.ink, borderColor: palette.line },
+      ]}
+    >
+      {unavailable}
+    </Text>
+  )
+}
+
 function StylePieceCard({
   look,
-  index,
+  owned,
+  photoUnavailable,
   owner,
   compositionKey,
   resetNonce,
@@ -1107,8 +1167,9 @@ function StylePieceCard({
   onViewSaved,
   onSwap,
 }: {
-  look: StylePieceLook
-  index: number
+  look: StylePieceOccasionLook
+  owned: readonly StylePieceOwnedCompanion[]
+  photoUnavailable: string
   owner: string
   compositionKey: string
   resetNonce: number
@@ -1126,11 +1187,15 @@ function StylePieceCard({
   const swapInvoker = useRef<ComponentRef<typeof Pressable> | null>(null)
   const text = { color: palette.ink }
   const recipeKey = stylePieceRecipeKey(look.recipe)
+  const name = (item: StylePieceCompanion) =>
+    isStylePieceOwnedCompanion(item)
+      ? samples.values.category[item.category]
+      : sampleGarmentText(item, samples).name
 
   return (
     <View testID="style-piece-look" style={[styles.card, { borderColor: palette.line }]}>
       <Text accessibilityRole="header" style={[styles.label, text]}>
-        {formatPreviewString(labels.idea, { number: index + 1 })}
+        {labels.occasions[look.occasion]}
       </Text>
       <View style={styles.row}>
         {anchorPhoto}
@@ -1139,7 +1204,7 @@ function StylePieceCard({
             {labels.companions}
           </Text>
           {look.companions.map((item) => {
-            const options = stylePieceSwapOptions(look, item.category).filter(
+            const options = stylePieceCompanionOptions(look, item.category, owned).filter(
               ({ id }) => id !== item.id
             )
             const expanded = editing === item.category
@@ -1148,11 +1213,25 @@ function StylePieceCard({
             })
             return (
               <View key={item.category} style={styles.group}>
-                <View style={styles.piece}>
-                  <SampleGarmentArt garment={item} size={36} />
-                  <Text style={[styles.pieceName, text]}>
-                    {sampleGarmentText(item, samples).name}
-                  </Text>
+                <View
+                  style={styles.piece}
+                  testID={
+                    isStylePieceOwnedCompanion(item)
+                      ? 'style-piece-owned-companion'
+                      : undefined
+                  }
+                >
+                  {isStylePieceOwnedCompanion(item) ? (
+                    <OwnedCompanionPhoto
+                      key={item.photo?.url}
+                      item={item}
+                      unavailable={photoUnavailable}
+                      palette={palette}
+                    />
+                  ) : (
+                    <SampleGarmentArt garment={item} size={36} />
+                  )}
+                  <Text style={[styles.pieceName, text]}>{name(item)}</Text>
                 </View>
                 {options.length > 0 && (
                   <PreviewButton
@@ -1168,7 +1247,7 @@ function StylePieceCard({
                   options.map((option) => (
                     <PreviewButton
                       key={option.id}
-                      label={sampleGarmentText(option, samples).name}
+                      label={name(option)}
                       testID={`style-piece-option-${option.id}`}
                       palette={palette}
                       onPress={() => {
@@ -1230,6 +1309,14 @@ const styles = StyleSheet.create({
   anchor: { width: 94, alignSelf: 'flex-start', gap: 4 },
   photo: { width: '100%', aspectRatio: 0.75, borderRadius: 8 },
   companions: { flexGrow: 1, flexShrink: 1, flexBasis: 145, gap: 8 },
+  companionPhoto: { width: 36, height: 36, borderRadius: 8 },
+  companionPlaceholder: {
+    maxWidth: 76,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 4,
+    fontSize: 12,
+  },
   piece: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pieceName: { flex: 1 },
 })
