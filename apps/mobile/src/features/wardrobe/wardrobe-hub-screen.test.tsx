@@ -1,5 +1,7 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 85: Add several photos at once.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-85-add-several-photos-at-once
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 // Learning path Step 61: Import device-saved looks for the same member.
@@ -1521,6 +1523,48 @@ describe('WardrobeHubScreen', () => {
     await waitFor(() => {
       expect(screen.getByTestId('garment-tagging-modal')).toBeInTheDocument()
     })
+  })
+
+  it('refreshes a batch commit until it needs tags and keeps tag review in Closet', async () => {
+    const garmentId = 'batch-closet-garment'
+    const settling = deferred()
+    let listReads = 0
+    imagePicker.launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file:///library-shot.png', width: 900, height: 900 }],
+    })
+    server.use(
+      ...captureUploadHandlers(garmentId, 'processing'),
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        listReads += 1
+        if (listReads === 1) return HttpResponse.json({ data: [] })
+        await settling.promise
+        return HttpResponse.json({ data: [garmentFixture({ id: garmentId })] })
+      })
+    )
+
+    try {
+      renderScreen([0, 1])
+      await screen.findByText('No pieces yet')
+      await browserUser.click(await screen.findByTestId('garment-capture-open'))
+      await browserUser.click(await screen.findByTestId('garment-batch-picker'))
+      await browserUser.click(await screen.findByTestId('garment-batch-keep-1'))
+      await browserUser.click(screen.getByRole('button', { name: 'Add 1 piece' }))
+      await screen.findByText('Saved', { exact: true })
+      await browserUser.click(screen.getByTestId('garment-batch-done'))
+      const card = screen.getByTestId(`garment-card-${garmentId}`)
+      expect(within(card).getByTestId('garment-status-processing')).toBeVisible()
+      await waitFor(() => expect(listReads).toBe(2))
+
+      settling.resolve()
+      expect(
+        await within(card).findByTestId('garment-status-awaiting_tags')
+      ).toBeVisible()
+      expect(screen.queryByTestId('garment-tagging-modal')).toBeNull()
+      expect(screen.queryByTestId('wardrobe-error-banner')).toBeNull()
+    } finally {
+      settling.resolve()
+    }
   })
 
   it('4.4-MOB-HUB-03B polls a still-processing commit until it needs tags, then opens tagging (regression, 4.4-R05)', async () => {

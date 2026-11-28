@@ -136,5 +136,10 @@ test.describe('Wardrobe batch capture @local-lane', () => {
       [first.garmentId, second.garmentId].sort()
     )
     expect(inventory.every(({ committedAt }) => committedAt !== null)).toBe(true)
+    await expect(page.getByTestId(`garment-card-${first.garmentId}`)).toBeVisible()
+    await expect(page.getByTestId(`garment-card-${second.garmentId}`)).toBeVisible()
+    await expect(page.getByRole('dialog', { name: 'Organize Garment Tags' })).toHaveCount(
+      0
+    )
   })
 })

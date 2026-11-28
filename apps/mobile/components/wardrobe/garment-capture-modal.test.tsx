@@ -406,9 +406,20 @@ describe('MobileGarmentCaptureModal', () => {
 
     imagePicker.launchImageLibraryAsync.mockResolvedValueOnce({
       canceled: false,
-      assets: [original],
+      assets: [{ ...original, width: 700 }],
     })
     await browserUser.click(retry)
+    expect(
+      await secondRow.findByText('Choose the original photo to retry.')
+    ).toBeVisible()
+    expect(commits).toHaveLength(2)
+    expect([...fileSystem.files.keys()]).toEqual([original.uri])
+
+    imagePicker.launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [original],
+    })
+    await browserUser.click(screen.getByTestId('garment-batch-retry-2'))
     expect(await secondRow.findByText('Saved')).toBeVisible()
     expect(imagePicker.launchImageLibraryAsync).toHaveBeenLastCalledWith({
       mediaTypes: ['images'],
@@ -440,6 +451,65 @@ describe('MobileGarmentCaptureModal', () => {
     expect([...fileSystem.files.keys()]).toEqual([original.uri])
     await browserUser.click(screen.getByTestId('garment-batch-done'))
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('recovers from a canceled picker and a picker error, then shows an invalid asset row', async () => {
+    imagePicker.launchImageLibraryAsync
+      .mockResolvedValueOnce({ canceled: true, assets: null })
+      .mockRejectedValueOnce(new Error('Picker unavailable'))
+      .mockResolvedValueOnce({
+        canceled: false,
+        assets: [{ ...libraryAsset, width: 200 }],
+      })
+    renderModal({ onBatchGarmentCommitted: vi.fn() })
+    const picker = screen.getByTestId('garment-batch-picker')
+
+    await browserUser.click(picker)
+    expect(screen.queryByTestId('garment-batch-row-1')).toBeNull()
+    await browserUser.click(picker)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not open the photo library.'
+    )
+    await browserUser.click(picker)
+    expect(await screen.findByText('This photo could not be prepared.')).toBeVisible()
+    expect(screen.getByTestId('garment-batch-add')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    expect(imageManipulator.manipulateAsync).not.toHaveBeenCalled()
+  })
+
+  it('shows sign-in guidance and stops the batch when the API rejects the session', async () => {
+    imagePicker.launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [libraryAsset, cameraAsset],
+    })
+    const allocate = vi.fn()
+    server.use(
+      http.post('*/api/v1/wardrobe/upload-url', () => {
+        allocate()
+        return HttpResponse.json({ message: 'SIGNED_OUT' }, { status: 401 })
+      })
+    )
+    const onBatchGarmentCommitted = vi.fn()
+    renderModal({ onBatchGarmentCommitted })
+
+    await browserUser.click(screen.getByTestId('garment-batch-picker'))
+    await browserUser.click(await screen.findByTestId('garment-batch-keep-1'))
+    await browserUser.click(await screen.findByTestId('garment-batch-keep-2'))
+    await browserUser.click(screen.getByRole('button', { name: 'Add 2 pieces' }))
+
+    expect(await screen.findByTestId('garment-batch-blocked')).toHaveTextContent(
+      'wardrobe.error.sign_in_required'
+    )
+    expect(allocate).toHaveBeenCalledOnce()
+    expect(onBatchGarmentCommitted).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
+    expect(screen.queryByTestId('garment-batch-preview-2')).toBeNull()
+    expect(screen.getByTestId('garment-batch-done')).not.toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
   })
 
   it('[7.28-CLEANUP-001] retires only app-owned picker copies returned after an account switch', async () => {

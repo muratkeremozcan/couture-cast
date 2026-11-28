@@ -1,7 +1,31 @@
 // Learning path Step 85: Add several photos at once.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-85-add-several-photos-at-once
 import { assert, describe, expect, it, vi } from 'vitest'
+import { GUEST_PREVIEW_LOCALES } from '../sample-wardrobe/strings'
 import { GarmentPhotoBatch } from './garment-photo-batch'
+import { garmentPhotoBatchStrings } from './garment-photo-batch-strings'
+
+describe('garmentPhotoBatchStrings', () => {
+  it.each(GUEST_PREVIEW_LOCALES)(
+    'formats a numbered photo and each Add count in %s',
+    (locale) => {
+      const copy = garmentPhotoBatchStrings(locale)
+      expect(copy.photo(5)).toContain('5')
+      expect(copy.photo(5)).not.toContain('{count}')
+      expect(copy.add(0)).toContain('0')
+      expect(copy.add(1)).toBe(copy.addOne)
+      expect(copy.add(4)).toContain('4')
+      expect(copy.add(4)).not.toContain('{count}')
+    }
+  )
+
+  it.each([undefined, 'unknown-locale'])('uses English copy for %s', (locale) => {
+    const copy = garmentPhotoBatchStrings(locale)
+    expect(copy.photo(2)).toBe('Photo 2')
+    expect(copy.add(1)).toBe('Add 1 piece')
+    expect(copy.add(4)).toBe('Add 4 pieces')
+  })
+})
 
 function photo(source: string) {
   return { image: `crop:${source}`, preview: `preview:${source}`, fingerprint: source }
@@ -23,6 +47,8 @@ function setup() {
     ) => Promise<string>
   >((image) => Promise.resolve(`saved:${image}`))
   const onCommitted = vi.fn<(result: string) => void>()
+  const classifyBlock =
+    vi.fn<(error: unknown) => 'consentRequired' | 'signedOut' | undefined>()
   const batch = new GarmentPhotoBatch(
     {
       isCurrent: (session: string) => session === owner,
@@ -31,6 +57,7 @@ function setup() {
       releasePrepared,
       upload,
       onCommitted,
+      classifyBlock,
     },
     vi.fn()
   )
@@ -53,6 +80,7 @@ function setup() {
     releasePrepared,
     upload,
     onCommitted,
+    classifyBlock,
     changeOwner: () => {
       owner = 'member-b'
     },
@@ -234,6 +262,101 @@ describe('GarmentPhotoBatch', () => {
     expect(prepare).not.toHaveBeenCalled()
     expect(upload).not.toHaveBeenCalled()
   })
+
+  it('keeps the current picker after a stale cancel and recovers after an empty selection', async () => {
+    const { batch, open, prepare, changeOwner } = setup()
+    const retiredPick = open()
+    batch.cancelPicker(retiredPick, 'pickerFailed')
+    const currentPick = open()
+    batch.cancelPicker(retiredPick)
+    await batch.accept(currentPick, [])
+    expect(batch.state).toMatchObject({
+      phase: 'source',
+      rows: [],
+      pickerError: undefined,
+    })
+
+    changeOwner()
+    expect(batch.open('member-a')).toBeNull()
+    batch.toggleKeep(1)
+    await batch.accept(open(), ['coat'])
+    expect(batch.open('member-b')).toBeNull()
+    expect(prepare.mock.calls.map(([source]) => source)).toEqual(['coat'])
+  })
+
+  it('guards an active retry and recovers from too many or unreadable replacements', async () => {
+    const { batch, open, openRetry, prepare, releaseSource, upload, changeOwner } =
+      setup()
+    upload.mockRejectedValueOnce(new Error('Response lost'))
+    await batch.accept(open(), ['coat'])
+    batch.toggleKeep(1)
+    await batch.save()
+    batch.toggleKeep(1)
+    expect(batch.state.keptCount).toBe(1)
+
+    const retry = openRetry(1)
+    expect(batch.openRetry(1)).toBeNull()
+    await batch.accept(retry, ['first', 'second'])
+    expect(batch.state.pickerError).toBe('tooMany')
+    expect(releaseSource.mock.calls.map(([source]) => source)).toEqual([
+      'coat',
+      'first',
+      'second',
+    ])
+    prepare.mockRejectedValueOnce(new Error('Unreadable replacement'))
+    await batch.accept(openRetry(1), ['unreadable'])
+    expect(batch.state.rows[0]).toMatchObject({ status: 'failed', differentPhoto: true })
+
+    const replacement = hold<ReturnType<typeof photo>>()
+    prepare.mockReturnValueOnce(replacement.promise)
+    const pending = batch.accept(openRetry(1), ['coat'])
+    expect(batch.openRetry(1)).toBeNull()
+    changeOwner()
+    expect(batch.openRetry(1)).toBeNull()
+    batch.reset()
+    replacement.resolve(photo('coat'))
+    await pending
+    expect(upload).toHaveBeenCalledTimes(1)
+    expect(batch.state.rows).toEqual([])
+  })
+
+  it.each(['consentRequired', 'signedOut'] as const)(
+    'preserves saved rows and clears the remaining previews on %s',
+    async (reason) => {
+      const { batch, open, classifyBlock, upload, onCommitted, releasePrepared } = setup()
+      const refusal = new Error('Account cannot upload')
+      classifyBlock.mockImplementation((error) =>
+        error === refusal ? reason : undefined
+      )
+      upload.mockResolvedValueOnce('saved:coat').mockRejectedValueOnce(refusal)
+      await batch.accept(open(), ['coat', 'boots', 'skirt'])
+      for (const rowId of [1, 2, 3]) batch.toggleKeep(rowId)
+      await batch.save()
+
+      expect(classifyBlock).toHaveBeenCalledExactlyOnceWith(refusal)
+      expect(batch.state).toMatchObject({
+        blocked: reason,
+        busy: false,
+        phase: 'results',
+      })
+      expect(batch.state.rows.map(({ status, preview }) => [status, preview])).toEqual([
+        ['saved', undefined],
+        ['failed', undefined],
+        ['failed', undefined],
+      ])
+      expect(onCommitted).toHaveBeenCalledExactlyOnceWith('saved:coat')
+      expect(upload.mock.calls.map(([image]) => image)).toEqual([
+        'crop:coat',
+        'crop:boots',
+      ])
+      expect(releasePrepared.mock.calls.map(([prepared]) => prepared)).toEqual([
+        photo('coat'),
+        photo('boots'),
+        photo('skirt'),
+      ])
+      expect(batch.openRetry(2)).toBeNull()
+    }
+  )
 
   it('aborts an upload and discards its late result without starting the next row', async () => {
     const { batch, open, changeOwner, upload, releasePrepared, onCommitted } = setup()
