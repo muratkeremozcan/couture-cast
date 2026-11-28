@@ -186,6 +186,9 @@ export function memberLookbookWeatherReason(
   locale: string | undefined
 ): string {
   const strings = getGuestPreviewStrings(locale)
+  if (result.context.windLayer && !result.context.rainReady) {
+    return strings.values.weather[result.context.weather]
+  }
   for (const key of ['layer-rain', 'layer-cold', 'no-layer']) {
     const reason = result.explanation.find((item) => item.key === key)
     if (reason)
