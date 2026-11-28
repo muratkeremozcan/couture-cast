@@ -55,7 +55,11 @@ export interface WardrobeStorage {
   createUploadSession(objectPath: string): Promise<WardrobeUploadSession>
   download(objectPath: string): Promise<Buffer>
   /** The object's bytes, read with a hard ceiling; see {@link BoundedDownload}. */
-  downloadBounded(objectPath: string, maxBytes: number): Promise<BoundedDownload>
+  downloadBounded(
+    objectPath: string,
+    maxBytes: number,
+    signal?: AbortSignal
+  ): Promise<BoundedDownload>
   /**
    * Writes verified bytes to a final path with server-owned metadata (content type and the
    * private cache policy), overwriting whatever is there. Final paths are never signed, so only
@@ -282,7 +286,11 @@ export class SupabaseWardrobeStorageAdapter implements WardrobeStorage {
    * the whole body before returning, which would let an oversized object reach memory before
    * the verifier could refuse it.
    */
-  async downloadBounded(objectPath: string, maxBytes: number): Promise<BoundedDownload> {
+  async downloadBounded(
+    objectPath: string,
+    maxBytes: number,
+    signal?: AbortSignal
+  ): Promise<BoundedDownload> {
     if (!this.url || !this.serviceRoleKey) {
       throw storageUnavailable('configure')
     }
@@ -295,6 +303,9 @@ export class SupabaseWardrobeStorageAdapter implements WardrobeStorage {
             Authorization: `Bearer ${this.serviceRoleKey}`,
             apikey: this.serviceRoleKey,
           },
+          signal,
+          redirect: 'error',
+          cache: 'no-store',
         }
       )
     } catch (error) {

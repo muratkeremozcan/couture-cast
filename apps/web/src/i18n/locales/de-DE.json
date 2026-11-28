@@ -1040,6 +1040,23 @@
     }
   },
   "settings": {
+    "photoAi": {
+      "heading": "Foto-KI",
+      "off": "Die externe Foto-KI ist ausgeschaltet.",
+      "manual": "Du kannst weiterhin selbst Beschreibungen schreiben, Kleidungsstücke hinzufügen und Tags auswählen.",
+      "revoke": "Widerrufen",
+      "revokeLabel": "Berechtigung für {{feature}} ({{provider}}) widerrufen",
+      "loadError": "Die Fotoberechtigungen konnten nicht geladen werden.",
+      "revokeError": "Der Widerruf konnte nicht bestätigt werden. Versuch es erneut.",
+      "revoked": "Berechtigung widerrufen.",
+      "retry": "Erneut versuchen",
+      "features": {
+        "community-description": "Community-Beschreibungen",
+        "garment-cutout": "Freistellen von Kleidungsstücken",
+        "garment-tags": "Kleidungs-Tags",
+        "flat-lay-garments": "Erkennung flach ausgelegter Kleidung"
+      }
+    },
     "profile": {
       "account": "Konto",
       "places": "Orte",

@@ -31,6 +31,10 @@ function extractComplianceState(
   return compliance as Record<string, unknown>
 }
 
+export function isActiveAccount(preferences: Prisma.JsonValue | null | undefined) {
+  return extractComplianceState(preferences).accountStatus === 'active'
+}
+
 /**
  * The teen lock RequestAuthGuard applies, as a pure rule. Under `required_13_15` a teen whose
  * account is not active or still needs guardian consent is refused on every signed-in endpoint.
@@ -143,9 +147,7 @@ export class GuardianConsentStateService {
       where: { id: userId },
       select: { profile: { select: { preferences: true } } },
     })
-    return (
-      extractComplianceState(profile?.profile?.preferences).accountStatus === 'active'
-    )
+    return isActiveAccount(profile?.profile?.preferences)
   }
 
   canTeenViewPrivateGarmentPhotos(userId: string): Promise<boolean> {

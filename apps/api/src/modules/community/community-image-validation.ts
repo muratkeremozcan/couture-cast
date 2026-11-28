@@ -217,6 +217,7 @@ export async function verifyAndNormalizeCommunityImage(
 ): Promise<NormalizedCommunityImage> {
   checkImageSignal(signal)
   const sniffedMime = verifyDeclaration(bytes, declaration)
+  let encoded: Buffer | undefined
 
   try {
     const { format, pipeline } = await openVerifiedImage(
@@ -227,9 +228,11 @@ export async function verifyAndNormalizeCommunityImage(
     )
 
     const output = pipeline.rotate().toFormat(format)
-    const { data, info } = await runAbortableSharp(output, signal, () =>
-      output.toBuffer({ resolveWithObject: true })
-    )
+    const { data, info } = await runAbortableSharp(output, signal, async () => {
+      const result = await output.toBuffer({ resolveWithObject: true })
+      encoded = result.data
+      return result
+    })
 
     assertDimensionsInRange(info.width, info.height)
 
@@ -242,6 +245,7 @@ export async function verifyAndNormalizeCommunityImage(
       heightPx: info.height,
     }
   } catch (error) {
+    encoded?.fill(0)
     if (error instanceof CommunityImageValidationError) {
       throw error
     }

@@ -71,6 +71,7 @@ import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announc
 import { useAppTheme } from '@/src/theme/theme-context'
 import { resolveThemePalette } from '@/src/theme/theme-palettes'
 import { TAB_BODY_INSET, useTokens } from '@/src/theme/tokens'
+import { PhotoAiConsentSettings } from './photo-ai-consent-settings'
 
 /** Exported so the screen test advances virtual time by the real bound rather
  *  than by a copy of it that silently stops matching when this changes. */
@@ -216,10 +217,12 @@ function OwnerSettings({ children }: { children: ReactNode }) {
 }
 
 export function AccountSettingsScreen() {
+  const signedIn = useMemberSignedIn()
   return (
     <TopicBody testID="settings-account-screen">
       <OwnerSettings>
-        <ProfileAccountHeader />
+        <ProfileAccountHeader signedIn={signedIn} />
+        <PhotoAiConsentSettings signedIn={signedIn} />
         <AccountDiagnostics />
       </OwnerSettings>
     </TopicBody>
@@ -1684,10 +1687,9 @@ function PaletteCard({
   )
 }
 
-function ProfileAccountHeader() {
+function ProfileAccountHeader({ signedIn }: { signedIn: boolean | null }) {
   const { t } = useTranslation()
   const tone = useSettingsTone()
-  const signedIn = useMemberSignedIn()
   const [account, setAccount] = useState<{
     displayName: string | null
     email: string

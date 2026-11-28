@@ -302,6 +302,7 @@ export class SupabaseCommunityStorageAdapter implements CommunityStorage {
           headers: { Authorization: `Bearer ${key}`, apikey: key },
           signal: controller.signal,
           redirect: 'error',
+          cache: 'no-store',
         }
       )
       reader = response.body?.getReader()

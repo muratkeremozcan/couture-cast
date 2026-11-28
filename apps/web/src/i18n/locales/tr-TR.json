@@ -1040,6 +1040,23 @@
     }
   },
   "settings": {
+    "photoAi": {
+      "heading": "Fotoğraflar için yapay zekâ",
+      "off": "Fotoğraflar için harici yapay zekâ kapalı.",
+      "manual": "Açıklamaları yazmaya, kıyafet eklemeye ve etiketleri seçmeye devam edebilirsin.",
+      "revoke": "İzni kaldır",
+      "revokeLabel": "{{feature}} ({{provider}}) iznini kaldır",
+      "loadError": "Fotoğraf izinleri yüklenemedi.",
+      "revokeError": "İznin kaldırıldığı doğrulanamadı. Tekrar dene.",
+      "revoked": "İzin kaldırıldı.",
+      "retry": "Tekrar dene",
+      "features": {
+        "community-description": "Topluluk açıklamaları",
+        "garment-cutout": "Kıyafet arka planını kaldırma",
+        "garment-tags": "Kıyafet etiketleri",
+        "flat-lay-garments": "Düz zemindeki kıyafetleri algılama"
+      }
+    },
     "profile": {
       "account": "Hesap",
       "places": "Yerler",
