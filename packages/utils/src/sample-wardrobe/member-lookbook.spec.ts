@@ -228,15 +228,15 @@ describe('CC-7.22 member lookbook', () => {
 
   it.each([
     ['en-US', 'Pin'],
+    ['en-CA', 'Pin'],
     ['de-DE', 'Anheften'],
-    ['es-ES', 'Fijar'],
+    ['es-419', 'Fijar'],
+    ['fr-CA', 'Épingler'],
     ['fr-FR', 'Épingler'],
     ['it-IT', 'Fissa'],
-    ['ja-JP', '固定'],
-    ['ko-KR', '고정'],
     ['pt-BR', 'Fixar'],
+    ['pt-PT', 'Fixar'],
     ['tr-TR', 'Sabitle'],
-    ['zh-CN', '固定'],
     ['unknown', 'Pin'],
     [undefined, 'Pin'],
   ])('localizes the pin and reset controls for %s', (locale, pin) => {

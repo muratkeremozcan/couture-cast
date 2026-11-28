@@ -645,12 +645,15 @@ describe('Screen budget: native Today', () => {
       await requested
       expect(screen.queryByTestId('home-closet-strip')).toBeNull()
       expect(screen.queryByTestId('home-add-garment')).toBeNull()
+      expect(screen.getByTestId('today-primary-action')).toBeVisible()
     } finally {
       releaseGarments()
     }
     expect(await screen.findByTestId('home-add-garment')).toHaveAccessibleName(
       'Add a piece'
     )
+    expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
+    expect(screen.queryByTestId('today-primary-action')).toBeNull()
   }, 30_000)
 
   for (const [id, fixture] of PROBES) {
