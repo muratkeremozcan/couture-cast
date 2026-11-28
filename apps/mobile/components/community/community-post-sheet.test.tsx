@@ -2,6 +2,8 @@
 // Story 6.1 Task 8 owner: the compose sheet.
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Learning path Step 82: Suggested Community descriptions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-82-suggested-community-descriptions
 // Story CC-7.11 test owner (TEA): 7.11-NAT-032, 7.11-NAT-033, the compose header is the layer's
 // swipe handle beside its X. [Codex 7.11 #3]: X and a swipe share one guarded close, so a draft
 // with a photo or text asks "Discard this post?" first (Keep editing or Discard).
@@ -139,12 +141,17 @@ import {
   CommunityRequestError,
   allocateCommunityLookFromMobile,
 } from '@/src/lib/community'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+import {
+  mobileApplicationUserId,
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
 import { press } from '@/src/test-utils/press'
 import { dragFrom } from '@/src/test-utils/layer-swipe'
 import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
 import { setViewport } from '@/src/test-utils/viewport'
 import { drainMacrotask } from '@/src/test-utils/drain-macrotask'
+import { trackJsonBodies } from '@/src/test-utils/late-response'
 import { server } from '@/src/test-utils/msw/server'
 import {
   CommunityPostSheet,
@@ -205,6 +212,14 @@ function allocateSession(overrides: Record<string, unknown> = {}) {
       ...overrides,
     },
   }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
 }
 
 const errorEnvelope = (
@@ -330,22 +345,188 @@ describe('CommunityPostSheet (Story 6.1)', () => {
   })
 
   it('adds the photo suggestion to the editable description and publishes the edited version', async () => {
+    const describe = vi.fn()
+    const publish = vi.fn()
     server.use(
-      http.post('*/api/v1/community/posts/describe', () =>
-        HttpResponse.json({ data: { caption: 'This photo features blue tones.' } })
-      )
+      http.post('*/api/v1/community/posts/describe', async ({ request }) => {
+        describe(await request.json())
+        return HttpResponse.json({ data: { caption: 'This photo features blue tones.' } })
+      }),
+      http.post('*/api/v1/community/posts/publish', async ({ request }) => {
+        publish(await request.json())
+        return HttpResponse.json({ data: publishedItem })
+      })
     )
     const { onPublished } = renderSheet()
+    expect(screen.queryByTestId('community-suggest-description')).toBeNull()
     await pickAndAllocate()
-    press(screen.getByTestId('community-suggest-description'))
     const caption = screen.getByTestId('community-caption-input')
+    expect(caption).toHaveValue('')
+    expect(describe).not.toHaveBeenCalled()
+    const suggestion = screen.getByTestId('community-suggest-description')
+    expect(screen.getAllByRole('button', { name: 'Suggest a description' })).toEqual([
+      suggestion,
+    ])
+    press(suggestion)
     await waitFor(() => expect(caption).toHaveValue('This photo features blue tones.'))
-    fireEvent.change(caption, { target: { value: 'Blue tones are my favorite.' } })
-    expect(caption).toHaveValue('Blue tones are my favorite.')
+    expect(describe).toHaveBeenCalledExactlyOnceWith({
+      postId: 'post-new-42',
+      uploadSessionId: 'session-42',
+    })
+    expect(screen.getByTestId('community-description-suggested')).toHaveTextContent(
+      'Suggested'
+    )
+    const editedCaption = 'Blue tones are my favorite.'
+    fireEvent.change(caption, { target: { value: editedCaption } })
+    expect(caption).toHaveValue(editedCaption)
+    expect(screen.queryByTestId('community-description-suggested')).toBeNull()
     expect(screen.queryByTestId('community-suggest-description')).toBeNull()
     press(screen.getByTestId('community-confirm-alt-text'))
     press(screen.getByTestId('community-publish-button'))
     await waitFor(() => expect(onPublished).toHaveBeenCalledOnce())
+    expect(publish).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ caption: editedCaption })
+    )
+  })
+
+  it('ignores the earlier photo reply and can suggest text for the replacement upload', async () => {
+    const firstRequest = vi.fn()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const release = deferred<void>()
+    const secondAltText = 'An outfit photographed beside a window.'
+    server.use(
+      http.post(
+        '*/api/v1/community/posts/describe',
+        async () => {
+          firstRequest()
+          await release.promise
+          return HttpResponse.json({
+            data: { caption: 'The first photo has blue tones.' },
+          })
+        },
+        { once: true }
+      ),
+      http.post('*/api/v1/community/posts/describe', () =>
+        HttpResponse.json({ data: { caption: 'The second photo has gold tones.' } })
+      )
+    )
+    renderSheet()
+    await pickAndAllocate()
+    press(screen.getByTestId('community-suggest-description'))
+    try {
+      await waitFor(() => expect(firstRequest).toHaveBeenCalledOnce())
+      // The MSW worker reconstructs its Request and cannot see the caller's abort signal.
+      const signal = fetchSpy.mock.calls.find(
+        ([url]) =>
+          typeof url === 'string' && url.endsWith('/api/v1/community/posts/describe')
+      )?.[1]?.signal
+      expect(signal?.aborted).toBe(false)
+      imagePicker.launchImageLibraryAsync.mockResolvedValueOnce({
+        canceled: false,
+        assets: [{ uri: 'file:///replacement.jpg', width: 1200, height: 1200 }],
+      })
+      server.use(
+        http.post('*/api/v1/community/posts/allocate', () =>
+          HttpResponse.json(
+            allocateSession({
+              postId: 'post-new-43',
+              uploadSessionId: 'session-43',
+              altTextSuggestion: secondAltText,
+            })
+          )
+        )
+      )
+      press(screen.getByTestId('community-change-image-button'))
+      await waitFor(() =>
+        expect(screen.getByTestId('community-alt-text-input')).toHaveValue(secondAltText)
+      )
+      await waitFor(() => expect(signal?.aborted).toBe(true))
+    } finally {
+      await act(async () => {
+        release.resolve()
+        await release.promise
+      })
+    }
+    const caption = screen.getByTestId('community-caption-input')
+    expect(caption).toHaveValue('')
+    expect(screen.queryByTestId('community-description-suggested')).toBeNull()
+    press(screen.getByTestId('community-suggest-description'))
+    await waitFor(() => expect(caption).toHaveValue('The second photo has gold tones.'))
+    expect(screen.getByTestId('community-description-suggested')).toHaveTextContent(
+      'Suggested'
+    )
+    press(screen.getByTestId('community-accept-description'))
+    expect(screen.queryByTestId('community-description-suggested')).toBeNull()
+    expect(caption).toHaveValue('The second photo has gold tones.')
+  })
+
+  it('discards the pending reply when the current member changes', async () => {
+    const started = vi.fn()
+    const release = deferred<void>()
+    const previousMember = mobileApplicationUserId()
+    const responses = trackJsonBodies('/api/v1/community/posts/describe')
+    server.use(
+      http.post('*/api/v1/community/posts/describe', async () => {
+        started()
+        await release.promise
+        return HttpResponse.json({
+          data: { caption: 'The earlier member has blue tones.' },
+        })
+      })
+    )
+    setMobileApplicationUserId('first-member')
+    try {
+      renderSheet()
+      await pickAndAllocate()
+      press(screen.getByTestId('community-suggest-description'))
+      await waitFor(() => expect(started).toHaveBeenCalledOnce())
+      act(() => setMobileApplicationUserId('second-member'))
+      release.resolve()
+      await responses.settled()
+      expect(screen.getByTestId('community-caption-input')).toHaveValue('')
+      expect(screen.queryByTestId('community-description-suggested')).toBeNull()
+    } finally {
+      release.resolve()
+      act(() => setMobileApplicationUserId(previousMember))
+    }
+  })
+
+  it('returns to manual entry at five seconds while the bearer read is stalled', async () => {
+    const describe = vi.fn()
+    server.use(
+      http.post('*/api/v1/community/posts/describe', () => {
+        describe()
+        return HttpResponse.json({ data: { caption: 'A belated description.' } })
+      })
+    )
+    renderSheet()
+    await pickAndAllocate()
+    const token = deferred<string>()
+    const readToken = vi.fn(() => token.promise)
+    const restore = setMobileAccessTokenResolver(readToken)
+    const suggest = screen.getByTestId('community-suggest-description')
+    vi.useFakeTimers()
+    try {
+      press(suggest)
+      await act(async () => await vi.advanceTimersByTimeAsync(4_999))
+      expect(readToken).toHaveBeenCalledOnce()
+      expect(suggest).toHaveAttribute('aria-disabled', 'true')
+      await act(async () => await vi.advanceTimersByTimeAsync(1))
+      expect(screen.getByText(/could not suggest a description/i)).toBeVisible()
+    } finally {
+      vi.useRealTimers()
+      restore()
+      await act(async () => {
+        token.resolve('session-token')
+        await token.promise
+        await drainMacrotask()
+      })
+    }
+    expect(describe).not.toHaveBeenCalled()
+    const caption = screen.getByTestId('community-caption-input')
+    expect(caption).toHaveValue('')
+    fireEvent.change(caption, { target: { value: 'My manual description.' } })
+    expect(caption).toHaveValue('My manual description.')
   })
 
   it.each(['verified', 'hidden', 'close', 'identity'] as const)(

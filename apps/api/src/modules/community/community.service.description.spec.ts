@@ -1,6 +1,8 @@
+// Learning path Step 82: Suggested Community descriptions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-82-suggested-community-descriptions
 import { createHash } from 'node:crypto'
 import sharp from 'sharp'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ForbiddenException, ServiceUnavailableException } from '@nestjs/common'
 import { CommunityObjectDownloadError } from './community-storage.adapter'
 import { CommunityRateLimitException } from './community-rate-limit.exception'
@@ -16,6 +18,14 @@ const input = {
   uploadSessionId: '1ac688b8-a0ea-4e32-91c1-ee2931fbd10c',
 }
 const path = `community/${input.postId}/${input.uploadSessionId}.png`
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
 
 function draft(overrides = {}) {
   return {
@@ -60,6 +70,63 @@ describe('Community draft photo caption', () => {
       bytes.length,
       expect.any(AbortSignal)
     )
+  })
+
+  it('includes eligibility in the five-second budget and stops before reading the photo', async () => {
+    vi.useFakeTimers()
+    const { service, assertDraftCaptionAccess, findPostById, downloadBounded } =
+      createService()
+    const eligibility = deferred<void>()
+    assertDraftCaptionAccess.mockReturnValueOnce(eligibility.promise)
+    const settled = vi.fn()
+    const attempt = service.describeDraft({ userId: viewerUserId, input })
+    const outcome = attempt.then(settled, settled)
+
+    try {
+      await vi.advanceTimersByTimeAsync(4_999)
+      expect(assertDraftCaptionAccess).toHaveBeenCalledOnce()
+      expect(settled).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(attempt).rejects.toMatchObject({ status: 503 })
+    } finally {
+      eligibility.resolve()
+    }
+
+    await outcome
+    await vi.advanceTimersByTimeAsync(0)
+    expect(findPostById).not.toHaveBeenCalled()
+    expect(downloadBounded).not.toHaveBeenCalled()
+  })
+
+  it('aborts a stalled private read at five seconds and discards the late image', async () => {
+    const { service, assertDraftCaptionAccess, findPostById, downloadBounded } =
+      createService()
+    const { post, bytes } = await validDraft()
+    vi.useFakeTimers()
+    const storage = deferred<Buffer>()
+    findPostById.mockResolvedValue(post)
+    downloadBounded.mockReturnValueOnce(storage.promise)
+    const settled = vi.fn()
+    const attempt = service.describeDraft({ userId: viewerUserId, input })
+    const outcome = attempt.then(settled, settled)
+
+    try {
+      await vi.advanceTimersByTimeAsync(4_999)
+      expect(downloadBounded).toHaveBeenCalledOnce()
+      const signal = downloadBounded.mock.calls[0]?.[2]
+      expect(signal?.aborted).toBe(false)
+      expect(settled).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(attempt).rejects.toMatchObject({ status: 503 })
+      expect(signal?.aborted).toBe(true)
+    } finally {
+      storage.resolve(bytes)
+    }
+
+    await outcome
+    await vi.advanceTimersByTimeAsync(0)
+    expect(assertDraftCaptionAccess).toHaveBeenCalledOnce()
+    expect(findPostById).toHaveBeenCalledOnce()
   })
 
   it.each([

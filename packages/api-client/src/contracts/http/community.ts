@@ -883,7 +883,20 @@ export type DescribeCommunityDraftInput = z.infer<
 
 export const describeCommunityDraftResponseSchema = z
   .object({
-    data: z.object({ caption: z.string().min(1).max(280) }).strict(),
+    data: z
+      .object({
+        caption: z
+          .string()
+          .min(1)
+          .max(280)
+          .refine(
+            (caption) =>
+              caption.trim() !== '' &&
+              communityPostCaptionSchema.safeParse(caption).success,
+            { message: 'Invalid suggested Community caption.' }
+          ),
+      })
+      .strict(),
   })
   .strict()
 

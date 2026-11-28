@@ -1434,18 +1434,22 @@ function PostTitleField({
 function DraftDescriptionControl({
   canSuggest,
   hasCaption,
+  suggested,
   suspended,
   isPublishing,
   status,
   onSuggest,
+  onAccept,
   t,
 }: {
   canSuggest: boolean
   hasCaption: boolean
+  suggested: boolean
   suspended: boolean
   isPublishing: boolean
   status: 'idle' | 'loading' | 'failed'
   onSuggest: () => void
+  onAccept: () => void
   t: Translate
 }) {
   return (
@@ -1465,6 +1469,26 @@ function DraftDescriptionControl({
           )}
         </button>
       )}
+      {suggested && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            role="status"
+            data-testid="community-description-suggested"
+            className="text-xs font-semibold text-theme-card-text"
+          >
+            {t('community.compose.descriptionSuggested')}
+          </span>
+          <button
+            type="button"
+            data-testid="community-accept-description"
+            className="min-h-11 rounded-md border border-theme-card-border px-3 text-sm font-semibold text-theme-card-text disabled:opacity-60"
+            disabled={suspended || isPublishing}
+            onClick={onAccept}
+          >
+            {t('community.compose.acceptDescription')}
+          </button>
+        </div>
+      )}
       {status === 'failed' && (
         <p role="status" className="text-xs text-theme-card-text">
           {t('community.compose.descriptionFailed')}
@@ -1474,21 +1498,12 @@ function DraftDescriptionControl({
   )
 }
 
-function describeDraftRequest(
-  allocated: AllocatedLook | null,
-  sessionScope: string | null
-) {
-  if (!allocated) return undefined
-  const { postId, uploadSessionId } = allocated
-  return (signal: AbortSignal) =>
-    describeCommunityDraftFromWeb({ postId, uploadSessionId }, sessionScope, signal)
-}
-
 interface PostCreationModalProps {
   suspended?: boolean
   onClose: () => void
   onSelectPhoto: (file: File) => void
-  describeDraft?: (signal: AbortSignal) => Promise<string>
+  allocated: AllocatedLook | null
+  sessionScope: string | null
   onPublish: (params: {
     altText: string
     caption?: string
@@ -1531,7 +1546,8 @@ function PostCreationModal({
   suspended = false,
   onClose,
   onSelectPhoto,
-  describeDraft,
+  allocated,
+  sessionScope,
   onPublish,
   photoPreview,
   altTextSuggestion,
@@ -1543,35 +1559,42 @@ function PostCreationModal({
 }: PostCreationModalProps) {
   const [altText, setAltText] = useState('')
   const [isAltTextConfirmed, setIsAltTextConfirmed] = useState(false)
-  const [caption, setCaption] = useState('')
+  const [{ caption, suggested }, setDescriptionDraft] = useState({
+    caption: '',
+    suggested: false,
+  })
   const [descriptionStatus, setDescriptionStatus] = useState<
     'idle' | 'loading' | 'failed'
   >('idle')
   const description = useRef<AbortController | null>(null)
-  const autoCaption = useRef<string | null>(null)
 
-  const cancelDescription = () => {
+  const cancelDescription = useCallback(() => {
     description.current?.abort()
     description.current = null
+  }, [])
+  const invalidateDescription = () => {
+    cancelDescription()
+    setDescriptionStatus('idle')
   }
-  useEffect(() => {
-    if (suspended) {
-      cancelDescription()
-      setDescriptionStatus('idle')
-    }
+  const challengeId = activeChallenge?.id
+  useLayoutEffect(() => {
+    setDescriptionStatus('idle')
     return cancelDescription
-  }, [suspended])
+  }, [allocated, cancelDescription, challengeId, sessionScope, suspended])
 
   const suggestDescription = async () => {
-    if (suspended || !describeDraft || caption || description.current) return
+    if (suspended || isPublishing || !allocated || caption || description.current) return
     const controller = new AbortController()
     description.current = controller
     setDescriptionStatus('loading')
     try {
-      const suggested = await describeDraft(controller.signal)
+      const proposedCaption = await describeCommunityDraftFromWeb(
+        { postId: allocated.postId, uploadSessionId: allocated.uploadSessionId },
+        sessionScope,
+        controller.signal
+      )
       if (controller.signal.aborted) return
-      autoCaption.current = suggested
-      setCaption((current) => current || suggested)
+      setDescriptionDraft({ caption: proposedCaption, suggested: true })
       setDescriptionStatus('idle')
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -1610,8 +1633,7 @@ function PostCreationModal({
     if (failure !== null || titleInvalid) {
       return
     }
-    cancelDescription()
-    setDescriptionStatus('idle')
+    invalidateDescription()
     onPublish({
       altText: altText.trim(),
       caption: caption.trim() || undefined,
@@ -1636,7 +1658,9 @@ function PostCreationModal({
       suspended={suspended}
       isOpen
       onClose={() => {
-        if (!isPublishing) onClose()
+        if (isPublishing) return
+        cancelDescription()
+        onClose()
       }}
       // The panel follows the lookbook theme, so a premium palette under a dark system setting
       // keeps its light panel and the controls inside it match.
@@ -1674,10 +1698,10 @@ function PostCreationModal({
             onChange={(event) => {
               const file = event.target.files?.[0]
               if (file) {
-                cancelDescription()
-                setDescriptionStatus('idle')
-                if (autoCaption.current !== null) setCaption('')
-                autoCaption.current = null
+                invalidateDescription()
+                setDescriptionDraft((current) =>
+                  current.suggested ? { caption: '', suggested: false } : current
+                )
                 setValidationKey(null)
                 onSelectPhoto(file)
               }
@@ -1713,6 +1737,7 @@ function PostCreationModal({
             data-testid="post-alt-text-input"
             value={altText}
             onChange={(event) => {
+              invalidateDescription()
               setAltText(event.target.value)
               setIsAltTextConfirmed(false)
             }}
@@ -1733,6 +1758,7 @@ function PostCreationModal({
               data-testid="confirm-alt-text-checkbox"
               checked={isAltTextConfirmed}
               onChange={(event) => {
+                invalidateDescription()
                 setIsAltTextConfirmed(event.target.checked)
               }}
               className="h-4 w-4 rounded-sm border-theme-card-border accent-ink"
@@ -1748,7 +1774,10 @@ function PostCreationModal({
 
         <PostTitleField
           title={title}
-          onChange={setTitle}
+          onChange={(value) => {
+            invalidateDescription()
+            setTitle(value)
+          }}
           titleInvalid={titleInvalid}
           t={t}
         />
@@ -1765,10 +1794,8 @@ function PostCreationModal({
             data-testid="post-caption-input"
             value={caption}
             onChange={(event) => {
-              cancelDescription()
-              autoCaption.current = null
-              setDescriptionStatus('idle')
-              setCaption(event.target.value)
+              invalidateDescription()
+              setDescriptionDraft({ caption: event.target.value, suggested: false })
               setValidationKey(captionValidationKey(event.target.value))
             }}
             maxLength={280}
@@ -1780,12 +1807,16 @@ function PostCreationModal({
             {t('community.compose.captionCount', { count: caption.length })}
           </span>
           <DraftDescriptionControl
-            canSuggest={Boolean(describeDraft)}
+            canSuggest={Boolean(allocated)}
             hasCaption={Boolean(caption)}
+            suggested={suggested}
             suspended={suspended}
             isPublishing={isPublishing}
             status={descriptionStatus}
             onSuggest={() => void suggestDescription()}
+            onAccept={() =>
+              setDescriptionDraft((current) => ({ ...current, suggested: false }))
+            }
             t={t}
           />
         </div>
@@ -1803,6 +1834,7 @@ function PostCreationModal({
               data-testid="post-challenge-select"
               value={selectedChallengeId ?? ''}
               onChange={(event) => {
+                invalidateDescription()
                 setSelectedChallengeId(event.target.value || null)
               }}
               className="w-full rounded-md border border-line-strong bg-page px-3 py-2 text-xs text-ink"
@@ -4883,7 +4915,8 @@ export function CommunityLookbookGrid({
           }}
           photoPreview={photoPreview}
           altTextSuggestion={altTextSuggestion}
-          describeDraft={describeDraftRequest(allocated, sessionScope)}
+          allocated={allocated}
+          sessionScope={sessionScope}
           isPreparing={isPreparingPhoto}
           isPublishing={isPublishing}
           activeChallenge={activeChallenge}

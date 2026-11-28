@@ -48,3 +48,39 @@ export async function withRequestDeadline<T>(
     cleanup()
   }
 }
+
+export function withCommunityDescriptionDeadline<T>(
+  signal: AbortSignal | undefined,
+  request: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  const timeoutMs = 5_000
+  const deadline = performance.now() + timeoutMs
+  return withRequestDeadline(timeoutMs, [signal], async (requestSignal) => {
+    const cancellationError = () =>
+      signal?.aborted
+        ? abortError('Community description request cancelled.')
+        : abortError('Community description deadline reached.', 'TimeoutError')
+    if (requestSignal.aborted) throw cancellationError()
+
+    let onAbort: () => void = () => undefined
+    const cancelled = new Promise<never>((_, reject) => {
+      onAbort = () => reject(cancellationError())
+      requestSignal.addEventListener('abort', onAbort, { once: true })
+    })
+    try {
+      const result = await Promise.race([
+        cancelled,
+        Promise.resolve().then(() => {
+          if (requestSignal.aborted || performance.now() >= deadline)
+            throw cancellationError()
+          return request(requestSignal)
+        }),
+      ])
+      if (requestSignal.aborted || performance.now() >= deadline)
+        throw cancellationError()
+      return result
+    } finally {
+      requestSignal.removeEventListener('abort', onAbort)
+    }
+  })
+}

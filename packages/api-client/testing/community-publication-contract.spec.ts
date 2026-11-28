@@ -2,11 +2,14 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Learning path Step 46: Home spotlight teaser.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
+// Learning path Step 82: Suggested Community descriptions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-82-suggested-community-descriptions
 import { describe, expect, it } from 'vitest'
 import {
   communityPostAltTextSchema,
   communityPostCaptionSchema,
   createCommunityChallengeInputSchema,
+  describeCommunityDraftResponseSchema,
   ianaTimeZoneSchema,
   openCommunityPostInputSchema,
   isSpotlightOpenInput,
@@ -17,6 +20,24 @@ import {
 import { withoutKey } from './community-contract-support'
 
 describe('community HTTP contracts', () => {
+  describe('draft description response', () => {
+    it('keeps a valid draft caption on the existing wire shape', () => {
+      const payload = { data: { caption: 'This photo features blue tones.' } }
+      expect(describeCommunityDraftResponseSchema.parse(payload)).toEqual(payload)
+    })
+
+    it.each([
+      ['blank', ' \t '],
+      ['oversized', 'a'.repeat(281)],
+      ['link', 'See https://example.test/outfit for details.'],
+      ['email address', 'Ask outfits@example.test for details.'],
+    ])('refuses a %s suggestion before it reaches the composer', (_, caption) => {
+      expect(
+        describeCommunityDraftResponseSchema.safeParse({ data: { caption } }).success
+      ).toBe(false)
+    })
+  })
+
   describe('publish input', () => {
     const publishInput = {
       postId: 'post-1',

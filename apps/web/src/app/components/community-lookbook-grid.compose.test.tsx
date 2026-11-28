@@ -1,4 +1,6 @@
 // Community grid journeys through the real web transport and MSW.
+// Learning path Step 82: Suggested Community descriptions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-82-suggested-community-descriptions
 import { http, HttpResponse } from 'msw'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -91,7 +93,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       ).not.toHaveLength(0)
     })
 
-    it('offers an editable photo description after upload and keeps authored text', async () => {
+    it('offers one opt-in action and carries only accepted text to a replacement photo', async () => {
       signIn()
       restoreObjectUrl = installImagePrepMocks()
       const describe = vi.fn()
@@ -109,28 +111,129 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       const user = userEvent.setup()
       renderGrid()
       await user.click(await screen.findByTestId('create-post-button'))
+      expect(screen.queryByTestId('community-suggest-description')).toBeNull()
       await choosePhoto(user)
       const description = screen.getByTestId('post-caption-input')
-      await user.click(await screen.findByTestId('community-suggest-description'))
+      const suggest = await screen.findByTestId('community-suggest-description')
+      expect(screen.getAllByRole('button', { name: 'Suggest a description' })).toEqual([
+        suggest,
+      ])
+      expect(description).toHaveValue('')
+      expect(describe).not.toHaveBeenCalled()
+      await user.click(suggest)
       expect(await screen.findByDisplayValue('This photo features blue tones.')).toBe(
         description
       )
-      expect(describe).toHaveBeenCalledWith({
+      expect(describe).toHaveBeenCalledExactlyOnceWith({
         postId: 'mock-allocated-post-id',
         uploadSessionId: 'mock-upload-session-id',
       })
 
-      await user.type(description, ' My favorite layer.')
+      expect(screen.getByTestId('community-description-suggested')).toHaveTextContent(
+        'Suggested'
+      )
+      const fileInput = screen.getByTestId('post-image-file-input')
       await user.upload(
-        screen.getByTestId('post-image-file-input'),
-        new File(['another-look'], 'new.jpg', { type: 'image/jpeg' })
+        fileInput,
+        new File(['another-look'], 'replacement.jpg', { type: 'image/jpeg' })
       )
-      expect(description).toHaveValue(
-        'This photo features blue tones. My favorite layer.'
+      const suggestAgain = await screen.findByTestId('community-suggest-description')
+      expect(description).toHaveValue('')
+      expect(screen.queryByTestId('community-description-suggested')).toBeNull()
+      await user.click(suggestAgain)
+      await screen.findByTestId('community-description-suggested')
+      await user.click(screen.getByTestId('community-accept-description'))
+      expect(screen.queryByTestId('community-description-suggested')).toBeNull()
+      await user.upload(
+        fileInput,
+        new File(['third-look'], 'third.jpg', { type: 'image/jpeg' })
       )
+      expect(description).toHaveValue('This photo features blue tones.')
       expect(
         screen.queryByTestId('community-suggest-description')
       ).not.toBeInTheDocument()
+    })
+
+    it.each([
+      ['description', 'post-caption-input'],
+      ['title', 'post-title-input'],
+    ])(
+      'discards a pending reply after the member types and clears the %s',
+      async (_, id) => {
+        signIn()
+        restoreObjectUrl = installImagePrepMocks()
+        const started = vi.fn<(signal: AbortSignal) => void>()
+        const finish = Promise.withResolvers<void>()
+        const responseReady = Promise.withResolvers<void>()
+        useMswHandlers(
+          feedHandler(),
+          imageFixtureHandler(),
+          http.post(ALLOCATE_PATH, () => allocateBody()),
+          http.post('/api/v1/community/posts/describe', async ({ request }) => {
+            started(request.signal)
+            await finish.promise
+            const response = HttpResponse.json({ data: { caption: 'A late draft.' } })
+            responseReady.resolve()
+            return response
+          })
+        )
+        const user = userEvent.setup()
+        renderGrid()
+        await user.click(await screen.findByTestId('create-post-button'))
+        await choosePhoto(user)
+        await user.click(await screen.findByTestId('community-suggest-description'))
+        const description = screen.getByTestId('post-caption-input')
+        const editedField = screen.getByTestId(id)
+        try {
+          await waitFor(() => expect(started).toHaveBeenCalledOnce())
+          const signal = started.mock.calls[0]![0]
+          expect(signal.aborted).toBe(false)
+          await user.type(editedField, 'My draft')
+          await user.clear(editedField)
+          await waitFor(() => expect(signal.aborted).toBe(true))
+        } finally {
+          finish.resolve()
+        }
+        await act(async () => await responseReady.promise)
+        expect(description).toHaveValue('')
+        expect(screen.queryByTestId('community-description-suggested')).toBeNull()
+        expect(screen.getByTestId('community-suggest-description')).toBeEnabled()
+      }
+    )
+
+    it('keeps manual publishing available when the server returns an invalid suggestion', async () => {
+      signIn()
+      restoreObjectUrl = installImagePrepMocks()
+      const publish = vi.fn()
+      useMswHandlers(
+        feedHandler(),
+        imageFixtureHandler(),
+        http.post(ALLOCATE_PATH, () => allocateBody()),
+        http.post('/api/v1/community/posts/describe', () =>
+          HttpResponse.json({ data: { caption: '   ' } })
+        ),
+        http.post(PUBLISH_PATH, async ({ request }) => {
+          publish(await request.json())
+          return publishBody()
+        })
+      )
+      const user = userEvent.setup()
+      renderGrid()
+      await user.click(await screen.findByTestId('create-post-button'))
+      await choosePhoto(user)
+      await user.click(await screen.findByTestId('community-suggest-description'))
+      expect(await screen.findByText(/could not suggest a description/i)).toBeVisible()
+      const description = screen.getByTestId('post-caption-input')
+      expect(description).toHaveValue('')
+      expect(screen.queryByTestId('community-description-suggested')).toBeNull()
+      await user.type(description, 'My favorite layer.')
+      await user.click(screen.getByTestId('confirm-alt-text-checkbox'))
+      await user.click(screen.getByTestId('post-publish-submit'))
+      await waitFor(() =>
+        expect(publish).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ caption: 'My favorite layer.' })
+        )
+      )
     })
 
     it('6.1-WEB-031 publishes a confirmed, server-suggested description under one idempotency key', async () => {

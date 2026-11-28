@@ -5,6 +5,7 @@ import {
   CommunityAuthorizationBudget,
   communityDependency,
 } from './community-availability.js'
+import { withCommunityDescriptionDeadline } from '@couture/api-client'
 import {
   type SetCommunityReactionInput,
   type CommunityReactionSummary,
@@ -31,6 +32,7 @@ import {
   COMMUNITY_UPLOAD_SESSION_MISMATCH_MESSAGE,
   communityChallengeCopySchema,
   defaultSupportedLocale,
+  describeCommunityDraftResponseSchema,
   resolveAcceptLanguage,
   safeDecodeCommunityFeedCursor,
   type AllocateCommunityPostInput,
@@ -1205,31 +1207,42 @@ export class CommunityService {
     input: DescribeCommunityDraftInput
   }) {
     const { userId, role, input } = params
-    await this.assertDraftCaptionAccess(userId, role)
+    try {
+      return await withCommunityDescriptionDeadline(undefined, async (signal) => {
+        await this.assertDraftCaptionAccess(userId, role, signal)
+        return this.generateDraftCaption(userId, role, input, signal)
+      })
+    } catch (error) {
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        throw new ServiceUnavailableException('Community caption suggestion timed out.')
+      }
+      throw error
+    }
+  }
 
+  private async generateDraftCaption(
+    userId: string,
+    role: string | undefined,
+    input: DescribeCommunityDraftInput,
+    signal: AbortSignal
+  ) {
+    signal.throwIfAborted()
     const { post, objectPath } = await this.requireOwnedDraftImage(userId, input)
+    signal.throwIfAborted()
     const declaration = draftImageDeclaration(post)
 
-    // Limit concurrent storage and decoder work per API instance and per account.
-    if (this.draftCaptionReaders.has(userId)) {
-      throw new CommunityRateLimitException(
-        'A Community caption request is in progress.',
-        1
-      )
-    }
-    if (this.draftCaptionReaders.size >= 4) {
-      throw new ServiceUnavailableException('Community caption suggestion is busy.')
-    }
-    this.draftCaptionReaders.add(userId)
+    this.acquireDraftCaptionSlot(userId)
     try {
       await this.repository.reserveDraftCaptionRequest(userId)
-      const signal = AbortSignal.timeout(8_000)
+      signal.throwIfAborted()
       const bytes = await this.storage.downloadBounded(
         objectPath,
         declaration.byteSize,
         signal
       )
+      signal.throwIfAborted()
       const sample = await sampleCommunityImageColors(bytes, declaration, signal)
+      signal.throwIfAborted()
       const locale = supportedLocaleSchema.safeParse(post.locale)
       const caption = buildCommunityPhotoCaption(
         sample,
@@ -1237,15 +1250,23 @@ export class CommunityService {
       )
       if (!caption)
         throw new BadRequestException('No visible colors in the Community draft image.')
-      await this.assertDraftCaptionAccess(userId, role)
+      const result = describeCommunityDraftResponseSchema.safeParse({ data: { caption } })
+      if (!result.success)
+        throw new BadRequestException('Invalid Community draft caption.')
+      await this.assertDraftCaptionAccess(userId, role, signal)
+      signal.throwIfAborted()
       const current = await this.requireOwnedDraftImage(userId, input)
+      signal.throwIfAborted()
       if (
         current.objectPath !== objectPath ||
-        current.post.image_checksum !== declaration.sha256
+        current.post.image_checksum !== declaration.sha256 ||
+        current.post.image_content_type !== declaration.mimeType ||
+        current.post.image_byte_size !== declaration.byteSize ||
+        current.post.locale !== post.locale
       ) {
         throw new ConflictException(COMMUNITY_UPLOAD_SESSION_MISMATCH_MESSAGE)
       }
-      return caption
+      return result.data.data.caption
     } catch (error: unknown) {
       if (error instanceof CommunityObjectDownloadError && error.reason === 'missing') {
         throw new ConflictException(COMMUNITY_UPLOAD_NOT_COMPLETED_MESSAGE)
@@ -1258,13 +1279,34 @@ export class CommunityService {
       }
       throw error
     } finally {
+      // The HTTP deadline can settle before a storage, database or decoder call.
       this.draftCaptionReaders.delete(userId)
     }
   }
 
-  private async assertDraftCaptionAccess(userId: string, role?: string) {
+  private acquireDraftCaptionSlot(userId: string) {
+    if (this.draftCaptionReaders.has(userId)) {
+      throw new CommunityRateLimitException(
+        'A Community caption request is in progress.',
+        1
+      )
+    }
+    if (this.draftCaptionReaders.size >= 4) {
+      throw new ServiceUnavailableException('Community caption suggestion is busy.')
+    }
+    this.draftCaptionReaders.add(userId)
+  }
+
+  private async assertDraftCaptionAccess(
+    userId: string,
+    role: string | undefined,
+    signal: AbortSignal
+  ) {
+    signal.throwIfAborted()
     await this.assertWriteEnabled(userId)
+    signal.throwIfAborted()
     await this.assertAgeGateAllows(userId, role)
+    signal.throwIfAborted()
     await this.repository.assertDraftCaptionAccess(userId)
   }
 
