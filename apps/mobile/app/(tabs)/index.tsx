@@ -92,6 +92,7 @@ import {
 import {
   getGuestPreviewStrings,
   shouldShowStyleSample,
+  isSmallLookbookCloset,
   styleForecastSampleWeather,
   todayForecastPeriods,
   todayRitualAnchorDate,
@@ -787,7 +788,9 @@ export default function TabOneScreen() {
   // The hero for the session on screen, in its own function to keep the screen's branching
   // readable. Story CC-7.7 D2: a member's slot stays empty until the ritual read settles.
   const styleDayPreview = Boolean(liveLook && styleProfile.day)
-  const showSample = shouldShowStyleSample(ritual?.data.outfits, styleProfile)
+  const smallCloset = isSmallLookbookCloset(homeWardrobe?.pieces)
+  const showSample =
+    smallCloset || shouldShowStyleSample(ritual?.data.outfits, styleProfile)
   const sampleWeather = styleForecastSampleWeather(weather?.current)
   const firstLook = !ritual?.data.outfits.some(({ garmentIds }) =>
     garmentIds.some((id) => !id.startsWith('default-'))
@@ -901,6 +904,7 @@ export default function TabOneScreen() {
                   weatherAvailable={Boolean(weather)}
                   sampleWeather={sampleWeather}
                   preview={styleDayPreview}
+                  useLookbookTop={smallCloset}
                   showStyleControls={false}
                 />
               )}

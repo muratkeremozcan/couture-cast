@@ -130,9 +130,13 @@ export function StyleMoodRow({
 export function StyleDayControls({
   style,
   showTune = false,
+  showMood = true,
+  disabled = false,
 }: {
   style: StyleState
   showTune?: boolean
+  showMood?: boolean
+  disabled?: boolean
 }) {
   const copy = useStyleCopy()
   const palette = useHeroPalette()
@@ -146,6 +150,7 @@ export function StyleDayControls({
         testID="style-day-open"
         onPress={() => setOpen(!open)}
         palette={palette}
+        disabled={disabled}
         expanded={open}
       />
       {open && (
@@ -163,6 +168,7 @@ export function StyleDayControls({
                   palette={palette}
                   selected={day?.temperature === temperature}
                   primary={day?.temperature === temperature}
+                  disabled={disabled}
                   onPress={() =>
                     store.updateDay(scope, {
                       temperature: day?.temperature === temperature ? null : temperature,
@@ -172,18 +178,21 @@ export function StyleDayControls({
               ))}
             </View>
           </View>
-          <StyleMoodRow
-            day
-            selected={day?.mood}
-            onSelect={(mood) =>
-              store.updateDay(scope, { mood: day?.mood === mood ? null : mood })
-            }
-          />
+          {showMood && (
+            <StyleMoodRow
+              day
+              selected={day?.mood}
+              disabled={disabled}
+              onSelect={(mood) =>
+                store.updateDay(scope, { mood: day?.mood === mood ? null : mood })
+              }
+            />
+          )}
           <PreviewButton
             label={copy.reset}
             testID="style-day-reset"
             palette={palette}
-            disabled={!day}
+            disabled={disabled || !day}
             onPress={() => store.updateDay(scope, null)}
           />
           {showTune && <StyleMemberControls style={style} showMood={false} />}

@@ -24,10 +24,12 @@ import {
   buildHomeSampleSavedLookInput,
   createAnnouncementToken,
   createIdempotencyKey,
+  createMemberLookbook,
   createMemberSampleOutfit,
   getGuestPreviewStrings,
   getStyleProfileStrings,
   shouldShowStyleSample,
+  isSmallLookbookCloset,
   isOfflineError,
   memberSampleWardrobeChoices,
   popLookUndoSnapshot,
@@ -116,7 +118,7 @@ let retainedSample:
 
 function sampleSelectionKey(result: SampleOutfitResult) {
   const { weather, preferences, avoid } = result.input
-  return JSON.stringify([weather, preferences, avoid])
+  return JSON.stringify([result.look?.id, weather, preferences, avoid])
 }
 
 function buildHomeSampleAttemptKey(
@@ -197,6 +199,7 @@ type SampleOutfitProps = {
   style: ReturnType<typeof useWebStyleProfile>
   sampleWeather: SampleWeatherKey
   preview: boolean
+  useLookbookTop: boolean
 }
 
 function SampleOutfit(props: SampleOutfitProps) {
@@ -217,14 +220,18 @@ function SampleOutfitInner({
   style,
   sampleWeather,
   preview,
+  useLookbookTop,
 }: SampleOutfitProps) {
   const { t } = useTranslation(undefined, { i18n: getI18n() })
   const router = useRouter()
   const statusBar = useStatusBar()
   const { profile, day, scope } = style
   const base = useMemo(
-    () => createMemberSampleOutfit(sampleWeather, { profile, day }),
-    [sampleWeather, profile, day]
+    () =>
+      (useLookbookTop &&
+        createMemberLookbook(sampleWeather, { profile, day })[0]?.result) ||
+      createMemberSampleOutfit(sampleWeather, { profile, day }),
+    [sampleWeather, profile, day, useLookbookTop]
   )
   const selection = sampleSelectionKey(base)
   const [sample, setSample] = useState(() =>
@@ -1101,6 +1108,7 @@ function MemberRitual({
             owner={owner}
             scope={start.scope}
             wardrobe={wardrobe}
+            smallCloset={isSmallLookbookCloset(pieces)}
             readAt={readAt}
             scenario={scenario}
             failure={failure}
@@ -1152,6 +1160,7 @@ function MemberRitualOutfit({
   owner,
   scope,
   wardrobe,
+  smallCloset,
   readAt,
   scenario,
   failure,
@@ -1165,13 +1174,14 @@ function MemberRitualOutfit({
   owner: string
   scope: string | null
   wardrobe: ReturnType<typeof useHomeWardrobe>['wardrobe']
+  smallCloset: boolean
   readAt: number
   scenario?: ScenarioName
   failure: RitualFailure | null
   retry: ReactNode
 }) {
   const preview = Boolean(liveOutfit && style.day)
-  const showSample = shouldShowStyleSample(liveOutfit?.outfits, style)
+  const showSample = smallCloset || shouldShowStyleSample(liveOutfit?.outfits, style)
   useLayoutEffect(() => {
     if (!showSample && retainedSample?.scope === style.scope) retainedSample = undefined
   }, [showSample, style.scope])
@@ -1207,6 +1217,7 @@ function MemberRitualOutfit({
             style={style}
             sampleWeather={styleForecastSampleWeather(ritual?.weather.current)}
             preview={preview}
+            useLookbookTop={smallCloset}
             actions={
               ritual ? null : (
                 <SetCityAction

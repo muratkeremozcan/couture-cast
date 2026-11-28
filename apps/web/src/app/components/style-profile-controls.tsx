@@ -115,9 +115,11 @@ export function StyleMoodRow({
 export function StyleDayControls({
   style,
   showTune = false,
+  showMood = true,
 }: {
   style: StyleState
   showTune?: boolean
+  showMood?: boolean
 }) {
   const copy = useStyleCopy()
   const { scope, day, store } = style
@@ -152,13 +154,15 @@ export function StyleDayControls({
             ))}
           </div>
         </fieldset>
-        <StyleMoodRow
-          day
-          selected={day?.mood}
-          onSelect={(mood) =>
-            store.updateDay(scope, { mood: day?.mood === mood ? null : mood })
-          }
-        />
+        {showMood && (
+          <StyleMoodRow
+            day
+            selected={day?.mood}
+            onSelect={(mood) =>
+              store.updateDay(scope, { mood: day?.mood === mood ? null : mood })
+            }
+          />
+        )}
         <button
           type="button"
           className={secondary}

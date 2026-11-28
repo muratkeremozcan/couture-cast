@@ -1,6 +1,6 @@
 // Story CC-7.12 owner: the Looks tab with Saved, Ideas and Plan segments (D1). Saved is one
 // newest-first grid of saved looks and capsules with All, Today and Capsules filters (D2 to D4),
-// Ideas shows the sample looks (D9) and Plan holds the planner with the free preview (D10). The
+// Ideas holds the member lookbook (CC-7.22) and Plan holds the planner with the free preview (D10). The
 // open segment and filter live in the address, so View, deep links, back and the redirects need
 // no other state.
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
@@ -9,7 +9,6 @@
 
 import Link from 'next/link'
 import { useWebStyleProfile } from '../../lib/style-profile'
-import { StyleDayControls } from './style-profile-controls'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Suspense,
@@ -59,6 +58,7 @@ import { useRetryOnVerifiedSession } from '../../lib/session-retry'
 import { AppPage, APP_MAIN_NARROW_CLASS } from './app-page'
 import { AppTopBar } from './app-top-bar'
 import { CapsuleTile, IdeaTile, LooksTileGrid, SavedLookTile } from './looks/looks-tile'
+import { MemberLookbook } from './looks/member-lookbook'
 import { looksHref, savedLookHref } from './looks/looks-address'
 import { NavRow } from './nav-row'
 import { PlannerRail } from './planner-rail'
@@ -599,26 +599,40 @@ function SavedPanel({
   )
 }
 
-function IdeasPanel({ showEmptyLine }: { showEmptyLine: boolean }) {
+function IdeasPanel({
+  owner,
+  showEmptyLine,
+}: {
+  owner: string | null
+  showEmptyLine: boolean
+}) {
   const { t } = useTranslation('translation', { useSuspense: false })
   const style = useWebStyleProfile()
-  const { profile, day } = style
-  const ideas = useMemo(() => looksIdeas({ profile, day }), [profile, day])
   return (
-    <div data-testid="looks-first-content">
+    <div data-testid="looks-first-content" className="space-y-3">
       {showEmptyLine && (
-        <p data-testid="looks-ideas-empty-line" className="mb-3 text-base text-ink-muted">
+        <p data-testid="looks-ideas-empty-line" className="text-base text-ink-muted">
           {t('looks.empty')}
         </p>
       )}
-      <StyleDayControls key={style.scope} style={style} />
-      <LooksTileGrid testId="looks-ideas-grid">
-        {ideas.map((idea) => (
-          <li key={idea.look.id}>
-            <IdeaTile idea={idea} />
-          </li>
-        ))}
-      </LooksTileGrid>
+      {owner ? (
+        style.scope && (
+          <MemberLookbook
+            key={style.scope}
+            owner={owner}
+            scope={style.scope}
+            style={style}
+          />
+        )
+      ) : (
+        <LooksTileGrid testId="looks-ideas-grid">
+          {looksIdeas().map((idea) => (
+            <li key={idea.look.id}>
+              <IdeaTile idea={idea} />
+            </li>
+          ))}
+        </LooksTileGrid>
+      )}
     </div>
   )
 }
@@ -710,6 +724,7 @@ function LooksBody({ owner }: { owner: string | null }) {
               )}
               {segment === 'ideas' && (
                 <IdeasPanel
+                  owner={owner}
                   // Codex #11: only an empty All says the member has saved nothing yet.
                   showEmptyLine={
                     !owner ||

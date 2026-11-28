@@ -15,6 +15,7 @@ import {
   buildHomeSampleSavedLookInput,
   createAnnouncementToken,
   createIdempotencyKey,
+  createMemberLookbook,
   createMemberSampleOutfit,
   getGuestPreviewStrings,
   getStyleProfileStrings,
@@ -176,6 +177,7 @@ type SampleProps = {
   sampleWeather?: SampleWeatherKey
   preview?: boolean
   showStyleControls?: boolean
+  useLookbookTop?: boolean
 }
 
 export function MemberSampleOutfit(props: SampleProps) {
@@ -201,6 +203,7 @@ function MemberSampleBody({
   weatherAvailable = false,
   sampleWeather,
   preview = false,
+  useLookbookTop = false,
   style,
 }: SampleProps & { style: ReturnType<typeof useMobileStyleProfile> }) {
   const { t, i18n } = useTranslation()
@@ -210,11 +213,14 @@ function MemberSampleBody({
   const palette = useHeroPalette()
   const { profile, day } = style
   const base = useMemo(
-    () => createMemberSampleOutfit(sampleWeather, { profile, day }),
-    [sampleWeather, profile, day]
+    () =>
+      (useLookbookTop &&
+        createMemberLookbook(sampleWeather, { profile, day })[0]?.result) ||
+      createMemberSampleOutfit(sampleWeather, { profile, day }),
+    [sampleWeather, profile, day, useLookbookTop]
   )
   const { weather, preferences, avoid } = base.input
-  const selection = JSON.stringify([weather, preferences, avoid])
+  const selection = JSON.stringify([base.look?.id, weather, preferences, avoid])
   const [sample, setSample] = useState({ selection, result: base })
   const result = sample.selection === selection ? sample.result : base
   useEffect(() => {
