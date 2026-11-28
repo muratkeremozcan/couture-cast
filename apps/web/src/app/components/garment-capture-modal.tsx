@@ -763,6 +763,7 @@ export function GarmentCaptureModal({
           onClose={handleClose}
           resetBatchRef={resetBatchRef}
           onFlatLayPickerOpen={() => {
+            resetBatchRef.current?.()
             cancelCapture()
             setErrorKey(null)
           }}

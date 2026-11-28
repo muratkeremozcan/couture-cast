@@ -7934,7 +7934,8 @@
                   "required": [
                     "category"
                   ],
-                  "additionalProperties": false
+                  "additionalProperties": false,
+                  "description": "A garment subtype must belong to the selected category when set."
                 }
               },
               "required": [
@@ -27974,6 +27975,27 @@
                     "message",
                     "error"
                   ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "FLAT_LAY_BUSY when a review slot is unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsHttpError"
                 }
               }
             }

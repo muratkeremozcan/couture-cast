@@ -8184,7 +8184,7 @@ export interface FlatLaySelectionItemsInner {
   tags: FlatLaySelectionItemsInnerTags
 }
 /**
- *
+ * A garment subtype must belong to the selected category when set.
  * @export
  * @interface FlatLaySelectionItemsInnerTags
  */

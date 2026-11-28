@@ -313,6 +313,8 @@ function traceFlatLayPiece(
   let count = 0
   let edges = 0
   let strongEdges = 0
+  let clipped = false
+  let tooClose = false
   let left = width
   let top = height
   let right = 0
@@ -327,18 +329,18 @@ function traceFlatLayPiece(
     const index = queue[cursor]!
     const x = index % width
     const y = Math.floor(index / width)
-    if (x < gap || y < gap || x >= width - gap || y >= height - gap) return null
+    clipped = clipped || nearFrameEdge(x, y, width, height, gap)
     left = Math.min(left, x)
     right = Math.max(right, x)
     top = Math.min(top, y)
     bottom = Math.max(bottom, y)
-    const neighbors = [index - 1, index + 1, index - width, index + width]
+    const neighbors = safeFlatLayNeighbors(index, x, y, width, height)
     if (neighbors.some((neighbor) => labels[neighbor] === BACKGROUND)) {
       edges++
       if (colorDistance(pixels, reference, index * 4) > STRONG_SUBJECT_TOLERANCE ** 2) {
         strongEdges++
       }
-      if (nearPreviousPiece(labels, index, width, gap, label)) return null
+      if (!clipped && nearPreviousPiece(labels, index, width, gap, label)) tooClose = true
     }
     neighbors.forEach(enqueue)
   }
@@ -346,8 +348,29 @@ function traceFlatLayPiece(
     count,
     edges,
     strongEdges,
+    clipped,
+    tooClose,
     bounds: { label, left, top, width: right - left + 1, height: bottom - top + 1 },
   }
+}
+
+function nearFrameEdge(x: number, y: number, width: number, height: number, gap: number) {
+  return x < gap || y < gap || x >= width - gap || y >= height - gap
+}
+
+function safeFlatLayNeighbors(
+  index: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+) {
+  const neighbors: number[] = []
+  if (x > 0) neighbors.push(index - 1)
+  if (x + 1 < width) neighbors.push(index + 1)
+  if (y > 0) neighbors.push(index - width)
+  if (y + 1 < height) neighbors.push(index + width)
+  return neighbors
 }
 
 /** Label separate foreground pieces on an opaque, continuous, contrasting backdrop. */
@@ -369,9 +392,12 @@ export function findFlatLayComponents(
 
   for (let start = 0; start < labels.length; start++) {
     if (labels[start]) continue
-    const piece = traceFlatLayPiece(raster, backdrop, start, pieces.length + 2)
-    if (!piece) return null
-    const { count, edges, strongEdges, bounds } = piece
+    const { count, edges, strongEdges, bounds, clipped, tooClose } = traceFlatLayPiece(
+      raster,
+      backdrop,
+      start,
+      pieces.length + 2
+    )
     if (count <= 4) {
       speckArea += count
       if (speckArea > labels.length * 0.001) return null
@@ -379,6 +405,8 @@ export function findFlatLayComponents(
       continue
     }
     if (
+      clipped ||
+      tooClose ||
       pieces.length === limit ||
       count < minArea ||
       bounds.width < minLength ||

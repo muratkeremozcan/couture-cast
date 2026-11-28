@@ -24,6 +24,7 @@ export type WardrobeDeletionReason =
   | 'selfie_superseded'
   | 'commit_compensation'
   | 'commit_staging_released'
+  | 'flat_lay_unfinished'
   | 'upload_rejected'
   | 'staging_swept'
   | 'held_copy_released'

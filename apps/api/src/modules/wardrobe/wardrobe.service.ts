@@ -74,6 +74,8 @@ import {
   type UploadSessionKeys,
 } from './wardrobe-upload-paths'
 import {
+  FLAT_LAY_RESERVATION_PREFIX,
+  isFlatLayReservation,
   nextCleanupHorizon,
   unfinishedPublicationDeadline,
   uploadInProgress,
@@ -403,14 +405,13 @@ type FlatLayCommit = {
   })[]
 }
 
-const FLAT_LAY_RESERVATION_PREFIX = 'flat-lay:'
+const FLAT_LAY_UNFINISHED_REASON = 'flat_lay_unfinished'
 
 function assertMatchingFlatLayCommit(
   garment: GarmentItem,
   request: GarmentCommitRequest
 ) {
-  const reservation =
-    garment.upload_idempotency_key?.startsWith(FLAT_LAY_RESERVATION_PREFIX) === true
+  const reservation = isFlatLayReservation(garment.upload_idempotency_key)
   if (reservation !== Boolean(request.flatLay))
     throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
   if (!request.flatLay) return
@@ -1269,6 +1270,15 @@ export class WardrobeService {
         },
       })
       if (claimed.count !== 1) throw uploadInProgress()
+      if (flatLay && garment.upload_expires_at) {
+        // Record the exact final key before a direct write can outlive this request.
+        await this.deletions.record(
+          tx,
+          [keys.finalPath],
+          FLAT_LAY_UNFINISHED_REASON,
+          garment.upload_expires_at
+        )
+      }
       return {
         kind: 'claimed',
         garment: {
@@ -1525,6 +1535,14 @@ export class WardrobeService {
             })
             if (changed.count !== 1) {
               throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
+            }
+            if (flatLayTags && initial.object_path) {
+              await tx.wardrobeObjectDeletion.deleteMany({
+                where: {
+                  object_path: initial.object_path,
+                  reason: FLAT_LAY_UNFINISHED_REASON,
+                },
+              })
             }
             return tx.garmentItem.findUniqueOrThrow({ where: { id: initial.id } })
           },

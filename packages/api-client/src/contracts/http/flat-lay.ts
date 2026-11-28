@@ -25,6 +25,9 @@ export const flatLayTagsSchema = garmentExpectedTagsSchema
       message: 'Subtype must match the garment category',
     }
   )
+  .openapi({
+    description: 'A garment subtype must belong to the selected category when set.',
+  })
 
 const flatLayMaskSchema = z
   .object({
@@ -129,6 +132,10 @@ export function registerFlatLayContracts(
           message: z.enum(['FLAT_LAY_PERSON', 'FLAT_LAY_UNCERTAIN']),
           error: z.string(),
         })
+      ),
+      429: response(
+        'FLAT_LAY_BUSY when a review slot is unavailable.',
+        common.tooManyRequestsHttpErrorSchema
       ),
       ...access,
     },

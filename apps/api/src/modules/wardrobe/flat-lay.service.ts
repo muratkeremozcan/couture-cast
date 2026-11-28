@@ -1,6 +1,8 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   UnprocessableEntityException,
@@ -16,7 +18,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import type { RequestAuthContext } from '../auth/security.types'
 import { requireAnalyticsIdSecret } from '../telemetry/telemetry.service'
-import { FlatLayDetector } from './flat-lay-detector'
+import { FlatLayDetector, type FlatLayDetection } from './flat-lay-detector'
 import { WardrobeService } from './wardrobe.service'
 
 type MaskGrant = {
@@ -50,6 +52,14 @@ function issueToken(key: Buffer, userId: string, grant: MaskGrant) {
 
 function invalid(): never {
   throw new BadRequestException('FLAT_LAY_INVALID')
+}
+
+function reviewBusy(): never {
+  const statusCode = HttpStatus.TOO_MANY_REQUESTS
+  throw new HttpException(
+    { statusCode, message: 'FLAT_LAY_BUSY', error: 'Too Many Requests' },
+    statusCode
+  )
 }
 
 function verifyToken(key: Buffer, userId: string, token: string): MaskGrant {
@@ -87,13 +97,25 @@ async function maskDimensions(bytes: Buffer) {
 
 @Injectable()
 export class FlatLayService {
+  private readonly activeReviews = new Set<string>()
+
   constructor(
     @Inject(FlatLayDetector) private readonly detector: FlatLayDetector,
     @Inject(WardrobeService) private readonly wardrobe: WardrobeService
   ) {}
 
   async review(userId: string, photo: Buffer): Promise<FlatLayReview> {
-    const result = await this.detector.detect(photo)
+    if (this.activeReviews.has(userId)) reviewBusy()
+    this.activeReviews.add(userId)
+    try {
+      return this.buildReview(userId, await this.detector.detect(photo))
+    } finally {
+      this.activeReviews.delete(userId)
+    }
+  }
+
+  private buildReview(userId: string, result: FlatLayDetection): FlatLayReview {
+    if (result.kind === 'busy') reviewBusy()
     if (result.kind === 'person')
       throw new UnprocessableEntityException('FLAT_LAY_PERSON')
     if (

@@ -26,16 +26,18 @@ const DETECTION_LIMIT = 2
 type Raster = { data: Buffer; width: number; height: number }
 type Components = NonNullable<ReturnType<typeof findFlatLayComponents>>
 export type FlatLayDetection =
+  | { kind: 'busy' }
   | { kind: 'person' }
   | { kind: 'uncertain' }
   | { kind: 'accepted'; items: { bytes: Buffer; category: GarmentCategory | null }[] }
 
 async function loadModel() {
-  const [runtime, response] = await Promise.all([
-    import('onnxruntime-node'),
-    fetch(MODEL_URL, { signal: AbortSignal.timeout(8_000) }),
-  ])
-  if (!response.ok || !response.body) throw new Error('Flat-lay model unavailable')
+  const runtime = await import('onnxruntime-node')
+  const response = await fetch(MODEL_URL, { signal: AbortSignal.timeout(8_000) })
+  if (!response.ok || !response.body) {
+    await response.body?.cancel().catch(() => undefined)
+    throw new Error('Flat-lay model unavailable')
+  }
   const reader = response.body.getReader()
   const bytes = Buffer.alloc(MODEL_BYTE_LIMIT)
   let length = 0
@@ -65,12 +67,12 @@ async function loadModel() {
 
 async function decodePhoto(photo: Buffer): Promise<Raster | null> {
   if (photo.length === 0 || photo.length > FLAT_LAY_MAX_PHOTO_BYTES) return null
-  const image = sharp(photo, { failOn: 'warning', limitInputPixels: 4096 ** 2 })
+  const image = sharp(photo, { failOn: 'error', limitInputPixels: 4096 ** 2 })
   const metadata = await image.metadata()
   if (
     !['jpeg', 'png', 'webp'].includes(metadata.format ?? '') ||
     (metadata.pages ?? 1) !== 1 ||
-    Math.min(metadata.width, metadata.height) < 256
+    !(metadata.width >= 256 && metadata.height >= 256)
   )
     return null
   const { data, info } = await image
@@ -193,7 +195,7 @@ export class FlatLayDetector {
   }
 
   async detect(photo: Buffer): Promise<FlatLayDetection> {
-    if (this.active >= DETECTION_LIMIT) return { kind: 'uncertain' }
+    if (this.active >= DETECTION_LIMIT) return { kind: 'busy' }
     this.active++
     try {
       const raster = await decodePhoto(photo)

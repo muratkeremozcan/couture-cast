@@ -3,18 +3,21 @@ title: 'Story CC-7.29: Several garments from one flat-lay photo'
 type: feature
 ticket: '7-29-several-garments-from-one-flat-lay-photo'
 created: '2026-11-28'
-status: in-review
+status: built
 baseline_revision: '0763c07082ab872239e6fa8c9840f931009c9d10'
 route: full
 route_source: pinned
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
-review_loop_iteration: 0
+lenses_ran:
+  - 'independent-correctness-and-verification'
+  - 'codex-security'
+review_loop_iteration: 1
 context:
   - '_bmad-output/implementation-artifacts/epic-7-context.md'
   - '_bmad-output/implementation-artifacts/spec-7-28-add-several-photos-once.md'
+  - '_bmad-output/test-artifacts/test-design-7-29-several-garments-from-one-flat-lay-photo.md'
 ---
 
 <frozen-after-approval>
@@ -85,7 +88,7 @@ detected cutouts in a grid, keep each by default and let members remove pieces o
 - [x] Add the authenticated review and confirmation contract and reuse idempotent publication.
 - [x] Wire a single-library picker, accessible review grid and tag editor on web and native.
 - [x] TEA adds acceptance coverage and links the new tests to Step 86.
-- [ ] Add Step 86 to the learning path and complete sprint status.
+- [x] Add Step 86 to the learning path and complete sprint status.
 
 Given a supported flat lay, when the member removes one cutout and confirms the others, then
 Closet contains one garment per kept cutout with its reviewed tags.
@@ -103,9 +106,34 @@ The pinned model loaded locally under Node 24.22.3. The publisher's person examp
 0.01. The production detector returned two masks when the fixtures were placed apart on a
 contrasting background. The separation check refused a low-contrast version of the scene.
 
+An accepted review never creates a storage object. Once a member confirms a mask, the API
+records the final-key cleanup obligation before publishing. A successful save clears that
+obligation. If the write is ambiguous and the review expires, the deletion worker can remove
+an unfinished final object while preserving active publications and holds.
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+The independent review covered all 36 paths from
+`0763c07082ab872239e6fa8c9840f931009c9d10` to
+`26169741c8c61b9c2232504cb7e12f3ce94ad0af`.
+Codex Security scan `26169741c8c6_20261128T133225Z` covered 27 worklist paths and nine
+supplemental paths. It reported one Low availability issue, `csf_802d5082aa7b409abf39baee`.
+
+| Finding                           | Resolution                                                                                          |
+| --------------------------------- | --------------------------------------------------------------------------------------------------- |
+| P0-1 Native design tokens         | Use D4 spacing and corner radii.                                                                    |
+| P0-2 Tag contract invariant       | Document the subtype refinement and regenerate OpenAPI and SDK outputs.                             |
+| P0-3 Browser selectors and expiry | Use the rendered category label and assert the expiry alert and empty capture dialog.               |
+| P0-4 Shared coverage              | Cover localized copy and segmentation refusals.                                                     |
+| P1-1 Workspace coverage           | Add focused web, mobile, SDK and API coverage for the new flow.                                     |
+| P1-2 Picker races                 | Prevent concurrent native launches and clear the other capture flow's feedback on picker entry.     |
+| P2-1 Decode and model fetch       | Use the wardrobe decoder's error threshold, check dimensions and cancel unsuccessful model streams. |
+| P2-2 Unfinished final writes      | Record final-key cleanup before publication and route expired reservations into guarded retention.  |
+| P2-3 Edge specks                  | Ignore tolerated specks before applying garment clipping and separation rules.                      |
+| P3-1 Detector availability        | Reserve one detector call per member and report saturation as retryable HTTP 429.                   |
+| P3-2 Closeout                     | Record the rounding regression and cross-link Step 86 coverage.                                     |
 
 ## Design Notes
 

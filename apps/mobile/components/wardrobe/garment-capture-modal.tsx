@@ -337,6 +337,7 @@ export function MobileGarmentCaptureModal({
   }
 
   const selectFixture = async () => {
+    flatLay.reset()
     // Required lazily (not at module scope) so importing this component in a Vite/
     // vitest environment, which has no Metro `require` for static assets, doesn't
     // throw; only pressing the __DEV__-only fixture button below ever runs it.
@@ -427,6 +428,7 @@ export function MobileGarmentCaptureModal({
         <MobileFlatLayPicker
           capture={flatLay}
           onOpen={() => {
+            resetBatchRef.current?.()
             sourceEpoch.current++
             setErrorMessage(null)
           }}

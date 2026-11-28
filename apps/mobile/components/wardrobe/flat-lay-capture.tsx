@@ -37,9 +37,12 @@ export function MobileFlatLayPicker({
   onOpen: () => void
 }) {
   const { i18n } = useTranslation()
+  const picking = useRef(false)
   const openPicker = async () => {
+    if (picking.current) return
     onOpen()
     const ticket = capture.open(currentUploadSession())
+    picking.current = true
     let asset: ImagePicker.ImagePickerAsset | undefined
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -68,6 +71,7 @@ export function MobileFlatLayPicker({
     } catch {
       capture.cancelPick(ticket, 'unavailable')
     } finally {
+      picking.current = false
       if (asset) releaseImagePickerCopy(asset.uri)
     }
   }
@@ -338,16 +342,16 @@ export function MobileFlatLayReview({
 const styles = StyleSheet.create({
   review: { gap: 12, paddingBottom: 16 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  piece: { width: '48%', padding: 6, borderWidth: 1, borderRadius: 10, gap: 4 },
-  preview: { width: '100%', aspectRatio: 1, borderRadius: 6 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  piece: { width: '48%', padding: 8, borderWidth: 1, borderRadius: 12, gap: 4 },
+  preview: { width: '100%', aspectRatio: 1, borderRadius: 8 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tagGroup: { gap: 8 },
   button: {
     minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderWidth: 1,
     borderRadius: 8,
   },

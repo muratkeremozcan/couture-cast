@@ -22803,6 +22803,8 @@ The review grid opens with each cutout kept.
 - [Mask separation](../../packages/utils/src/garment-background.spec.ts) and
   [person screening and encoding](../../apps/api/src/modules/wardrobe/flat-lay-detector.spec.ts).
 - [Native capture](../../apps/mobile/components/wardrobe/garment-capture-modal.test.tsx) and
+  [web capture](../../apps/web/src/app/components/garment-capture-modal.test.tsx).
+- [Localized review copy](../../packages/utils/src/wardrobe/flat-lay-strings.spec.ts) and
   [review state and retry](../../packages/api-client/testing/flat-lay-capture.spec.ts).
 - [Step 81](#step-81-photo-ai-consent-and-processor-approval) covers external processing policy.
 - [Step 85](#step-85-add-several-photos-at-once) covers selecting multiple separate photos.
