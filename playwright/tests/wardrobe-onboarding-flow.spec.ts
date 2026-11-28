@@ -1,11 +1,17 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 84: Suggested tags that are right.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 // Story 4.4 AC 1 and AC 3: the guided wardrobe onboarding flow. Permission,
 // capture-and-tag one real garment through the Story 4.1/4.2 components, the
 // silhouette step, completion redirect, and resuming mid-flow after a reload
 // against the real server-authoritative state machine (decision 3).
 import path from 'node:path'
-import { garmentListResponseSchema } from '@couture/api-client/contracts/http'
+import {
+  createGarmentItemResponseSchema,
+  garmentListResponseSchema,
+} from '@couture/api-client/contracts/http'
+import { createSuggestGarmentTagsWireFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import type { Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { expect } from '../support/fixtures/merged-fixtures'
@@ -45,22 +51,50 @@ async function clickContinueAndWaitForAdvance(
   expect((await advanceResponse).status).toBe(200)
 }
 
-async function captureAndTagOneGarment(page: Page) {
+async function captureAndTagOneGarment(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn
+) {
   await test.step('Capture and tag one garment', async () => {
     await page.getByRole('button', { name: 'Add a piece' }).click()
     const captureDialog = page.getByRole('dialog')
     await expect(captureDialog).toBeVisible()
     await page.getByLabel('Garment image file').setInputFiles(garmentFixturePath)
+    const saveImage = interceptNetworkCall({
+      method: 'POST',
+      url: '**/api/v1/wardrobe/garments',
+    })
     await page.getByRole('button', { name: 'Use This Image' }).click()
+    const committed = await saveImage
+    expect(committed.status).toBe(201)
+    const garment = createGarmentItemResponseSchema.parse(committed.responseJson).data
+    const suggested = createSuggestGarmentTagsWireFixture({ garmentId: garment.id })
+    const suggestion = interceptNetworkCall({
+      method: 'POST',
+      url: `**/api/v1/wardrobe/garments/${garment.id}/suggest-tags`,
+      fulfillResponse: {
+        status: 200,
+        body: {
+          data: {
+            ...suggested,
+            suggestions: {
+              ...suggested.suggestions,
+              subtype: { value: 'tank', confidence: 0.91, isConfident: true },
+            },
+          },
+        },
+      },
+    })
     await expect(page.getByText('Piece added')).toBeVisible()
     await page.getByRole('button', { name: 'Done' }).click()
 
     const taggingDialog = page.getByRole('dialog', { name: 'Organize Garment Tags' })
     await expect(taggingDialog).toBeVisible()
-    await taggingDialog
-      .getByRole('radiogroup', { name: 'Garment Category' })
-      .getByRole('radio', { name: 'Top', exact: true })
-      .click()
+    expect((await suggestion).status).toBe(200)
+    await expect(
+      taggingDialog.getByRole('radio', { name: 'Top', exact: true })
+    ).toBeChecked()
+    await expect(taggingDialog.getByTestId('garment-tagging-subtype-tank')).toBeChecked()
     await taggingDialog.getByRole('button', { name: 'Looks right' }).click()
     await expect(taggingDialog).not.toBeVisible()
 
@@ -115,7 +149,7 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
         ).toBeVisible()
       })
 
-      await captureAndTagOneGarment(page)
+      await captureAndTagOneGarment(page, interceptNetworkCall)
 
       await test.step('The starter-wardrobe skip is withdrawn once a real garment exists', async () => {
         await expect(page.getByRole('button', { name: 'Use sample closet' })).toHaveCount(
@@ -192,7 +226,7 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
       await page.goto('/wardrobe/onboarding')
       await waitForAccessibilityReady(page)
       await page.getByRole('button', { name: 'Allow access' }).click()
-      await captureAndTagOneGarment(page)
+      await captureAndTagOneGarment(page, interceptNetworkCall)
       await clickContinueAndWaitForAdvance(page, interceptNetworkCall) // capture -> tagging
       await clickContinueAndWaitForAdvance(page, interceptNetworkCall) // tagging -> silhouette
       await expect(page.getByTestId('silhouette-settings-panel')).toBeVisible()

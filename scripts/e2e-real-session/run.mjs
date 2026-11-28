@@ -374,6 +374,7 @@ async function main() {
       HTTP_CORS_ORIGIN: WEB_BASE_URL,
       E2E_WEATHER_DOUBLE_PORT: String(WEATHER_DOUBLE_PORT),
       COMMUNITY_SCREENING_EVIDENCE_MODE: 'fixture',
+      GARMENT_TAGGING_ENGINE: 'fixture',
       PLAYWRIGHT_SKIP_DB_RESET: 'true',
       // The API runs the lane's guardian consent policy, whatever .env.local says.
       GUARDIAN_CONSENT_POLICY: realSessionConsentPolicy(),

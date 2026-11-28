@@ -96,6 +96,10 @@ export const garmentTagSuggestionSnapshotSchema = z
       garmentSubtypeMatchesCategory(category.value, subtype.value),
     { path: ['subtype', 'value'], message: 'Subtype must match the suggested category.' }
   )
+  .openapi({
+    description:
+      'A non-null subtype suggestion must belong to the suggested garment category.',
+  })
 
 export const createGarmentUploadUrlInputSchema = z
   .object({
