@@ -265,6 +265,41 @@ describe('style one piece', () => {
     ])
   })
 
+  it('[7.30-WEATHER] keeps occasion ideas available when the closet has one compatible combination', () => {
+    const { looks } = stylePieceLooks(top, 'mild-dry')
+    const trio = ['sample:l:office-oxford', 'sample:l:easy-chinos', 'sample:l:silk-midi']
+    const bases = looks.filter(({ recipe }) => trio.includes(recipe.lookId))
+    const owned: StylePieceOwnedCompanion[] = [
+      {
+        id: 'only-bottom',
+        kind: 'garment',
+        category: 'bottom',
+        comfortRange: 'mild',
+        photo: null,
+      },
+      {
+        id: 'only-shoes',
+        kind: 'garment',
+        category: 'shoes',
+        comfortRange: 'mild',
+        photo: null,
+      },
+    ]
+
+    const ideas = stylePieceOccasionLooks(bases, {}, { owned })
+
+    expect(ideas.map(({ occasion }) => occasion).sort()).toEqual([
+      'goingOut',
+      'school',
+      'weekend',
+    ])
+    expect(ideas.map(({ companions }) => companions.map(({ id }) => id))).toEqual([
+      ['only-bottom', 'only-shoes'],
+      ['only-bottom', 'only-shoes'],
+      ['only-bottom', 'only-shoes'],
+    ])
+  })
+
   it('[7.30-ACCOUNT] keeps a change back to the catalog default after another saved-slot swap', () => {
     const base = stylePieceLooks(top, 'mild-dry').looks.find(
       ({ recipe }) => recipe.lookId === 'sample:l:office-oxford'

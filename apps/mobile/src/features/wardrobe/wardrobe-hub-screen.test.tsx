@@ -436,6 +436,54 @@ function captureUploadHandlers(garmentId: string, status: string) {
   ]
 }
 
+function exactStylePieceLook(garment: GarmentItemContract): SavedLookContract {
+  const selection = stylePieceAnchor(garment)!
+  const generated = stylePieceLooks(selection, 'warm-rainy', SAMPLE_CATALOG).looks[0]!
+  return {
+    id: 'hub-focus-look',
+    ownerUserId: ACCESS_TOKEN,
+    source: 'style_piece',
+    lookId: generated.recipe.lookId,
+    weather: 'warm-rainy',
+    title: null,
+    anchorGarmentId: garment.id,
+    anchorSnapshot: {
+      garmentId: garment.id,
+      category: selection.category,
+      comfortRange: selection.comfortRange,
+    },
+    composition: [
+      {
+        slotIndex: 0,
+        category: selection.category,
+        kind: 'garment',
+        itemId: garment.id,
+        label: null,
+        missing: false,
+        imageAccess: null,
+      },
+      ...generated.companions.map((companion, index) => ({
+        slotIndex: index + 1,
+        category: companion.category,
+        kind: 'catalog' as const,
+        itemId: companion.id,
+        label: null,
+        missing: false,
+        imageAccess: null,
+      })),
+    ],
+    swaps: generated.recipe.swaps,
+    collection: null,
+    comfort: null,
+    availabilityStatus: 'ready',
+    missingGarmentIds: [],
+    needsReviewReasons: [],
+    revision: 0,
+    createdAt: '2026-11-22T00:00:00.000Z',
+    updatedAt: '2026-11-22T00:00:00.000Z',
+  }
+}
+
 describe('WardrobeHubScreen', () => {
   let restoreAccessTokenResolver: () => void
   const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
@@ -955,40 +1003,7 @@ describe('WardrobeHubScreen', () => {
       })
       const renewed = { ...garment, imageAccess: fixtureWardrobePhoto('#663311') }
       const { handlers } = createSavedLooksMswHandlers([
-        {
-          id: 'seeded-mobile-race-1',
-          ownerUserId: ACCESS_TOKEN,
-          source: 'style_piece',
-          lookId: 'sample:l:silk-midi',
-          weather: 'warm-rainy',
-          title: null,
-          anchorGarmentId: garment.id,
-          anchorSnapshot: {
-            garmentId: garment.id,
-            category: 'top',
-            comfortRange: 'mild',
-          },
-          composition: [
-            {
-              slotIndex: 0,
-              category: 'top',
-              kind: 'garment',
-              itemId: garment.id,
-              label: null,
-              missing: false,
-              imageAccess: null,
-            },
-          ],
-          swaps: {},
-          collection: null,
-          comfort: null,
-          availabilityStatus: 'ready',
-          missingGarmentIds: [],
-          needsReviewReasons: [],
-          revision: 0,
-          createdAt: '2026-11-22T00:00:00.000Z',
-          updatedAt: '2026-11-22T00:00:00.000Z',
-        },
+        { ...exactStylePieceLook(garment), id: 'seeded-mobile-race-1' },
       ])
       const verification = deferred()
       const started = deferred()
@@ -2132,54 +2147,6 @@ describe('WardrobeHubScreen', () => {
     }
 
     /** A style_piece look the editor reopens exactly: the anchor plus its generated companions. */
-    function exactStylePieceLook(garment: GarmentItemContract): SavedLookContract {
-      const selection = stylePieceAnchor(garment)!
-      const generated = stylePieceLooks(selection, 'warm-rainy', SAMPLE_CATALOG).looks[0]!
-      return {
-        id: 'hub-focus-look',
-        ownerUserId: ACCESS_TOKEN,
-        source: 'style_piece',
-        lookId: generated.recipe.lookId,
-        weather: 'warm-rainy',
-        title: null,
-        anchorGarmentId: garment.id,
-        anchorSnapshot: {
-          garmentId: garment.id,
-          category: selection.category,
-          comfortRange: selection.comfortRange,
-        },
-        composition: [
-          {
-            slotIndex: 0,
-            category: selection.category,
-            kind: 'garment',
-            itemId: garment.id,
-            label: null,
-            missing: false,
-            imageAccess: null,
-          },
-          ...generated.companions.map((companion, index) => ({
-            slotIndex: index + 1,
-            category: companion.category,
-            kind: 'catalog' as const,
-            itemId: companion.id,
-            label: null,
-            missing: false,
-            imageAccess: null,
-          })),
-        ],
-        swaps: generated.recipe.swaps,
-        collection: null,
-        comfort: null,
-        availabilityStatus: 'ready',
-        missingGarmentIds: [],
-        needsReviewReasons: [],
-        revision: 0,
-        createdAt: '2026-11-22T00:00:00.000Z',
-        updatedAt: '2026-11-22T00:00:00.000Z',
-      }
-    }
-
     it('[P1] [Codex 7.11 #8] [7.11-NAT-031] the empty-state Add takes focus back when capture closes', async () => {
       nativeStyleRuntime.enabled = true
       setMobileApplicationUserId('focus-empty-add-owner')

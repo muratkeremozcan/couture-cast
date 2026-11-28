@@ -467,6 +467,25 @@ describe('WardrobeSavedLookService', () => {
     expect(prisma.savedLook.create).not.toHaveBeenCalled()
   })
 
+  it('[7.30-ACCOUNT] verifies the weather tags of an owned non-anchor in slot zero', async () => {
+    const { prisma, service } = createHarness()
+    const base = makeStylePieceInput()
+    const nonAnchor = 'cold-weather-top'
+    const input = createSavedLookInputSchema.parse({
+      ...base,
+      composition: base.composition.map((slot) =>
+        slot.slotIndex === 0 ? { ...slot, itemId: nonAnchor } : slot
+      ),
+    })
+    prisma.garmentItem.findMany.mockResolvedValueOnce([
+      { id: base.anchorGarmentId, category: 'top', comfort_range: 'mild' },
+      { id: nonAnchor, category: 'top', comfort_range: 'cold' },
+    ])
+
+    await expect(service.createSavedLook(ACTOR, input)).rejects.toThrow(NotFoundException)
+    expect(prisma.savedLook.create).not.toHaveBeenCalled()
+  })
+
   it.each([
     { weather: 'warm-rainy', comfort: 'warm' },
     { weather: 'cool-windy', comfort: 'cold' },

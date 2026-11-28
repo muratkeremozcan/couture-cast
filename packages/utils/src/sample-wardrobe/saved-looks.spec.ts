@@ -171,6 +171,15 @@ describe('saved-looks helpers', () => {
     )
 
     expect(reopenStylePieceRecipe(saved, anchor, [alternative])).toBeNull()
+    const replacement = reopenStylePieceRecipe(saved, anchor, [alternative], {
+      bottom: 'sample:g:dark-jeans',
+    })
+    expect(replacement?.swaps).toMatchObject({ bottom: 'sample:g:dark-jeans' })
+    expect(
+      reopenStylePieceRecipe(saved, anchor, [alternative], {
+        bottom: 'not-an-eligible-piece',
+      })
+    ).toBeNull()
     expect(
       reopenStylePieceRecipe(
         { ...saved, availabilityStatus: 'needs_review' },

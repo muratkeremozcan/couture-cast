@@ -333,6 +333,21 @@ test.describe('Style this piece on a phone', () => {
       )
     ).toEqual({ firstConnected: false, secondConnected: true, secondOwnsFocus: true })
     await expectPinnedPhoto(matching, garment.imageAccess!.url)
+
+    const goingOut = looks.filter({
+      has: page.getByRole('heading', { name: 'Going out', exact: true }),
+    })
+    await goingOut.getByTestId('style-piece-swap-bottom').click()
+    await goingOut.getByTestId('style-piece-option-sample:g:chinos').click()
+    await expect(matching).toHaveAttribute(
+      'data-style-look',
+      'mild-dry:sample:l:office-oxford'
+    )
+    await panel.getByTestId('status-bar-action-undo').click()
+    await expect(matching).toHaveAttribute(
+      'data-style-look',
+      'mild-dry:sample:l:easy-chinos'
+    )
   })
 
   for (const failure of ['expiry', 'image decode failure'] as const) {
