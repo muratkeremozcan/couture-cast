@@ -30,6 +30,9 @@ import { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
 import { WardrobeProcessingQueue } from './wardrobe-processing.queue'
 import { SilhouettePhotoProcessingQueue } from './silhouette-photo-processing.queue'
 import { WardrobeRetentionService } from './wardrobe-retention.service'
+import { FlatLayController } from './flat-lay.controller'
+import { FlatLayDetector } from './flat-lay-detector'
+import { FlatLayService } from './flat-lay.service'
 
 @Module({
   imports: [
@@ -40,6 +43,7 @@ import { WardrobeRetentionService } from './wardrobe-retention.service'
     TelemetryModule,
   ],
   controllers: [
+    FlatLayController,
     WardrobeController,
     WardrobeGarmentRemovalController,
     WardrobeCapsuleController,
@@ -48,6 +52,8 @@ import { WardrobeRetentionService } from './wardrobe-retention.service'
     WardrobeSilhouetteController,
   ],
   providers: [
+    FlatLayDetector,
+    FlatLayService,
     WardrobeService,
     WardrobeAccessService,
     WardrobeCapsuleRepository,

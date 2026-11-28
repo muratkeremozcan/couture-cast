@@ -1,6 +1,10 @@
 // Step 11 request-context owner: searchable owner anchor
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
+import {
+  FLAT_LAY_CONFIRM_PATH,
+  FLAT_LAY_REVIEW_PATH,
+} from '@couture/api-client/contracts/http'
 import type { NextFunction, Request, Response } from 'express'
 import type { AuthenticatedRequest } from '../modules/auth/security.types'
 import { COMMUNITY_AUTHORIZATION_BUDGET_MS } from '../modules/community/community-authorization-budget.js'
@@ -38,12 +42,18 @@ export const LOOK_IDEAS_ROUTE = '/api/v1/personalization/look-ideas'
 
 export const PHOTO_AI_CONSENT_ROUTE = '/api/v1/privacy/photo-ai-consent'
 
+export function normalizedRequestRoute(path: string | undefined) {
+  return path?.split('?')[0]?.replace(/\/+$/, '').toLowerCase()
+}
+
 export function isPrivateAccountRoute(path: string | undefined): boolean {
-  const normalized = path?.split('?')[0]?.replace(/\/+$/, '').toLowerCase()
+  const normalized = normalizedRequestRoute(path)
   return (
     normalized === LOOK_IDEAS_ROUTE ||
     normalized === PHOTO_AI_CONSENT_ROUTE ||
-    normalized === `${PHOTO_AI_CONSENT_ROUTE}/revoke`
+    normalized === `${PHOTO_AI_CONSENT_ROUTE}/revoke` ||
+    normalized === FLAT_LAY_REVIEW_PATH ||
+    normalized === FLAT_LAY_CONFIRM_PATH
   )
 }
 

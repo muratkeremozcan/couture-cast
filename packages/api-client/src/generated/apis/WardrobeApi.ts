@@ -23,6 +23,9 @@ import type {
   CreateSilhouetteUploadUrlInput,
   CreateSilhouetteUploadUrlResponse,
   FavoriteOutfitCapsuleInput,
+  FlatLayConfirmation,
+  FlatLayReview,
+  FlatLaySelection,
   GarmentListResponse,
   GarmentUsageResponse,
   OutfitCapsuleListResponse,
@@ -167,6 +170,14 @@ export interface ApiV1WardrobeSilhouettePutRequest {
 export interface ApiV1WardrobeUploadUrlPostRequest {
   idempotencyKey: string
   createGarmentUploadUrlInput: CreateGarmentUploadUrlInput
+}
+
+export interface ConfirmFlatLayRequest {
+  flatLaySelection: FlatLaySelection
+}
+
+export interface ReviewFlatLayRequest {
+  photo: Blob
 }
 
 /**
@@ -2105,6 +2116,147 @@ export class WardrobeApi extends runtime.BaseAPI {
       requestParameters,
       initOverrides
     )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for confirmFlatLay without sending the request
+   */
+  async confirmFlatLayRequestOpts(
+    requestParameters: ConfirmFlatLayRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['flatLaySelection'] == null) {
+      throw new runtime.RequiredError(
+        'flatLaySelection',
+        'Required parameter "flatLaySelection" was null or undefined when calling confirmFlatLay().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/flat-lay/confirm`
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['flatLaySelection'],
+    }
+  }
+
+  /**
+   * Save the selected flat-lay cutouts with the reviewed tags
+   */
+  async confirmFlatLayRaw(
+    requestParameters: ConfirmFlatLayRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<FlatLayConfirmation>> {
+    const requestOptions = await this.confirmFlatLayRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Save the selected flat-lay cutouts with the reviewed tags
+   */
+  async confirmFlatLay(
+    requestParameters: ConfirmFlatLayRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<FlatLayConfirmation> {
+    const response = await this.confirmFlatLayRaw(requestParameters, initOverrides)
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for reviewFlatLay without sending the request
+   */
+  async reviewFlatLayRequestOpts(
+    requestParameters: ReviewFlatLayRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['photo'] == null) {
+      throw new runtime.RequiredError(
+        'photo',
+        'Required parameter "photo" was null or undefined when calling reviewFlatLay().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+    const consumes: runtime.Consume[] = [{ contentType: 'multipart/form-data' }]
+    // @ts-ignore: canConsumeForm may be unused
+    const canConsumeForm = runtime.canConsumeForm(consumes)
+
+    let formParams: { append(param: string, value: any): any }
+    let useForm = false
+    // use FormData to transmit files using content-type "multipart/form-data"
+    useForm = canConsumeForm
+    if (useForm) {
+      formParams = new FormData()
+    } else {
+      formParams = new URLSearchParams()
+    }
+
+    if (requestParameters['photo'] != null) {
+      formParams.append('photo', requestParameters['photo'] as any)
+    }
+
+    let urlPath = `/api/v1/wardrobe/flat-lay/review`
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: formParams,
+    }
+  }
+
+  /**
+   * Screen a flat-lay photo locally and return cutouts for review
+   */
+  async reviewFlatLayRaw(
+    requestParameters: ReviewFlatLayRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<FlatLayReview>> {
+    const requestOptions = await this.reviewFlatLayRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Screen a flat-lay photo locally and return cutouts for review
+   */
+  async reviewFlatLay(
+    requestParameters: ReviewFlatLayRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<FlatLayReview> {
+    const response = await this.reviewFlatLayRaw(requestParameters, initOverrides)
     return await response.value()
   }
 }

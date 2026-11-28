@@ -131,7 +131,7 @@ export {
   GARMENT_COLOR_FAMILIES,
 } from './garment-color'
 export type { GarmentColorFamily } from './garment-color'
-export { maskGarmentBackground } from './garment-background'
+export { findFlatLayComponents, maskGarmentBackground } from './garment-background'
 
 export * from './sample-wardrobe'
 export * from './federated-signin'
@@ -140,6 +140,7 @@ export * from './looks-feed'
 export * from './wardrobe/deferred-garment-deletion'
 export * from './wardrobe/garment-photo-batch'
 export { garmentPhotoBatchStrings } from './wardrobe/garment-photo-batch-strings'
+export { flatLayStrings } from './wardrobe/flat-lay-strings'
 
 export {
   boxShadowFor,

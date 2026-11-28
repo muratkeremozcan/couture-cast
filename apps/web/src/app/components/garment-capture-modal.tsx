@@ -3,7 +3,13 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getGuestPreviewStrings } from '@couture/utils'
+import type { TFunction } from 'i18next'
+import { flatLayStrings, getGuestPreviewStrings } from '@couture/utils'
+import {
+  createFlatLayClient,
+  FlatLayCapture,
+  type FlatLayCaptureState,
+} from '@couture/api-client'
 import type {
   GarmentItemContract,
   UploadAttemptSession,
@@ -21,10 +27,21 @@ import {
 import {
   currentUploadSession,
   isUploadSessionCurrent,
+  resolveUploadBearer,
   useUploadSessionChange,
 } from '../../lib/upload-attempts'
 import { AccessibleModal } from './accessible-modal'
 import { WebGarmentPhotoBatch } from './garment-photo-batch'
+import { FlatLayPicker, FlatLayReviewGrid } from './flat-lay-capture'
+import { resolveWebApiBaseUrl } from '../../lib/api-client'
+import { readStorage, WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
+
+const flatLayClient = createFlatLayClient(resolveWebApiBaseUrl, (session) =>
+  resolveUploadBearer(
+    session,
+    () => readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null
+  )
+)
 
 type PickedImage = { dataUrl: string; session: UploadAttemptSession }
 type CropRatio = '1:1' | '4:3'
@@ -108,10 +125,12 @@ function SourceStep({
   onStartCamera,
   onFilePickerOpen,
   onFileSelect,
+  flatLayPicker,
 }: {
   onStartCamera: () => void
   onFilePickerOpen: () => void
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
+  flatLayPicker?: React.ReactNode
 }) {
   const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -151,8 +170,63 @@ function SourceStep({
           onChange={onFileSelect}
         />
       </div>
+      {flatLayPicker}
     </div>
   )
+}
+
+function CaptureSource({
+  flatLay,
+  state,
+  onClose,
+  resetBatchRef,
+  onFlatLayPickerOpen,
+  onBatchPickerOpen,
+  onBatchGarmentCommitted,
+  uploadGarment,
+  source,
+}: {
+  flatLay: FlatLayCapture
+  state: FlatLayCaptureState
+  onClose: () => void
+  resetBatchRef: React.RefObject<(() => void) | null>
+  onFlatLayPickerOpen: () => void
+  onBatchPickerOpen: () => void
+  onBatchGarmentCommitted: GarmentCaptureModalProps['onBatchGarmentCommitted']
+  uploadGarment: NonNullable<GarmentCaptureModalProps['uploadGarment']>
+  source: React.ComponentProps<typeof SourceStep>
+}) {
+  if (state.phase !== 'source') {
+    return <FlatLayReviewGrid state={state} capture={flatLay} onClose={onClose} />
+  }
+  if (!onBatchGarmentCommitted) return <SourceStep {...source} />
+  return (
+    <WebGarmentPhotoBatch
+      resetRef={resetBatchRef}
+      onClose={onClose}
+      onInitialPickerOpen={onBatchPickerOpen}
+      onGarmentCommitted={onBatchGarmentCommitted}
+      uploadGarment={uploadGarment}
+    >
+      <SourceStep
+        {...source}
+        flatLayPicker={<FlatLayPicker capture={flatLay} onOpen={onFlatLayPickerOpen} />}
+      />
+    </WebGarmentPhotoBatch>
+  )
+}
+
+function captureErrorMessage(
+  t: TFunction,
+  copy: ReturnType<typeof flatLayStrings>,
+  flatLayError: FlatLayCaptureState['error'],
+  error: CaptureErrorKey | null
+) {
+  if (flatLayError === 'signedOut' || flatLayError === 'consentRequired') {
+    return t(`wardrobe.capture.errors.${flatLayError}`)
+  }
+  if (flatLayError) return copy[flatLayError]
+  return error ? t(`wardrobe.capture.errors.${error}`) : null
 }
 
 function CameraStep({
@@ -396,6 +470,27 @@ export function GarmentCaptureModal({
 }: GarmentCaptureModalProps) {
   const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language).firstUse
+  const flatLayCopy = flatLayStrings(i18n.language)
+  const flatLayCallbacks = useRef({ onClose, onBatchGarmentCommitted })
+  flatLayCallbacks.current = { onClose, onBatchGarmentCommitted }
+  const [flatLayState, setFlatLayState] = useState<FlatLayCaptureState>({
+    phase: 'source',
+    pieces: [],
+  })
+  const [flatLay] = useState(
+    () =>
+      new FlatLayCapture(
+        {
+          ...flatLayClient,
+          isCurrent: isUploadSessionCurrent,
+          onCommitted: (garment) =>
+            flatLayCallbacks.current.onBatchGarmentCommitted?.(garment),
+          onComplete: () => flatLayCallbacks.current.onClose(),
+        },
+        setFlatLayState
+      )
+  )
+  useEffect(() => () => flatLay.reset(false), [flatLay])
   const [isDiscarding, setIsDiscarding] = useState(false)
   const keepEditing = useRef<HTMLButtonElement>(null)
   const confirmCrop = useRef<HTMLButtonElement>(null)
@@ -465,6 +560,7 @@ export function GarmentCaptureModal({
   useEffect(() => cancelCapture, [cancelCapture])
 
   const resetCapture = useCallback(() => {
+    flatLay.reset()
     resetBatchRef.current?.()
     cancelCapture()
     restoreCropFocus.current = false
@@ -474,7 +570,7 @@ export function GarmentCaptureModal({
     setErrorKey(null)
     setUploadProgress(0)
     setUploadState('')
-  }, [cancelCapture])
+  }, [cancelCapture, flatLay])
   // Round 5 account epoch: the camera, the picked photo and its upload belong to the account
   // signed in when the camera or picker opened; any account change drops them.
   useUploadSessionChange(resetCapture)
@@ -487,6 +583,7 @@ export function GarmentCaptureModal({
   }
 
   const handleStartCamera = async () => {
+    flatLay.reset()
     setErrorKey(null)
     const session = currentUploadSession()
     const epoch = ++captureEpoch.current
@@ -538,6 +635,7 @@ export function GarmentCaptureModal({
   }
 
   const handleFilePickerOpen = () => {
+    flatLay.reset()
     pickerSessionRef.current = {
       session: currentUploadSession(),
       epoch: captureEpoch.current,
@@ -632,16 +730,6 @@ export function GarmentCaptureModal({
     setIsDiscarding(false)
   }
 
-  const source = (
-    <SourceStep
-      onStartCamera={() => {
-        void handleStartCamera()
-      }}
-      onFilePickerOpen={handleFilePickerOpen}
-      onFileSelect={handleFileSelect}
-    />
-  )
-
   return (
     <AccessibleModal
       isOpen={isOpen}
@@ -654,7 +742,9 @@ export function GarmentCaptureModal({
         handleClose()
       }}
       titleId="garment-capture-title"
-      title={t('wardrobe.capture.title')}
+      title={
+        flatLayState.phase === 'source' ? t('wardrobe.capture.title') : flatLayCopy.review
+      }
       invokingElementRef={invokingElementRef}
       closeLabel={t('wardrobe.capture.close')}
       ariaLiveMessage={
@@ -664,25 +754,32 @@ export function GarmentCaptureModal({
             })
           : null
       }
-      errorMessage={errorKey ? t(`wardrobe.capture.errors.${errorKey}`) : null}
+      errorMessage={captureErrorMessage(t, flatLayCopy, flatLayState.error, errorKey)}
     >
-      {step === 'source' &&
-        (onBatchGarmentCommitted ? (
-          <WebGarmentPhotoBatch
-            resetRef={resetBatchRef}
-            onClose={handleClose}
-            onInitialPickerOpen={() => {
-              cancelCapture()
-              setErrorKey(null)
-            }}
-            onGarmentCommitted={onBatchGarmentCommitted}
-            uploadGarment={uploadGarment}
-          >
-            {source}
-          </WebGarmentPhotoBatch>
-        ) : (
-          source
-        ))}
+      {step === 'source' && (
+        <CaptureSource
+          flatLay={flatLay}
+          state={flatLayState}
+          onClose={handleClose}
+          resetBatchRef={resetBatchRef}
+          onFlatLayPickerOpen={() => {
+            cancelCapture()
+            setErrorKey(null)
+          }}
+          onBatchPickerOpen={() => {
+            flatLay.reset()
+            cancelCapture()
+            setErrorKey(null)
+          }}
+          onBatchGarmentCommitted={onBatchGarmentCommitted}
+          uploadGarment={uploadGarment}
+          source={{
+            onStartCamera: () => void handleStartCamera(),
+            onFilePickerOpen: handleFilePickerOpen,
+            onFileSelect: handleFileSelect,
+          }}
+        />
+      )}
 
       {step === 'camera' && (
         <CameraStep

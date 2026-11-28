@@ -1,8 +1,12 @@
 import { HttpAdapterHost } from '@nestjs/core'
 import { BadRequestException, type INestApplication } from '@nestjs/common'
+import {
+  FLAT_LAY_CONFIRM_PATH,
+  FLAT_LAY_REVIEW_PATH,
+} from '@couture/api-client/contracts/http'
 import { json, urlencoded, type NextFunction, type Request, type Response } from 'express'
 import { ApiExceptionFilter } from '../filters/api-exception.filter.js'
-import { bindRequestContext } from '../logger/request-context.js'
+import { bindRequestContext, normalizedRequestRoute } from '../logger/request-context.js'
 import { createRequestLoggerMiddleware } from '../logger/request-logger.middleware.js'
 import { TelemetryService } from '../modules/telemetry/telemetry.service.js'
 
@@ -73,6 +77,7 @@ export const UNPARSABLE_BODY_RESPONSE = Object.freeze({
 
 /** Body-parser's default limit, kept explicit for both parsers: 100 kB. */
 export const JSON_BODY_LIMIT_BYTES = 102_400
+const FLAT_LAY_CONFIRM_LIMIT_BYTES = 2 * 1024 * 1024
 
 function isJsonParseFailure(error: unknown): boolean {
   return (
@@ -101,8 +106,12 @@ function keepRawBody(
 }
 
 export function createJsonBodyParser() {
-  const parse = json({ limit: JSON_BODY_LIMIT_BYTES, verify: keepRawBody })
+  const parseDefault = json({ limit: JSON_BODY_LIMIT_BYTES, verify: keepRawBody })
+  const parseConfirm = json({ limit: FLAT_LAY_CONFIRM_LIMIT_BYTES, inflate: false })
   return function jsonParser(request: Request, response: Response, next: NextFunction) {
+    const route = normalizedRequestRoute(request.path)
+    if (route === FLAT_LAY_REVIEW_PATH) return next()
+    const parse = route === FLAT_LAY_CONFIRM_PATH ? parseConfirm : parseDefault
     parse(request, response, (error?: unknown) => {
       if (error === undefined) return next()
       next(
@@ -116,7 +125,20 @@ export function createJsonBodyParser() {
 
 /** Nest's URL-encoded defaults (`extended: true`, 100 kB), with the raw body kept. */
 export function createUrlencodedBodyParser() {
-  return urlencoded({ extended: true, limit: JSON_BODY_LIMIT_BYTES, verify: keepRawBody })
+  const parse = urlencoded({
+    extended: true,
+    limit: JSON_BODY_LIMIT_BYTES,
+    verify: keepRawBody,
+  })
+  return function urlencodedParser(
+    request: Request,
+    response: Response,
+    next: NextFunction
+  ) {
+    const route = normalizedRequestRoute(request.path)
+    if (route === FLAT_LAY_REVIEW_PATH || route === FLAT_LAY_CONFIRM_PATH) return next()
+    parse(request, response, next)
+  }
 }
 
 /**

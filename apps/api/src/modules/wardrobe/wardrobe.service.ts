@@ -23,6 +23,8 @@ import {
   type GarmentTagSuggestionSnapshot,
   type CreateGarmentItemInput,
   type CreateGarmentUploadUrlInput,
+  type FlatLayConfirmation,
+  type FlatLayTags,
   type GarmentColorFamilyContract,
   type GarmentItemResponse,
   type SuggestGarmentTagsResponse,
@@ -386,6 +388,36 @@ type GarmentCommitRequest = {
   input: CreateGarmentItemInput
   idempotencyKey: string
   payloadHash: string
+  flatLay?: { bytes: Buffer; tags: Required<FlatLayTags> }
+}
+
+type FlatLayCommit = {
+  reviewId: string
+  reviewItems: string[]
+  expiresAt: Date
+  pieces: (NonNullable<GarmentCommitRequest['flatLay']> & {
+    id: string
+    sha256: string
+    widthPx: number
+    heightPx: number
+  })[]
+}
+
+const FLAT_LAY_RESERVATION_PREFIX = 'flat-lay:'
+
+function assertMatchingFlatLayCommit(
+  garment: GarmentItem,
+  request: GarmentCommitRequest
+) {
+  const reservation =
+    garment.upload_idempotency_key?.startsWith(FLAT_LAY_RESERVATION_PREFIX) === true
+  if (reservation !== Boolean(request.flatLay))
+    throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
+  if (!request.flatLay) return
+  if (!garment.upload_expires_at || garment.upload_expires_at <= new Date()) {
+    throw new BadRequestException('FLAT_LAY_INVALID')
+  }
+  assertCommitReplayMatches(garment, request.idempotencyKey, request.payloadHash)
 }
 
 /** A commit of a session already past commit, answered with a read signed under the lock. */
@@ -632,7 +664,10 @@ export class WardrobeService {
     }
   }
 
-  private async toResponse(garment: GarmentItem): Promise<GarmentItemResponse> {
+  private async toResponse(
+    garment: GarmentItem,
+    options: GarmentReadOptions = {}
+  ): Promise<GarmentItemResponse> {
     if (!garment.object_path) {
       throw new ServiceUnavailableException('STORAGE_UNAVAILABLE')
     }
@@ -651,10 +686,14 @@ export class WardrobeService {
       READ_URL_EXPIRY_SECONDS
     )
     return {
-      data: garmentData(garment, {
-        url: readUrl,
-        expiresAt: new Date(Date.now() + READ_URL_EXPIRY_SECONDS * 1000).toISOString(),
-      }),
+      data: withGarmentMetadata(
+        garment,
+        garmentData(garment, {
+          url: readUrl,
+          expiresAt: new Date(Date.now() + READ_URL_EXPIRY_SECONDS * 1000).toISOString(),
+        }),
+        options
+      ),
     }
   }
 
@@ -955,7 +994,120 @@ export class WardrobeService {
     idempotencyKey: string
   ): Promise<CommitResult> {
     const payloadHash = commitPayloadHash(input)
-    const request = { userId, input, idempotencyKey, payloadHash }
+    return this.commitGarmentRequest({ userId, input, idempotencyKey, payloadHash }, role)
+  }
+
+  async commitFlatLay(
+    userId: string,
+    role: ApiRole,
+    review: FlatLayCommit
+  ): Promise<FlatLayConfirmation> {
+    await this.guardianService.assertWardrobeUploadAllowed(userId, role)
+    const requests = await this.reserveFlatLaySelection(userId, review)
+    // Independent claims allow other selected pieces to finish when one publication is ambiguous.
+    const results = await Promise.allSettled(
+      requests.map((request) => this.commitGarmentRequest(request, role))
+    )
+    if (review.pieces.some(({ tags }) => tags.category !== null)) {
+      await this.ritualService.invalidateUserCache(userId).catch(() => undefined)
+    }
+    return {
+      garments: results.map((result) => {
+        if (result.status === 'rejected') throw result.reason
+        return result.value.response.data
+      }),
+    }
+  }
+
+  private async reserveFlatLaySelection(
+    userId: string,
+    review: FlatLayCommit
+  ): Promise<GarmentCommitRequest[]> {
+    if (!isWardrobePathSegment(userId)) throw new BadRequestException('FLAT_LAY_INVALID')
+    const { reviewId, reviewItems, pieces, expiresAt } = review
+    const selectionHash = createHash('sha256')
+      .update(
+        JSON.stringify(
+          pieces
+            .map(({ id, sha256, tags }) => ({ id, sha256, tags }))
+            .sort((a, b) => a.id.localeCompare(b.id))
+        )
+      )
+      .digest('hex')
+    const prefix = `${FLAT_LAY_RESERVATION_PREFIX}${reviewId}:`
+    return interactiveTransaction(this.prisma, async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${prefix}))`
+      if (expiresAt <= new Date()) throw new BadRequestException('FLAT_LAY_INVALID')
+      const existing = await tx.garmentItem.findMany({
+        where: { id: { in: reviewItems } },
+      })
+      const byId = new Map(existing.map((row) => [row.id, row]))
+      // Even a disjoint selection is a different save once the first selection was reserved.
+      if (existing.length !== 0 && existing.length !== pieces.length) {
+        throw new BadRequestException('FLAT_LAY_INVALID')
+      }
+      const requests: GarmentCommitRequest[] = []
+      for (const piece of pieces) {
+        const { id, bytes, tags, sha256, widthPx, heightPx } = piece
+        const idempotencyKey = `${prefix}${id}`
+        const payloadHash = createHash('sha256')
+          .update(JSON.stringify([selectionHash, id]))
+          .digest('hex')
+        const row = byId.get(id)
+        if (
+          existing.length &&
+          (row?.user_id !== userId ||
+            row.upload_idempotency_key !== idempotencyKey ||
+            row.commit_idempotency_key !== idempotencyKey ||
+            row.commit_payload_hash !== payloadHash)
+        )
+          throw new BadRequestException('FLAT_LAY_INVALID')
+
+        const uploadSessionId = row?.upload_session_id ?? randomUUID()
+        if (!row) {
+          await tx.garmentItem.create({
+            data: {
+              id,
+              user_id: userId,
+              object_path: buildGarmentObjectPath(userId, id, 'webp'),
+              upload_session_id: uploadSessionId,
+              upload_idempotency_key: idempotencyKey,
+              commit_idempotency_key: idempotencyKey,
+              commit_payload_hash: payloadHash,
+              file_size_bytes: bytes.length,
+              mime_type: 'image/webp',
+              content_sha256: sha256,
+              width_px: widthPx,
+              height_px: heightPx,
+              upload_status: 'pending_upload',
+              retention_status: 'active',
+              upload_expires_at: expiresAt,
+              consent_checked_at: new Date(),
+            },
+          })
+        }
+        requests.push({
+          userId,
+          idempotencyKey,
+          payloadHash,
+          input: {
+            garmentId: id,
+            uploadSessionId,
+            hasCropping: true,
+            hasBgCleanup: true,
+          },
+          flatLay: { bytes, tags },
+        })
+      }
+      return requests
+    })
+  }
+
+  private async commitGarmentRequest(
+    request: GarmentCommitRequest,
+    role: ApiRole
+  ): Promise<CommitResult> {
+    const { userId, input, idempotencyKey, payloadHash, flatLay } = request
 
     // Every decision comes from one locked read of the row (see classifyGarmentCommit): a replay
     // is answered from it, and so is everything that ends or blocks the session.
@@ -978,10 +1130,13 @@ export class WardrobeService {
     // until the claim succeeds: a crash anywhere before it leaves a retry, once this claim's
     // lease runs out, able to verify and publish again. A legacy row's bytes went through the
     // retired relay and already sit at the final path.
-    const fromStaging = initial.upload_status === 'pending_upload'
+    const fromStaging = !flatLay && initial.upload_status === 'pending_upload'
     let publishStarted = false
     try {
-      if (fromStaging) {
+      if (flatLay) {
+        publishStarted = true
+        await this.storage.publish(keys.finalPath, flatLay.bytes, 'image/webp')
+      } else if (fromStaging) {
         const bytes = await this.verifyStoredGarment(
           initial,
           keys.stagingPath,
@@ -1012,24 +1167,37 @@ export class WardrobeService {
         input,
         idempotencyKey,
         payloadHash,
-        publishAttemptId
+        publishAttemptId,
+        flatLay?.tags
       )
     } catch (error) {
       const replay = await this.replayIfCommitted(request)
       if (replay) return this.finishReplay(replay)
       // The publish returned, so the write has landed; nothing of this attempt is in flight.
       await this.releaseGarmentPublication(initial.id, publishAttemptId)
-      if (fromStaging) await this.releaseUnclaimedFinal(initial, keys.finalPath)
+      if (fromStaging || flatLay)
+        await this.releaseUnclaimedFinal(initial, keys.finalPath)
       throw error
     }
 
-    await this.ensureProcessingHandoff(committed)
-    if (fromStaging) {
-      await this.deletions.recordAndRemove([keys.stagingPath], 'commit_staging_released')
+    if (!flatLay) {
+      await this.ensureProcessingHandoff(committed)
+      if (fromStaging) {
+        await this.deletions.recordAndRemove(
+          [keys.stagingPath],
+          'commit_staging_released'
+        )
+      }
+      await this.emitUploadCompletionTelemetry(userId, committed)
     }
-    await this.emitUploadCompletionTelemetry(userId, committed)
 
-    return { replayed: false, response: await this.committedResponse(committed.id) }
+    return {
+      replayed: false,
+      response: await this.committedResponse(
+        committed.id,
+        flatLay ? { includeSubtype: true } : undefined
+      ),
+    }
   }
 
   /**
@@ -1046,7 +1214,7 @@ export class WardrobeService {
     request: GarmentCommitRequest,
     claimAttemptId: string | null
   ): Promise<GarmentCommitDecision> {
-    const { userId, input, idempotencyKey, payloadHash } = request
+    const { userId, input, idempotencyKey, payloadHash, flatLay } = request
     return interactiveTransaction(this.prisma, async (tx) => {
       const garment = await lockGarmentRow(tx, input.garmentId)
       if (!garment || garment.user_id !== userId) {
@@ -1065,9 +1233,17 @@ export class WardrobeService {
       if (garment.upload_session_id !== input.uploadSessionId) {
         throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
       }
+      assertMatchingFlatLayCommit(garment, request)
       if (COMMITTED_UPLOAD_STATUSES.has(garment.upload_status)) {
         assertCommitReplayMatches(garment, idempotencyKey, payloadHash)
-        return { kind: 'replay', garment, response: await this.toResponse(garment) }
+        return {
+          kind: 'replay',
+          garment,
+          response: await this.toResponse(
+            garment,
+            flatLay ? { includeSubtype: true } : undefined
+          ),
+        }
       }
       if (!COMMITTABLE_UPLOAD_STATUSES.includes(garment.upload_status)) {
         throw new BadRequestException('INVALID_GARMENT_COMMIT')
@@ -1129,7 +1305,14 @@ export class WardrobeService {
         throw new ForbiddenException('WARDROBE_UPLOAD_FORBIDDEN')
       }
       assertCommitReplayMatches(garment, idempotencyKey, payloadHash)
-      return { kind: 'replay', garment, response: await this.toResponse(garment) }
+      return {
+        kind: 'replay',
+        garment,
+        response: await this.toResponse(
+          garment,
+          request.flatLay ? { includeSubtype: true } : undefined
+        ),
+      }
     })
   }
 
@@ -1145,14 +1328,17 @@ export class WardrobeService {
    * The response of a commit that just moved the row on, read and signed under the row lock: a
    * garment that left `active` meanwhile is answered without image access.
    */
-  private async committedResponse(garmentId: string): Promise<GarmentItemResponse> {
+  private async committedResponse(
+    garmentId: string,
+    options: GarmentReadOptions = {}
+  ): Promise<GarmentItemResponse> {
     return interactiveTransaction(this.prisma, async (tx) => {
       const garment = await lockGarmentRow(tx, garmentId)
       if (!garment) throw new NotFoundException('UPLOAD_SESSION_NOT_FOUND')
       if (garment.retention_status !== 'active') {
-        return { data: garmentData(garment, null) }
+        return { data: withGarmentMetadata(garment, garmentData(garment, null), options) }
       }
-      return this.toResponse(garment)
+      return this.toResponse(garment, options)
     })
   }
 
@@ -1279,7 +1465,8 @@ export class WardrobeService {
     input: CreateGarmentItemInput,
     idempotencyKey: string,
     payloadHash: string,
-    publishAttemptId: string
+    publishAttemptId: string,
+    flatLayTags?: Required<FlatLayTags>
   ): Promise<GarmentItem> {
     for (
       let attempt = 1;
@@ -1313,7 +1500,19 @@ export class WardrobeService {
                 publish_attempt_id: publishAttemptId,
               },
               data: {
-                upload_status: 'processing',
+                upload_status: flatLayTags
+                  ? flatLayTags.category
+                    ? 'ready'
+                    : 'awaiting_tags'
+                  : 'processing',
+                ...(flatLayTags && {
+                  category: flatLayTags.category,
+                  subtype: flatLayTags.subtype,
+                  material: flatLayTags.material,
+                  comfort_range: flatLayTags.comfortRange,
+                  tags_confirmed_at: flatLayTags.category ? new Date() : null,
+                  tagging_failure_code: TAGGING_MANUAL_MODE_CODE,
+                }),
                 publish_attempt_id: null,
                 publish_started_at: null,
                 committed_at: new Date(),
