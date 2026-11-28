@@ -31,6 +31,10 @@ describe('community HTTP contracts', () => {
       ['oversized', 'a'.repeat(281)],
       ['link', 'See https://example.test/outfit for details.'],
       ['email address', 'Ask outfits@example.test for details.'],
+      ['control character', 'Blue\u0000 tones.'],
+      ['line feed', 'Blue tones.\nLight layers.'],
+      ['Unicode line separator', 'Blue tones.\u2028Light layers.'],
+      ['Unicode paragraph separator', 'Blue tones.\u2029Light layers.'],
     ])('refuses a %s suggestion before it reaches the composer', (_, caption) => {
       expect(
         describeCommunityDraftResponseSchema.safeParse({ data: { caption } }).success

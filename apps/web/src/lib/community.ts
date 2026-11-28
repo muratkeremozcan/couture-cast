@@ -726,25 +726,28 @@ export async function allocateCommunityLookFromWeb({
   }
 }
 
-export function describeCommunityDraftFromWeb(
+export async function describeCommunityDraftFromWeb(
   input: DescribeCommunityDraftInput,
   owner: string | null,
   signal: AbortSignal
 ) {
-  return withCommunityDescriptionDeadline(signal, async (requestSignal) => {
-    const assertOwner = () => {
-      if (requestSignal.aborted || !owner || owner !== communityCommentsSessionFromWeb())
-        throw new CommunityRequestSuperseded()
-    }
+  const assertOwner = () => {
+    if (!owner || owner !== communityCommentsSessionFromWeb())
+      throw new CommunityRequestSuperseded()
+  }
+  const response = await withCommunityDescriptionDeadline(signal, (requestSignal) => {
     assertOwner()
     const api = createWebApiClient({ accessToken: readAccessToken() })
-    const response = await api.apiV1CommunityPostsDescribePost(
+    return api.apiV1CommunityPostsDescribePost(
       { describeCommunityDraftInput: input },
       { signal: requestSignal }
     )
+  }).catch((error: unknown) => {
     assertOwner()
-    return describeCommunityDraftResponseSchema.parse(response).data.caption
+    throw error
   })
+  assertOwner()
+  return describeCommunityDraftResponseSchema.parse(response).data.caption
 }
 
 export interface PublishCommunityLookInput {

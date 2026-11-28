@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import sharp from 'sharp'
 import { describe, expect, it, vi } from 'vitest'
 import { ForbiddenException, ServiceUnavailableException } from '@nestjs/common'
+import { COMMUNITY_UPLOAD_SESSION_MISMATCH_MESSAGE } from '@couture/api-client/contracts/http'
 import { CommunityObjectDownloadError } from './community-storage.adapter'
 import { CommunityRateLimitException } from './community-rate-limit.exception'
 import {
@@ -70,6 +71,7 @@ describe('Community draft photo caption', () => {
       bytes.length,
       expect.any(AbortSignal)
     )
+    expect(bytes.every((byte) => byte === 0)).toBe(true)
   })
 
   it('includes eligibility in the five-second budget and stops before reading the photo', async () => {
@@ -98,10 +100,11 @@ describe('Community draft photo caption', () => {
     expect(downloadBounded).not.toHaveBeenCalled()
   })
 
-  it('aborts a stalled private read at five seconds and discards the late image', async () => {
+  it('aborts a stalled private read and keeps its slot until the late image is discarded', async () => {
     const { service, assertDraftCaptionAccess, findPostById, downloadBounded } =
       createService()
     const { post, bytes } = await validDraft()
+    const lateBytes = Buffer.from(bytes)
     vi.useFakeTimers()
     const storage = deferred<Buffer>()
     findPostById.mockResolvedValue(post)
@@ -119,14 +122,98 @@ describe('Community draft photo caption', () => {
       await vi.advanceTimersByTimeAsync(1)
       await expect(attempt).rejects.toMatchObject({ status: 503 })
       expect(signal?.aborted).toBe(true)
+      await expect(
+        service.describeDraft({ userId: viewerUserId, input })
+      ).rejects.toMatchObject({
+        status: 429,
+        retryAfterSeconds: 1,
+      })
+      expect(downloadBounded).toHaveBeenCalledOnce()
     } finally {
-      storage.resolve(bytes)
+      storage.resolve(lateBytes)
     }
 
     await outcome
     await vi.advanceTimersByTimeAsync(0)
-    expect(assertDraftCaptionAccess).toHaveBeenCalledOnce()
-    expect(findPostById).toHaveBeenCalledOnce()
+    expect(assertDraftCaptionAccess).toHaveBeenCalledTimes(2)
+    expect(findPostById).toHaveBeenCalledTimes(2)
+    expect(lateBytes.every((byte) => byte === 0)).toBe(true)
+
+    vi.useRealTimers()
+    downloadBounded.mockResolvedValueOnce(Buffer.from(bytes))
+    await expect(service.describeDraft({ userId: viewerUserId, input })).resolves.toBe(
+      'Cette photo fait ressortir des nuances de bleu.'
+    )
+    expect(downloadBounded).toHaveBeenCalledTimes(2)
+  })
+
+  it('serves four active readers and refuses a fifth before reserving or reading', async () => {
+    const { service, findPostById, reserveDraftCaptionRequest, downloadBounded } =
+      createService()
+    const { post, bytes } = await validDraft()
+    const storage = deferred<void>()
+    const drafts = Array.from({ length: 5 }, (_, index) => {
+      const userId = `member-${index}`
+      const postId = `ead5dc72-9d08-42a5-820e-c125a8528dc${index}`
+      return {
+        userId,
+        input: { ...input, postId },
+        post: {
+          ...post,
+          id: postId,
+          user_id: userId,
+          image_object_path: `community/${postId}/${input.uploadSessionId}.png`,
+        },
+      }
+    })
+    findPostById.mockImplementation((postId) =>
+      Promise.resolve(drafts.find((entry) => entry.post.id === postId)?.post ?? null)
+    )
+    downloadBounded.mockImplementation(async () => {
+      await storage.promise
+      return Buffer.from(bytes)
+    })
+    const all = Promise.allSettled(
+      drafts.slice(0, 4).map((entry) => service.describeDraft(entry))
+    )
+    try {
+      await vi.waitFor(() => expect(downloadBounded).toHaveBeenCalledTimes(4))
+      await expect(service.describeDraft(drafts[4]!)).rejects.toMatchObject({
+        status: 503,
+        message: 'Community caption suggestion is busy.',
+      })
+      expect(reserveDraftCaptionRequest).toHaveBeenCalledTimes(4)
+      expect(downloadBounded).toHaveBeenCalledTimes(4)
+    } finally {
+      storage.resolve()
+    }
+    expect(await all).toEqual(
+      Array.from({ length: 4 }, () => ({
+        status: 'fulfilled',
+        value: 'Cette photo fait ressortir des nuances de bleu.',
+      }))
+    )
+  })
+
+  it.each([
+    ['checksum', { image_checksum: '8'.repeat(64) }],
+    ['media type', { image_content_type: 'image/jpeg' }],
+    ['byte size', { image_byte_size: 1 }],
+    ['locale', { locale: 'en-US' }],
+  ])('refuses a draft whose %s changes before delivery', async (_, updated) => {
+    const { service, findPostById, downloadBounded } = createService()
+    const { post, bytes } = await validDraft()
+    downloadBounded.mockResolvedValue(bytes)
+    findPostById
+      .mockResolvedValueOnce(post)
+      .mockResolvedValueOnce({ ...post, ...updated })
+    await expect(
+      service.describeDraft({ userId: viewerUserId, input })
+    ).rejects.toMatchObject({
+      status: 409,
+      message: COMMUNITY_UPLOAD_SESSION_MISMATCH_MESSAGE,
+    })
+    expect(findPostById).toHaveBeenCalledTimes(2)
   })
 
   it.each([

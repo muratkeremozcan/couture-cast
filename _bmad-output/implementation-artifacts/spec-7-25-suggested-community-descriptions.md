@@ -3,15 +3,17 @@ title: 'Story CC-7.25: Suggested Community descriptions'
 type: feature
 ticket: '7-25-suggested-community-descriptions'
 created: '2026-11-28'
-status: in-review
+status: built
 baseline_revision: 'dcd09dee7d8d0e2866e8cfe6407c6a7e610deadc'
 route: full
 route_source: auto
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
-review_loop_iteration: 0
+lenses_ran:
+  - 'independent-correctness'
+  - 'codex-security'
+review_loop_iteration: 1
 context:
   - '_bmad-output/implementation-artifacts/epic-7-context.md'
   - '_bmad-output/test-artifacts/test-design-7-25-suggested-community-descriptions.md'
@@ -78,7 +80,7 @@ and publish it through the same screening as anything they write.
       deadline and output checks. Preserve authenticated draft validation and publication.
 - [x] Update both composers to label, accept, and fence suggestions. Localize the
       action, marker, and accept control across the ten web and native locales.
-- [ ] Complete the [acceptance plan](../test-artifacts/test-design-7-25-suggested-community-descriptions.md),
+- [x] Complete the [acceptance plan](../test-artifacts/test-design-7-25-suggested-community-descriptions.md),
       link the test files from Step 82, and close the sprint story.
 
 Given a fresh upload, the description stays empty until the member requests a suggestion.
@@ -95,6 +97,20 @@ description** keeps the text as part of the member's draft.
 ## Plan Change Log
 
 ## Review Triage Log
+
+The independent code review and Codex Security covered
+`dcd09dee7d8d0e2866e8cfe6407c6a7e610deadc..7b560e9a5ee2d4b02d12a55daf3234eb88ed8d77`.
+The static security scan covered all 37 changed paths and reported zero findings.
+
+| Finding                    | Resolution                                                                                                                             |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| P1-1 Deadline branches     | Remove the unused listener initializer and cover cancellation before dispatch and clock overrun after resolution.                      |
+| P1-2 Acceptance gaps       | Cover in-flight reader limits, changed source data, stale and timed-out replies, invalid output, and accepted text across replacement. |
+| P2-1 Session changes       | Recheck identity when a description request resolves or rejects.                                                                       |
+| P2-2 Private image buffers | Clear downloaded bytes and the sampled raster when analysis settles.                                                                   |
+| P2-3 Invalid output        | Reject control characters and line separators in description replies.                                                                  |
+| P3-1 Closeout              | Record review decisions, link the Step 82 evidence, and close the sprint story.                                                        |
+| P3-2 Busy state            | Expose the web suggestion button's busy state to assistive technology.                                                                 |
 
 ## Verification
 

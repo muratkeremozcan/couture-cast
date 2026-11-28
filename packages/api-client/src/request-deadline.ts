@@ -62,7 +62,7 @@ export function withCommunityDescriptionDeadline<T>(
         : abortError('Community description deadline reached.', 'TimeoutError')
     if (requestSignal.aborted) throw cancellationError()
 
-    let onAbort: () => void = () => undefined
+    let onAbort!: () => void
     const cancelled = new Promise<never>((_, reject) => {
       onAbort = () => reject(cancellationError())
       requestSignal.addEventListener('abort', onAbort, { once: true })

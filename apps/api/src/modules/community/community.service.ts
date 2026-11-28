@@ -1232,16 +1232,15 @@ export class CommunityService {
     const declaration = draftImageDeclaration(post)
 
     this.acquireDraftCaptionSlot(userId)
+    let bytes: Buffer | undefined
+    let rgba: Buffer | undefined
     try {
       await this.repository.reserveDraftCaptionRequest(userId)
       signal.throwIfAborted()
-      const bytes = await this.storage.downloadBounded(
-        objectPath,
-        declaration.byteSize,
-        signal
-      )
+      bytes = await this.storage.downloadBounded(objectPath, declaration.byteSize, signal)
       signal.throwIfAborted()
       const sample = await sampleCommunityImageColors(bytes, declaration, signal)
+      rgba = sample.rgba
       signal.throwIfAborted()
       const locale = supportedLocaleSchema.safeParse(post.locale)
       const caption = buildCommunityPhotoCaption(
@@ -1279,6 +1278,8 @@ export class CommunityService {
       }
       throw error
     } finally {
+      bytes?.fill(0)
+      rgba?.fill(0)
       // The HTTP deadline can settle before a storage, database or decoder call.
       this.draftCaptionReaders.delete(userId)
     }

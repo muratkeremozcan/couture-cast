@@ -789,26 +789,32 @@ export async function publishCommunityLookFromMobile({
   }
 }
 
-export function describeCommunityDraftFromMobile(
+export async function describeCommunityDraftFromMobile(
   input: DescribeCommunityDraftInput,
   signal: AbortSignal
 ) {
   const epoch = mobileIdentityEpoch()
-  return withCommunityDescriptionDeadline(signal, async (requestSignal) => {
-    const assertOwner = () => {
-      if (requestSignal.aborted || epoch !== mobileIdentityEpoch())
-        throw new CommunityRequestSuperseded()
+  const assertOwner = () => {
+    if (epoch !== mobileIdentityEpoch()) throw new CommunityRequestSuperseded()
+  }
+  const response = await withCommunityDescriptionDeadline(
+    signal,
+    async (requestSignal) => {
+      assertOwner()
+      const token = await readAccessToken()
+      if (requestSignal.aborted) throw new CommunityRequestSuperseded()
+      assertOwner()
+      return communityClient(token).apiV1CommunityPostsDescribePost(
+        { describeCommunityDraftInput: input },
+        { signal: requestSignal }
+      )
     }
+  ).catch((error: unknown) => {
     assertOwner()
-    const token = await readAccessToken()
-    assertOwner()
-    const response = await communityClient(token).apiV1CommunityPostsDescribePost(
-      { describeCommunityDraftInput: input },
-      { signal: requestSignal }
-    )
-    assertOwner()
-    return describeCommunityDraftResponseSchema.parse(response).data.caption
+    throw error
   })
+  assertOwner()
+  return describeCommunityDraftResponseSchema.parse(response).data.caption
 }
 
 export async function editCommunityPostTextFromMobile(

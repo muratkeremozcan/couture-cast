@@ -1459,6 +1459,7 @@ function DraftDescriptionControl({
           type="button"
           data-testid="community-suggest-description"
           className="block min-h-11 rounded-md border border-theme-card-border px-3 text-sm font-semibold text-theme-card-text disabled:opacity-60"
+          aria-busy={status === 'loading'}
           disabled={suspended || isPublishing || status === 'loading'}
           onClick={onSuggest}
         >

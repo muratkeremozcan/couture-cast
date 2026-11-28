@@ -12,6 +12,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { signInFixtureMember } from '../../test-utils/member-session'
 import {
   FEED_PATH,
   ALLOCATE_PATH,
@@ -144,10 +145,13 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       await screen.findByTestId('community-description-suggested')
       await user.click(screen.getByTestId('community-accept-description'))
       expect(screen.queryByTestId('community-description-suggested')).toBeNull()
+      const altText = screen.getByTestId('post-alt-text-input')
+      await user.type(altText, ' The previous photo.')
       await user.upload(
         fileInput,
         new File(['third-look'], 'third.jpg', { type: 'image/jpeg' })
       )
+      await waitFor(() => expect(altText).toHaveValue(SUGGESTED_ALT_TEXT))
       expect(description).toHaveValue('This photo features blue tones.')
       expect(
         screen.queryByTestId('community-suggest-description')
@@ -232,6 +236,107 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       await waitFor(() =>
         expect(publish).toHaveBeenCalledExactlyOnceWith(
           expect.objectContaining({ caption: 'My favorite layer.' })
+        )
+      )
+    })
+
+    it.each([200, 403])(
+      'keeps a prior session response with status %i out of the composer',
+      async (status) => {
+        signIn()
+        restoreObjectUrl = installImagePrepMocks()
+        const started = vi.fn()
+        const finish = Promise.withResolvers<void>()
+        const response =
+          status === 200
+            ? HttpResponse.json({
+                data: { caption: 'The former member has blue tones.' },
+              })
+            : errorBody(status, 'The previous session ended.', 'Forbidden')
+        useMswHandlers(
+          feedHandler(),
+          imageFixtureHandler(),
+          http.post(ALLOCATE_PATH, () => allocateBody()),
+          http.post('/api/v1/community/posts/describe', async () => {
+            started()
+            await finish.promise
+            return response
+          })
+        )
+        const user = userEvent.setup()
+        renderGrid()
+        await user.click(await screen.findByTestId('create-post-button'))
+        await choosePhoto(user)
+        const suggest = await screen.findByTestId('community-suggest-description')
+        await user.click(suggest)
+        try {
+          await waitFor(() => expect(started).toHaveBeenCalledOnce())
+          expect(suggest).toBeDisabled()
+          // Same-tab storage changes can reach the transport before the composer rerenders.
+          signInFixtureMember('test-token-second-member')
+        } finally {
+          finish.resolve()
+        }
+        await waitFor(() => expect(suggest).toBeEnabled())
+        expect(screen.getByTestId('post-caption-input')).toHaveValue('')
+        expect(screen.queryByTestId('community-description-suggested')).toBeNull()
+        expect(screen.queryByText(/could not suggest a description/i)).toBeNull()
+      }
+    )
+
+    it('expires a held reply at five seconds and publishes manual text', async () => {
+      signIn()
+      restoreObjectUrl = installImagePrepMocks()
+      const started = Promise.withResolvers<AbortSignal>()
+      const finish = Promise.withResolvers<void>()
+      const publish = vi.fn()
+      useMswHandlers(
+        feedHandler(),
+        imageFixtureHandler(),
+        http.post(ALLOCATE_PATH, () => allocateBody()),
+        http.post('/api/v1/community/posts/describe', async ({ request }) => {
+          started.resolve(request.signal)
+          await finish.promise
+          return HttpResponse.json({
+            data: { caption: 'The late photo has blue tones.' },
+          })
+        }),
+        http.post(PUBLISH_PATH, async ({ request }) => {
+          publish(await request.json())
+          return publishBody()
+        })
+      )
+      const user = userEvent.setup()
+      renderGrid()
+      await user.click(await screen.findByTestId('create-post-button'))
+      await choosePhoto(user)
+      const suggest = await screen.findByTestId('community-suggest-description')
+      const description = screen.getByTestId('post-caption-input')
+
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+      try {
+        fireEvent.click(suggest)
+        const signal = await started.promise
+        await act(async () => await vi.advanceTimersByTimeAsync(4_999))
+        expect(suggest).toBeDisabled()
+        expect(signal.aborted).toBe(false)
+        await act(async () => await vi.advanceTimersByTimeAsync(1))
+        expect(signal.aborted).toBe(true)
+        expect(screen.getByText(/could not suggest a description/i)).toBeVisible()
+      } finally {
+        vi.useRealTimers()
+        finish.resolve()
+      }
+
+      expect(description).toHaveValue('')
+      expect(screen.queryByTestId('community-description-suggested')).toBeNull()
+      const manual = 'My caption while the request was held.'
+      await user.type(description, manual)
+      await user.click(screen.getByTestId('confirm-alt-text-checkbox'))
+      await user.click(screen.getByTestId('post-publish-submit'))
+      await waitFor(() =>
+        expect(publish).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ caption: manual })
         )
       )
     })

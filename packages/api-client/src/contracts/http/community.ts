@@ -892,6 +892,7 @@ export const describeCommunityDraftResponseSchema = z
           .refine(
             (caption) =>
               caption.trim() !== '' &&
+              !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(caption) &&
               communityPostCaptionSchema.safeParse(caption).success,
             { message: 'Invalid suggested Community caption.' }
           ),

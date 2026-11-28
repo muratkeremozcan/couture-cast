@@ -136,3 +136,42 @@ it('settles at five seconds even when the request ignores the abort signal', asy
   expect(request.mock.calls[0]?.[0].aborted).toBe(true)
   expect(vi.getTimerCount()).toBe(0)
 })
+
+it('skips the queued description callback when its caller aborts in the same turn', async () => {
+  vi.useFakeTimers()
+  const owner = new AbortController()
+  const request = vi.fn<() => Promise<string>>()
+  const flight = withCommunityDescriptionDeadline(owner.signal, request)
+  const rejection = expect(flight).rejects.toMatchObject({ name: 'AbortError' })
+  owner.abort()
+  await rejection
+  expect(request).not.toHaveBeenCalled()
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+it('rejects an elapsed deadline before the timed callback has run', async () => {
+  vi.useFakeTimers()
+  const happenedAt = vi.spyOn(performance, 'now').mockReturnValue(0)
+  const request = vi.fn(() => {
+    happenedAt.mockReturnValue(5_000)
+    return Promise.resolve('A description that arrived at the deadline.')
+  })
+  await expect(
+    withCommunityDescriptionDeadline(undefined, request)
+  ).rejects.toMatchObject({
+    name: 'TimeoutError',
+  })
+  expect(request).toHaveBeenCalledOnce()
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+it('skips dispatch when the clock advances to the deadline before the queued callback', async () => {
+  vi.useFakeTimers()
+  const happenedAt = vi.spyOn(performance, 'now').mockReturnValue(0)
+  const request = vi.fn<() => Promise<string>>()
+  const flight = withCommunityDescriptionDeadline(undefined, request)
+  happenedAt.mockReturnValue(5_000)
+  await expect(flight).rejects.toMatchObject({ name: 'TimeoutError' })
+  expect(request).not.toHaveBeenCalled()
+  expect(vi.getTimerCount()).toBe(0)
+})
