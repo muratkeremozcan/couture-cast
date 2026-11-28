@@ -259,6 +259,11 @@ describe('CC-7.29 flat-lay separation', () => {
       colorAt: (x, y) => (bottom(x, y) ? [215, 224, 224] : cleanScene(x, y)),
     },
     {
+      scene: 'a substantial enclosed backdrop opening',
+      colorAt: (x, y) =>
+        x >= 15 && x < 27 && y >= 19 && y < 31 ? backdrop : cleanScene(x, y),
+    },
+    {
       scene: 'an overly narrow component',
       colorAt: (x, y) =>
         x >= 73 && x < 76 && y >= 20 && y < 60 ? garment : cleanScene(x, y),

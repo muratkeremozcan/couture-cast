@@ -364,4 +364,35 @@ describe('CC-7.29 shared flat-lay capture', () => {
     expect(capture.state).toEqual({ phase: 'source', pieces: [], error: 'expired' })
     expect(onCommitted).not.toHaveBeenCalled()
   })
+
+  it('[P0] [7.29-REPLAY] reports an already-started save after its previews expire', async () => {
+    const { capture, ticket, body, fetch, onCommitted, onComplete } = harness()
+    const started = deferred<void>()
+    const response = deferred<Response>()
+    fetch.mockResolvedValueOnce(accepted()).mockImplementationOnce(() => {
+      started.resolve()
+      return response.promise
+    })
+    await capture.review(ticket, body)
+    await vi.advanceTimersByTimeAsync(lifetime - 1000)
+    const saving = capture.save()
+    await started.promise
+
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(capture.state).toMatchObject({ phase: 'saving', pieces: [] })
+    expect(onCommitted).not.toHaveBeenCalled()
+    expect(fetch.mock.calls[1]?.[1].signal?.aborted).toBe(false)
+    await capture.save()
+    expect(fetch).toHaveBeenCalledTimes(2)
+
+    response.resolve(Response.json(saved))
+    await saving
+
+    expect(onCommitted).toHaveBeenCalledExactlyOnceWith(
+      saved.garments[0],
+      'synthetic-bearer'
+    )
+    expect(onComplete).toHaveBeenCalledOnce()
+    expect(capture.state).toMatchObject({ phase: 'source', pieces: [], error: undefined })
+  })
 })

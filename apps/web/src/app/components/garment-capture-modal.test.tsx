@@ -1356,12 +1356,8 @@ describe('CC-7.29 flat-lay capture in Closet', () => {
     )
     const onClose = vi.fn()
     const onBatchGarmentCommitted = vi.fn()
-    const { container } = render(
-      <GarmentCaptureModal isOpen {...{ onClose, onBatchGarmentCommitted }} />
-    )
-    const input = container.querySelector<HTMLInputElement>(
-      'input[accept="image/jpeg,image/png,image/webp"]'
-    )!
+    render(<GarmentCaptureModal isOpen {...{ onClose, onBatchGarmentCommitted }} />)
+    const input = screen.getByTestId('flat-lay-photo-input')
     const choose = screen.getByRole('button', { name: 'Add from flat-lay photo' })
     return { fetch, input, choose, onClose, onBatchGarmentCommitted }
   }

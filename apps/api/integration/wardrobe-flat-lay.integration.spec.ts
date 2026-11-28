@@ -560,4 +560,51 @@ describe('CC-7.29 flat-lay review and confirmation over HTTP', () => {
     expect(objects.has(savedPiece.object_path!)).toBe(true)
     expect(storage.remove).toHaveBeenCalledWith([unfinishedKey])
   })
+
+  it('[P0] [7.29-PURGE] refuses to commit a stale publication after cleanup removes its object', async () => {
+    const owner = await member()
+    vi.setSystemTime(new Date('2026-11-28T15:00:00.000Z'))
+    const staged = await review(owner.auth)
+    expect(staged.status).toBe(200)
+    const { items, expiresAt } = flatLayReviewResponseSchema.parse(staged.body)
+    const written = deferred<string>()
+    const response = deferred<void>()
+    storage.publish.mockImplementationOnce(async (objectPath, bytes, contentType) => {
+      await publish(objectPath, bytes, contentType)
+      written.resolve(objectPath)
+      await response.promise
+    })
+    const completing = confirm(owner.auth, [confirmation(items[0]!, 'top')]).then(
+      (result) => result
+    )
+    const retention = new WardrobeRetentionService(prisma, storage as never, {
+      invalidateUserCache: vi.fn().mockResolvedValue(true),
+    })
+
+    try {
+      const objectPath = await Promise.race([
+        written.promise,
+        completing.then(({ status }) => {
+          throw new Error(`Confirmation ended before publication (${status})`)
+        }),
+      ])
+      expect(objects.has(objectPath)).toBe(true)
+      const expiry = new Date(expiresAt)
+      vi.setSystemTime(expiry)
+      await retention.drainDeletions(expiry)
+      expect(objects.has(objectPath)).toBe(false)
+      expect(storage.remove).toHaveBeenCalledWith([objectPath])
+    } finally {
+      response.resolve()
+      await completing
+    }
+
+    const stale = await completing
+    expect(stale.status).toBe(409)
+    expect(stale.body).toMatchObject({ message: 'UPLOAD_ALREADY_CLAIMED' })
+    expect(
+      (await saved(owner.id)).filter(({ committed_at }) => committed_at !== null)
+    ).toEqual([])
+    expect(objects.size).toBe(0)
+  })
 })
