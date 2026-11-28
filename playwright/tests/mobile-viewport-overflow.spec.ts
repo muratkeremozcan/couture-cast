@@ -187,13 +187,20 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
   })
 }
 
-/**
- * Let the browser apply the new scheme and viewport before measuring layout.
- */
-async function settle(page: Page) {
-  await page.evaluate(
-    () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)))
+/** Wait for the requested media rules and a painted frame before measuring glyphs. */
+async function settle(page: Page, width: number, colorScheme: (typeof SCHEMES)[number]) {
+  await page.waitForFunction(
+    ({ width, colorScheme }) =>
+      matchMedia(`(width: ${width}px)`).matches &&
+      matchMedia(`(prefers-color-scheme: ${colorScheme})`).matches,
+    { width, colorScheme }
   )
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    })
+    await document.fonts.ready
+  })
 }
 
 /**
@@ -241,7 +248,7 @@ async function expectNoOverflow(page: Page, route: string) {
     await page.setViewportSize({ width, height: 852 })
     for (const colorScheme of SCHEMES) {
       await page.emulateMedia({ colorScheme })
-      await settle(page)
+      await settle(page, width, colorScheme)
       for (const problem of await layoutProblems(page))
         problems.push(`${route} at ${width} px, ${colorScheme}: ${problem}`)
       if (route === '/wardrobe')
@@ -310,7 +317,7 @@ for (const locale of ['en-US', 'de-DE']) {
               for (const colorScheme of SCHEMES) {
                 await page.setViewportSize({ width: 393, height: 852 })
                 await page.emulateMedia({ colorScheme })
-                await settle(page)
+                await settle(page, 393, colorScheme)
                 await testInfo.attach(`wardrobe-header-393-${colorScheme}-${locale}`, {
                   body: await page
                     .locator('header')
