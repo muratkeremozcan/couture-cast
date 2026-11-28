@@ -73,6 +73,17 @@ export type StylePieceOwnedCompanion = StylePieceSelection & {
   photo: WardrobePhoto | null
 }
 
+function withoutExpiredCompanionPhotos(
+  owned: readonly StylePieceOwnedCompanion[],
+  now: number
+) {
+  return owned.map((item) =>
+    item.photo && Date.parse(item.photo.expiresAt) <= now
+      ? { ...item, photo: null }
+      : item
+  )
+}
+
 export function stylePieceOwnedCompanions(
   items: readonly InventoryItem[],
   anchorId: string,
@@ -195,11 +206,7 @@ export function createStylePieceRefresh({
       return
     }
     const now = Date.now()
-    owned = owned.map((item) =>
-      item.photo && Date.parse(item.photo.expiresAt) <= now
-        ? { ...item, photo: null }
-        : item
-    )
+    owned = withoutExpiredCompanionPhotos(owned, now)
     const expiresAt = owned.reduce(
       (expiry, item) =>
         item.photo ? Math.min(expiry, Date.parse(item.photo.expiresAt)) : expiry,
@@ -321,7 +328,7 @@ export function createStylePieceRefresh({
       return currentValidAnchor()
     },
     currentCompanions() {
-      return currentValidAnchor() ? owned : []
+      return currentValidAnchor() ? withoutExpiredCompanionPhotos(owned, Date.now()) : []
     },
     setVisible(visible: boolean) {
       if (stopped || !isCurrent()) return
@@ -548,24 +555,24 @@ export function applyStylePieceRecipe(
     const saved = recipe.savedCompanions?.[category]
     const swapId = recipe.swaps[category]
     const options = stylePieceCompanionOptions(base, category, owned, catalog)
-    const swap = options.find((item) => item.id === swapId)
-    if (swap) {
-      if (swap.id !== garment.id || owned.some((item) => item.category === category)) {
-        swaps[category] = swap.id
-      }
-      return swap
-    }
-    if (saved) {
-      return (
-        options.find(
+    const fallback = saved
+      ? (options.find(
           (item) =>
             item.id === saved.itemId &&
             (isStylePieceOwnedCompanion(item) ? 'garment' : 'catalog') === saved.kind
-        ) ?? garment
-      )
+        ) ?? garment)
+      : options[0] && isStylePieceOwnedCompanion(options[0])
+        ? options[0]
+        : garment
+    const swap = options.find((item) => item.id === swapId)
+    if (
+      swap &&
+      (swap.id !== fallback.id ||
+        isStylePieceOwnedCompanion(swap) !== isStylePieceOwnedCompanion(fallback))
+    ) {
+      swaps[category] = swap.id
     }
-    const first = options[0]
-    return first && isStylePieceOwnedCompanion(first) ? first : garment
+    return swap ?? fallback
   })
   return { recipe: { ...recipe, swaps }, companions }
 }
@@ -635,6 +642,40 @@ const OCCASION_STYLES = {
 export type StylePieceOccasion = keyof typeof OCCASION_STYLES
 export type StylePieceOccasionLook = StylePieceLook & { occasion: StylePieceOccasion }
 
+function distinctOwnedLook(
+  look: StylePieceLook,
+  usedSignatures: ReadonlySet<string>,
+  owned: readonly StylePieceOwnedCompanion[],
+  catalog: SampleCatalog
+) {
+  const signature = companionSignature(look.companions)
+  if (!usedSignatures.has(signature)) return look
+  for (const companion of look.companions) {
+    if (!isStylePieceOwnedCompanion(companion)) continue
+    for (const alternative of stylePieceCompanionOptions(
+      look,
+      companion.category,
+      owned,
+      catalog
+    )) {
+      if (!isStylePieceOwnedCompanion(alternative)) break
+      if (alternative.id === companion.id) continue
+      const companions = look.companions.map((item) =>
+        item === companion ? alternative : item
+      )
+      if (usedSignatures.has(companionSignature(companions))) continue
+      return {
+        companions,
+        recipe: {
+          ...look.recipe,
+          swaps: { ...look.recipe.swaps, [companion.category]: alternative.id },
+        },
+      }
+    }
+  }
+  return null
+}
+
 export function stylePieceOccasionLooks(
   bases: readonly CatalogStylePieceLook[],
   edits: Readonly<Record<string, StylePieceRecipe>>,
@@ -644,6 +685,12 @@ export function stylePieceOccasionLooks(
   const catalog = options.catalog ?? SAMPLE_CATALOG
   const styles = new Map(catalog.looks.map((item) => [item.id, item.preferences?.style]))
   const used = new Set<StylePieceLook>()
+  const owned = options.owned ?? []
+  const hasOwnedCompanions = rendered.some((look) =>
+    look.companions.some(isStylePieceOwnedCompanion)
+  )
+  const usedSignatures = new Set<string>()
+  if (latestEdit) usedSignatures.add(companionSignature(latestEdit.companions))
   const ideas = (Object.keys(OCCASION_STYLES) as StylePieceOccasion[]).flatMap(
     (occasion) => {
       const preference: readonly (string | undefined)[] = OCCASION_STYLES[occasion]
@@ -651,24 +698,45 @@ export function stylePieceOccasionLooks(
         const index = preference.indexOf(styles.get(look.recipe.lookId))
         return index === -1 ? preference.length : index
       }
-      const best = (looks: StylePieceLook[]) =>
-        looks
-          .filter((look) => !used.has(look))
-          .reduce<
-            StylePieceLook | undefined
-          >((choice, look) => (!choice || rank(look) < rank(choice) ? look : choice), undefined)
-      const look = best(visible) ?? best(rendered)
-      if (!look) return []
-      used.add(look)
-      return [{ look, occasion }]
+      const sorted = (looks: StylePieceLook[]) =>
+        looks.filter((look) => !used.has(look)).sort((a, b) => rank(a) - rank(b))
+      const ranked = sorted(rendered)
+      for (const source of hasOwnedCompanions ? ranked : sorted(visible)) {
+        const locked = source === latestEdit || edits[source.recipe.lookId] !== undefined
+        if (
+          locked &&
+          source !== latestEdit &&
+          usedSignatures.has(companionSignature(source.companions))
+        )
+          continue
+        const look = locked
+          ? source
+          : distinctOwnedLook(source, usedSignatures, owned, catalog)
+        if (!look) continue
+        used.add(source)
+        usedSignatures.add(companionSignature(look.companions))
+        return [{ source, look, occasion }]
+      }
+      // A small closet can have fewer than three different compatible outfits.
+      const source =
+        ranked.find(
+          (look) =>
+            companionSignature(look.companions) !==
+            (latestEdit && companionSignature(latestEdit.companions))
+        ) ?? ranked[0]
+      if (!source) return []
+      used.add(source)
+      usedSignatures.add(companionSignature(source.companions))
+      return [{ source, look: source, occasion }]
     }
   )
   if (latestEdit && !used.has(latestEdit) && ideas.length > 0) {
     const last = ideas[ideas.length - 1]!
+    last.source = latestEdit
     last.look = latestEdit
   }
   return ideas
-    .sort((a, b) => rendered.indexOf(a.look) - rendered.indexOf(b.look))
+    .sort((a, b) => rendered.indexOf(a.source) - rendered.indexOf(b.source))
     .map(({ look, occasion }) => ({ ...look, occasion }))
 }
 

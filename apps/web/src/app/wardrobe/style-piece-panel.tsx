@@ -15,6 +15,7 @@ import {
   createStylePieceRefresh,
   formatPreviewString,
   formatSampleTemperature,
+  garmentSubtypeStrings,
   getGuestPreviewStrings,
   getStylePieceStrings,
   initialStylePieceWeather,
@@ -28,6 +29,7 @@ import {
   SAMPLE_WEATHER,
   reopenStylePieceRecipe,
   savedStylePieceEditorRecipe,
+  savedLookMatchesStylePiece,
   STYLE_PIECE_WEATHER_KEYS,
   stylePieceAnchor,
   stylePieceCompanionOptions,
@@ -373,9 +375,8 @@ function StylePieceIdeas({
   const [edits, setEdits] = useState<Record<string, StylePieceRecipe>>(() =>
     initialRecipe ? { [initialRecipe.lookId]: initialRecipe } : {}
   )
-  const [reopened, setReopened] = useState<string | undefined>(
-    () => initialRecipe?.lookId
-  )
+  const [reopenedSaved, setReopenedSaved] = useState(initialSavedLook ?? null)
+  const reopened = reopenedSaved?.lookId
   const [latestEdit, setLatestEdit] = useState<string | undefined>(
     () => initialRecipe?.lookId
   )
@@ -484,7 +485,7 @@ function StylePieceIdeas({
     setWeather(value)
     setEdits({})
     setLatestEdit(undefined)
-    setReopened(undefined)
+    setReopenedSaved(null)
     statusBar.dismissNotice()
   }
 
@@ -499,12 +500,15 @@ function StylePieceIdeas({
       { ...fresh, id: garmentId },
       inventory?.currentCompanions() ?? []
     )
-    if (!recipe) return
+    if (!recipe) {
+      router.push(savedLookHref(entry.id))
+      return
+    }
     swapUndoStackRef.current = []
     statusBar.dismissNotice()
     setWeather(recipe.weather)
     setEdits({ [recipe.lookId]: recipe })
-    setReopened(recipe.lookId)
+    setReopenedSaved(entry)
     setLatestEdit(recipe.lookId)
     requestAnimationFrame(() => {
       if (draftRevision.current === revision && currentPiece(inventory))
@@ -528,11 +532,14 @@ function StylePieceIdeas({
     )
 
   const result = stylePieceLooks(piece, weather)
+  const selection = { ...piece, id: garmentId }
+  const staleReopen =
+    reopenedSaved && !reopenStylePieceRecipe(reopenedSaved, selection, owned)
   const looks = stylePieceOccasionLooks(result.looks, edits, {
     owned,
     reopenedLookId: reopened,
     editedLookId: latestEdit,
-  })
+  }).filter((look) => !staleReopen || look.recipe.lookId !== reopened)
   const weatherName = (value: StylePieceWeatherKey) => samples.values.weather[value]
   const emptyMessage = {
     protection: labels.protection,
@@ -590,6 +597,11 @@ function StylePieceIdeas({
         </p>
       )}
       {error && anchorPhoto}
+      {staleReopen && (
+        <p role="status" className="text-sm">
+          {t('savedLooks.needsReview')}
+        </p>
+      )}
 
       {looks.map((look, index) => {
         const recipeKey = stylePieceRecipeKey(look.recipe)
@@ -601,6 +613,7 @@ function StylePieceIdeas({
             key={recipeKey}
             look={look}
             owned={owned}
+            locale={locale}
             photoUnavailable={t('savedLooks.photoUnavailable')}
             owner={owner}
             compositionKey={compositionKey}
@@ -629,26 +642,9 @@ function StylePieceIdeas({
                 },
                 look
               )
-              const existingMatch = saved.find((item) => {
-                if (
-                  item.source !== 'style_piece' ||
-                  item.lookId !== payload.lookId ||
-                  item.weather !== payload.weather ||
-                  item.anchorGarmentId !== garmentId ||
-                  item.composition.length !== payload.composition.length
-                ) {
-                  return false
-                }
-                return payload.composition.every((slot) => {
-                  const match = item.composition[slot.slotIndex]
-                  return (
-                    match !== undefined &&
-                    match.kind === slot.kind &&
-                    match.category === slot.category &&
-                    match.itemId === slot.itemId
-                  )
-                })
-              })
+              const existingMatch = saved.find((item) =>
+                savedLookMatchesStylePiece(item, garmentId, look, fresh.category)
+              )
               const attemptKey = `${recipeKey}:${compositionKey}`
               if (existingMatch) {
                 delete lastCreatedRef.current[attemptKey]
@@ -800,6 +796,8 @@ function StylePieceIdeas({
         >
           <h3 className="text-sm font-semibold">{t('savedLooks.title')}</h3>
           {saved.map((entry) => {
+            const canReopen = Boolean(reopenStylePieceRecipe(entry, selection, owned))
+            const missing = entry.availabilityStatus === 'missing_garment'
             const companionNames = entry.composition
               .filter((slot) => slot.slotIndex !== 0)
               .map((slot) => {
@@ -821,25 +819,29 @@ function StylePieceIdeas({
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm">{description}</p>
-                  {entry.availabilityStatus === 'needs_review' && (
+                  {!canReopen && (
                     <span
-                      data-testid="saved-look-needs-review"
+                      data-testid={
+                        missing ? 'saved-look-missing-piece' : 'saved-look-needs-review'
+                      }
                       className="rounded-sm bg-card-muted px-2 py-0.5 text-xs font-semibold text-ink"
                     >
-                      {t('savedLooks.needsReview')}
+                      {t(missing ? 'savedLooks.missingPiece' : 'savedLooks.needsReview')}
                     </span>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-x-2">
-                  <button
-                    type="button"
-                    className={action}
-                    data-testid="style-piece-reopen"
-                    aria-label={`${labels.reopen}: ${description}`}
-                    onClick={() => void openSaved(entry)}
-                  >
-                    {labels.reopen}
-                  </button>
+                  {canReopen && (
+                    <button
+                      type="button"
+                      className={action}
+                      data-testid="style-piece-reopen"
+                      aria-label={`${labels.reopen}: ${description}`}
+                      onClick={() => void openSaved(entry)}
+                    >
+                      {labels.reopen}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={action}
@@ -1070,6 +1072,7 @@ function OwnedCompanionPhoto({
 function StylePieceCard({
   look,
   owned,
+  locale,
   photoUnavailable,
   owner,
   compositionKey,
@@ -1086,6 +1089,7 @@ function StylePieceCard({
 }: {
   look: StylePieceOccasionLook
   owned: readonly StylePieceOwnedCompanion[]
+  locale: string
   photoUnavailable: string
   owner: string
   compositionKey: string
@@ -1105,7 +1109,9 @@ function StylePieceCard({
   const recipeKey = stylePieceRecipeKey(look.recipe)
   const name = (item: StylePieceCompanion) =>
     isStylePieceOwnedCompanion(item)
-      ? samples.values.category[item.category]
+      ? item.subtype
+        ? garmentSubtypeStrings(locale).values[item.subtype]
+        : samples.values.category[item.category]
       : sampleGarmentText(item, samples).name
   const art = (item: StylePieceCompanion, compact = false) =>
     isStylePieceOwnedCompanion(item) ? (

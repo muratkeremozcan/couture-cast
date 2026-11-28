@@ -28,6 +28,7 @@ import {
 import {
   doesSavedLookResolve,
   SAMPLE_CATALOG,
+  SAMPLE_LOOK_ID_PATTERN,
   stylePieceCompanionSuitsWeather,
   type ComfortRange,
   type SampleGarmentCategory,
@@ -77,19 +78,21 @@ function matchesStylePieceCompanion(
 }
 
 function hasChangedStylePieceCompanion(
-  row: Pick<SavedLook, 'source' | 'anchor_garment_id' | 'weather'>,
+  row: Pick<SavedLook, 'source' | 'anchor_garment_id' | 'look_id' | 'weather'>,
   slots: readonly StoredSlot[],
   garments: ReadonlyMap<string, GarmentProjection>
 ): boolean {
-  return (
-    row.source === 'style_piece' &&
-    slots.some(
-      (slot) =>
-        slot.kind === 'garment' &&
-        slot.itemId !== row.anchor_garment_id &&
-        !matchesStylePieceCompanion(slot, garments.get(slot.itemId), row.weather)
-    )
-  )
+  if (row.source !== 'style_piece') return false
+  const catalogRecipe = SAMPLE_LOOK_ID_PATTERN.test(row.look_id)
+  return slots.some((slot) => {
+    if (slot.kind !== 'garment') return false
+    const isAnchor = slot.itemId === row.anchor_garment_id
+    const garment = garments.get(slot.itemId)
+    // Older records can use a different anchor position and weather vocabulary.
+    if (!catalogRecipe) return !isAnchor && garment?.category !== slot.category
+    if (slot.slotIndex === 0) return !isAnchor
+    return isAnchor || !matchesStylePieceCompanion(slot, garment, row.weather)
+  })
 }
 
 const storedCompositionSchema = z.array(savedLookCompositionSlotInputSchema)
@@ -601,15 +604,16 @@ export class WardrobeSavedLookService {
       return null
     }
     const byId = new Map(ownedGarments.map((item) => [item.id, item]))
-    if (
-      input.composition.some(
-        (slot) =>
-          slot.kind === 'garment' &&
-          slot.itemId !== input.anchorGarmentId &&
-          !matchesStylePieceCompanion(slot, byId.get(slot.itemId), input.weather)
-      )
-    ) {
-      throw new NotFoundException('GARMENT_NOT_FOUND')
+    const seen = new Set([input.anchorGarmentId])
+    for (const slot of input.composition) {
+      if (slot.kind !== 'garment' || slot.slotIndex === 0) continue
+      if (
+        seen.has(slot.itemId) ||
+        !matchesStylePieceCompanion(slot, byId.get(slot.itemId), input.weather)
+      ) {
+        throw new NotFoundException('GARMENT_NOT_FOUND')
+      }
+      seen.add(slot.itemId)
     }
     const anchorRow = ownedGarments.find((item) => item.id === input.anchorGarmentId)
     if (!anchorRow || !anchorRow.category || !anchorRow.comfort_range) {

@@ -1,6 +1,13 @@
 // Story 6.16: the building blocks of the mobile guest preview. Each reads the shared
 // policy result and strings, so mobile says and shows exactly what web does.
-import { useEffect, useRef, useState, type ComponentRef, type Ref } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentRef,
+  type ReactNode,
+  type Ref,
+} from 'react'
 import {
   AccessibilityInfo,
   Platform,
@@ -126,6 +133,7 @@ export function PreviewButton({
   selected,
   accessibilityLabel,
   buttonRef,
+  leading,
 }: {
   label: string
   onPress: () => void
@@ -139,6 +147,7 @@ export function PreviewButton({
   selected?: boolean
   accessibilityLabel?: string
   buttonRef?: Ref<ComponentRef<typeof Pressable>>
+  leading?: ReactNode
 }) {
   return (
     <Pressable
@@ -156,6 +165,7 @@ export function PreviewButton({
       onPress={onPress}
       style={[
         styles.button,
+        leading ? styles.buttonWithLeading : undefined,
         compact && styles.compactButton,
         // Story CC-7.9 D3: a filled button is ink; any other is the neutral outline.
         primary
@@ -164,9 +174,11 @@ export function PreviewButton({
         disabled ? styles.disabled : null,
       ]}
     >
+      {leading}
       <Text
         style={[
           styles.buttonText,
+          leading ? styles.buttonTextWithLeading : undefined,
           compact && styles.compactButtonText,
           {
             color: todayPrimary
@@ -1230,6 +1242,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  buttonWithLeading: { flexDirection: 'row', justifyContent: 'flex-start', gap: 8 },
+  buttonTextWithLeading: { flexShrink: 1, textAlign: 'left' },
   compactButton: { alignSelf: 'stretch', paddingHorizontal: 4, marginTop: 'auto' },
   compactButtonText: { fontSize: 12 },
   disabled: { opacity: 0.6 },

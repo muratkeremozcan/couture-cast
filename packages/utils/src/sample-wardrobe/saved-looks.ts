@@ -95,6 +95,7 @@ export type SavedLookLike = {
   swaps: Partial<Record<SampleGarmentCategory, string>>
   collection: string | null
   comfort: SavedLookComfortPayload | null
+  composition?: readonly SavedLookCompositionSlotPayload[]
 }
 
 export type LegacySavedLookImportEntry<TRaw> = {
@@ -876,15 +877,11 @@ export function parseLegacyStylePieceRecipesForImport(
   return { entries, hadInvalidEntries, malformedPayload: false }
 }
 
-/**
- * Builds the canonical account-backed SavedLook payload for a Style this piece look.
- * Slot 0 is the anchor. Companion pieces follow in display order.
- */
-export function buildStylePieceSavedLookInput(
-  garment: StylePieceSelection,
+function stylePieceComposition(
+  garment: Pick<StylePieceSelection, 'id' | 'category'>,
   look: StylePieceLook
-): CreateSavedLookPayload {
-  const composition: SavedLookCompositionSlotPayload[] = [
+): SavedLookCompositionSlotPayload[] {
+  return [
     {
       slotIndex: 0,
       category: garment.category,
@@ -900,7 +897,32 @@ export function buildStylePieceSavedLookInput(
       itemId: companion.id,
     })),
   ]
+}
 
+function sameOrderedComposition(
+  stored: readonly SavedLookCompositionSlotPayload[],
+  expected: readonly SavedLookCompositionSlotPayload[]
+) {
+  const ordered = [...stored].sort((a, b) => a.slotIndex - b.slotIndex)
+  return (
+    ordered.length === expected.length &&
+    expected.every((slot, index) => {
+      const previous = ordered[index]
+      return (
+        previous?.slotIndex === slot.slotIndex &&
+        previous.kind === slot.kind &&
+        previous.category === slot.category &&
+        previous.itemId === slot.itemId
+      )
+    })
+  )
+}
+
+/** Builds the saved payload with the anchor followed by companions in display order. */
+export function buildStylePieceSavedLookInput(
+  garment: StylePieceSelection,
+  look: StylePieceLook
+): CreateSavedLookPayload {
   return {
     source: 'style_piece',
     lookId: look.recipe.lookId,
@@ -911,7 +933,7 @@ export function buildStylePieceSavedLookInput(
       category: garment.category,
       comfortRange: garment.comfortRange,
     },
-    composition,
+    composition: stylePieceComposition(garment, look),
     swaps: cleanSwaps(
       Object.fromEntries(
         look.companions.flatMap((companion) =>
@@ -1013,18 +1035,10 @@ export function reopenStylePieceRecipe(
   )
   if (!base) return null
   const restored = applyStylePieceRecipe(base, recipe, SAMPLE_CATALOG, owned)
-  const { composition } = buildStylePieceSavedLookInput(anchor, restored)
-  const stored = [...saved.composition].sort((a, b) => a.slotIndex - b.slotIndex)
-  return stored.length === composition.length &&
-    composition.every((slot, index) => {
-      const previous = stored[index]
-      return (
-        previous?.slotIndex === slot.slotIndex &&
-        previous.kind === slot.kind &&
-        previous.category === slot.category &&
-        previous.itemId === slot.itemId
-      )
-    })
+  return sameOrderedComposition(
+    saved.composition,
+    stylePieceComposition(anchor, restored)
+  )
     ? recipe
     : null
 }
@@ -1088,14 +1102,29 @@ export function savedLookToSampleBookmark(
 export function savedLookMatchesStylePiece(
   savedLook: SavedLookLike,
   garmentId: string,
-  look: StylePieceLook
+  look: StylePieceLook,
+  anchorCategory?: SampleGarmentCategory
 ): boolean {
-  return (
-    savedLook.source === 'style_piece' &&
-    savedLook.anchorGarmentId === garmentId &&
-    savedLook.lookId === look.recipe.lookId &&
-    savedLook.weather === look.recipe.weather &&
-    swapsEqual(cleanSwaps(savedLook.swaps), cleanSwaps(look.recipe.swaps))
+  if (
+    savedLook.source !== 'style_piece' ||
+    savedLook.anchorGarmentId !== garmentId ||
+    savedLook.lookId !== look.recipe.lookId ||
+    savedLook.weather !== look.recipe.weather
+  )
+    return false
+  if (!savedLook.composition) {
+    return swapsEqual(cleanSwaps(savedLook.swaps), cleanSwaps(look.recipe.swaps))
+  }
+  const anchor = savedLook.composition.find((slot) => slot.slotIndex === 0)
+  return Boolean(
+    anchor &&
+      sameOrderedComposition(
+        savedLook.composition,
+        stylePieceComposition(
+          { id: garmentId, category: anchorCategory ?? anchor.category },
+          look
+        )
+      )
   )
 }
 

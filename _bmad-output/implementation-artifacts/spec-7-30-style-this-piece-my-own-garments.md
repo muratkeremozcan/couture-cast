@@ -3,15 +3,17 @@ title: 'Story CC-7.30: Style this piece with my own garments'
 type: feature
 ticket: '7-30-style-this-piece-my-own-garments'
 created: '2026-11-28'
-status: in-review
+status: built
 baseline_revision: '8e9b2d07574c77172e635c3a4ad57ca7a451289c'
 route: full
 route_source: auto
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
-review_loop_iteration: 0
+lenses_ran:
+  - independent-code-review
+  - codex-security
+review_loop_iteration: 1
 context:
   - '_bmad-output/planning-artifacts/epics.md'
   - '_bmad-output/implementation-artifacts/epic-7-context.md'
@@ -68,8 +70,8 @@ They can save and reopen the exact outfit through the CC-7.2 account flow.
 - [x] Add owned companion selection and occasion ideas within the existing weather rules.
 - [x] Render the same behavior on web and native using the owner-scoped refresh lifecycle.
 - [x] Save and reopen exact mixed compositions with the existing API and storage.
-- [ ] Verify the acceptance plan with TEA and link Step 87 from the test files.
-- [ ] Complete the full peer review with Codex Security and resolve findings.
+- [x] Coordinate the acceptance plan with TEA and link Step 87 from the test files.
+- [x] Complete the full peer review with Codex Security and resolve findings.
 
 - Given a compatible anchor and owned companion, when the member opens styling or swaps that
   slot, then the owned piece leads and any unfilled slot has a catalog suggestion.
@@ -86,6 +88,25 @@ The existing API supports garment and catalog slots in the same composition. Reu
 ## Plan change log
 
 ## Review triage log
+
+The combined review and static Codex Security scan covered
+`8e9b2d07574c77172e635c3a4ad57ca7a451289c..21bd7e92fa2864f5f4921b7bb39ca77dd2ffbc27`.
+Scan `21bd7e92fa28_20261128T152427Z` covered 17 source worklist paths and three supplemental
+paths and reported zero findings.
+
+| Finding | Resolution                                                                                      |
+| ------- | ----------------------------------------------------------------------------------------------- |
+| P0-1    | Read legacy non-catalog looks without imposing catalog weather or anchor position.              |
+| P0-2    | Add utility coverage for occasion selection, photo expiry, current inventory, and exact reopen. |
+| P1-1    | Preserve a swap when it differs from the starting slot of a reopened look.                      |
+| P1-2    | Reject an anchor or duplicate garment ID submitted in a companion slot.                         |
+| P1-3    | Show unavailable saved-look state and offer reopen only for exact compositions.                 |
+| P1-4    | Use localized subtype labels and show companion photos or placeholders in native swap options.  |
+| P1-5    | Add web, native and API regression coverage for mixed saves and companion photo behavior.       |
+| P2-1    | Give other occasions distinct compatible owned companions when available.                       |
+| P2-2    | Compare ordered slot kinds and item IDs for duplicate account saves.                            |
+| P2-3    | Recheck companion photo expiry on read as well as at the scheduled expiry.                      |
+| P3-1    | Add Step 87, test cross-links, and the done status to the PR.                                   |
 
 ## Verification
 

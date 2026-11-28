@@ -33,6 +33,7 @@ import {
   createStylePieceRefresh,
   formatPreviewString,
   formatSampleTemperature,
+  garmentSubtypeStrings,
   getGuestPreviewStrings,
   getStylePieceStrings,
   initialStylePieceWeather,
@@ -46,6 +47,7 @@ import {
   SAMPLE_WEATHER,
   reopenStylePieceRecipe,
   savedStylePieceEditorRecipe,
+  savedLookMatchesStylePiece,
   STYLE_PIECE_WEATHER_KEYS,
   stylePieceAnchor,
   stylePieceCompanionOptions,
@@ -449,9 +451,8 @@ function StylePieceIdeas({
   const [edits, setEdits] = useState<Record<string, StylePieceRecipe>>(() =>
     initialRecipe ? { [initialRecipe.lookId]: initialRecipe } : {}
   )
-  const [reopened, setReopened] = useState<string | undefined>(
-    () => initialRecipe?.lookId
-  )
+  const [reopenedSaved, setReopenedSaved] = useState(initialSavedLook ?? null)
+  const reopened = reopenedSaved?.lookId
   const [latestEdit, setLatestEdit] = useState<string | undefined>(
     () => initialRecipe?.lookId
   )
@@ -573,7 +574,7 @@ function StylePieceIdeas({
     setWeather(value)
     setEdits({})
     setLatestEdit(undefined)
-    setReopened(undefined)
+    setReopenedSaved(null)
     statusBar.dismissNotice()
   }
 
@@ -588,12 +589,15 @@ function StylePieceIdeas({
       { ...fresh, id: garmentId },
       inventory?.currentCompanions() ?? []
     )
-    if (!recipe) return
+    if (!recipe) {
+      onViewSavedLook(entry.id)
+      return
+    }
     swapUndoStackRef.current = []
     statusBar.dismissNotice()
     setWeather(recipe.weather)
     setEdits({ [recipe.lookId]: recipe })
-    setReopened(recipe.lookId)
+    setReopenedSaved(entry)
     setLatestEdit(recipe.lookId)
     requestAnimationFrame(() => {
       if (reopenAction.current !== action || !currentPiece(inventory)) return
@@ -621,11 +625,14 @@ function StylePieceIdeas({
     )
 
   const result = stylePieceLooks(piece, weather)
+  const selection = { ...piece, id: garmentId }
+  const staleReopen =
+    reopenedSaved && !reopenStylePieceRecipe(reopenedSaved, selection, owned)
   const looks = stylePieceOccasionLooks(result.looks, edits, {
     owned,
     reopenedLookId: reopened,
     editedLookId: latestEdit,
-  })
+  }).filter((look) => !staleReopen || look.recipe.lookId !== reopened)
   const weatherName = (value: StylePieceWeatherKey) => samples.values.weather[value]
   const emptyMessage = {
     protection: labels.protection,
@@ -684,6 +691,11 @@ function StylePieceIdeas({
         </View>
       )}
 
+      {staleReopen && (
+        <Text accessibilityLiveRegion="polite" style={text}>
+          {t('savedLooks.needsReview')}
+        </Text>
+      )}
       {looks.map((look) => {
         const recipeKey = stylePieceRecipeKey(look.recipe)
         const compositionKey = look.companions
@@ -694,6 +706,7 @@ function StylePieceIdeas({
             key={recipeKey}
             look={look}
             owned={owned}
+            locale={locale}
             photoUnavailable={t('savedLooks.photoUnavailable')}
             owner={owner}
             compositionKey={compositionKey}
@@ -722,26 +735,9 @@ function StylePieceIdeas({
                 },
                 look
               )
-              const existingMatch = saved.find((item) => {
-                if (
-                  item.source !== 'style_piece' ||
-                  item.lookId !== payload.lookId ||
-                  item.weather !== payload.weather ||
-                  item.anchorGarmentId !== garmentId ||
-                  item.composition.length !== payload.composition.length
-                ) {
-                  return false
-                }
-                return payload.composition.every((slot) => {
-                  const match = item.composition[slot.slotIndex]
-                  return (
-                    match !== undefined &&
-                    match.kind === slot.kind &&
-                    match.category === slot.category &&
-                    match.itemId === slot.itemId
-                  )
-                })
-              })
+              const existingMatch = saved.find((item) =>
+                savedLookMatchesStylePiece(item, garmentId, look, fresh.category)
+              )
               const attemptKey = `${recipeKey}:${compositionKey}`
               if (existingMatch) {
                 delete lastCreatedRef.current[attemptKey]
@@ -889,6 +885,8 @@ function StylePieceIdeas({
             {t('savedLooks.title')}
           </Text>
           {saved.map((entry) => {
+            const canReopen = Boolean(reopenStylePieceRecipe(entry, selection, owned))
+            const missing = entry.availabilityStatus === 'missing_garment'
             const companionNames = entry.composition
               .filter((slot) => slot.slotIndex !== 0)
               .map((slot) => {
@@ -905,19 +903,26 @@ function StylePieceIdeas({
             return (
               <View key={entry.id} style={[styles.card, { borderColor: palette.line }]}>
                 <Text style={text}>{description}</Text>
-                {entry.availabilityStatus === 'needs_review' ? (
-                  <Text testID="saved-look-needs-review" style={[styles.label, text]}>
-                    {t('savedLooks.needsReview')}
+                {!canReopen && (
+                  <Text
+                    testID={
+                      missing ? 'saved-look-missing-piece' : 'saved-look-needs-review'
+                    }
+                    style={[styles.label, text]}
+                  >
+                    {t(missing ? 'savedLooks.missingPiece' : 'savedLooks.needsReview')}
                   </Text>
-                ) : null}
+                )}
                 <View style={styles.row}>
-                  <PreviewButton
-                    label={labels.reopen}
-                    accessibilityLabel={`${labels.reopen}: ${description}`}
-                    testID="style-piece-reopen"
-                    palette={palette}
-                    onPress={() => void openSaved(entry)}
-                  />
+                  {canReopen && (
+                    <PreviewButton
+                      label={labels.reopen}
+                      accessibilityLabel={`${labels.reopen}: ${description}`}
+                      testID="style-piece-reopen"
+                      palette={palette}
+                      onPress={() => void openSaved(entry)}
+                    />
+                  )}
                   <PreviewButton
                     label={labels.remove}
                     accessibilityLabel={`${labels.remove}: ${description}`}
@@ -1153,6 +1158,7 @@ function OwnedCompanionPhoto({
 function StylePieceCard({
   look,
   owned,
+  locale,
   photoUnavailable,
   owner,
   compositionKey,
@@ -1169,6 +1175,7 @@ function StylePieceCard({
 }: {
   look: StylePieceOccasionLook
   owned: readonly StylePieceOwnedCompanion[]
+  locale: string
   photoUnavailable: string
   owner: string
   compositionKey: string
@@ -1189,8 +1196,21 @@ function StylePieceCard({
   const recipeKey = stylePieceRecipeKey(look.recipe)
   const name = (item: StylePieceCompanion) =>
     isStylePieceOwnedCompanion(item)
-      ? samples.values.category[item.category]
+      ? item.subtype
+        ? garmentSubtypeStrings(locale).values[item.subtype]
+        : samples.values.category[item.category]
       : sampleGarmentText(item, samples).name
+  const art = (item: StylePieceCompanion) =>
+    isStylePieceOwnedCompanion(item) ? (
+      <OwnedCompanionPhoto
+        key={item.photo?.url}
+        item={item}
+        unavailable={photoUnavailable}
+        palette={palette}
+      />
+    ) : (
+      <SampleGarmentArt garment={item} size={36} />
+    )
 
   return (
     <View testID="style-piece-look" style={[styles.card, { borderColor: palette.line }]}>
@@ -1221,16 +1241,7 @@ function StylePieceCard({
                       : undefined
                   }
                 >
-                  {isStylePieceOwnedCompanion(item) ? (
-                    <OwnedCompanionPhoto
-                      key={item.photo?.url}
-                      item={item}
-                      unavailable={photoUnavailable}
-                      palette={palette}
-                    />
-                  ) : (
-                    <SampleGarmentArt garment={item} size={36} />
-                  )}
+                  {art(item)}
                   <Text style={[styles.pieceName, text]}>{name(item)}</Text>
                 </View>
                 {options.length > 0 && (
@@ -1248,6 +1259,7 @@ function StylePieceCard({
                     <PreviewButton
                       key={option.id}
                       label={name(option)}
+                      leading={art(option)}
                       testID={`style-piece-option-${option.id}`}
                       palette={palette}
                       onPress={() => {

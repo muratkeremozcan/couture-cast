@@ -1,6 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-27.
+Updated: 2026-11-28.
+Added Step 87 for CC-7.30, Style this piece with my own garments.
 Added Steps 40 to 73:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
@@ -172,10 +173,10 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest step: Step 73, Story CC-7.16, Calm Closet and Profile.
-  Its plan is `_bmad-output/implementation-artifacts/spec-7-16-calm-closet-profile.md`.
-  `epic-7` is `in-progress` in `sprint-status.yaml`; CC-7.8 is `done` as dropped by owner decision.
-- Previous completed steps: Steps 59 to 72, Stories CC-7.1 to CC-7.7 and CC-7.9 to CC-7.15, merged on `main` (the last, Step 72, as `d64216fa`, PR #299).
+- Latest step: Step 87, Story CC-7.30, Style this piece with my own garments.
+  Its plan is `_bmad-output/implementation-artifacts/spec-7-30-style-this-piece-my-own-garments.md`.
+  Epic 7 remains `in-progress` in `sprint-status.yaml`.
+- Previous completed step: Step 86, Story CC-7.29, merged on `main` as `8e9b2d07` (PR #313).
 - Previous completed step: Step 58, production status and nightly health, the project close on 2026-11-19, merged on `main` (including its production follow-ups: image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week races, and production profile/location checks).
   It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
   Delivery for Epic 6 stays `in-progress` while `6-15b-expo-sdk-55-58-upgrade` stays `backlog`.
@@ -345,6 +346,7 @@ Read it before changing or adding a numbered step.
 |   57 | Sign in with Google. Ask a new person only their birthdate.                  |
 |   58 | Check production every day. Make every red night say why.                    |
 |   59 | Tell members when a save works, fails, is offline, or can be undone.         |
+|   87 | Style one garment with your closet and reopen the pieces you saved.          |
 
 ## Special feature: AI garment tagging
 
@@ -22808,3 +22810,84 @@ The review grid opens with each cutout kept.
   [review state and retry](../../packages/api-client/testing/flat-lay-capture.spec.ts).
 - [Step 81](#step-81-photo-ai-consent-and-processor-approval) covers external processing policy.
 - [Step 85](#step-85-add-several-photos-at-once) covers selecting multiple separate photos.
+
+## Step 87: Style this piece with my own garments
+
+User/business impact:
+
+A member can start with one closet garment and build a school, weekend, or going-out outfit for
+the selected weather. They can save the pieces they chose and reopen the same outfit later.
+
+Key takeaways:
+
+1. Use the owner-scoped inventory to choose eligible companions by category and comfort range.
+   Existing catalog pieces fill missing slots and supply known rain or wind protection.
+2. A garment stays eligible when its photo is unavailable.
+   The editor displays a placeholder and renews authorized photo access with the inventory.
+3. A saved composition records ordered garment and catalog IDs.
+   The editor checks the saved slots against current inventory before reopening them.
+
+Hard-won lessons from the implementation and code review of this story:
+
+1. A saved swap becomes the editor's starting point when a look reopens.
+   Keep an explicit change back to the catalog default so the next swap preserves it.
+2. Compare ordered slot kinds and IDs when looking for an existing save.
+   Two looks can share one catalog recipe and use different owned garments.
+3. Validate current weather on catalog recipes. Older account rows can use a different weather
+   vocabulary and still have intact garment references.
+
+Story/Task mapping:
+
+- CC-7.30 AC1 covers owned priority, catalog fill, and unavailable photos.
+- CC-7.30 AC2 covers three occasions within the selected weather.
+- CC-7.30 AC3 covers empty, sparse, and populated closets and the CC-7.2 account save flow.
+
+Story reference:
+
+- [Story spec](../implementation-artifacts/spec-7-30-style-this-piece-my-own-garments.md)
+- [Acceptance plan](../test-artifacts/test-design-7-30-style-this-piece-my-own-garments.md)
+
+Cross-links:
+
+- [Step 60](#step-60-saved-looks-follow-the-account) covers account persistence.
+- [Step 63](#step-63-garment-detail-and-tag-edit) covers the anchor's garment detail entry.
+
+Sequence to follow:
+
+1. Open Closet and select a ready, tagged garment. Choose **Style this piece**.
+2. Check the School, Weekend, and Going out looks. With only the anchor in Closet, check that
+   catalog pieces complete each outfit.
+3. Add a weather-compatible companion. Check that it appears before catalog alternatives for
+   its slot. Change the weather and check that the choices follow the new conditions.
+4. With an unavailable companion photo, look for **Photo unavailable** alongside the piece.
+   Save the look, reload, and use **Open saved look** to verify the original pieces.
+5. Repeat on native. Verify that an additional garment can change new suggestions while the
+   stored outfit keeps its original composition.
+
+Task owner map:
+
+- Selection and signed photo expiry live in
+  [style-one-piece.ts](../../packages/utils/src/sample-wardrobe/style-one-piece.ts).
+- Account payloads and editor restoration live in
+  [saved-looks.ts](../../packages/utils/src/sample-wardrobe/saved-looks.ts).
+- The
+  [saved-look service](../../apps/api/src/modules/wardrobe/wardrobe-saved-look.service.ts)
+  checks ownership and current garment eligibility.
+- The editor renders the same shared choices on
+  [web](../../apps/web/src/app/wardrobe/style-piece-panel.tsx) and
+  [native](../../apps/mobile/src/features/wardrobe/style-piece-panel.tsx).
+
+Tests that cover this step:
+
+- Browser acceptance covers closet sizes, weather, fallback, and account reopen in
+  [style-one-piece.spec.ts](../../playwright/tests/style-one-piece.spec.ts).
+- Web component coverage exercises companion load, fallback, and saved state in
+  [page.styling.test.tsx](../../apps/web/src/app/wardrobe/page.styling.test.tsx).
+- Native component coverage opens styling from
+  [garment detail](../../apps/mobile/src/features/wardrobe/garment-detail-screen.test.tsx)
+  and checks occasions, an owned photo, and its fallback.
+- Shared unit coverage checks
+  [selection and photo expiry](../../packages/utils/src/sample-wardrobe/style-one-piece.spec.ts)
+  and [ordered mixed saves](../../packages/utils/src/sample-wardrobe/saved-looks.spec.ts).
+- The [API service tests](../../apps/api/src/modules/wardrobe/wardrobe-saved-look.service.spec.ts)
+  check unavailable references and changed companion tags.
