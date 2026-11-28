@@ -999,6 +999,7 @@ test('P-OUTFIT P-CANCEL: all persisted scenarios render, and reopening retains e
     `Bearer ${member.access_token}`
   )
   const live = page.getByTestId('home-live-outfit')
+  await expect(live).toBeVisible()
   await live.getByTestId('today-outfit-details').click()
   for (const label of ['Before school', 'Midday', 'Going out']) {
     const scenario = live.getByRole('button', { name: label, exact: true })
@@ -1076,8 +1077,10 @@ test('P-OFFLINE: an outfit card refuses export offline, keeps its preview, and t
   const ritual = interceptNetworkCall({ method: 'GET', url: '**/api/v1/ritual?*' })
   await page.goto('/')
   expect((await ritual).status).toBe(200)
-  await page.getByTestId('today-outfit-details').click()
-  await page.getByTestId('home-live-outfit').getByTestId('share-card-open').click()
+  const live = page.getByTestId('home-live-outfit')
+  await expect(live).toBeVisible()
+  await live.getByTestId('today-outfit-details').click()
+  await live.getByTestId('share-card-open').click()
   const dialog = modal(page)
   const preview = dialog.getByTestId('share-card-preview')
   await expect(preview).toHaveAttribute('data-loaded', 'true')

@@ -238,6 +238,34 @@ const uploaded = await authAdmin.storage
   .from('community-images')
   .upload(objectPath, photo, { contentType: 'image/png', upsert: false })
 if (uploaded.error) throw new Error('Owned synthetic card-photo upload failed.')
+// CC-7.22 selects the member lookbook for closets of up to two pieces. Give the
+// primary fixture three accessories so the real Today export still opens its catalog outfit.
+for (let index = 0; index < 3; index += 1) {
+  const id = randomUUID()
+  const garmentPath = `wardrobe/${primary.appUserId}/${id}.png`
+  resources.storageObjects.push({ bucket: 'wardrobe-images', objectPath: garmentPath })
+  privateJson('resources.json', resources)
+  const garmentUpload = await authAdmin.storage
+    .from('wardrobe-images')
+    .upload(garmentPath, photo, { contentType: 'image/png', upsert: false })
+  if (garmentUpload.error) throw new Error('Owned synthetic garment upload failed.')
+  await prisma.garmentItem.create({
+    data: {
+      id,
+      user_id: primary.appUserId,
+      object_path: garmentPath,
+      category: 'accessory',
+      material: 'cotton',
+      comfort_range: 'mild',
+      upload_status: 'ready',
+      retention_status: 'active',
+      mime_type: 'image/png',
+      file_size_bytes: photo.length,
+      tags_confirmed_at: new Date(),
+      committed_at: new Date(),
+    },
+  })
+}
 await prisma.lookbookPost.create({
   data: {
     id: postId,

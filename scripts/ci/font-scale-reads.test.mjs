@@ -24,6 +24,7 @@
 // Story CC-7.17 lets the hourly forecast card grow with system text. Its width is capped
 // to the viewport, and its text retains React Native's sizing.
 // Looks also stacks the Plan segment and sample week labels at compact enlarged text.
+// CC-7.22 switches the lookbook to one piece per row at enlarged text on narrow screens.
 // Story CC-7.20 widens the mood cards and places them in a horizontal scroll row at enlarged
 // text sizes. React Native still sizes each label.
 // The owner's live font fix (PR 242) adds one read that rescales no text: React Native 0.81 keeps
@@ -98,6 +99,7 @@ const ALLOWED = {
   ],
   'src/components/nav-row.tsx': ['NavRow'],
   'src/features/looks/looks-screen.tsx': ['SegmentControl'],
+  'src/features/looks/member-lookbook.tsx': ['MemberLookbook'],
   'src/features/premium/planner-screen.tsx': ['FreePlanPreview'],
   'src/features/preview/style-profile-controls.tsx': ['StyleMoodRow', 'TuneModalHeader'],
   'src/features/wardrobe/wardrobe-hub-screen.tsx': ['MemberWardrobeHub'],
@@ -184,6 +186,7 @@ const FONT_SCALE_FORMS = {
   },
   'src/components/nav-row.tsx': { NavRow: compactLayoutScaleRead },
   'src/features/looks/looks-screen.tsx': { SegmentControl: compactLayoutScaleRead },
+  'src/features/looks/member-lookbook.tsx': { MemberLookbook: compactLayoutScaleRead },
   'src/features/premium/planner-screen.tsx': { FreePlanPreview: compactLayoutScaleRead },
   'src/features/preview/style-profile-controls.tsx': {
     StyleMoodRow: moodRowScaleRead,
