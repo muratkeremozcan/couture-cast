@@ -759,6 +759,7 @@ describe('GarmentDetailScreen', () => {
 
   it('[7.30-NATIVE] shows owned pieces, a photo placeholder and catalog rain protection', async () => {
     const shoesPhoto = photo('#253019')
+    const bootsPhoto = photo('#5c3014')
     closet = [
       blueTop,
       {
@@ -769,6 +770,26 @@ describe('GarmentDetailScreen', () => {
           imageAccess: null,
         }),
         colorFamily: null,
+      },
+      {
+        ...createReadyGarmentFixture({
+          id: 'z-owned-ankle-boots',
+          category: 'shoes',
+          comfortRange: 'warm',
+          imageAccess: null,
+        }),
+        colorFamily: null,
+        subtype: 'ankle-boots',
+      },
+      {
+        ...createReadyGarmentFixture({
+          id: 'zz-owned-moto-boots',
+          category: 'shoes',
+          comfortRange: 'warm',
+          imageAccess: bootsPhoto,
+        }),
+        colorFamily: null,
+        subtype: 'moto-boots',
       },
       {
         ...createReadyGarmentFixture({
@@ -802,6 +823,34 @@ describe('GarmentDetailScreen', () => {
         16
       )
     )
+    fireEvent.error(school.querySelector(`img[src="${shoesPhoto.url}"]`)!)
+    expect(look.getAllByTestId('style-piece-companion-placeholder')).toHaveLength(2)
+
+    await browserUser.click(look.getByTestId('style-piece-swap-shoes'))
+    const ankleBoots = look.getByTestId('style-piece-option-z-owned-ankle-boots')
+    const motoBoots = look.getByTestId('style-piece-option-zz-owned-moto-boots')
+    expect(ankleBoots).toHaveAccessibleName(/Ankle boots/)
+    expect(
+      within(ankleBoots).getByTestId('style-piece-companion-placeholder')
+    ).toBeVisible()
+    expect(motoBoots).toHaveAccessibleName('Moto boots')
+    expect(motoBoots.querySelector('img')).toHaveAttribute('src', bootsPhoto.url)
+    expect(motoBoots.querySelector('img')).toHaveAttribute('data-cache-policy', 'none')
+    expect(look.getAllByTestId(/^style-piece-option-/)[0]).toBe(ankleBoots)
+
+    await browserUser.click(ankleBoots)
+    expect(look.getByText('Ankle boots')).toBeVisible()
+    await browserUser.click(look.getByTestId('style-piece-save'))
+    const reopen = await panel.findByTestId('style-piece-reopen')
+    await browserUser.click(panel.getByTestId('style-piece-weather-mild-dry'))
+    await browserUser.click(reopen)
+    await waitFor(() => {
+      const restored = panel
+        .getByRole('heading', { name: 'School' })
+        .closest('[data-testid="style-piece-look"]') as HTMLElement
+      expect(within(restored).getByText('Ankle boots')).toBeVisible()
+      expect(within(restored).getByText('Rain shell', { exact: true })).toBeVisible()
+    })
   })
 
   it('[P1] [Codex 7.11 #3] [7.11-NAT-032] a swipe down on the editor header closes it like its X and Style this piece takes focus back', async () => {

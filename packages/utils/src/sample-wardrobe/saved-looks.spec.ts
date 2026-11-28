@@ -24,11 +24,14 @@ import {
   parseLegacyStylePieceRecipesForImport,
   parseMemberSampleBookmarksStorageKey,
   parseStylePieceStorageKey,
+  reopenStylePieceAnchor,
   reopenStylePieceRecipe,
   savedLookMatchesHomeSample,
   savedLookMatchesStylePiece,
   savedLookToSampleBookmark,
   savedLookToStylePieceRecipe,
+  savedStylePieceEditorRecipe,
+  stylePieceLookHasCurrentCompanions,
   type SavedLookLike,
 } from './saved-looks'
 
@@ -175,6 +178,64 @@ describe('saved-looks helpers', () => {
         available
       )
     ).toBeNull()
+    expect(
+      reopenStylePieceRecipe(saved, { ...anchor, id: 'wrong-anchor' }, available)
+    ).toBeNull()
+    expect(
+      reopenStylePieceRecipe({ ...saved, lookId: 'sample:l:unknown' }, anchor, available)
+    ).toBeNull()
+    expect(
+      reopenStylePieceRecipe(
+        {
+          ...saved,
+          composition: saved.composition.slice(0, 2),
+        },
+        anchor,
+        available
+      )
+    ).toBeNull()
+    expect(savedStylePieceEditorRecipe({ ...saved, source: 'home_sample' })).toBeNull()
+    expect(savedStylePieceEditorRecipe({ ...saved, weather: 'unknown' })).toBeNull()
+
+    expect(savedLookMatchesStylePiece(saved, anchor.id, look)).toBe(true)
+    expect(savedLookMatchesStylePiece(saved, anchor.id, base)).toBe(false)
+    expect(
+      savedLookMatchesStylePiece(
+        { ...saved, composition: saved.composition.slice(0, 2) },
+        anchor.id,
+        look
+      )
+    ).toBe(false)
+    expect(stylePieceLookHasCurrentCompanions(look, available)).toBe(true)
+    expect(stylePieceLookHasCurrentCompanions(look, [alternative])).toBe(false)
+    expect(
+      stylePieceLookHasCurrentCompanions(look, [{ ...owned, category: 'shoes' }])
+    ).toBe(false)
+    expect(
+      stylePieceLookHasCurrentCompanions(look, [{ ...owned, comfortRange: 'cold' }])
+    ).toBe(false)
+    expect(stylePieceLookHasCurrentCompanions(base, [])).toBe(true)
+
+    const anchorItem = {
+      ...anchor,
+      status: 'ready',
+      retentionStatus: 'active',
+      imageAccess: owned.photo,
+    }
+    const ownedItem = {
+      id: owned.id,
+      category: owned.category,
+      comfortRange: owned.comfortRange,
+      status: 'ready',
+      retentionStatus: 'active',
+      imageAccess: null,
+    }
+    expect(reopenStylePieceAnchor(saved, [ownedItem, anchorItem])).toBe(anchorItem)
+    expect(reopenStylePieceAnchor(saved, [ownedItem])).toBeNull()
+    expect(
+      reopenStylePieceAnchor(saved, [{ ...anchorItem, imageAccess: null }, ownedItem])
+    ).toBeNull()
+    expect(reopenStylePieceAnchor(saved, [anchorItem])).toBeNull()
   })
 
   it('builds, converts, and matches Home sample saved look inputs', () => {
