@@ -1,9 +1,11 @@
 // Learning path Step 83: Clean garment cutouts.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-83-clean-garment-cutouts
+// Learning path Step 86: Several garments from one flat-lay photo.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-86-several-garments-from-one-flat-lay-photo
 import path from 'node:path'
 import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
-import { maskGarmentBackground } from './garment-background'
+import { findFlatLayComponents, maskGarmentBackground } from './garment-background'
 
 const fixtures = path.resolve(__dirname, '../test/fixtures/garment-cutouts')
 
@@ -190,5 +192,73 @@ describe('garment cutout acceptance', () => {
     expect(maskGarmentBackground(pixels, size, size)).toBe(true)
     expect(pixels[3]).toBe(0)
     expect(pixels[(40 * size + 40) * 4 + 3]).toBe(255)
+  })
+})
+
+describe('CC-7.29 flat-lay separation', () => {
+  const top = (x: number, y: number) =>
+    (x >= 10 && x < 32 && y >= 10 && y < 33) || (x >= 6 && x < 36 && y >= 12 && y < 18)
+  const bottom = (x: number, y: number) => x >= 45 && x < 67 && y >= 22 && y < 62
+  const denim: Rgb = [53, 34, 128]
+  const cleanScene = (x: number, y: number) =>
+    top(x, y) ? garment : bottom(x, y) ? denim : backdrop
+
+  it('[P0] [7.29-REJECT] labels the full silhouettes of two separated pieces', () => {
+    const pixels = raster(cleanScene)
+    const original = pixels.slice()
+    const components = findFlatLayComponents(pixels, size, size, 5)
+
+    expect(
+      components?.pieces.map(({ left, top, width, height }) => ({
+        left,
+        top,
+        width,
+        height,
+      }))
+    ).toEqual([
+      { left: 6, top: 10, width: 30, height: 23 },
+      { left: 45, top: 22, width: 22, height: 40 },
+    ])
+    const [shirt, trousers] = components!.pieces
+    const expected = Array.from({ length: size * size }, (_, index) => {
+      const x = index % size
+      const y = Math.floor(index / size)
+      if (top(x, y)) return shirt!.label
+      if (bottom(x, y)) return trousers!.label
+      return 1
+    })
+    expect(shirt!.label).not.toBe(trousers!.label)
+    expect(Array.from(components!.labels)).toEqual(expected)
+    expect(pixels).toEqual(original)
+  })
+
+  it.each<{ scene: string; colorAt: (x: number, y: number) => Rgb }>([
+    {
+      scene: 'touching pieces',
+      colorAt: (x, y) => (x >= 32 && x < 45 && y === 25 ? garment : cleanScene(x, y)),
+    },
+    {
+      scene: 'a narrow gap',
+      colorAt: (x, y) => (x >= 32 && x < 43 && y === 25 ? garment : cleanScene(x, y)),
+    },
+    {
+      scene: 'a clipped piece',
+      colorAt: (x, y) => (x < 6 && y === 14 ? garment : cleanScene(x, y)),
+    },
+    {
+      scene: 'a backdrop-colored piece',
+      colorAt: (x, y) => (bottom(x, y) ? [239, 239, 239] : cleanScene(x, y)),
+    },
+    {
+      scene: 'an extra substantial object',
+      colorAt: (x, y) =>
+        x >= 12 && x < 22 && y >= 51 && y < 57 ? denim : cleanScene(x, y),
+    },
+  ])('[P0] [7.29-REJECT] abstains for $scene', ({ colorAt }) => {
+    expect(findFlatLayComponents(raster(colorAt), size, size, 5)).toBeNull()
+  })
+
+  it('[P0] [7.29-REJECT] refuses a scene exceeding the configured piece cap', () => {
+    expect(findFlatLayComponents(raster(cleanScene), size, size, 1)).toBeNull()
   })
 })

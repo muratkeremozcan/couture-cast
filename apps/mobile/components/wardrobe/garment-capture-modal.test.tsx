@@ -10,6 +10,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-83-clean-garment-cutouts
 // Learning path Step 85: Add several photos at once.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-85-add-several-photos-at-once
+// Learning path Step 86: Several garments from one flat-lay photo.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-86-several-garments-from-one-flat-lay-photo
 // Story CC-7.11 test owner (TEA): 7.11-NAT-032, 7.11-NAT-033, the capture header is the layer's
 // swipe handle beside its X. [Codex 7.11 #3]: the swipe takes the X's guarded close, so a
 // picked photo asks "Discard this photo?" first; an upload in flight keeps the sheet open (busy guard).
@@ -30,6 +32,8 @@ import { PNG } from 'pngjs/browser'
 import {
   createGarmentItemInputSchema,
   createGarmentUploadUrlInputSchema,
+  flatLayConfirmInputSchema,
+  type FlatLaySelection,
   type CreateGarmentItemInput,
   type CreateGarmentUploadUrlInput,
 } from '@couture/api-client/contracts/http'
@@ -52,7 +56,16 @@ import {
 } from '@/src/test-utils/edge-to-edge-modal'
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en-US' } }),
+  useTranslation: () => ({
+    t: (key: string) => {
+      const labels: Record<string, string> = {
+        'wardrobe.tagging.options.category.outerwear': 'Outerwear',
+        'wardrobe.detail.done': 'Done',
+      }
+      return labels[key] ?? key
+    },
+    i18n: { language: 'en-US' },
+  }),
 }))
 
 const openSettingsMock = vi.hoisted(() => vi.fn())
@@ -551,6 +564,150 @@ describe('MobileGarmentCaptureModal', () => {
     expect(screen.queryByTestId('garment-batch-row-1')).toBeNull()
     expect(imageManipulator.manipulateAsync).not.toHaveBeenCalled()
     expect([...fileSystem.files.keys()]).toEqual([original.uri])
+    expect(onBatchGarmentCommitted).not.toHaveBeenCalled()
+  })
+
+  it('[P1] [7.29-NATIVE] keeps cutouts by default and confirms only the remaining piece with edited tags', async () => {
+    const file = new File(['synthetic-flat-lay'], 'original-filename.jpg', {
+      type: 'image/jpeg',
+    })
+    const pickerCopy = {
+      ...libraryAsset,
+      file,
+      uri: 'file:///cache/ImagePicker/flat-lay.jpg',
+    }
+    const original = 'file:///library/flat-lay.jpg'
+    fileSystem.files.set(pickerCopy.uri, fileSystem.state.bytes)
+    fileSystem.files.set(original, fileSystem.state.bytes)
+    imagePicker.launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [pickerCopy],
+    })
+    const first = {
+      id: '254ead7d-3549-4c56-8d7a-ad5b7eee1956',
+      mask: 'UklGRh4AAABXRUJQVlA4TBEAAAAvA8AAAAfQn7JWqv+BiOh/AAA=',
+      token: 'synthetic-top-token',
+    }
+    const second = {
+      id: 'cf826481-68f1-4ae9-bfea-0593c4bcc034',
+      mask: 'UklGRh4AAABXRUJQVlA4TBEAAAAvA8AAAAdQns50sP+BiOh/AAA=',
+      token: 'synthetic-bottom-token',
+    }
+    const submissions: FlatLaySelection[] = []
+    const reviewUpload = vi.fn()
+    server.use(
+      http.post('*/api/v1/wardrobe/flat-lay/review', async ({ request }) => {
+        // MSW runs this handler in Chromium, which exposes the DOM FormData getters.
+        const multipart = (await request.formData()) as unknown as {
+          get(name: string): unknown
+        }
+        const part = multipart.get('photo')
+        if (!(part instanceof File)) throw new Error('Expected one multipart photo')
+        reviewUpload(part.name, await part.text())
+        return HttpResponse.json({
+          items: [
+            { ...first, category: null },
+            { ...second, category: 'bottom' },
+          ],
+          expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+        })
+      }),
+      http.post('*/api/v1/wardrobe/flat-lay/confirm', async ({ request }) => {
+        submissions.push(flatLayConfirmInputSchema.parse(await request.json()))
+        return HttpResponse.json({
+          garments: [
+            {
+              id: first.id,
+              status: 'ready',
+              category: 'outerwear',
+              material: null,
+              comfortRange: null,
+              tagsConfirmedAt: '2026-11-28T14:00:00.000Z',
+              fileSizeBytes: 42,
+              mimeType: 'image/webp',
+              retentionStatus: 'active',
+              createdAt: '2026-11-28T14:00:00.000Z',
+              committedAt: '2026-11-28T14:00:00.000Z',
+              imageAccess: null,
+            },
+          ],
+        })
+      })
+    )
+    setMobileApplicationUserId('flat-lay-owner')
+    const onBatchGarmentCommitted = vi.fn()
+    const { onClose, onGarmentCommitted } = renderModal({ onBatchGarmentCommitted })
+
+    await browserUser.click(
+      screen.getByRole('button', { name: 'Add from flat-lay photo' })
+    )
+    expect(await screen.findByRole('button', { name: 'Add 2 pieces' })).toBeVisible()
+    expect(screen.getAllByRole('button', { name: 'Edit tags' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(2)
+    expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalledOnce()
+    expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ allowsMultipleSelection: false })
+    )
+    expect(reviewUpload).toHaveBeenCalledExactlyOnceWith('photo', 'synthetic-flat-lay')
+    await waitFor(() => expect([...fileSystem.files.keys()]).toEqual([original]))
+    expect(submissions).toEqual([])
+
+    await browserUser.click(screen.getAllByRole('button', { name: 'Edit tags' })[0]!)
+    await browserUser.click(screen.getByRole('button', { name: 'Outerwear' }))
+    await browserUser.click(screen.getByRole('button', { name: 'Done' }))
+    await browserUser.click(screen.getAllByRole('button', { name: 'Remove' })[1]!)
+    await browserUser.click(screen.getByRole('button', { name: 'Add 1 piece' }))
+
+    await waitFor(() =>
+      expect(onBatchGarmentCommitted).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ id: first.id, category: 'outerwear' }),
+        'test-access-token'
+      )
+    )
+    expect(submissions).toEqual([
+      { items: [{ ...first, tags: expect.objectContaining({ category: 'outerwear' }) }] },
+    ])
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(
+      await screen.findByRole('button', { name: 'Add from flat-lay photo' })
+    ).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Edit tags' })).toBeNull()
+    expect(onGarmentCommitted).not.toHaveBeenCalled()
+    expect([...fileSystem.files.keys()]).toEqual([original])
+  })
+
+  it('[P1] [7.29-NATIVE] releases a late picker copy after account change', async () => {
+    const pickerCopy = { ...libraryAsset, uri: 'file:///cache/ImagePicker/flat-lay.jpg' }
+    fileSystem.files.set(pickerCopy.uri, fileSystem.state.bytes)
+    let finishPick!: (result: ImagePickerResult) => void
+    const pendingPick = new Promise<ImagePickerResult>((resolve) => {
+      finishPick = resolve
+    })
+    imagePicker.launchImageLibraryAsync.mockReturnValueOnce(pendingPick)
+    const reviewed = vi.fn()
+    server.use(
+      http.post('*/api/v1/wardrobe/flat-lay/review', () => {
+        reviewed()
+        return HttpResponse.error()
+      })
+    )
+    setMobileApplicationUserId('former-flat-lay-owner')
+    const onBatchGarmentCommitted = vi.fn()
+    renderModal({ onBatchGarmentCommitted })
+
+    await browserUser.click(
+      screen.getByRole('button', { name: 'Add from flat-lay photo' })
+    )
+    expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalledOnce()
+    act(() => setMobileApplicationUserId('new-flat-lay-owner'))
+    await act(async () => {
+      finishPick({ canceled: false, assets: [pickerCopy] })
+      await pendingPick
+    })
+
+    expect(fileSystem.files.has(pickerCopy.uri)).toBe(false)
+    expect(reviewed).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Edit tags' })).toBeNull()
     expect(onBatchGarmentCommitted).not.toHaveBeenCalled()
   })
 
