@@ -106,7 +106,15 @@ Scan `55a92a8_20261128T094120Z` covered 61 changed paths and reported one low fi
 | P2-3 Inference assumptions                 | Clarify the weights manifest identity and document model capacity and benchmark scope.                                            |
 | P3-1 Story closeout                        | Link Step 84, update sprint status and describe the suggestion header in the generated contract.                                  |
 
+CodeRabbit reviewed `d1b409044a04f3b82a7c38e1ef7549378bc85c78` in one round.
+The real-session runner pins fixture tagging. The onboarding journey supplies its suggestion response,
+and the smart-tagging journey continues to cover the worker-backed path.
+
 ## Verification
 
 Run scoped lint, builds and type checks locally. Verify the model benchmark, new browser and native
 acceptance tests, and every PR check in CI on the final head.
+
+The opening Linux accuracy run scored 18/20 categories (90%) and 16/18 subtypes (88.9%).
+The three smoke cases completed in 15.31 seconds, including the independent plain shirt.
+[Accuracy job](https://github.com/muratkeremozcan/couture-cast/actions/runs/46132967595/job/140942067554).
