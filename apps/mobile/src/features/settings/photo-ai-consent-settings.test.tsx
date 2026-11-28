@@ -51,6 +51,9 @@ vi.mock('@/src/lib/user', async (importOriginal) => ({
       user: { displayName: 'Test member', email: 'member@example.test' },
     }),
 }))
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock()
+)
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
