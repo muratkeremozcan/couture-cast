@@ -7099,7 +7099,7 @@ export interface DescribeCommunityDraftResponse {
  */
 export interface DescribeCommunityDraftResponseData {
   /**
-   *
+   * A nonblank, single-line description. Control characters, Unicode line and paragraph separators, and links and email addresses matching the Community caption rules are disallowed.
    * @type {string}
    * @memberof DescribeCommunityDraftResponseData
    */

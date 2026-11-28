@@ -10,6 +10,7 @@ import {
   commentSessionIdentity,
   ResponseError,
   retryOnceWhenCommunityUnavailable,
+  withCommunityDescriptionDeadline,
   withRequestDeadline,
 } from '@couture/api-client'
 // Story 6.1 Task 5 owner: the web app's community feed client.
@@ -731,18 +732,20 @@ export async function describeCommunityDraftFromWeb(
   signal: AbortSignal
 ) {
   const assertOwner = () => {
-    signal.throwIfAborted()
     if (!owner || owner !== communityCommentsSessionFromWeb())
       throw new CommunityRequestSuperseded()
   }
-  assertOwner()
-  const api = createWebApiClient({ accessToken: readAccessToken() })
-  const response = await withRequestDeadline(10_000, [signal], (requestSignal) =>
-    api.apiV1CommunityPostsDescribePost(
+  const response = await withCommunityDescriptionDeadline(signal, (requestSignal) => {
+    assertOwner()
+    const api = createWebApiClient({ accessToken: readAccessToken() })
+    return api.apiV1CommunityPostsDescribePost(
       { describeCommunityDraftInput: input },
       { signal: requestSignal }
     )
-  )
+  }).catch((error: unknown) => {
+    assertOwner()
+    throw error
+  })
   assertOwner()
   return describeCommunityDraftResponseSchema.parse(response).data.caption
 }

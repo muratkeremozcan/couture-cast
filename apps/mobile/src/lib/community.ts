@@ -7,6 +7,7 @@ import {
   commentSessionIdentity,
   ResponseError,
   retryOnceWhenCommunityUnavailable,
+  withCommunityDescriptionDeadline,
 } from '@couture/api-client'
 // Story 6.1 Task 5 owner: the mobile app's community feed client.
 //
@@ -794,17 +795,24 @@ export async function describeCommunityDraftFromMobile(
 ) {
   const epoch = mobileIdentityEpoch()
   const assertOwner = () => {
-    if (signal.aborted || epoch !== mobileIdentityEpoch())
-      throw new CommunityRequestSuperseded()
+    if (epoch !== mobileIdentityEpoch()) throw new CommunityRequestSuperseded()
   }
-  const token = await readAccessToken()
-  assertOwner()
-  const response = await withRequestTimeout(signal, (requestSignal) =>
-    communityClient(token).apiV1CommunityPostsDescribePost(
-      { describeCommunityDraftInput: input },
-      { signal: requestSignal }
-    )
-  )
+  const response = await withCommunityDescriptionDeadline(
+    signal,
+    async (requestSignal) => {
+      assertOwner()
+      const token = await readAccessToken()
+      if (requestSignal.aborted) throw new CommunityRequestSuperseded()
+      assertOwner()
+      return communityClient(token).apiV1CommunityPostsDescribePost(
+        { describeCommunityDraftInput: input },
+        { signal: requestSignal }
+      )
+    }
+  ).catch((error: unknown) => {
+    assertOwner()
+    throw error
+  })
   assertOwner()
   return describeCommunityDraftResponseSchema.parse(response).data.caption
 }

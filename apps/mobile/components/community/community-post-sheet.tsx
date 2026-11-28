@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -329,16 +336,35 @@ export function CommunityPostSheet({
   const [allocated, setAllocated] = useState<AllocatedCommunityLook | null>(null)
   const [altText, setAltText] = useState('')
   const [altTextConfirmed, setAltTextConfirmed] = useState(false)
-  const [caption, setCaption] = useState('')
+  const [{ caption, suggested }, setDescriptionDraft] = useState({
+    caption: '',
+    suggested: false,
+  })
   const [descriptionStatus, setDescriptionStatus] = useState<
     'idle' | 'loading' | 'failed'
   >('idle')
   const description = useRef<AbortController | null>(null)
-  const autoCaption = useRef<string | null>(null)
   const cancelDescription = useCallback(() => {
     description.current?.abort()
     description.current = null
   }, [])
+  const invalidateDescription = useCallback(() => {
+    cancelDescription()
+    setDescriptionStatus('idle')
+  }, [cancelDescription])
+  const challengeId = challenge?.id
+  useLayoutEffect(() => {
+    setDescriptionStatus('idle')
+    return cancelDescription
+  }, [
+    allocated,
+    cancelDescription,
+    challengeId,
+    defaultChallengeOptIn,
+    locale,
+    suspended,
+    visible,
+  ])
   const [title, setTitle] = useState('')
   const titleInvalid =
     Boolean(title.trim()) && !communityPostTitleSchema.safeParse(title).success
@@ -357,19 +383,13 @@ export function CommunityPostSheet({
   const verificationWaiters = useRef(new Set<() => void>())
   useEffect(() => {
     if (!suspended) verificationWaiters.current.forEach((resume) => resume())
-    else {
-      cancelDescription()
-      setDescriptionStatus('idle')
-    }
-  }, [suspended, cancelDescription])
+  }, [suspended])
   // One key per attempt, reused across allocate, upload, publish and any retry of
   // that attempt, so a retry replays the first session instead of allocating a second.
   const idempotencyKeyRef = useRef<string | null>(null)
 
   const resetState = useCallback(() => {
-    cancelDescription()
-    autoCaption.current = null
-    setDescriptionStatus('idle')
+    invalidateDescription()
     controllerRef.current?.abort()
     controllerRef.current = null
     idempotencyKeyRef.current = null
@@ -377,12 +397,12 @@ export function CommunityPostSheet({
     setAllocated(null)
     setAltText('')
     setAltTextConfirmed(false)
-    setCaption('')
+    setDescriptionDraft({ caption: '', suggested: false })
     setTitle('')
     setPublishState(null)
     setIsBusy(false)
     setErrorMessage(null)
-  }, [cancelDescription])
+  }, [invalidateDescription])
 
   useEffect(() => {
     if (!visible) {
@@ -407,9 +427,8 @@ export function CommunityPostSheet({
   useEffect(
     () => () => {
       controllerRef.current?.abort()
-      cancelDescription()
     },
-    [cancelDescription]
+    []
   )
 
   /**
@@ -467,8 +486,7 @@ export function CommunityPostSheet({
 
   const handlePickImage = useCallback(async () => {
     if (access.current.suspended || !access.current.visible) return
-    cancelDescription()
-    setDescriptionStatus('idle')
+    invalidateDescription()
     setErrorMessage(null)
     setIsBusy(true)
     controllerRef.current?.abort()
@@ -481,8 +499,9 @@ export function CommunityPostSheet({
         return
       }
       setAsset(picked)
-      if (autoCaption.current !== null) setCaption('')
-      autoCaption.current = null
+      setDescriptionDraft((current) =>
+        current.suggested ? { caption: '', suggested: false } : current
+      )
       setAllocated(null)
       setAltText('')
       setAltTextConfirmed(false)
@@ -548,7 +567,7 @@ export function CommunityPostSheet({
         setIsBusy(false)
       }
     }
-  }, [cancelDescription, locale, t])
+  }, [invalidateDescription, locale, t])
 
   const suggestDescription = async () => {
     if (!visible || suspended || isBusy || !allocated || caption || description.current)
@@ -557,7 +576,7 @@ export function CommunityPostSheet({
     description.current = controller
     setDescriptionStatus('loading')
     try {
-      const suggested = await describeCommunityDraftFromMobile(
+      const proposedCaption = await describeCommunityDraftFromMobile(
         {
           postId: allocated.postId,
           uploadSessionId: allocated.uploadSessionId,
@@ -570,8 +589,7 @@ export function CommunityPostSheet({
         access.current.suspended
       )
         return
-      autoCaption.current = suggested
-      setCaption((current) => current || suggested)
+      setDescriptionDraft({ caption: proposedCaption, suggested: true })
       setDescriptionStatus('idle')
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -619,8 +637,7 @@ export function CommunityPostSheet({
       return
     }
 
-    cancelDescription()
-    setDescriptionStatus('idle')
+    invalidateDescription()
     setErrorMessage(null)
     setIsBusy(true)
     setPublishState('publishing')
@@ -668,9 +685,9 @@ export function CommunityPostSheet({
     allocated,
     altText,
     caption,
-    cancelDescription,
     challenge,
     handleClose,
+    invalidateDescription,
     joinChallenge,
     locale,
     onPublished,
@@ -770,6 +787,7 @@ export function CommunityPostSheet({
                 {...reveal.fieldFocus('alt')}
                 value={altText}
                 onChangeText={(next) => {
+                  invalidateDescription()
                   setAltText(next)
                   // Editing the description withdraws the confirmation. Without this the
                   // wire carries altTextConfirmed: true for text nobody confirmed, and
@@ -782,7 +800,10 @@ export function CommunityPostSheet({
                 testID="community-confirm-alt-text"
                 checked={altTextConfirmed}
                 label={t('community.compose.altConfirm')}
-                onToggle={() => setAltTextConfirmed((prev) => !prev)}
+                onToggle={() => {
+                  invalidateDescription()
+                  setAltTextConfirmed((prev) => !prev)
+                }}
               />
             </View>
 
@@ -800,7 +821,10 @@ export function CommunityPostSheet({
                 {...reveal.fieldFocus('title')}
                 value={title}
                 maxLength={COMMUNITY_POST_TITLE_MAX_LENGTH}
-                onChangeText={setTitle}
+                onChangeText={(value) => {
+                  invalidateDescription()
+                  setTitle(value)
+                }}
               />
               {titleInvalid ? (
                 <ComposeErrorPanel
@@ -836,19 +860,21 @@ export function CommunityPostSheet({
                 {...reveal.fieldFocus('caption')}
                 value={caption}
                 onChangeText={(value) => {
-                  cancelDescription()
-                  autoCaption.current = null
-                  setDescriptionStatus('idle')
-                  setCaption(value)
+                  invalidateDescription()
+                  setDescriptionDraft({ caption: value, suggested: false })
                 }}
               />
               <DraftDescriptionControl
                 hasUpload={Boolean(allocated)}
                 hasCaption={Boolean(caption)}
+                suggested={suggested}
                 suspended={suspended}
                 isBusy={isBusy}
                 status={descriptionStatus}
                 onSuggest={() => void suggestDescription()}
+                onAccept={() =>
+                  setDescriptionDraft((current) => ({ ...current, suggested: false }))
+                }
               />
               {captionErrorKey ? (
                 <ComposeErrorPanel
@@ -870,7 +896,10 @@ export function CommunityPostSheet({
                   label={
                     joinChallenge ? challenge.title : t('community.compose.challengeNone')
                   }
-                  onToggle={() => setJoinChallenge((prev) => !prev)}
+                  onToggle={() => {
+                    invalidateDescription()
+                    setJoinChallenge((prev) => !prev)
+                  }}
                 />
                 <ChallengeInstructions challenge={challenge} selected={joinChallenge} />
               </View>
@@ -931,17 +960,21 @@ export function CommunityPostSheet({
 function DraftDescriptionControl({
   hasUpload,
   hasCaption,
+  suggested,
   suspended,
   isBusy,
   status,
   onSuggest,
+  onAccept,
 }: {
   hasUpload: boolean
   hasCaption: boolean
+  suggested: boolean
   suspended: boolean
   isBusy: boolean
   status: 'idle' | 'loading' | 'failed'
   onSuggest: () => void
+  onAccept: () => void
 }) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
@@ -967,6 +1000,29 @@ function DraftDescriptionControl({
             )}
           </Text>
         </TouchableOpacity>
+      )}
+      {suggested && (
+        <View style={styles.suggestedDescriptionRow}>
+          <Text
+            accessibilityLiveRegion="polite"
+            testID="community-description-suggested"
+            style={[styles.helperText, { color: palette.inkMuted }]}
+          >
+            {t('community.compose.descriptionSuggested')}
+          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            aria-disabled={isBusy || suspended}
+            testID="community-accept-description"
+            disabled={isBusy || suspended}
+            onPress={onAccept}
+            style={[styles.descriptionButton, { borderColor: palette.line }]}
+          >
+            <Text style={{ color: palette.ink }}>
+              {t('community.compose.acceptDescription')}
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
       {status === 'failed' && (
         <Text accessibilityLiveRegion="polite" style={{ color: palette.inkMuted }}>
@@ -1032,6 +1088,12 @@ function ComposeActions({
 }
 
 const styles = StyleSheet.create({
+  suggestedDescriptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   descriptionButton: {
     minHeight: 44,
     alignSelf: 'flex-start',

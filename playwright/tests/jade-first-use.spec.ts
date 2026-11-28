@@ -1,7 +1,10 @@
+// Learning path Step 82: Suggested Community descriptions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-82-suggested-community-descriptions
 import { selectCommunityClimate } from '../support/helpers/community-ui'
 import type { Locator, Page } from '@playwright/test'
 import {
   createGarmentUploadUrlInputSchema,
+  describeCommunityDraftResponseSchema,
   resolveCommunityTargetsResponseSchema,
   type CommunityFeedItem,
   type CommunityFeedMode,
@@ -554,9 +557,11 @@ privateCommunityTest.describe('Jade Community composer @local-lane', () => {
       const composer = page.getByRole('dialog')
       const caption = composer.getByTestId('post-caption-input')
       const suggest = composer.getByRole('button', {
-        name: 'Suggest a description from photo',
+        name: 'Suggest a description',
       })
+      const marker = composer.getByTestId('community-description-suggested')
       const publish = composer.getByTestId('post-publish-submit')
+      await expect(suggest).toHaveCount(0)
       const allocation = interceptNetworkCall({
         method: 'POST',
         url: `**${COMMUNITY_ALLOCATE_PATH}`,
@@ -569,6 +574,7 @@ privateCommunityTest.describe('Jade Community composer @local-lane', () => {
           data: { postId: string; uploadSessionId: string }
         }
       ).data
+      await expect(suggest).toHaveCount(1)
       await expect(suggest).toBeEnabled()
       await expect(caption).toHaveValue('')
       await expect(publish).toBeDisabled()
@@ -581,9 +587,12 @@ privateCommunityTest.describe('Jade Community composer @local-lane', () => {
       const suggested = await description
       expect(suggested.status).toBe(200)
       expect(suggested.requestJson).toEqual({ postId, uploadSessionId })
-      const { data: draft } = suggested.responseJson as { data: { caption: string } }
+      const { data: draft } = describeCommunityDraftResponseSchema.parse(
+        suggested.responseJson
+      )
       expect(draft.caption).toMatch(/blue/i)
       await expect(caption).toHaveValue(draft.caption)
+      await expect(marker).toHaveText('Suggested')
       await expect(publish).toBeDisabled()
 
       const otherUserId = await signUpCommunityUser(
@@ -606,6 +615,7 @@ privateCommunityTest.describe('Jade Community composer @local-lane', () => {
 
       const edited = 'Blue layers for a day out.'
       await caption.fill(edited)
+      await expect(marker).toHaveCount(0)
       await composer.getByTestId('confirm-alt-text-checkbox').check()
       const publication = interceptNetworkCall({
         method: 'POST',
@@ -629,6 +639,7 @@ privateCommunityTest.describe('Jade Community composer @local-lane', () => {
         }
       )
       expect(terminal.status).toBe('published')
+      expect(terminal.engineVersion).toMatch(/^[^;]+;[^;]+$/)
       await page.reload()
       await page.getByTestId(`lookbook-open-${postId}`).click()
       await expect(page.getByTestId('community-detail-caption')).toHaveText(edited)
@@ -645,6 +656,8 @@ privateCommunityTest.describe('Jade Community composer @local-lane', () => {
         releaseFirst = resolve
       })
       let describeAttempts = 0
+      // playwright-utils deviation: this case holds a route across photo replacement and
+      // aborts a separate retry, which requires Playwright's request-specific route control.
       await page.route(`**${describeDraftPath}`, async (route) => {
         if (++describeAttempts === 1) {
           await holdFirst
@@ -658,7 +671,7 @@ privateCommunityTest.describe('Jade Community composer @local-lane', () => {
       const composer = page.getByRole('dialog')
       const input = composer.getByTestId('post-image-file-input')
       const suggest = composer.getByRole('button', {
-        name: 'Suggest a description from photo',
+        name: 'Suggest a description',
       })
       const caption = composer.getByTestId('post-caption-input')
       const replacement = await syntheticGarment(page, 'detailed')

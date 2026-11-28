@@ -22646,3 +22646,33 @@ description, keep the original garment photo, choose tags or add garments one at
 - [Guardian revocation](../../apps/api/src/modules/guardian/guardian.service.revocation.spec.ts),
   [bounded wardrobe reads](../../apps/api/src/modules/wardrobe/wardrobe-storage.adapter.spec.ts),
   and [private API errors](../../apps/api/src/filters/api-exception.filter.spec.ts).
+
+## Step 82: Suggested Community descriptions
+
+Pick a photo in the Community composer. Tap **Suggest a description** to start
+with a sentence about the colors in the photo.
+
+### Sequence to follow
+
+1. Choose a photo and wait for the upload. Check that the description is empty
+   until you tap the suggestion button.
+2. Check that the result appears in the editable field with a **Suggested** label.
+   Tap **Use this description** to keep the text and clear the label. Editing the
+   description clears the label too.
+3. Hold a response while replacing the photo, editing the draft, or switching
+   accounts. Release it and confirm the current text stays intact. Hold a response
+   for five seconds and confirm you can continue writing the description.
+4. Publish an edited suggestion. Follow the resulting post through the regular
+   text and image screening pipeline.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-25-suggested-community-descriptions.md)
+  and [acceptance plan](../test-artifacts/test-design-7-25-suggested-community-descriptions.md).
+- [Private draft description](../../apps/api/src/modules/community/community.service.description.spec.ts)
+  and [publication and screening](../../playwright/tests/jade-first-use.spec.ts).
+- [Web composer](../../apps/web/src/app/components/community-lookbook-grid.compose.test.tsx)
+  and [native composer](../../apps/mobile/components/community/community-post-sheet.test.tsx).
+- [Caption response validation](../../packages/api-client/testing/community-publication-contract.spec.ts)
+  and [request deadline](../../packages/api-client/testing/request-deadline.spec.ts).
+- [Step 81](#step-81-photo-ai-consent-and-processor-approval) covers the external processing policy.

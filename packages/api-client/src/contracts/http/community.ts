@@ -883,7 +883,25 @@ export type DescribeCommunityDraftInput = z.infer<
 
 export const describeCommunityDraftResponseSchema = z
   .object({
-    data: z.object({ caption: z.string().min(1).max(280) }).strict(),
+    data: z
+      .object({
+        caption: z
+          .string()
+          .min(1)
+          .max(280)
+          .refine(
+            (caption) =>
+              caption.trim() !== '' &&
+              !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(caption) &&
+              communityPostCaptionSchema.safeParse(caption).success,
+            { message: 'Invalid suggested Community caption.' }
+          )
+          .openapi({
+            description:
+              'A nonblank, single-line description. Control characters, Unicode line and paragraph separators, and links and email addresses matching the Community caption rules are disallowed.',
+          }),
+      })
+      .strict(),
   })
   .strict()
 

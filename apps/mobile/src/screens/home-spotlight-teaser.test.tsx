@@ -180,7 +180,8 @@ describe('6.7 mobile Home spotlight teaser', () => {
     expect(document.body.textContent).not.toContain('Private caption')
     await screen.findByTestId('home-spotlight-teaser-image-loaded')
     // It follows the hero conditional in focus order.
-    expect(follows(screen.getByTestId('outfit-recommendation-card'), link)).toBe(true)
+    const hero = await screen.findByTestId('outfit-recommendation-card')
+    expect(follows(hero, link)).toBe(true)
     expect(link.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)
   })
 
