@@ -92,7 +92,6 @@ import {
 import {
   getGuestPreviewStrings,
   shouldShowStyleSample,
-  isSmallLookbookCloset,
   styleForecastSampleWeather,
   todayForecastPeriods,
   todayRitualAnchorDate,
@@ -789,7 +788,7 @@ export default function TabOneScreen() {
   // readable. Story CC-7.7 D2: a member's slot stays empty until the ritual read settles.
   const styleDayPreview = Boolean(liveLook && styleProfile.day)
   const outfitReady = ritualSettled && homeWardrobe !== undefined
-  const smallCloset = isSmallLookbookCloset(homeWardrobe?.pieces)
+  const smallCloset = homeWardrobe?.smallCloset ?? false
   const liveWardrobeLook = smallCloset ? null : liveLook
   const showSample =
     smallCloset || shouldShowStyleSample(ritual?.data.outfits, styleProfile)

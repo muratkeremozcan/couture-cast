@@ -8,6 +8,7 @@ import type { GarmentCategory, GarmentWithTags } from '@couture/api-client/contr
 import {
   formatGarmentAlt,
   formatLocalizedList,
+  isSmallLookbookCloset,
   TODAY_WARDROBE_READ_TIMEOUT_MS,
 } from '@couture/utils'
 import { getI18n } from '../../i18n'
@@ -25,6 +26,7 @@ export function useHomeWardrobe(owner: string, scope: string | null) {
   const [pieces, setPieces] = useState<(GarmentCategory | null)[] | null | undefined>(
     restored
   )
+  const [smallCloset, setSmallCloset] = useState(() => isSmallLookbookCloset(restored))
   const [wardrobe, setWardrobe] = useState<GarmentWithTags[]>(noGarments)
   useScreenGateRead('closet', pieces !== undefined)
 
@@ -48,12 +50,13 @@ export function useHomeWardrobe(owner: string, scope: string | null) {
             .slice(0, 3)
             .map(({ category }) => category)
           setPieces(recent)
+          setSmallCloset(isSmallLookbookCloset(recent))
           setWardrobe(garments)
           remember(recent)
         })
         .catch(() => {
           if (!request.signal.aborted && isLiveScope(scope)) {
-            setPieces((current) => current ?? null)
+            setPieces(null)
             setWardrobe(noGarments)
             remember(undefined)
           }
@@ -70,8 +73,8 @@ export function useHomeWardrobe(owner: string, scope: string | null) {
   }, [beginRead, remember, scope])
 
   return isLiveScope(scope)
-    ? { pieces, wardrobe }
-    : { pieces: null, wardrobe: noGarments }
+    ? { pieces, wardrobe, smallCloset }
+    : { pieces: null, wardrobe: noGarments, smallCloset: false }
 }
 
 export function HomeCloset({ pieces }: { pieces?: (GarmentCategory | null)[] | null }) {

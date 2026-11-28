@@ -29,7 +29,6 @@ import {
   getGuestPreviewStrings,
   getStyleProfileStrings,
   shouldShowStyleSample,
-  isSmallLookbookCloset,
   isOfflineError,
   memberSampleWardrobeChoices,
   popLookUndoSnapshot,
@@ -958,7 +957,7 @@ function MemberRitual({
     }
   })
   const snapshot = start.snapshot
-  const { pieces, wardrobe } = useHomeWardrobe(owner, start.scope)
+  const { pieces, wardrobe, smallCloset } = useHomeWardrobe(owner, start.scope)
   const [ritual, setRitual] = useState<LiveRitual | null>(snapshot?.ritual ?? null)
   const [readAt, setReadAt] = useState(() => snapshot?.readAt ?? Date.now())
   const [city, setCity] = useState<string | undefined>(snapshot?.city)
@@ -1109,7 +1108,7 @@ function MemberRitual({
             owner={owner}
             scope={start.scope}
             wardrobe={wardrobe}
-            smallCloset={isSmallLookbookCloset(pieces)}
+            smallCloset={smallCloset}
             readAt={readAt}
             scenario={scenario}
             failure={failure}

@@ -7,6 +7,7 @@ import type { GarmentCategory, GarmentWithTags } from '@couture/api-client/contr
 import {
   formatGarmentAlt,
   formatLocalizedList,
+  isSmallLookbookCloset,
   TODAY_WARDROBE_READ_TIMEOUT_MS,
 } from '@couture/utils'
 import { useHeroPalette } from '@/components/hero/hero-theme'
@@ -25,6 +26,7 @@ export function useHomeWardrobe(owner: string | null, enabled: boolean) {
     epoch: number
     pieces: (GarmentCategory | null)[] | null
     wardrobe: GarmentWithTags[]
+    smallCloset: boolean
   } | null>(null)
   useFocusEffect(
     useCallback(() => {
@@ -38,6 +40,15 @@ export function useHomeWardrobe(owner: string | null, enabled: boolean) {
           !request.signal.aborted &&
           mobileApplicationUserId() === owner &&
           mobileIdentityEpoch() === epoch
+        const unavailable = () => {
+          if (!current()) return
+          setResult((previous) => ({
+            epoch,
+            pieces: null,
+            wardrobe: [],
+            smallCloset: previous?.epoch === epoch && previous.smallCloset,
+          }))
+        }
         void withRequestDeadline(
           TODAY_WARDROBE_READ_TIMEOUT_MS,
           [request.signal],
@@ -50,27 +61,24 @@ export function useHomeWardrobe(owner: string | null, enabled: boolean) {
         )
           .then((garments) => {
             if (!current()) return
-            const pieces = garments
-              ? [...garments]
-                  .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-                  .slice(0, 3)
-                  .map(({ category }) => category)
-              : null
-            setResult({ epoch, pieces, wardrobe: garments ?? [] })
+            if (!garments) return unavailable()
+            const pieces = [...garments]
+              .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+              .slice(0, 3)
+              .map(({ category }) => category)
+            setResult({
+              epoch,
+              pieces,
+              wardrobe: garments,
+              smallCloset: isSmallLookbookCloset(pieces),
+            })
           })
-          .catch(() => {
-            if (current())
-              setResult((previous) => ({
-                epoch,
-                pieces: previous?.epoch === epoch ? previous.pieces : null,
-                wardrobe: [],
-              }))
-          })
+          .catch(unavailable)
       }
       read()
       const unsubscribe = onWardrobeChanged(() => {
         setResult((current) =>
-          current?.epoch === epoch ? { ...current, wardrobe: [] } : current
+          current?.epoch === epoch ? { ...current, pieces: null, wardrobe: [] } : current
         )
         read()
       })
