@@ -152,6 +152,16 @@ export class FlatLayCapture {
     this.publish({ phase: 'source', pieces: [], error }, notify)
   }
 
+  private expire() {
+    if (this.state.phase !== 'saving') return this.reset(true, 'expired')
+    // The server may already own publication. Keep this request fenced to its
+    // ticket while discarding everything needed to preview or submit it again.
+    this.deadline = undefined
+    this.expiresAt = 0
+    this.selection = null
+    this.publish({ phase: 'saving', pieces: [] })
+  }
+
   open(session: UploadAttemptSession) {
     this.reset()
     const ticket = { session, abort: new AbortController() }
@@ -178,10 +188,7 @@ export class FlatLayCapture {
         Date.now() + FLAT_LAY_REVIEW_LIFETIME_MS
       )
       if (this.expiresAt <= Date.now()) return this.reset(true, 'expired')
-      this.deadline = setTimeout(
-        () => this.reset(true, 'expired'),
-        this.expiresAt - Date.now()
-      )
+      this.deadline = setTimeout(() => this.expire(), this.expiresAt - Date.now())
       this.publish({
         phase: 'review',
         pieces: result.items.map(({ category, ...piece }) => ({
@@ -215,18 +222,18 @@ export class FlatLayCapture {
   }
 
   async save() {
-    const { phase, pieces } = this.state
+    const { phase } = this.state
     const ticket = this.ticket
     if (
       !ticket ||
       !this.isActive(ticket) ||
-      !pieces.length ||
+      !this.state.pieces.length ||
       (phase !== 'review' && phase !== 'retry')
     )
       return
     if (Date.now() >= this.expiresAt) return this.reset(true, 'expired')
-    this.selection ??= { items: [...pieces] }
-    this.publish({ phase: 'saving', pieces })
+    this.selection ??= { items: [...this.state.pieces] }
+    this.publish({ phase: 'saving', pieces: this.state.pieces })
     let result: Awaited<ReturnType<Platform['confirm']>>
     try {
       result = await this.platform.confirm(ticket, this.selection)
@@ -234,12 +241,11 @@ export class FlatLayCapture {
       if (!this.isActive(ticket)) return
       if (Date.now() >= this.expiresAt) return this.reset(true, 'expired')
       if (ambiguousSave(error))
-        this.publish({ phase: 'retry', pieces, error: 'saveFailed' })
+        this.publish({ phase: 'retry', pieces: this.state.pieces, error: 'saveFailed' })
       else this.reset(true, captureError(error, 'saveFailed'))
       return
     }
     if (!this.isActive(ticket)) return
-    if (Date.now() >= this.expiresAt) return this.reset(true, 'expired')
     this.reset()
     for (const garment of result.confirmation.garments)
       this.platform.onCommitted(garment, result.token)

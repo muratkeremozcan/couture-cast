@@ -313,6 +313,7 @@ function traceFlatLayPiece(
   let count = 0
   let edges = 0
   let strongEdges = 0
+  let enclosedBackdrop = 0
   let clipped = false
   let tooClose = false
   let left = width
@@ -334,22 +335,25 @@ function traceFlatLayPiece(
     right = Math.max(right, x)
     top = Math.min(top, y)
     bottom = Math.max(bottom, y)
+    const distance = colorDistance(pixels, reference, index * 4)
+    if (distance <= BACKGROUND_TOLERANCE ** 2) enclosedBackdrop++
     const neighbors = safeFlatLayNeighbors(index, x, y, width, height)
     if (neighbors.some((neighbor) => labels[neighbor] === BACKGROUND)) {
       edges++
-      if (colorDistance(pixels, reference, index * 4) > STRONG_SUBJECT_TOLERANCE ** 2) {
-        strongEdges++
-      }
+      if (distance > STRONG_SUBJECT_TOLERANCE ** 2) strongEdges++
       if (!clipped && nearPreviousPiece(labels, index, width, gap, label)) tooClose = true
     }
     neighbors.forEach(enqueue)
   }
   return {
     count,
-    edges,
-    strongEdges,
-    clipped,
-    tooClose,
+    // A border flood leaves enclosed background inside the piece. A broad patch
+    // of that color could also be fabric, so refuse the ambiguous cutout.
+    uncertain:
+      clipped ||
+      tooClose ||
+      strongEdges < edges * MIN_STRONG_BOUNDARY_FRACTION ||
+      enclosedBackdrop > Math.max(4, count * MAX_AMBIGUOUS_AREA),
     bounds: { label, left, top, width: right - left + 1, height: bottom - top + 1 },
   }
 }
@@ -392,7 +396,7 @@ export function findFlatLayComponents(
 
   for (let start = 0; start < labels.length; start++) {
     if (labels[start]) continue
-    const { count, edges, strongEdges, bounds, clipped, tooClose } = traceFlatLayPiece(
+    const { count, bounds, uncertain } = traceFlatLayPiece(
       raster,
       backdrop,
       start,
@@ -405,13 +409,11 @@ export function findFlatLayComponents(
       continue
     }
     if (
-      clipped ||
-      tooClose ||
+      uncertain ||
       pieces.length === limit ||
       count < minArea ||
       bounds.width < minLength ||
-      bounds.height < minLength ||
-      strongEdges < edges * MIN_STRONG_BOUNDARY_FRACTION
+      bounds.height < minLength
     )
       return null
     pieces.push(bounds)

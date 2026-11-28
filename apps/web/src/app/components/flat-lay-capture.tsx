@@ -45,6 +45,7 @@ export function FlatLayPicker({
     <>
       <input
         ref={input}
+        data-testid="flat-lay-photo-input"
         type="file"
         accept="image/jpeg,image/png,image/webp"
         hidden

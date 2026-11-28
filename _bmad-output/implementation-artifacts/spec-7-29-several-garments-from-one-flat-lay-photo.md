@@ -135,6 +135,16 @@ supplemental paths. It reported one Low availability issue, `csf_802d5082aa7b409
 | P3-1 Detector availability        | Reserve one detector call per member and report saturation as retryable HTTP 429.                   |
 | P3-2 Closeout                     | Record the rounding regression and cross-link Step 86 coverage.                                     |
 
+CodeRabbit reviewed `e14abcd7d755fd2284bfa2e46402d3b362d59924` in one round.
+The review body repeated the four inline findings. Reviews were paused before pushing fixes.
+
+| Finding                                   | Resolution                                                                          |
+| ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| Expiry cleanup can race publication       | Check the claim lease under the garment row lock before committing the final image. |
+| Web unit test can select the wrong picker | Target the flat-lay file input explicitly.                                          |
+| Preview expiry can hide a completed save  | Release previews at expiry and accept an in-flight success for the same session.    |
+| Enclosed backdrop can remain opaque       | Refuse flat-lay masks containing a substantial enclosed backdrop-colored region.    |
+
 ## Design Notes
 
 The YOLOX release asset is

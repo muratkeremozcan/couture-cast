@@ -1499,6 +1499,21 @@ export class WardrobeService {
               throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
             }
 
+            if (flatLayTags) {
+              // Expiry cleanup locks this row before touching the final key. Judge the
+              // publication lease after taking that same lock, including any time spent waiting.
+              const locked = await lockGarmentRow(tx, initial.id)
+              if (
+                locked?.publish_attempt_id !== publishAttemptId ||
+                !unfinishedPublicationDeadline({
+                  attemptId: locked.publish_attempt_id,
+                  startedAt: locked.publish_started_at,
+                  committable: true,
+                })
+              ) {
+                throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
+              }
+            }
             const changed = await tx.garmentItem.updateMany({
               where: {
                 id: initial.id,
