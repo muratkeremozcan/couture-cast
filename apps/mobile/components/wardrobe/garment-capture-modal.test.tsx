@@ -480,7 +480,7 @@ describe('MobileGarmentCaptureModal', () => {
     expect(seen.uploadedContentType).toBe('image/png')
     expect(seen.bytes).toEqual(displayed)
     expect(seen.commit).toMatchObject({ hasCropping: true, hasBgCleanup: true })
-    expect(fileSystem.files.has(uri)).toBe(false)
+    await waitFor(() => expect(fileSystem.files.has(uri)).toBe(false))
   })
 
   it('CC-7.26 waits for in-flight preparation and runs only the latest crop', async () => {
