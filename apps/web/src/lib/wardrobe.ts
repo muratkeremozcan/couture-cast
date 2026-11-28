@@ -305,7 +305,11 @@ export async function prepareGarmentImage(
       useBgCleanup && encodingChoice === 'compact'
         ? preparedImageEncoding(false)
         : encoding
-    if (useBgCleanup) drawCrop(originalEncoding.mimeType)
+    if (useBgCleanup) {
+      // Restore the source alpha without compositing it over the previous draw.
+      context.clearRect(0, 0, outputWidth, outputHeight)
+      drawCrop(originalEncoding.mimeType)
+    }
     blob = await toBlob(canvas, originalEncoding.mimeType, originalEncoding.quality)
   }
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(blob.type)) {

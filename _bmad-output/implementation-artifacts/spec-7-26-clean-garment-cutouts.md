@@ -109,6 +109,12 @@ Scan `56c3345_20261128T075214Z` covered 27 changed paths and reported zero secur
 | P2-3 Capture parity             | Clear hidden RGB on cutouts and clear stale native errors when crop settings change.       |
 | P3-1 Story closeout             | Record the review, link Step 83, align the JPEG test mocks, and close the sprint story.    |
 
+CodeRabbit reviewed `5c3017075d4f847b17021b7620a1d815a6db5f7d` in one round.
+
+- Clear the canvas before redrawing a fallback so a second draw preserves the crop's alpha.
+- Treat a coherent near-backdrop color as ambiguous even when the color difference is small.
+  The regression keeps the pale panel attached to the garment.
+
 ## Verification
 
 Run scoped lint and type checks. Verify labeled masks, native capture, and the phone-width

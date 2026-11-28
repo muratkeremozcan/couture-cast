@@ -3,7 +3,6 @@ type RgbaPixels = Uint8Array | Uint8ClampedArray
 const CORNER_TOLERANCE = 22
 const BACKGROUND_TOLERANCE = 32
 const PLANE_COLOR_TOLERANCE = 12
-const NEAR_PLANE_COLOR_TOLERANCE = 6
 const MAX_AMBIGUOUS_AREA = 0.015
 const STRONG_SUBJECT_TOLERANCE = 44
 const MAX_DETACHED_SUBJECT_FRACTION = 0.02
@@ -64,10 +63,10 @@ function hasAmbiguousBackgroundTone(
   for (let cursor = 0; cursor < size; cursor++) {
     const index = background[cursor]!
     const distance = colorDistance(pixels, reference, index * 4)
-    if (distance <= NEAR_PLANE_COLOR_TOLERANCE ** 2) continue
+    if (distance === 0) continue
     if (
       distance <= PLANE_COLOR_TOLERANCE ** 2 &&
-      !isCoherentTone(pixels, index, width, reference)
+      !isCoherentTone(pixels, index, width, distance / 4)
     )
       continue
     if (++ambiguousPixels > maxAmbiguousPixels) return true
@@ -79,7 +78,7 @@ function isCoherentTone(
   pixels: RgbaPixels,
   index: number,
   width: number,
-  reference: number
+  agreementDistance: number
 ) {
   // The difference must persist in both axes. Sensor grain can vary locally on
   // the same backdrop. A broad, distinct patch can be a garment panel.
@@ -90,9 +89,10 @@ function isCoherentTone(
   if (column < reach || column + reach >= width || above < 0 || below >= pixels.length)
     return false
   const offset = index * 4
+  // The agreement radius is half the distance to the reference tone, so a matched
+  // sample also differs from the backdrop even when the center is only a few RGB levels away.
   const similarDistinctTone = (sample: number) =>
-    colorDistance(pixels, offset, sample) <= NEAR_PLANE_COLOR_TOLERANCE ** 2 &&
-    colorDistance(pixels, reference, sample) > NEAR_PLANE_COLOR_TOLERANCE ** 2
+    colorDistance(pixels, offset, sample) <= agreementDistance
   return (
     similarDistinctTone(above) &&
     similarDistinctTone(below) &&
