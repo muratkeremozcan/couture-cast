@@ -87,6 +87,13 @@ interface ImagePrepOverrides {
   encoded?: Blob | null
 }
 
+function fixtureCanvas({ width, height }: { width: number; height: number }) {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  return canvas
+}
+
 function installImagePrepMocks(overrides: ImagePrepOverrides = {}) {
   const failsToDecode = overrides.failsToDecode ?? false
   class FakeImage {
@@ -1920,10 +1927,10 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
   it('removes the connected background and preserves the garment and its light detail', async () => {
     authenticate()
     const imageData = plainBackgroundImageData()
-    const { width, height, data } = imageData
+    const { data } = imageData
     const putImageData = vi.fn()
     const context = {
-      canvas: { width, height },
+      canvas: fixtureCanvas(imageData),
       drawImage: vi.fn(),
       getImageData: vi.fn().mockReturnValue(imageData),
       putImageData,
@@ -2053,7 +2060,7 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     const fillRect = vi.fn()
     const imageData = plainBackgroundImageData()
     const context = {
-      canvas: { width: imageData.width, height: imageData.height },
+      canvas: fixtureCanvas(imageData),
       drawImage: vi.fn(),
       fillRect,
       getImageData: vi.fn().mockReturnValue(imageData),
@@ -2086,7 +2093,7 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     }
     const putImageData = vi.fn()
     const context = {
-      canvas: { width, height },
+      canvas: fixtureCanvas({ width, height }),
       drawImage: vi.fn(),
       fillRect: vi.fn(),
       getImageData: vi.fn().mockReturnValue({ data: pixels, width, height }),
@@ -2112,7 +2119,7 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     authenticate()
     const imageData = plainBackgroundImageData()
     const context = {
-      canvas: { width: imageData.width, height: imageData.height },
+      canvas: fixtureCanvas(imageData),
       drawImage: vi.fn(),
       fillRect: vi.fn(),
       getImageData: vi.fn().mockReturnValue(imageData),
@@ -2286,7 +2293,7 @@ describe('prepareGarmentImage source encoding', () => {
       const fillRect = vi.fn()
       const putImageData = vi.fn()
       const context = {
-        canvas: { width, height },
+        canvas: fixtureCanvas({ width, height }),
         drawImage,
         fillRect,
         getImageData: vi.fn().mockReturnValue({ data, width, height }),
