@@ -24,6 +24,7 @@ import {
   useUploadSessionChange,
 } from '../../lib/upload-attempts'
 import { AccessibleModal } from './accessible-modal'
+import { WebGarmentPhotoBatch } from './garment-photo-batch'
 
 type PickedImage = { dataUrl: string; session: UploadAttemptSession }
 type CropRatio = '1:1' | '4:3'
@@ -78,6 +79,7 @@ export interface GarmentCaptureModalProps {
   isOpen: boolean
   onClose: () => void
   onGarmentCommitted?: (garment: GarmentItemContract) => void
+  onBatchGarmentCommitted?: (garment: GarmentItemContract) => void
   uploadGarment?: (input: UploadGarmentImageInput) => Promise<GarmentItemContract>
   invokingElementRef?: React.RefObject<HTMLElement | null>
 }
@@ -387,6 +389,7 @@ export function GarmentCaptureModal({
   isOpen,
   onClose,
   onGarmentCommitted,
+  onBatchGarmentCommitted,
   uploadGarment = uploadGarmentImageFromWeb,
   invokingElementRef,
   confirmDiscard = false,
@@ -420,6 +423,7 @@ export function GarmentCaptureModal({
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const uploadAbortRef = useRef<AbortController | null>(null)
+  const resetBatchRef = useRef<(() => void) | null>(null)
   const isOpenRef = useRef(isOpen)
   const captureEpoch = useRef(0)
   /** The session captured when the camera or file picker last opened. */
@@ -461,6 +465,7 @@ export function GarmentCaptureModal({
   useEffect(() => cancelCapture, [cancelCapture])
 
   const resetCapture = useCallback(() => {
+    resetBatchRef.current?.()
     cancelCapture()
     restoreCropFocus.current = false
     setIsDiscarding(false)
@@ -627,6 +632,16 @@ export function GarmentCaptureModal({
     setIsDiscarding(false)
   }
 
+  const source = (
+    <SourceStep
+      onStartCamera={() => {
+        void handleStartCamera()
+      }}
+      onFilePickerOpen={handleFilePickerOpen}
+      onFileSelect={handleFileSelect}
+    />
+  )
+
   return (
     <AccessibleModal
       isOpen={isOpen}
@@ -651,15 +666,19 @@ export function GarmentCaptureModal({
       }
       errorMessage={errorKey ? t(`wardrobe.capture.errors.${errorKey}`) : null}
     >
-      {step === 'source' && (
-        <SourceStep
-          onStartCamera={() => {
-            void handleStartCamera()
-          }}
-          onFilePickerOpen={handleFilePickerOpen}
-          onFileSelect={handleFileSelect}
-        />
-      )}
+      {step === 'source' &&
+        (onBatchGarmentCommitted ? (
+          <WebGarmentPhotoBatch
+            resetRef={resetBatchRef}
+            onClose={handleClose}
+            onGarmentCommitted={onBatchGarmentCommitted}
+            uploadGarment={uploadGarment}
+          >
+            {source}
+          </WebGarmentPhotoBatch>
+        ) : (
+          source
+        ))}
 
       {step === 'camera' && (
         <CameraStep

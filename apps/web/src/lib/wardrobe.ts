@@ -49,21 +49,35 @@ export type GarmentUploadState =
   | 'verifying'
   | 'processing'
 
-export interface UploadGarmentImageInput {
-  imagePreview: string
+interface GarmentUploadOptions {
   /**
    * The session captured when the member opened the camera or file picker that produced
    * `imagePreview` (`currentUploadSession`). The upload resolves its bearer for that account
    * and refuses once the signed-in account changed.
    */
   uploadSession: UploadAttemptSession
-  aspectRatio: '1:1' | '4:3'
-  useBgCleanup: boolean
-  prepared?: PreparedImage
+  /** A batch row's identity, distinct even when two rows contain the same photo. */
+  attemptId?: string
   signal?: AbortSignal
   onStateChange?: (state: GarmentUploadState) => void
   onProgress?: (percentage: number) => void
 }
+
+export type UploadGarmentImageInput = GarmentUploadOptions &
+  (
+    | {
+        imagePreview: string
+        aspectRatio: '1:1' | '4:3'
+        useBgCleanup: boolean
+        prepared?: PreparedImage
+      }
+    | {
+        prepared: PreparedImage
+        imagePreview?: never
+        aspectRatio?: never
+        useBgCleanup?: never
+      }
+  )
 
 export type PreparedImage = {
   blob: Blob
@@ -72,6 +86,16 @@ export type PreparedImage = {
   sha256: string
   widthPx: number
   backgroundRemoved?: boolean
+}
+
+export function garmentImageFingerprint(image: PreparedImage): string {
+  return `${preparedImageFingerprint({
+    sha256: image.sha256,
+    fileSizeBytes: image.blob.size,
+    mimeType: image.mimeType,
+    widthPx: image.widthPx,
+    heightPx: image.heightPx,
+  })}:${image.backgroundRemoved ? 'cleanup' : 'original'}`
 }
 
 export class WardrobeRequestError extends Error {
@@ -434,47 +458,45 @@ async function actionableWardrobeError(error: unknown, fallback: string): Promis
   return error instanceof Error ? error : new Error(fallback)
 }
 
-export async function uploadGarmentImageFromWeb({
-  imagePreview,
-  aspectRatio,
-  useBgCleanup,
-  prepared,
-  signal,
-  onStateChange,
-  onProgress,
-  uploadSession,
-}: UploadGarmentImageInput): Promise<GarmentItemContract> {
+export async function uploadGarmentImageFromWeb(
+  input: UploadGarmentImageInput
+): Promise<GarmentItemContract> {
+  const { signal, onStateChange, onProgress, uploadSession, attemptId } = input
   // The bearer of the account the photo was picked under; an account change from the pick on
   // refuses here, and while the image is prepared or uploaded it fences this run.
   const accessToken = await resolveUploadBearer(uploadSession, readAccessToken)
   onStateChange?.('preparing')
   onProgress?.(10)
   const image =
-    prepared ??
-    (await prepareGarmentImage(imagePreview, aspectRatio, useBgCleanup, 'compact'))
+    input.imagePreview === undefined
+      ? input.prepared
+      : (input.prepared ??
+        (await prepareGarmentImage(
+          input.imagePreview,
+          input.aspectRatio,
+          input.useBgCleanup,
+          'compact'
+        )))
   const hasBgCleanup = image.backgroundRemoved ?? false
 
   const api = createWebApiClient({ accessToken })
   // A retry of the same prepared image (the member taps Use This Image again after a failure)
   // is the same attempt: same garment session, same commit key.
-  const attemptId = `${preparedImageFingerprint({
-    sha256: image.sha256,
-    fileSizeBytes: image.blob.size,
-    mimeType: image.mimeType,
-    widthPx: image.widthPx,
-    heightPx: image.heightPx,
-  })}:${hasBgCleanup ? 'cleanup' : 'original'}`
+  const fingerprint = garmentImageFingerprint(image)
+  const trackedId = attemptId ? `${attemptId}:${fingerprint}` : fingerprint
+  signal?.throwIfAborted()
   const garment = await runTrackedUpload(
     garmentUploadAttempts,
     uploadSession,
-    attemptId,
+    trackedId,
     {
       allocate: async (idempotencyKey) => {
+        signal?.throwIfAborted()
         onStateChange?.('requesting_upload')
         onProgress?.(25)
         try {
-          return (
-            await api.apiV1WardrobeUploadUrlPost(
+          const response = await withRequestTimeout(signal, (requestSignal) =>
+            api.apiV1WardrobeUploadUrlPost(
               {
                 idempotencyKey,
                 createGarmentUploadUrlInput: {
@@ -485,9 +507,10 @@ export async function uploadGarmentImageFromWeb({
                   heightPx: image.heightPx,
                 },
               },
-              { signal }
+              { signal: requestSignal }
             )
-          ).data
+          )
+          return response.data
         } catch (error) {
           return throwUploadStepError(error, (raw) =>
             actionableWardrobeError(raw, 'Unable to allocate garment upload.')
@@ -495,6 +518,7 @@ export async function uploadGarmentImageFromWeb({
         }
       },
       upload: async (allocation) => {
+        signal?.throwIfAborted()
         onStateChange?.('uploading')
         onProgress?.(35)
         await uploadGarmentBytes({
@@ -513,11 +537,12 @@ export async function uploadGarmentImageFromWeb({
         })
       },
       commit: async (allocation, idempotencyKey) => {
+        signal?.throwIfAborted()
         onStateChange?.('verifying')
         onProgress?.(90)
         try {
-          return (
-            await api.apiV1WardrobeGarmentsPost(
+          const response = await withRequestTimeout(signal, (requestSignal) =>
+            api.apiV1WardrobeGarmentsPost(
               {
                 idempotencyKey,
                 createGarmentItemInput: {
@@ -527,9 +552,10 @@ export async function uploadGarmentImageFromWeb({
                   hasBgCleanup,
                 },
               },
-              { signal }
+              { signal: requestSignal }
             )
-          ).data
+          )
+          return response.data
         } catch (error) {
           return throwUploadStepError(error, (raw) =>
             actionableWardrobeError(raw, 'Unable to commit garment upload.')
@@ -538,6 +564,7 @@ export async function uploadGarmentImageFromWeb({
       },
     }
   )
+  signal?.throwIfAborted()
   onStateChange?.('processing')
   onProgress?.(100)
   return garment

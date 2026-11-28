@@ -22742,3 +22742,32 @@ subtype, material, and comfort chips. Tap **Looks right** to confirm the suggest
   [shared selection and copy tests](../../packages/utils/src/sample-wardrobe/garment-tag-selection.spec.ts).
 - [Web setup session change](../../apps/web/src/app/wardrobe/onboarding/page.test.tsx) and
   [native setup session change](../../apps/mobile/src/features/wardrobe/wardrobe-onboarding-screen.test.tsx).
+
+## Step 85: Add several photos at once
+
+Open Closet and tap **Choose several photos** from the Add menu. Choose up to five
+photos, inspect each prepared preview, and select **Keep piece** for every photo
+you want in Closet. The **Add** button shows how many pieces you kept.
+
+### Sequence to follow
+
+1. Select three photos and keep two. Save both in one action and reopen Closet.
+   Find the two saved garments and open their tag review after processing.
+2. Hold one garment's commit response until the client reports a failure.
+   Retry that row with the same photo. Compare the saved garment IDs before
+   and after retry. The earlier success stays and the second ID appears once.
+3. Close the batch before saving, or switch accounts while a photo is preparing.
+   Check that the old previews disappear and the next batch opens empty.
+4. Repeat the flow in the native Closet. Confirm the library picker caps the
+   selection at five and removing a preview leaves the library original intact.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-28-add-several-photos-once.md)
+  and [acceptance plan](../test-artifacts/test-design-7-28-add-several-photos-once.md).
+- [Browser batch journey](../../playwright/tests/wardrobe-batch-capture.spec.ts)
+  and [private staging retention](../../apps/api/src/modules/wardrobe/wardrobe-retention.service.spec.ts).
+- [Web capture](../../apps/web/src/app/components/garment-capture-modal.test.tsx),
+  [native capture](../../apps/mobile/components/wardrobe/garment-capture-modal.test.tsx), and
+  [batch state](../../packages/utils/src/wardrobe/garment-photo-batch.spec.ts).
+- [Step 84](#step-84-suggested-tags-that-are-right) covers tag review after upload.

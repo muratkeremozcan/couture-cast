@@ -27,18 +27,15 @@ import {
 // dark sheet; a plain react-native Text paints black there.
 import { Text, createSchemeStyles, useSchemeColors } from '@/components/themed'
 import {
-  createGarmentItemResponseSchema,
-  createGarmentUploadUrlResponseSchema,
-  uploadGarmentBytes,
   UploadSessionChangedError,
-  WARDROBE_UPLOAD_CACHE_CONTROL,
   type GarmentItemContract,
   type UploadAttemptSession,
 } from '@couture/api-client/contracts/http'
 
-import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
-import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
-import { sha256Hex } from '@/src/lib/expo-native-helpers'
+import {
+  GarmentUploadError,
+  uploadGarmentImageFromMobile,
+} from '@/src/lib/garment-upload'
 import {
   prepareGarmentCaptureImage,
   releaseGarmentCaptureFile,
@@ -47,13 +44,8 @@ import {
   type PreparedGarmentImage,
 } from '@/src/lib/garment-capture-image'
 import {
-  createUploadAttempts,
   currentUploadSession,
   isUploadSessionCurrent,
-  preparedImageFingerprint,
-  resolveUploadBearer,
-  runTrackedUpload,
-  throwUploadStepError,
   useUploadSessionChange,
 } from '@/src/lib/upload-attempts'
 import {
@@ -63,19 +55,10 @@ import {
 } from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
+import { MobileGarmentPhotoBatch } from './garment-photo-batch'
 
 type CaptureStep = 'source' | 'crop' | 'uploading' | 'complete'
 
-/**
- * Open garment upload attempts in this app session, keyed by the prepared image and scoped to
- * the signed-in account; see `runTrackedUpload`. Each attempt gets fresh UUID v4 keys.
- */
-const garmentUploadAttempts = createUploadAttempts<{
-  garmentId: string
-  uploadSessionId: string
-  uploadUrl: string
-  uploadToken: string
-}>()
 /** A picked photo, bound to the session captured before its camera or picker opened. */
 type PickedImage = GarmentCaptureSource & { session: UploadAttemptSession }
 
@@ -131,15 +114,6 @@ function usePreparedCrop(
   return result
 }
 
-async function responseError(response: Response): Promise<Error> {
-  try {
-    const body = (await response.json()) as { message?: string }
-    return new Error(body.message ?? `Wardrobe request failed with ${response.status}`)
-  } catch {
-    return new Error(`Wardrobe request failed with ${response.status}`)
-  }
-}
-
 export interface MobileGarmentCaptureModalProps {
   confirmDiscard?: boolean
   visible: boolean
@@ -151,6 +125,7 @@ export interface MobileGarmentCaptureModalProps {
    * checklist react to a committed garment differently.
    */
   onGarmentCommitted?: (garment: GarmentItemContract, accessToken: string) => void
+  onBatchGarmentCommitted?: (garment: GarmentItemContract, accessToken: string) => void
   /** Focus returns here on close, matching the tagging/capsule modal convention. */
   invokingNodeHandle?: number | null
 }
@@ -160,6 +135,7 @@ export function MobileGarmentCaptureModal({
   visible,
   onClose,
   onGarmentCommitted,
+  onBatchGarmentCommitted,
   invokingNodeHandle,
   confirmDiscard = false,
 }: MobileGarmentCaptureModalProps) {
@@ -189,6 +165,7 @@ export function MobileGarmentCaptureModal({
   }
 
   const uploadAbortRef = useRef<AbortController | null>(null)
+  const resetBatchRef = useRef<(() => void) | null>(null)
   const titleRef = useRef<ElementRef<typeof NativeText> | null>(null)
   const invokingNodeHandleRef = useRef(invokingNodeHandle)
   invokingNodeHandleRef.current = invokingNodeHandle
@@ -211,6 +188,7 @@ export function MobileGarmentCaptureModal({
   }, [visible])
 
   const resetCapture = useCallback(() => {
+    resetBatchRef.current?.()
     uploadAbortRef.current?.abort()
     uploadAbortRef.current = null
     setStep('source')
@@ -338,109 +316,14 @@ export function MobileGarmentCaptureModal({
     setErrorMessage(null)
 
     try {
-      setUploadStatus(t('wardrobe.upload.preparing'))
-      const { file, mimeType, backgroundRemoved } = prepared
-      const bytes = await file.bytes()
-      if (bytes.byteLength > 10 * 1024 * 1024) {
-        throw new Error(t('wardrobe.error.image_too_large'))
-      }
-      // The session captured when the photo was picked: its account's bearer is resolved now
-      // (refused once the account changed), and an account change from here on fences this run,
-      // so its answers never reach the next account's attempts.
-      const uploadSession = source.session
-      const accessToken = await resolveUploadBearer(
-        uploadSession,
-        resolveMobileAccessToken
-      )
-      if (!accessToken) {
-        throw new Error(t('wardrobe.error.sign_in_required'))
-      }
-
-      const sha256 = await sha256Hex(bytes)
-      // Tapping upload again after a failure with the same prepared image is the same attempt:
-      // same garment session, same commit key. A retry commits first and re-sends the bytes only
-      // when the server reports them missing.
-      const attemptId = `${preparedImageFingerprint({
-        sha256,
-        fileSizeBytes: bytes.byteLength,
-        mimeType,
-        widthPx: prepared.width,
-        heightPx: prepared.height,
-      })}:${backgroundRemoved ? 'cleanup' : 'original'}`
-      const garment = await runTrackedUpload(
-        garmentUploadAttempts,
-        uploadSession,
-        attemptId,
-        {
-          allocate: async (idempotencyKey) => {
-            setUploadStatus(t('wardrobe.upload.requesting'))
-            const allocationResponse = await fetch(
-              `${resolveMobileApiBaseUrl()}/api/v1/wardrobe/upload-url`,
-              {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json',
-                  'Idempotency-Key': idempotencyKey,
-                },
-                body: JSON.stringify({
-                  fileSizeBytes: bytes.byteLength,
-                  mimeType,
-                  sha256,
-                  widthPx: prepared.width,
-                  heightPx: prepared.height,
-                }),
-                signal: controller.signal,
-              }
-            )
-            if (!allocationResponse.ok) {
-              return throwUploadStepError(allocationResponse, responseError)
-            }
-            return createGarmentUploadUrlResponseSchema.parse(
-              await allocationResponse.json()
-            ).data
-          },
-          upload: async (allocation) => {
-            setUploadStatus(t('wardrobe.upload.uploading'))
-            await uploadGarmentBytes({
-              cacheControl: WARDROBE_UPLOAD_CACHE_CONTROL,
-              // Commit verifies the stored bytes' sha256, so an object a lost answer left is safe.
-              acceptExistingObject: true,
-              uploadUrl: allocation.uploadUrl,
-              uploadToken: allocation.uploadToken,
-              bearerToken: accessToken,
-              mimeType,
-              body: bytes.buffer,
-              signal: controller.signal,
-            })
-          },
-          commit: async (allocation, idempotencyKey) => {
-            setUploadStatus(t('wardrobe.upload.verifying'))
-            const commitResponse = await fetch(
-              `${resolveMobileApiBaseUrl()}/api/v1/wardrobe/garments`,
-              {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json',
-                  'Idempotency-Key': idempotencyKey,
-                },
-                body: JSON.stringify({
-                  garmentId: allocation.garmentId,
-                  uploadSessionId: allocation.uploadSessionId,
-                  hasCropping: true,
-                  hasBgCleanup: backgroundRemoved,
-                }),
-                signal: controller.signal,
-              }
-            )
-            if (!commitResponse.ok) {
-              return throwUploadStepError(commitResponse, responseError)
-            }
-            return createGarmentItemResponseSchema.parse(await commitResponse.json()).data
-          },
-        }
-      )
+      const { garment, accessToken } = await uploadGarmentImageFromMobile({
+        prepared,
+        uploadSession: source.session,
+        signal: controller.signal,
+        onStateChange: (next) => {
+          if (!controller.signal.aborted) setUploadStatus(t(`wardrobe.upload.${next}`))
+        },
+      })
       if (controller.signal.aborted) return
       onGarmentCommitted?.(garment, accessToken)
       setSelectedImage(null)
@@ -451,9 +334,11 @@ export function MobileGarmentCaptureModal({
         setErrorMessage(
           error instanceof UploadSessionChangedError
             ? t('wardrobe.error.upload_session_changed')
-            : error instanceof Error
-              ? error.message
-              : t('wardrobe.upload.failed')
+            : error instanceof GarmentUploadError
+              ? t(`wardrobe.error.${error.kind}`)
+              : error instanceof Error
+                ? error.message
+                : t('wardrobe.upload.failed')
         )
         setStep('crop')
       }
@@ -463,6 +348,38 @@ export function MobileGarmentCaptureModal({
       }
     }
   }
+
+  const sourceActions = (
+    <View style={styles.sourceActions}>
+      <Pressable
+        accessibilityRole="button"
+        testID="garment-source-camera"
+        style={[styles.sourceButton, themed.outline]}
+        onPress={() => void openCamera()}
+      >
+        <Text style={styles.sourceButtonText}>{t('wardrobe.capture.camera')}</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        testID="garment-source-library"
+        style={[styles.sourceButton, themed.outline]}
+        onPress={() => void openLibrary()}
+      >
+        <Text style={styles.sourceButtonText}>{t('wardrobe.capture.library')}</Text>
+      </Pressable>
+      {__DEV__ ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Use deterministic garment fixture"
+          testID="garment-e2e-fixture-source"
+          style={styles.fixtureButton}
+          onPress={() => void selectFixture()}
+        >
+          <Text>Use deterministic garment fixture</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  )
 
   return (
     <EdgeToEdgeModal
@@ -518,37 +435,19 @@ export function MobileGarmentCaptureModal({
           </View>
         ) : null}
 
-        {step === 'source' ? (
-          <View style={styles.sourceActions}>
-            <Pressable
-              accessibilityRole="button"
-              testID="garment-source-camera"
-              style={[styles.sourceButton, themed.outline]}
-              onPress={() => void openCamera()}
+        {visible &&
+          step === 'source' &&
+          (onBatchGarmentCommitted ? (
+            <MobileGarmentPhotoBatch
+              resetRef={resetBatchRef}
+              onClose={handleClose}
+              onGarmentCommitted={onBatchGarmentCommitted}
             >
-              <Text style={styles.sourceButtonText}>{t('wardrobe.capture.camera')}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              testID="garment-source-library"
-              style={[styles.sourceButton, themed.outline]}
-              onPress={() => void openLibrary()}
-            >
-              <Text style={styles.sourceButtonText}>{t('wardrobe.capture.library')}</Text>
-            </Pressable>
-            {__DEV__ ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Use deterministic garment fixture"
-                testID="garment-e2e-fixture-source"
-                style={styles.fixtureButton}
-                onPress={() => void selectFixture()}
-              >
-                <Text>Use deterministic garment fixture</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
+              {sourceActions}
+            </MobileGarmentPhotoBatch>
+          ) : (
+            sourceActions
+          ))}
 
         {step === 'crop' && selectedImage ? (
           <ScrollView contentContainerStyle={styles.cropContent}>
