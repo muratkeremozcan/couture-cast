@@ -1,5 +1,7 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 84: Suggested tags that are right.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 import React from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
@@ -159,7 +161,7 @@ const readyGarment = {
 }
 
 function renderScreen() {
-  render(
+  return render(
     <AccessibilityAnnouncerProvider>
       <WardrobeOnboardingScreen />
     </AccessibilityAnnouncerProvider>
@@ -337,11 +339,11 @@ describe('WardrobeOnboardingScreen', () => {
   // Learning path Step 58: Image uploads straight to storage.
   // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
   //
-  // Final review F-3: the screen stored A's token at load and mounts the editor only on the
-  // silhouette step. A sign-out in that interval leaves the token in the screen; the editor
-  // mounted afterwards must not read (or remove) My Form with it.
-  it('4.4-MOB-ONB-15 an editor mounted after sign-out never reads My Form with the screen token', async () => {
+  // Final review F-3: the screen stored A's token at load. Signing out before the silhouette
+  // step must retire the screen before the editor can read or remove My Form with A's token.
+  it('4.4-MOB-ONB-15 retires the signed-out screen before it can read My Form', async () => {
     const silhouetteReads: (string | null)[] = []
+    const advanceAfterSignOut = vi.fn()
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
@@ -353,27 +355,23 @@ describe('WardrobeOnboardingScreen', () => {
         silhouetteReads.push(request.headers.get('authorization'))
         return HttpResponse.json({ data: defaultSilhouetteProfile })
       }),
-      http.patch('*/api/v1/wardrobe/onboarding', () =>
-        HttpResponse.json({
+      http.patch('*/api/v1/wardrobe/onboarding', () => {
+        advanceAfterSignOut()
+        return HttpResponse.json({
           data: { ...inProgressState, currentStep: 'silhouette', revision: 2 },
         })
-      )
+      })
     )
     setMobileApplicationUserId('member-a')
     renderScreen()
     await waitFor(() => screen.getByTestId('onboarding-use-starter'))
 
-    // A signs out: the app's resolver has no bearer any more; the screen still holds A's.
     const restoreSignedOut = setMobileAccessTokenResolver(() => undefined)
     try {
       act(() => setMobileApplicationUserId(null))
-      fireEvent.click(screen.getByTestId('onboarding-use-starter'))
-
-      await waitFor(() =>
-        expect(screen.getByTestId('onboarding-silhouette-step')).toHaveTextContent(
-          'Your session could not be verified. Sign in again.'
-        )
-      )
+      expect(await screen.findByText('Sign in to manage your wardrobe.')).toBeVisible()
+      expect(screen.queryByTestId('onboarding-use-starter')).not.toBeInTheDocument()
+      expect(advanceAfterSignOut).not.toHaveBeenCalled()
       expect(silhouetteReads).toEqual([])
       expect(screen.queryByTestId('silhouette-my-form-remove')).not.toBeInTheDocument()
     } finally {
@@ -640,6 +638,101 @@ describe('WardrobeOnboardingScreen', () => {
     ])
   })
 
+  it('retires the previous member’s signed preview when the mobile identity epoch changes', async () => {
+    const otherToken = fakeAccessToken('auth-principal-user-2')
+    const previous = {
+      ...readyGarment,
+      id: 'garment-preview-owner-a',
+      status: 'awaiting_tags',
+      category: null,
+      imageAccess: {
+        url: 'https://example.test/private/owner-a.png?token=fixture-owner-a',
+        expiresAt: '2030-08-09T00:15:00.000Z',
+      },
+    }
+    const current = { ...readyGarment, id: 'garment-owner-b' }
+    let respond!: () => void
+    const pendingResponse = new Promise<void>((resolve) => {
+      respond = resolve
+    })
+    const suggestionRequested = vi.fn()
+    let token = ACCESS_TOKEN
+    const restoreToken = setMobileAccessTokenResolver(() => token)
+    const otherBearer = `Bearer ${otherToken}`
+    server.use(
+      http.get('*/api/v1/user/profile', ({ request }) => {
+        const userId =
+          request.headers.get('authorization') === otherBearer ? 'user-2' : 'user-1'
+        return HttpResponse.json({
+          user: {
+            id: userId,
+            email: `${userId}@synthetic.test`,
+            displayName: null,
+            birthdate: '1990-01-01T00:00:00.000Z',
+            role: 'guardian',
+          },
+          linkedGuardians: [],
+          linkedTeens: [],
+        })
+      }),
+      http.get('*/api/v1/wardrobe/onboarding', () =>
+        HttpResponse.json({
+          data: { ...inProgressState, currentStep: 'tagging', revision: 1 },
+        })
+      ),
+      http.get('*/api/v1/wardrobe/garments', ({ request }) =>
+        HttpResponse.json({
+          data:
+            request.headers.get('authorization') === otherBearer ? [current] : [previous],
+        })
+      ),
+      http.post(
+        `*/api/v1/wardrobe/garments/${previous.id}/suggest-tags`,
+        async ({ request }) => {
+          suggestionRequested(request.headers.get('authorization'))
+          await pendingResponse
+          return HttpResponse.json({
+            data: createSuggestGarmentTagsDataFixture({ garmentId: previous.id }),
+          })
+        }
+      )
+    )
+
+    setMobileApplicationUserId('user-1')
+    const view = renderScreen()
+    try {
+      press(await screen.findByTestId(`onboarding-tag-${previous.id}`))
+      const preview = await screen.findByLabelText('Garment preview')
+      expect(preview).toBeVisible()
+      await waitFor(() =>
+        expect(suggestionRequested).toHaveBeenCalledExactlyOnceWith(
+          `Bearer ${ACCESS_TOKEN}`
+        )
+      )
+
+      token = otherToken
+      act(() => setMobileApplicationUserId('user-2'))
+      expect(preview).not.toBeInTheDocument()
+      expect(
+        await screen.findByTestId(`onboarding-checklist-${current.id}`)
+      ).toBeVisible()
+
+      await act(async () => {
+        respond()
+        await pendingResponse
+      })
+      expect(screen.queryByLabelText('Garment preview')).not.toBeInTheDocument()
+      expect(
+        screen.queryByTestId(`onboarding-checklist-${previous.id}`)
+      ).not.toBeInTheDocument()
+    } finally {
+      respond()
+      view.unmount()
+      restoreToken()
+      act(() => setMobileApplicationUserId(null))
+    }
+  })
+
   it('4.4-MOB-ONB-13 tags a garment from the checklist and unblocks Continue', async () => {
     // The checklist is the only place in onboarding where tagging can be
     // started, and Continue stays blocked until every garment is ready, so the
@@ -671,7 +764,7 @@ describe('WardrobeOnboardingScreen', () => {
     await waitFor(() => screen.getByTestId(`onboarding-tag-${readyGarment.id}`))
     fireEvent.click(screen.getByTestId(`onboarding-tag-${readyGarment.id}`))
 
-    await screen.findByText('AI suggested: Top')
+    await screen.findByRole('button', { name: 'Looks right' })
     await waitFor(() => {
       expect(screen.getByTestId('garment-tagging-save')).toBeEnabled()
     })

@@ -6,6 +6,8 @@
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 84: Suggested tags that are right.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 // Story 4.4 Task 5 owner: unit-test the web wardrobe onboarding guided flow.
 // This file keeps the primary happy-path describe block. The bootstrap and
 // step-advance failure paths live in `page.bootstrap-failures.test.tsx`, the
@@ -14,6 +16,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -35,6 +38,14 @@ import {
 } from '@couture/api-client/testing/wardrobe-fixtures'
 import { stubGarmentPreviewUrl } from '../../../test-utils/garment-capture'
 import { clearAppHistory } from '../../../lib/app-history'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/browser-persistence'
+import type * as WebSession from '../../../lib/web-session'
+
+const verifiedSession = vi.hoisted(() => ({ owner: null as string | null }))
+vi.mock('../../../lib/web-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof WebSession>()),
+  webSessionIdentity: () => verifiedSession.owner,
+}))
 
 const routerReplace = vi.fn()
 const routerPush = vi.fn()
@@ -857,6 +868,78 @@ describe('WardrobeOnboardingPage', () => {
     })
   })
 
+  it('retires the previous member’s signed preview when the verified owner changes', async () => {
+    const user = userEvent.setup()
+    const previous = {
+      ...committedGarment,
+      id: 'garment-preview-owner-a',
+      imageAccess: {
+        url: 'https://example.test/private/owner-a.png?token=fixture-owner-a',
+        expiresAt: '2030-08-04T10:00:00.000Z',
+      },
+    }
+    const current = createReadyGarmentFixture({
+      id: 'garment-owner-b',
+      category: 'bottom',
+    })
+    const suggestions =
+      Promise.withResolvers<ReturnType<typeof createSuggestGarmentTagsDataFixture>>()
+    let pendingSignal: AbortSignal | undefined
+    getOnboardingStateFromWeb.mockResolvedValue(
+      state({ status: 'in_progress', currentStep: 'tagging', revision: 2 })
+    )
+    listGarmentsFromWeb.mockResolvedValueOnce([previous]).mockResolvedValue([current])
+    suggestGarmentTagsFromWeb.mockImplementationOnce(
+      (_id: string, signal: AbortSignal) => {
+        pendingSignal = signal
+        return suggestions.promise
+      }
+    )
+    const publishMember = (owner: string) => {
+      verifiedSession.owner = owner
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, `test-token-${owner}`)
+      window.dispatchEvent(new Event('couture:session'))
+    }
+
+    publishMember(SIGNED_IN_USER)
+    const view = render(<WardrobeOnboardingPage />)
+    try {
+      await user.click(
+        await screen.findByRole('button', { name: 'Garment 1: needs tags' })
+      )
+      const preview = screen.getByRole('img', { name: 'Garment preview' })
+      expect(preview).toHaveAttribute('src', previous.imageAccess.url)
+      expect(suggestGarmentTagsFromWeb).toHaveBeenCalledWith(
+        previous.id,
+        expect.any(AbortSignal)
+      )
+
+      act(() => publishMember('user-onboarding-2'))
+      expect(preview).not.toBeInTheDocument()
+      expect(pendingSignal?.aborted).toBe(true)
+      const checklist = await screen.findByTestId('onboarding-garment-checklist')
+      expect(checklist).toHaveTextContent(/bottom/i)
+
+      await act(async () => {
+        suggestions.resolve(
+          createSuggestGarmentTagsDataFixture({ garmentId: previous.id })
+        )
+        await suggestions.promise
+      })
+      expect(
+        screen.queryByRole('img', { name: 'Garment preview' })
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: /needs tags/i })
+      ).not.toBeInTheDocument()
+      expect(updateGarmentTagsFromWeb).not.toHaveBeenCalled()
+    } finally {
+      view.unmount()
+      verifiedSession.owner = null
+      window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+    }
+  })
+
   it('announces a garment being tagged', async () => {
     const user = userEvent.setup()
     getOnboardingStateFromWeb.mockResolvedValue(
@@ -877,7 +960,7 @@ describe('WardrobeOnboardingPage', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Garment 1: needs tags' }))
     await screen.findByRole('radio', { name: /Top/ })
-    await user.click(screen.getByRole('button', { name: 'Save tags' }))
+    await user.click(await screen.findByRole('button', { name: 'Looks right' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-status-region')).toHaveTextContent(

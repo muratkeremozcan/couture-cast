@@ -1822,7 +1822,7 @@ describe('WardrobeHubScreen', () => {
 
     // Saving is only possible once the confident suggestions have been applied,
     // so wait on that rather than on the button merely existing.
-    await screen.findByText('AI suggested: Top')
+    await screen.findByRole('button', { name: 'Looks right' })
     await waitFor(() => {
       expect(screen.getByTestId('garment-tagging-save')).toBeEnabled()
     })

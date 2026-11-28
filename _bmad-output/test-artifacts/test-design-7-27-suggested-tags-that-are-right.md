@@ -8,6 +8,11 @@
 | P1       | A response overwrites a member's choices or applies an incompatible subtype | Hold the suggestion response in the modal harness, make a member selection, and release the response. Assert that the member's selection survives, remaining confident fields fill, and the update payload matches the chosen tags. Exercise explicit “None” and the legacy response without a subtype. |
 | P1       | Native diverges from web review                                             | Exercise the native modal's selected, unresolved, and confirmed states through its existing rendered controls. Verify the cutout and update payload. Preserve the Android capture and tagging journeys.                                                                                                 |
 
+Both onboarding wrappers must also retire a private preview when the active member changes.
+Keep the first member's suggestion request pending with their cutout visible. Publish the next
+member through the identity store and verify the old cutout disappears immediately and stays
+gone when the pending response resolves.
+
 The browser journey uses the shared Playwright Utils fixtures and a new account per test.
 The real worker proves integration and persistence. A controlled suggestion response fixes the
 confidence inputs for the uncertainty case. The accuracy benchmark uses image bytes and the

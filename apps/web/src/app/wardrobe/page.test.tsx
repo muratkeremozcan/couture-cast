@@ -821,7 +821,7 @@ describe('WardrobePage direct garment entry', () => {
 
     const tagging = await screen.findByRole('dialog', { name: 'Organize Garment Tags' })
     expect(window.location.search).toBe('?from=home')
-    await user.click(await within(tagging).findByRole('button', { name: 'Save tags' }))
+    await user.click(await within(tagging).findByRole('button', { name: 'Looks right' }))
     const error = await screen.findByRole('alert')
     expect(error).toHaveTextContent('Refresh rejected')
     expect(error).toHaveTextContent('Showing your saved garments. Refresh failed.')
@@ -990,7 +990,7 @@ describe('WardrobePage tag confirmation', () => {
     render(<WardrobePage />)
     await user.click(await screen.findByRole('button', { name: 'Needs tags' }))
     await screen.findByText('Organize Garment Tags')
-    await user.click(await screen.findByRole('button', { name: 'Save tags' }))
+    await user.click(await screen.findByRole('button', { name: 'Looks right' }))
     return user
   }
 
@@ -1459,7 +1459,7 @@ describe('WardrobePage commit deduplication', () => {
     releasePoll([garmentFixture('garment-poll', 'awaiting_tags')])
     await screen.findByText('Organize Garment Tags')
 
-    await user.click(await screen.findByRole('button', { name: 'Save tags' }))
+    await user.click(await screen.findByRole('button', { name: 'Looks right' }))
 
     await waitFor(() =>
       expect(screen.queryByText('Organize Garment Tags')).not.toBeInTheDocument()
