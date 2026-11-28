@@ -67,6 +67,7 @@ import { MobileGarmentTaggingModal } from '@/components/wardrobe/garment-tagging
 import {
   getWardrobeOnboardingStateFromMobile,
   listGarmentsFromMobile,
+  pollClosetInventory,
   pollGarmentUntilSettled,
 } from '@/src/lib/wardrobe'
 import { ensureMobileLegacySavedLooksMigration } from '@/src/lib/saved-looks'
@@ -228,6 +229,8 @@ function MemberWardrobeHub({
   // Story CC-7.7 D3: the Closet gate waits for the first inventory read.
   const [inventorySettled, setInventorySettled] = useState(false)
   const pollingAbortRef = useRef<AbortController | null>(null)
+  const batchPollingAbortRef = useRef<AbortController | null>(null)
+  const batchPendingIds = useRef(new Set<string>())
   const pendingTagging = useRef<{ id: string; invoker?: number | null } | null>(null)
   const isCaptureOpenRef = useRef(false)
   const addGarmentButtonRef = useRef<ElementRef<typeof Pressable> | null>(null)
@@ -437,7 +440,13 @@ function MemberWardrobeHub({
     return () => controller.abort()
   }, [epoch, loadAttempt])
 
-  useEffect(() => () => pollingAbortRef.current?.abort(), [])
+  useEffect(
+    () => () => {
+      pollingAbortRef.current?.abort()
+      batchPollingAbortRef.current?.abort()
+    },
+    []
+  )
 
   useEffect(() => {
     if (!addEntry) {
@@ -516,14 +525,70 @@ function MemberWardrobeHub({
     presentTagging(garmentId, invokingNodeHandle)
   }
 
-  const handleGarmentCommitted = (garment: GarmentItemContract, token: string) => {
-    if (epoch !== mobileIdentityEpoch()) return
+  const showCommittedGarment = (garment: GarmentItemContract, token: string) => {
     inventoryRevision.current++
     setAccessToken(token)
     setGarments((current) => [
       garment,
       ...current.filter((item) => item.id !== garment.id),
     ])
+  }
+
+  const handleBatchGarmentCommitted = (garment: GarmentItemContract, token: string) => {
+    if (epoch !== mobileIdentityEpoch()) return
+    showCommittedGarment(garment, token)
+    batchPendingIds.current.add(garment.id)
+    batchPollingAbortRef.current?.abort()
+    const controller = new AbortController()
+    batchPollingAbortRef.current = controller
+    setErrorMessage(null)
+    notifyingWardrobeRef.current = true
+    try {
+      notifyWardrobeChanged()
+    } finally {
+      notifyingWardrobeRef.current = false
+    }
+    void (async () => {
+      try {
+        for await (const persisted of pollClosetInventory(
+          token,
+          controller.signal,
+          pollOffsetsMs ?? [0, 1_000, 2_000, 4_000, 8_000],
+          refreshGarmentList
+        )) {
+          if (controller.signal.aborted || epoch !== mobileIdentityEpoch()) return
+          const pending = batchPendingIds.current
+          for (const id of pending) {
+            if (
+              !persisted.some((item) => item.id === id && item.status === 'processing')
+            ) {
+              pending.delete(id)
+            }
+          }
+          if (pending.size === 0) return
+        }
+        if (!controller.signal.aborted && epoch === mobileIdentityEpoch()) {
+          setErrorMessage(t('wardrobe.tagging.poll_timeout'))
+        }
+      } catch (error) {
+        if (!controller.signal.aborted && epoch === mobileIdentityEpoch()) {
+          setErrorMessage(
+            error instanceof Error ? error.message : t('wardrobe.tagging.load_failed')
+          )
+        }
+      } finally {
+        // A poll superseded by another commit shares the new poll's pending IDs.
+        if (batchPollingAbortRef.current === controller) {
+          batchPendingIds.current.clear()
+          batchPollingAbortRef.current = null
+        }
+      }
+    })()
+  }
+
+  const handleGarmentCommitted = (garment: GarmentItemContract, token: string) => {
+    if (epoch !== mobileIdentityEpoch()) return
+    showCommittedGarment(garment, token)
     if (garment.status === 'ready') markGarmentConfirmed()
     if (garment.status === 'awaiting_tags') {
       pendingTagging.current = { id: garment.id }
@@ -774,6 +839,7 @@ function MemberWardrobeHub({
           visible={isCaptureOpen}
           onClose={closeCapture}
           onGarmentCommitted={handleGarmentCommitted}
+          onBatchGarmentCommitted={handleBatchGarmentCommitted}
           invokingNodeHandle={safeFindNodeHandle(captureInvoker())}
         />
       </View>

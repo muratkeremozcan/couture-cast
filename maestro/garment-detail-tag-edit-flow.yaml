@@ -1,7 +1,8 @@
 # Learning path Step 63: Garment detail and tag edit.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 # Story 7.5 test plan 7.5-MAE-001: open a seeded ready garment on Android, change its material,
-# Done shows Saved, the change survives a relaunch, then the original material is restored.
+# The change appears on the detail screen, survives a relaunch, and is restored to the original.
+# The native garment-detail-screen tests (7.5-NAT-004) verify the five-second Saved notice and Undo.
 #
 # The fixture wardrobe that scripts/run-maestro.mjs seeds has one shoes garment (cotton, mild),
 # and no other flow creates shoes, so the card is found by its label without knowing its id or
@@ -71,23 +72,16 @@ tags:
 - tapOn:
     id: 'garment-tag-done'
 
-# The bar's container carries the test id and its child Text carries the copy, so the two are
-# asserted separately: one native element never holds both.
-- extendedWaitUntil:
-    visible:
-      id: 'status-feedback-bar'
-    timeout: 15000
-- assertVisible:
-    text: 'Saved'
-- assertVisible:
-    id: 'status-bar-action-undo'
+# The device can finish settling after the Saved notice has expired. Wait for the saved value.
 - scrollUntilVisible:
     element:
       id: 'garment-detail-material'
     direction: UP
-- assertVisible:
-    id: 'garment-detail-material'
-    text: 'Wool'
+- extendedWaitUntil:
+    visible:
+      id: 'garment-detail-material'
+      text: 'Wool'
+    timeout: 15000
 
 - takeScreenshot:
     path: maestro/artifacts/garment-detail-tag-edit-saved
@@ -131,21 +125,15 @@ tags:
     direction: DOWN
 - tapOn:
     id: 'garment-tag-done'
-# The bar's container carries the test id and its child Text carries the copy, so the two are
-# asserted separately: one native element never holds both.
-- extendedWaitUntil:
-    visible:
-      id: 'status-feedback-bar'
-    timeout: 15000
-- assertVisible:
-    text: 'Saved'
 - scrollUntilVisible:
     element:
       id: 'garment-detail-material'
     direction: UP
-- assertVisible:
-    id: 'garment-detail-material'
-    text: 'Cotton'
+- extendedWaitUntil:
+    visible:
+      id: 'garment-detail-material'
+      text: 'Cotton'
+    timeout: 15000
 
 - tapOn:
     id: 'app-top-bar-back'

@@ -8,6 +8,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Learning path Step 83: Clean garment cutouts.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-83-clean-garment-cutouts
+// Learning path Step 85: Add several photos at once.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-85-add-several-photos-at-once
 // Story CC-7.11 test owner (TEA): 7.11-NAT-032, 7.11-NAT-033, the capture header is the layer's
 // swipe handle beside its X. [Codex 7.11 #3]: the swipe takes the X's guarded close, so a
 // picked photo asks "Discard this photo?" first; an upload in flight keeps the sheet open (busy guard).
@@ -15,8 +17,9 @@
 import React from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
+import type { ImagePickerResult } from 'expo-image-picker'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forgetAllUploadAttempts } from '@/src/lib/upload-attempts'
 import { AccessibilityInfo, Alert, findNodeHandle, Platform } from 'react-native'
@@ -301,6 +304,254 @@ describe('MobileGarmentCaptureModal', () => {
     renderModal({ visible: false })
 
     expect(screen.queryByTestId('garment-capture-modal')).not.toBeInTheDocument()
+  })
+
+  it('[7.28-NAT-001] reviews scoped picker results and retries only the failed row', async () => {
+    const pickerCopy = { ...libraryAsset, uri: 'file:///cache/ImagePicker/coat.png' }
+    const original = { ...libraryAsset, uri: 'file:///library/boots.png', width: 800 }
+    const bytes = new Uint8Array([1, 2, 3, 4])
+    fileSystem.files.set(pickerCopy.uri, bytes)
+    fileSystem.files.set(original.uri, bytes)
+    imagePicker.launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [pickerCopy, original],
+    })
+    imageManipulator.manipulateAsync.mockImplementation(
+      (
+        _uri: string,
+        [, { resize }]: [unknown, { resize: { width: number; height: number } }],
+        { format }: { format: string }
+      ) => {
+        const uri = `file:///cache/batch-crop-${resize.width}.${format}`
+        fileSystem.files.set(uri, bytes)
+        return Promise.resolve({ uri, ...resize })
+      }
+    )
+
+    const allocations: string[] = []
+    const puts: string[] = []
+    const commits: { garmentId: string; key: string | null }[] = []
+    server.use(
+      http.post('*/api/v1/wardrobe/upload-url', ({ request }) => {
+        allocations.push(request.headers.get('idempotency-key') ?? '')
+        const position = allocations.length
+        return HttpResponse.json({
+          data: {
+            garmentId: `garment-${position}`,
+            uploadSessionId: `session-${position}`,
+            uploadUrl: `${window.location.origin}/mock-storage/batch-${position}`,
+            uploadToken: `upload-token-${position}`,
+            requiredHeaders: { 'content-type': 'image/jpeg' },
+            expiresAt: '2026-08-09T01:00:00.000Z',
+          },
+        })
+      }),
+      http.put('*/mock-storage/:name', ({ params }) => {
+        puts.push(String(params.name))
+        return new HttpResponse(null, { status: 204 })
+      }),
+      http.post('*/api/v1/wardrobe/garments', async ({ request }) => {
+        const { garmentId } = createGarmentItemInputSchema.parse(await request.json())
+        commits.push({ garmentId, key: request.headers.get('idempotency-key') })
+        if (commits.length === 2) return HttpResponse.error()
+        return HttpResponse.json({
+          data: {
+            id: garmentId,
+            status: 'processing',
+            category: null,
+            material: null,
+            comfortRange: null,
+            tagsConfirmedAt: null,
+            fileSizeBytes: bytes.byteLength,
+            mimeType: 'image/jpeg',
+            retentionStatus: 'active',
+            createdAt: '2026-08-09T00:00:00.000Z',
+            committedAt: '2026-08-09T00:00:01.000Z',
+            imageAccess: null,
+          },
+        })
+      })
+    )
+    const onBatchGarmentCommitted = vi.fn()
+    const { onClose, onGarmentCommitted } = renderModal({ onBatchGarmentCommitted })
+    await browserUser.click(screen.getByTestId('garment-batch-picker'))
+    await screen.findByTestId('garment-batch-keep-2')
+
+    expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalledExactlyOnceWith({
+      mediaTypes: ['images'],
+      quality: 1,
+      allowsMultipleSelection: true,
+      selectionLimit: 5,
+    })
+    expect(imagePicker.requestMediaLibraryPermissionsAsync).not.toHaveBeenCalled()
+    expect(imageManipulator.manipulateAsync).toHaveBeenCalledTimes(2)
+    expect(imageManipulator.manipulateAsync).toHaveBeenNthCalledWith(
+      1,
+      pickerCopy.uri,
+      expect.any(Array),
+      expect.objectContaining({ format: 'jpeg' })
+    )
+    expect(imageManipulator.manipulateAsync).toHaveBeenNthCalledWith(
+      2,
+      original.uri,
+      expect.any(Array),
+      expect.objectContaining({ format: 'jpeg' })
+    )
+    expect(allocations).toHaveLength(0)
+    expect(fileSystem.files.has(pickerCopy.uri)).toBe(false)
+    expect(fileSystem.files.has(original.uri)).toBe(true)
+    expect(screen.getByTestId('garment-batch-add')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+
+    await browserUser.click(screen.getByTestId('garment-batch-keep-1'))
+    expect(screen.getByTestId('garment-batch-add')).toHaveTextContent('Add 1 piece')
+    await browserUser.click(screen.getByTestId('garment-batch-keep-2'))
+    await browserUser.click(screen.getByRole('button', { name: 'Add 2 pieces' }))
+    const retry = await screen.findByTestId('garment-batch-retry-2')
+    const firstRow = within(screen.getByTestId('garment-batch-row-1'))
+    const secondRow = within(screen.getByTestId('garment-batch-row-2'))
+    expect(firstRow.getByText('Saved')).toBeVisible()
+    expect(secondRow.getByText('Could not save')).toBeVisible()
+    expect(screen.queryByTestId('garment-batch-preview-2')).toBeNull()
+    expect([...fileSystem.files.keys()]).toEqual([original.uri])
+
+    imagePicker.launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ ...original, width: 700 }],
+    })
+    await browserUser.click(retry)
+    expect(
+      await secondRow.findByText('Choose the original photo to retry.')
+    ).toBeVisible()
+    expect(commits).toHaveLength(2)
+    expect([...fileSystem.files.keys()]).toEqual([original.uri])
+
+    imagePicker.launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [original],
+    })
+    await browserUser.click(screen.getByTestId('garment-batch-retry-2'))
+    expect(await secondRow.findByText('Saved')).toBeVisible()
+    expect(imagePicker.launchImageLibraryAsync).toHaveBeenLastCalledWith({
+      mediaTypes: ['images'],
+      quality: 1,
+      allowsMultipleSelection: false,
+      selectionLimit: 1,
+    })
+    expect(commits.map(({ garmentId }) => garmentId)).toEqual([
+      'garment-1',
+      'garment-2',
+      'garment-2',
+    ])
+    expect(new Set(commits.map(({ key }) => key)).size).toBe(2)
+    expect(commits[1]?.key).toBe(commits[2]?.key)
+    expect(allocations).toHaveLength(2)
+    expect(puts).toEqual(['batch-1', 'batch-2'])
+    expect(onBatchGarmentCommitted).toHaveBeenCalledTimes(2)
+    expect(onBatchGarmentCommitted).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ id: 'garment-1' }),
+      'test-access-token'
+    )
+    expect(onBatchGarmentCommitted).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ id: 'garment-2' }),
+      'test-access-token'
+    )
+    expect(onGarmentCommitted).not.toHaveBeenCalled()
+    expect([...fileSystem.files.keys()]).toEqual([original.uri])
+    await browserUser.click(screen.getByTestId('garment-batch-done'))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('recovers from a canceled picker and a picker error, then shows an invalid asset row', async () => {
+    imagePicker.launchImageLibraryAsync
+      .mockResolvedValueOnce({ canceled: true, assets: null })
+      .mockRejectedValueOnce(new Error('Picker unavailable'))
+      .mockResolvedValueOnce({
+        canceled: false,
+        assets: [{ ...libraryAsset, width: 200 }],
+      })
+    renderModal({ onBatchGarmentCommitted: vi.fn() })
+    const picker = screen.getByTestId('garment-batch-picker')
+
+    await browserUser.click(picker)
+    expect(screen.queryByTestId('garment-batch-row-1')).toBeNull()
+    await browserUser.click(picker)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not open the photo library.'
+    )
+    await browserUser.click(picker)
+    expect(await screen.findByText('This photo could not be prepared.')).toBeVisible()
+    expect(screen.getByTestId('garment-batch-add')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    expect(imageManipulator.manipulateAsync).not.toHaveBeenCalled()
+  })
+
+  it('shows sign-in guidance and stops the batch when the API rejects the session', async () => {
+    imagePicker.launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [libraryAsset, cameraAsset],
+    })
+    const allocate = vi.fn()
+    server.use(
+      http.post('*/api/v1/wardrobe/upload-url', () => {
+        allocate()
+        return HttpResponse.json({ message: 'SIGNED_OUT' }, { status: 401 })
+      })
+    )
+    const onBatchGarmentCommitted = vi.fn()
+    renderModal({ onBatchGarmentCommitted })
+
+    await browserUser.click(screen.getByTestId('garment-batch-picker'))
+    await browserUser.click(await screen.findByTestId('garment-batch-keep-1'))
+    await browserUser.click(await screen.findByTestId('garment-batch-keep-2'))
+    await browserUser.click(screen.getByRole('button', { name: 'Add 2 pieces' }))
+
+    expect(await screen.findByTestId('garment-batch-blocked')).toHaveTextContent(
+      'wardrobe.error.sign_in_required'
+    )
+    expect(allocate).toHaveBeenCalledOnce()
+    expect(onBatchGarmentCommitted).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
+    expect(screen.queryByTestId('garment-batch-preview-2')).toBeNull()
+    expect(screen.getByTestId('garment-batch-done')).not.toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+  })
+
+  it('[7.28-CLEANUP-001] retires only app-owned picker copies returned after an account switch', async () => {
+    const pickerCopy = { ...libraryAsset, uri: 'file:///cache/ImagePicker/coat.png' }
+    const original = { ...libraryAsset, uri: 'file:///library/coat.png' }
+    fileSystem.files.set(pickerCopy.uri, fileSystem.state.bytes)
+    fileSystem.files.set(original.uri, fileSystem.state.bytes)
+    let finishPick!: (result: ImagePickerResult) => void
+    const picked = new Promise<ImagePickerResult>((resolve) => {
+      finishPick = resolve
+    })
+    imagePicker.launchImageLibraryAsync.mockReturnValueOnce(picked)
+    setMobileApplicationUserId('member-a')
+    const onBatchGarmentCommitted = vi.fn()
+    renderModal({ onBatchGarmentCommitted })
+
+    await browserUser.click(screen.getByTestId('garment-batch-picker'))
+    expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalledOnce()
+    act(() => setMobileApplicationUserId('member-b'))
+    await act(async () => {
+      finishPick({ canceled: false, assets: [pickerCopy, original] })
+      await picked
+    })
+
+    expect(screen.getByTestId('garment-batch-picker')).toBeVisible()
+    expect(screen.queryByTestId('garment-batch-row-1')).toBeNull()
+    expect(imageManipulator.manipulateAsync).not.toHaveBeenCalled()
+    expect([...fileSystem.files.keys()]).toEqual([original.uri])
+    expect(onBatchGarmentCommitted).not.toHaveBeenCalled()
   })
 
   it('4.4-MOB-CAP-03 closes and resets through the close button', () => {

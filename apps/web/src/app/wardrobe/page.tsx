@@ -42,6 +42,7 @@ import { hasAppHistoryBelow } from '../../lib/app-history'
 import { LANDING_SESSION_ATTRIBUTE } from '../../lib/landing-session'
 import { hasStoredWebSession } from '../../lib/web-session'
 import { useRetryOnVerifiedSession } from '../../lib/session-retry'
+import { onUploadSessionChange } from '../../lib/upload-attempts'
 import {
   currentWebSessionBearer,
   currentWebSessionOwner,
@@ -795,6 +796,8 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
   const pendingTaggingGarmentIdRef = useRef<string | null>(null)
   const isCaptureOpenRef = useRef(false)
   const pollingControllerRef = useRef<AbortController | null>(null)
+  const batchPollingControllerRef = useRef<AbortController | null>(null)
+  const batchPendingIds = useRef(new Set<string>())
   const directEntryConsumed = useRef(false)
   /**
    * The account, setup progress and closet reads below run once at mount. One that ran before
@@ -877,6 +880,8 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
 
   useEffect(() => {
     pollingControllerRef.current?.abort()
+    // A tag save or manual refresh can finish while other batch pieces are processing.
+    // The inventory revision check coordinates this read with the continuing batch poll.
     const controller = new AbortController()
     listController.current = controller
     setIsLoading(true)
@@ -902,7 +907,18 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     return () => controller.abort()
   }, [sessionAttempt, missedSession, loadAttempt, loadInventory])
 
-  useEffect(() => () => pollingControllerRef.current?.abort(), [])
+  useEffect(() => {
+    const abortPolls = () => {
+      pollingControllerRef.current?.abort()
+      batchPollingControllerRef.current?.abort()
+      batchPendingIds.current.clear()
+    }
+    const unsubscribe = onUploadSessionChange(abortPolls)
+    return () => {
+      unsubscribe()
+      abortPolls()
+    }
+  }, [])
 
   const openCapture = (invoker: HTMLElement) => {
     captureInvokerRef.current = invoker
@@ -920,53 +936,86 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
 
   const waitForPoll = (delayMs: number, signal: AbortSignal) =>
     new Promise<void>((resolve, reject) => {
-      const timer = window.setTimeout(resolve, delayMs)
-      signal.addEventListener(
-        'abort',
-        () => {
-          window.clearTimeout(timer)
-          reject(new DOMException('Polling aborted', 'AbortError'))
-        },
-        { once: true }
-      )
+      const abort = () => {
+        window.clearTimeout(timer)
+        reject(new DOMException('Polling aborted', 'AbortError'))
+      }
+      const timer = window.setTimeout(() => {
+        signal.removeEventListener('abort', abort)
+        resolve()
+      }, delayMs)
+      if (signal.aborted) abort()
+      else signal.addEventListener('abort', abort, { once: true })
     })
 
-  const pollCommittedGarment = (garmentId: string) => {
-    pollingControllerRef.current?.abort()
-    listController.current?.abort()
-    setIsLoading(false)
+  const settleBatchRows = (persisted: GarmentItemContract[] | null) => {
+    if (!persisted) return false
+    const pending = batchPendingIds.current
+    for (const id of pending) {
+      if (!persisted.some((item) => item.id === id && item.status === 'processing')) {
+        pending.delete(id)
+      }
+    }
+    return pending.size === 0
+  }
+
+  const handleSinglePolledGarment = (garment: GarmentItemContract) => {
+    if (garment.status === 'ready') setConfirmedGarment(true)
+    if (garment.status === 'awaiting_tags') {
+      if (isCaptureOpenRef.current) pendingTaggingGarmentIdRef.current = garment.id
+      else openTagging(garment.id)
+    }
+  }
+
+  const pollCommittedGarment = (garmentId: string, batch = false) => {
+    const poll = batch ? batchPollingControllerRef : pollingControllerRef
+    poll.current?.abort()
+    if (!batch) {
+      listController.current?.abort()
+      setIsLoading(false)
+    }
     const controller = new AbortController()
-    pollingControllerRef.current = controller
+    const scope = currentWebSessionScope()
+    const isCurrentPoll = () =>
+      !controller.signal.aborted && currentWebSessionScope() === scope
+    poll.current = controller
     setGarmentError(null)
 
     void (async () => {
       try {
         const startedAt = Date.now()
-        for (const offsetMs of [1_000, 2_000, 4_000, 8_000]) {
+        const offsets = batch
+          ? [0, 1_000, 2_000, 4_000, 8_000]
+          : [1_000, 2_000, 4_000, 8_000]
+        for (const offsetMs of offsets) {
           await waitForPoll(
             Math.max(0, startedAt + offsetMs - Date.now()),
             controller.signal
           )
+          if (!isCurrentPoll()) return
           const persisted = await loadInventory(controller.signal)
-          if (controller.signal.aborted || currentWebSessionOwner() !== owner) return
+          if (!isCurrentPoll()) return
+          if (batch) {
+            if (settleBatchRows(persisted)) return
+            continue
+          }
           const current = persisted?.find((garment) => garment.id === garmentId)
           if (!current || current.status === 'processing') continue
-          if (current.status === 'ready') setConfirmedGarment(true)
-          if (current.status === 'awaiting_tags') {
-            if (isCaptureOpenRef.current) {
-              pendingTaggingGarmentIdRef.current = current.id
-            } else {
-              openTagging(current.id)
-            }
-          }
+          handleSinglePolledGarment(current)
           return
         }
         setGarmentError(t('wardrobe.hub.taggingSlow'))
       } catch (error) {
-        if (!controller.signal.aborted) {
+        if (isCurrentPoll()) {
           setGarmentError(
             error instanceof Error ? error.message : t('wardrobe.hub.statusRefreshFailed')
           )
+        }
+      } finally {
+        // A poll superseded by another commit shares the new poll's pending IDs.
+        if (batch && poll.current === controller) {
+          batchPendingIds.current.clear()
+          poll.current = null
         }
       }
     })()
@@ -991,12 +1040,22 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
       openCapture(addGarmentButtonRef.current)
   }, [garments, hasLoaded, isLoading, loadError, owner])
 
-  const handleGarmentCommitted = (garment: GarmentItemContract) => {
+  const showCommittedGarment = (garment: GarmentItemContract) => {
     inventoryVersion.current++
     setGarments((current) => [
       garment,
       ...current.filter((item) => item.id !== garment.id),
     ])
+  }
+
+  const handleBatchGarmentCommitted = (garment: GarmentItemContract) => {
+    showCommittedGarment(garment)
+    batchPendingIds.current.add(garment.id)
+    pollCommittedGarment(garment.id, true)
+  }
+
+  const handleGarmentCommitted = (garment: GarmentItemContract) => {
+    showCommittedGarment(garment)
     if (garment.status === 'ready') setConfirmedGarment(true)
     if (garment.status === 'awaiting_tags') {
       pendingTaggingGarmentIdRef.current = garment.id
@@ -1300,6 +1359,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
         isOpen={isCaptureModalOpen}
         onClose={closeCapture}
         onGarmentCommitted={handleGarmentCommitted}
+        onBatchGarmentCommitted={handleBatchGarmentCommitted}
         invokingElementRef={captureInvokerRef}
       />
 

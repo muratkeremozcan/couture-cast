@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+// Learning path Step 85: Add several photos at once.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-85-add-several-photos-at-once
 // Story 4.1 Task 8 step 3 owner: unit-test web garment capture behavior
 // @vitest-environment jsdom
 import React from 'react'
@@ -13,6 +15,7 @@ import {
   render as renderUnwrapped,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -74,14 +77,16 @@ const preparedPhoto: wardrobe.PreparedImage = {
   backgroundRemoved: true,
 }
 const revokePreviewUrl = vi.fn()
+const createPreviewUrl = vi.fn()
 
 beforeEach(() => {
   vi.spyOn(wardrobe, 'prepareGarmentImage').mockResolvedValue(preparedPhoto)
   revokePreviewUrl.mockClear()
+  createPreviewUrl.mockReset().mockReturnValue('blob:prepared-photo')
   vi.stubGlobal(
     'URL',
     class extends URL {
-      static createObjectURL = vi.fn(() => 'blob:prepared-photo')
+      static createObjectURL = createPreviewUrl
       static revokeObjectURL = revokePreviewUrl
     }
   )
@@ -903,6 +908,235 @@ describe('GarmentCaptureModal account epoch', () => {
         uploadSession: expect.objectContaining({ account: 'member-a' }) as unknown,
       })
     )
+  })
+})
+
+describe('GarmentCaptureModal Closet batch', () => {
+  beforeEach(() => {
+    let urlNumber = 0
+    createPreviewUrl.mockImplementation(() => `blob:batch-${++urlNumber}`)
+    setUploadAttemptAccount('member-a')
+  })
+
+  afterEach(() => {
+    setUploadAttemptAccount(null)
+  })
+
+  function files(count: number) {
+    return Array.from(
+      { length: count },
+      (_, index) =>
+        new File([`photo-${index}`], `garment-${index}.png`, { type: 'image/png' })
+    )
+  }
+
+  it('[7.28-WEB-001] rejects six files, reviews five and releases the previews when closed', async () => {
+    const user = userEvent.setup()
+    const uploadGarment = vi.fn()
+    const onClose = vi.fn()
+    const modalProps = { onClose, uploadGarment, onBatchGarmentCommitted: vi.fn() }
+    const { rerender } = render(<GarmentCaptureModal isOpen {...modalProps} />)
+    const input = screen.getByTestId('garment-batch-input')
+    const picker = screen.getByRole('button', { name: 'Choose several photos' })
+    const openInput = vi.spyOn(input, 'click')
+    await user.click(picker)
+    fireEvent(input, new Event('cancel'))
+    await user.click(picker)
+    await user.click(picker)
+    expect(openInput).toHaveBeenCalledTimes(3)
+    await user.upload(input, files(6))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose up to 5 photos.')
+    expect(wardrobe.prepareGarmentImage).not.toHaveBeenCalled()
+    expect(createPreviewUrl).not.toHaveBeenCalled()
+
+    await user.click(picker)
+    await user.upload(input, files(5))
+    await screen.findByTestId('garment-batch-keep-5')
+    const keepControls = screen.getAllByRole('checkbox', { name: 'Keep piece' })
+    expect(keepControls).toHaveLength(5)
+    expect(screen.getByTestId('garment-batch-add')).toBeDisabled()
+    for (const keep of keepControls.slice(0, 4)) await user.click(keep)
+    expect(screen.getByRole('button', { name: 'Add 4 pieces' })).toBeEnabled()
+    expect(uploadGarment).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Close capture modal' }))
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(revokePreviewUrl.mock.calls.flat().sort()).toEqual(
+      Array.from({ length: 10 }, (_, index) => `blob:batch-${index + 1}`).sort()
+    )
+    expect(uploadGarment).not.toHaveBeenCalled()
+
+    rerender(<GarmentCaptureModal isOpen={false} {...modalProps} />)
+    rerender(<GarmentCaptureModal isOpen {...modalProps} />)
+    expect(screen.getByTestId('garment-batch-picker')).toBeVisible()
+    expect(screen.queryByRole('checkbox', { name: 'Keep piece' })).toBeNull()
+  })
+
+  it('[7.28-CLEANUP-001] releases the raw URL immediately when identity changes during preparation', async () => {
+    const user = userEvent.setup()
+    let finish!: (image: wardrobe.PreparedImage) => void
+    const preparing = new Promise<wardrobe.PreparedImage>((resolve) => {
+      finish = resolve
+    })
+    vi.mocked(wardrobe.prepareGarmentImage).mockReturnValueOnce(preparing)
+    const uploadGarment = vi.fn()
+    render(
+      <GarmentCaptureModal
+        isOpen
+        onClose={vi.fn()}
+        onBatchGarmentCommitted={vi.fn()}
+        uploadGarment={uploadGarment}
+      />
+    )
+    await user.click(screen.getByRole('button', { name: 'Choose several photos' }))
+    await user.upload(screen.getByTestId('garment-batch-input'), files(1))
+    expect(await screen.findByText('Preparing photo…')).toBeVisible()
+    expect(createPreviewUrl).toHaveBeenCalledOnce()
+
+    act(() => setUploadAttemptAccount('member-b'))
+    expect(screen.getByTestId('garment-batch-picker')).toBeVisible()
+    expect(revokePreviewUrl).toHaveBeenCalledExactlyOnceWith('blob:batch-1')
+    await act(async () => {
+      finish(preparedPhoto)
+      await preparing
+    })
+
+    expect(screen.queryByTestId('garment-batch-row-1')).toBeNull()
+    expect(createPreviewUrl).toHaveBeenCalledOnce()
+    expect(revokePreviewUrl).toHaveBeenCalledOnce()
+    expect(uploadGarment).not.toHaveBeenCalled()
+  })
+
+  it('reports each outcome and reopens a retry picker after a missed cancel', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    const onBatchGarmentCommitted = vi.fn()
+    const uploadGarment = vi
+      .fn<typeof wardrobe.uploadGarmentImageFromWeb>()
+      .mockResolvedValueOnce(mockCommittedGarment)
+      .mockRejectedValueOnce(new Error('Response lost'))
+      .mockResolvedValueOnce({ ...mockCommittedGarment, id: 'garment-2' })
+    vi.mocked(wardrobe.prepareGarmentImage).mockRejectedValueOnce(
+      new Error('Invalid image')
+    )
+    render(
+      <GarmentCaptureModal
+        isOpen
+        {...{ onClose, onBatchGarmentCommitted, uploadGarment }}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Choose several photos' }))
+    await user.upload(screen.getByTestId('garment-batch-input'), files(3))
+    expect(await screen.findByText('This photo could not be prepared.')).toBeVisible()
+    await user.click(await screen.findByTestId('garment-batch-keep-2'))
+    await user.click(await screen.findByTestId('garment-batch-keep-3'))
+    await user.click(screen.getByRole('button', { name: 'Add 2 pieces' }))
+    const retry = await screen.findByTestId('garment-batch-retry-3')
+    expect(screen.getByText('Saved', { exact: true })).toBeVisible()
+    expect(screen.getByText('Could not save', { exact: true })).toBeVisible()
+    const retryInput = screen.getByTestId('garment-batch-retry-input')
+    const openFile = vi.spyOn(retryInput, 'click')
+    await user.click(retry)
+    await user.click(retry)
+    expect(openFile).toHaveBeenCalledTimes(2)
+
+    const failedRow = within(screen.getByTestId('garment-batch-row-3'))
+    vi.mocked(wardrobe.prepareGarmentImage).mockRejectedValueOnce(
+      new Error('Cannot decode')
+    )
+    await user.upload(retryInput, files(1))
+    expect(await failedRow.findByText('This photo could not be prepared.')).toBeVisible()
+    expect(failedRow.getByRole('button', { name: 'Retry' })).toBeEnabled()
+    expect(uploadGarment).toHaveBeenCalledTimes(2)
+
+    await user.click(failedRow.getByRole('button', { name: 'Retry' }))
+
+    vi.mocked(wardrobe.prepareGarmentImage).mockResolvedValueOnce({
+      ...preparedPhoto,
+      sha256: 'different-photo',
+    })
+    await user.upload(retryInput, files(1))
+    expect(await screen.findByText('Choose the original photo to retry.')).toBeVisible()
+    expect(uploadGarment).toHaveBeenCalledTimes(2)
+
+    await user.click(screen.getByTestId('garment-batch-retry-3'))
+    await user.upload(retryInput, files(1))
+    await waitFor(() =>
+      expect(screen.getAllByText('Saved', { exact: true })).toHaveLength(2)
+    )
+    expect(onBatchGarmentCommitted).toHaveBeenCalledTimes(2)
+    const attemptId = uploadGarment.mock.calls[1]?.[0].attemptId
+    expect(attemptId).toBeTruthy()
+    expect(uploadGarment.mock.calls[2]?.[0].attemptId).toBe(attemptId)
+    await user.click(screen.getByTestId('garment-batch-done'))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the batch review when an earlier camera request finishes', async () => {
+    const user = userEvent.setup()
+    let finishCamera!: (stream: MediaStream) => void
+    const permission = new Promise<MediaStream>((resolve) => {
+      finishCamera = resolve
+    })
+    const getUserMedia = vi.fn().mockReturnValue(permission)
+    const stop = vi.fn()
+    installCameraMock(getUserMedia)
+    render(
+      <GarmentCaptureModal isOpen onClose={vi.fn()} onBatchGarmentCommitted={vi.fn()} />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Take Photo' }))
+    expect(getUserMedia).toHaveBeenCalledOnce()
+    await user.click(screen.getByRole('button', { name: 'Choose several photos' }))
+    await user.upload(screen.getByTestId('garment-batch-input'), files(1))
+    expect(await screen.findByRole('checkbox', { name: 'Keep piece' })).toBeVisible()
+
+    await act(async () => {
+      finishCamera({ getTracks: () => [{ stop }] } as unknown as MediaStream)
+      await permission
+    })
+    expect(stop).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: 'Snap Photo' })).toBeNull()
+    expect(screen.getByRole('checkbox', { name: 'Keep piece' })).toBeVisible()
+    expect(wardrobe.prepareGarmentImage).toHaveBeenCalledExactlyOnceWith(
+      'blob:batch-1',
+      '1:1',
+      false,
+      'compact'
+    )
+  })
+
+  it('stops the queued uploads and shows guardian guidance when the API refuses consent', async () => {
+    const user = userEvent.setup()
+    const uploadGarment = vi
+      .fn()
+      .mockRejectedValue(
+        new WardrobeRequestError('Refused', 'GUARDIAN_CONSENT_REQUIRED', 403)
+      )
+    render(
+      <GarmentCaptureModal
+        isOpen
+        onClose={vi.fn()}
+        onBatchGarmentCommitted={vi.fn()}
+        uploadGarment={uploadGarment}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Choose several photos' }))
+    await user.upload(screen.getByTestId('garment-batch-input'), files(2))
+    await user.click(await screen.findByTestId('garment-batch-keep-1'))
+    await user.click(await screen.findByTestId('garment-batch-keep-2'))
+    await user.click(screen.getByRole('button', { name: 'Add 2 pieces' }))
+
+    expect(await screen.findByTestId('garment-batch-blocked')).toHaveTextContent(
+      'Guardian consent is required for wardrobe uploads.'
+    )
+    expect(uploadGarment).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
+    expect(screen.getByTestId('garment-batch-done')).toBeEnabled()
+    expect(revokePreviewUrl).toHaveBeenCalledTimes(4)
   })
 })
 

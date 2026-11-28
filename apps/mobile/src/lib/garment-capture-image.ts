@@ -1,6 +1,6 @@
 import { maskGarmentBackground } from '@couture/utils'
 import { Buffer } from 'buffer'
-import { File } from 'expo-file-system'
+import { File, Paths } from 'expo-file-system'
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { PNG } from 'pngjs/browser'
 
@@ -25,6 +25,24 @@ export function releaseGarmentCaptureFile(file: File) {
     if (file.exists) file.delete()
   } catch {
     // The cache file can also be evicted by the device.
+  }
+}
+
+/** Expo ImagePicker copies assets into its own app cache directory on iOS and Android. */
+export function releaseImagePickerCopy(uri: string) {
+  try {
+    const cache = Paths.cache
+    const cacheUri = typeof cache === 'string' ? cache : cache?.uri
+    if (!cacheUri) return
+    const prefix = `${cacheUri.replace(/\/$/, '')}/ImagePicker/`
+    if (
+      uri.startsWith(prefix) &&
+      /^[a-z0-9][a-z0-9_.-]*$/i.test(uri.slice(prefix.length))
+    ) {
+      releaseGarmentCaptureFile(new File(uri))
+    }
+  } catch {
+    // Some runtimes cannot resolve the native cache directory.
   }
 }
 

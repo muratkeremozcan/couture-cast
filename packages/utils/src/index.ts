@@ -138,6 +138,8 @@ export * from './federated-signin'
 export * from './save-feedback'
 export * from './looks-feed'
 export * from './wardrobe/deferred-garment-deletion'
+export * from './wardrobe/garment-photo-batch'
+export { garmentPhotoBatchStrings } from './wardrobe/garment-photo-batch-strings'
 
 export {
   boxShadowFor,

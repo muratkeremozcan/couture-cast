@@ -1,5 +1,7 @@
 // Learning path Step 83: Clean garment cutouts.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-83-clean-garment-cutouts
+// Learning path Step 85: Add several photos at once.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-85-add-several-photos-at-once
 import { Buffer } from 'buffer'
 import type { PNG as BrowserPng } from 'pngjs/browser'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -7,6 +9,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const files = vi.hoisted(() => new Map<string, Uint8Array>())
 const manipulate = vi.hoisted(() => vi.fn())
 const deleteFile = vi.hoisted(() => vi.fn((uri: string) => files.delete(uri)))
+const paths = vi.hoisted(() => ({
+  cache: undefined as string | { uri: string } | undefined,
+}))
 
 vi.mock('expo-image-manipulator', () => ({
   manipulateAsync: manipulate,
@@ -14,6 +19,7 @@ vi.mock('expo-image-manipulator', () => ({
 }))
 
 vi.mock('expo-file-system', () => ({
+  Paths: paths,
   File: class {
     constructor(readonly uri: string) {}
 
@@ -62,6 +68,7 @@ function colorPhoto(codec: typeof BrowserPng, transparentFormat = false) {
 
 beforeEach(() => {
   files.clear()
+  paths.cache = undefined
   deleteFile.mockClear()
   manipulate.mockReset().mockResolvedValueOnce(png).mockResolvedValueOnce(jpeg)
 })
@@ -116,6 +123,38 @@ it.each([
     expect(manipulate).toHaveBeenCalledOnce()
   }
 )
+
+it.each([
+  { shape: 'legacy string', cache: 'file:///cache/' },
+  { shape: 'Expo Directory', cache: { uri: 'file:///cache' } },
+])(
+  'retires the picker copy with a $shape cache and preserves the library original',
+  async ({ cache }) => {
+    const { releaseImagePickerCopy } = await import('./garment-capture-image.js')
+    paths.cache = cache
+    const pickerCopy = 'file:///cache/ImagePicker/picked.jpg'
+    const original = 'file:///library/picked.jpg'
+    const nestedCopy = 'file:///cache/ImagePicker/album/picked.jpg'
+    for (const uri of [pickerCopy, original, nestedCopy])
+      files.set(uri, new Uint8Array(1))
+
+    releaseImagePickerCopy(original)
+    releaseImagePickerCopy(nestedCopy)
+    releaseImagePickerCopy(pickerCopy)
+
+    expect(deleteFile).toHaveBeenCalledExactlyOnceWith(pickerCopy)
+    expect([...files.keys()]).toEqual([original, nestedCopy])
+  }
+)
+
+it('preserves the source when the platform does not provide a cache URI', async () => {
+  const sourceUri = 'file:///cache/ImagePicker/picked.jpg'
+  files.set(sourceUri, new Uint8Array(1))
+  const { releaseImagePickerCopy } = await import('./garment-capture-image.js')
+  releaseImagePickerCopy(sourceUri)
+  expect(deleteFile).not.toHaveBeenCalled()
+  expect(files.has(sourceUri)).toBe(true)
+})
 
 it.each([
   { state: 'truncated header', offset: 0, value: 0, truncateAt: 20 },

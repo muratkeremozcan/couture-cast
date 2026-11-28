@@ -16,6 +16,8 @@
 // Learning path Step 76: Garment subtypes.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
+// Learning path Step 85: Add several photos at once.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-85-add-several-photos-at-once
 // @vitest-environment jsdom
 import { Blob as NodeBlob } from 'node:buffer'
 import {
@@ -955,6 +957,41 @@ describe('upload attempts across retries', () => {
       expect(calls.commit).toHaveLength(2)
       expect(keyOf(calls.commit[1])).toBe(keyOf(calls.commit[0]))
       expect(keyOf(calls.commit[0])).not.toBe(keyOf(calls.allocate[0]))
+    })
+
+    it('keeps distinct attempts for two reviewed rows with the same prepared photo', async () => {
+      authenticate()
+      const calls = installLegs(routes, {
+        allocate: [ok(allocation), ok(allocation)],
+        upload: [stored, stored],
+        commit: [networkDown, ok(committed), ok(committed)],
+      })
+      const prepared = {
+        blob: new Blob(['reviewed garment'], { type: 'image/jpeg' }),
+        widthPx: 400,
+        heightPx: 400,
+        mimeType: 'image/jpeg' as const,
+        sha256: 'a'.repeat(64),
+      }
+      const uploadRow = (attemptId: string) =>
+        uploadGarmentImageFromWeb({
+          prepared,
+          attemptId,
+          uploadSession: currentUploadSession(),
+        })
+
+      await expect(uploadRow('batch:1:1')).rejects.toMatchObject({
+        name: 'FetchError',
+        cause: { name: 'TypeError', message: 'Failed to fetch' },
+      })
+      await uploadRow('batch:1:2')
+      await uploadRow('batch:1:1')
+
+      expect(calls.allocate).toHaveLength(2)
+      expect(calls.upload).toHaveLength(2)
+      expect(keyOf(calls.allocate[1])).not.toBe(keyOf(calls.allocate[0]))
+      expect(keyOf(calls.commit[1])).not.toBe(keyOf(calls.commit[0]))
+      expect(keyOf(calls.commit[2])).toBe(keyOf(calls.commit[0]))
     })
 
     it('re-sends the bytes only after commit answers UPLOAD_BYTES_MISSING', async () => {

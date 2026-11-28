@@ -81,18 +81,19 @@ export async function throwUploadStepError<TRaw>(
   throw surfaced
 }
 
-function failureOf(error: unknown): UploadFailure | undefined {
+/** The API status and code associated with a surfaced error. */
+export function uploadFailureOf(error: unknown): UploadFailure | undefined {
   return typeof error === 'object' && error ? failures.get(error) : undefined
 }
 
 function isBytesMissing(error: unknown): boolean {
-  const failure = failureOf(error)
+  const failure = uploadFailureOf(error)
   return failure?.status === 409 && failure.code === 'UPLOAD_BYTES_MISSING'
 }
 
 /** True when the server ended the attempt, so no retry of it can succeed and it is forgotten. */
 export function isTerminalUploadFailure(error: unknown): boolean {
-  const failure = failureOf(error)
+  const failure = uploadFailureOf(error)
   return failure ? isTerminalUploadStatus(failure.status, failure.code) : false
 }
 
@@ -101,7 +102,7 @@ export function isTerminalUploadFailure(error: unknown): boolean {
  * one fresh attempt on that same Retry or pick; see `shouldRestartUploadAttempt`.
  */
 export function uploadFailureEnding(error: unknown): UploadAttemptEnding | null {
-  const failure = failureOf(error)
+  const failure = uploadFailureOf(error)
   return failure ? uploadAttemptEnding(failure.status, failure.code) : null
 }
 
