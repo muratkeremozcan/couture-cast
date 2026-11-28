@@ -111,6 +111,7 @@ function installImagePrepMocks(overrides: ImagePrepOverrides = {}) {
       ? ({
           drawImage: vi.fn(),
           fillRect: vi.fn(),
+          clearRect: vi.fn(),
         } as unknown as CanvasRenderingContext2D)
       : overrides.context
   )
@@ -2096,6 +2097,7 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
       canvas: fixtureCanvas({ width, height }),
       drawImage: vi.fn(),
       fillRect: vi.fn(),
+      clearRect: vi.fn(),
       getImageData: vi.fn().mockReturnValue({ data: pixels, width, height }),
       putImageData,
     } as unknown as CanvasRenderingContext2D
@@ -2296,6 +2298,7 @@ describe('prepareGarmentImage source encoding', () => {
         canvas: fixtureCanvas({ width, height }),
         drawImage,
         fillRect,
+        clearRect: vi.fn(),
         getImageData: vi.fn().mockReturnValue({ data, width, height }),
         putImageData,
       } as unknown as CanvasRenderingContext2D
@@ -2319,6 +2322,41 @@ describe('prepareGarmentImage source encoding', () => {
       expect(prepared).toMatchObject({ mimeType: 'image/jpeg', backgroundRemoved: false })
     }
   )
+
+  it('CC-7.26 clears the canvas before redrawing a translucent source after an encoder failure', async () => {
+    const width = 5
+    const height = 5
+    const data = new Uint8ClampedArray(width * height * 4).fill(255)
+    data[3] = 128
+    const drawImage = vi.fn()
+    const clearRect = vi.fn()
+    const putImageData = vi.fn()
+    const context = {
+      canvas: fixtureCanvas({ width, height }),
+      drawImage,
+      clearRect,
+      getImageData: vi.fn().mockReturnValue({ data, width, height }),
+      putImageData,
+    } as unknown as CanvasRenderingContext2D
+    const { toBlob } = installImagePrepMocks({ context })
+    toBlob.mockImplementationOnce((callback) => callback(null))
+
+    const prepared = await prepareGarmentImage(
+      'data:image/png;base64,c2FtcGxl',
+      '1:1',
+      true,
+      'source'
+    )
+
+    expect(putImageData).not.toHaveBeenCalled()
+    expect(drawImage).toHaveBeenCalledTimes(2)
+    expect(clearRect).toHaveBeenCalledWith(0, 0, 900, 900)
+    const beforeRedraw = clearRect.mock.invocationCallOrder.at(-1)!
+    expect(beforeRedraw).toBeGreaterThan(toBlob.mock.invocationCallOrder[0]!)
+    expect(beforeRedraw).toBeLessThan(drawImage.mock.invocationCallOrder[1]!)
+    expect(toBlob).toHaveBeenNthCalledWith(2, expect.any(Function), 'image/png', 0.92)
+    expect(prepared).toMatchObject({ mimeType: 'image/png', backgroundRemoved: false })
+  })
 })
 
 describe('wardrobe uploads to storage', () => {

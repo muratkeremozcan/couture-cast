@@ -168,6 +168,13 @@ describe('garment cutout acceptance', () => {
         return x >= 8 && x < 20 && y >= 25 && y < 55 ? [241, 241, 241] : backdrop
       },
     },
+    {
+      scene: 'a coherent panel three RGB levels darker than the backdrop',
+      colorAt: (x, y) => {
+        if (insideGarment(x, y)) return garment
+        return x >= 8 && x < 20 && y >= 25 && y < 55 ? [242, 242, 242] : backdrop
+      },
+    },
   ])('keeps all pixels for $scene', ({ colorAt }) => {
     const pixels = raster(colorAt)
     const before = pixels.slice()
