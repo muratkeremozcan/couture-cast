@@ -113,8 +113,13 @@ export class PhotoAiExecutionService {
       const output = await started.pending
       if (output == null || signal.aborted) return null
 
-      const delivered = await this.withFreshSource(source, request, signal, () => true)
-      released = delivered === true && !signal.aborted
+      const deliverUntil = await this.withFreshSource(
+        source,
+        request,
+        signal,
+        (expiresAt) => expiresAt.getTime()
+      )
+      released = deliverUntil !== null && deliverUntil > Date.now() && !signal.aborted
       return released ? output : null
     } catch {
       return null
@@ -159,7 +164,7 @@ export class PhotoAiExecutionService {
     source: PhotoAiSource,
     request: PhotoAiExecutionRequest,
     signal: AbortSignal,
-    work: () => T | null
+    work: (expiresAt: Date) => T | null
   ): Promise<T | null> {
     return this.gate.withGrant(source.memberId, request, async ({ tx, expiresAt }) => {
       if (signal.aborted) return null
@@ -175,7 +180,7 @@ export class PhotoAiExecutionService {
         signal.aborted
       )
         return null
-      return work()
+      return work(expiresAt)
     })
   }
 

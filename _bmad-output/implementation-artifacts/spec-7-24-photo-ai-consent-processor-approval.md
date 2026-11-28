@@ -162,6 +162,11 @@ Codex Security accounted for all 68 paths and reported CC724-SEC-001 below.
 | P3-2 HTTP contract               | Cover validation, deadline and published authentication, cache and response behavior.                                                            |
 | P3-3 Verification outage         | Return the documented 503 for private teen verification failures.                                                                                |
 
+CodeRabbit posted four findings in one review. The executor checks expiration again after
+the delivery transaction releases its locks. The fixtures distinguish a missing checkpoint
+from a stalled read, prove cancellation before releasing late photo bytes, and separate
+database connectivity from migration and fixture failures.
+
 ## Verification
 
 Use targeted lint and workspace type checks locally. The
