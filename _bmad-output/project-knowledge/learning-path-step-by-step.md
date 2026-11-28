@@ -22770,4 +22770,8 @@ you want in Closet. The **Add** button shows how many pieces you kept.
 - [Web capture](../../apps/web/src/app/components/garment-capture-modal.test.tsx),
   [native capture](../../apps/mobile/components/wardrobe/garment-capture-modal.test.tsx), and
   [batch state](../../packages/utils/src/wardrobe/garment-photo-batch.spec.ts).
+- [Web Closet polling](../../apps/web/src/app/wardrobe/page.test.tsx),
+  [native Closet polling](../../apps/mobile/src/features/wardrobe/wardrobe-hub-screen.test.tsx), and
+  [web upload attempt identity](../../apps/web/src/lib/wardrobe.test.ts).
+- [Native temporary photo cleanup](../../apps/mobile/src/lib/garment-capture-image.test.ts).
 - [Step 84](#step-84-suggested-tags-that-are-right) covers tag review after upload.

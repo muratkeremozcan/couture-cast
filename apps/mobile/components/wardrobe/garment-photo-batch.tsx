@@ -39,6 +39,7 @@ import {
 } from '@/src/lib/garment-capture-image'
 import {
   garmentImageFingerprint,
+  garmentUploadBlock,
   uploadGarmentImageFromMobile,
 } from '@/src/lib/garment-upload'
 import { currentUploadSession, isUploadSessionCurrent } from '@/src/lib/upload-attempts'
@@ -99,6 +100,7 @@ export function MobileGarmentPhotoBatch({
           releasePrepared: ({ image }) => releaseGarmentCaptureFile(image.file),
           upload: (prepared, uploadSession, attemptId, signal) =>
             uploadGarmentImageFromMobile({ prepared, uploadSession, attemptId, signal }),
+          classifyBlock: garmentUploadBlock,
           onCommitted: ({ garment, accessToken }) =>
             committed.current(garment, accessToken),
         },
@@ -113,7 +115,7 @@ export function MobileGarmentPhotoBatch({
     }
   }, [batch, resetRef])
   const title = useRef<ElementRef<typeof NativeText>>(null)
-  const { phase, rows, keptCount, busy, pickerError } = state ?? batch.state
+  const { phase, rows, keptCount, busy, pickerError, blocked } = state ?? batch.state
   useEffect(() => {
     if (phase === 'source' || Platform.OS === 'web') return
     const node = safeFindNodeHandle(title.current)
@@ -170,6 +172,19 @@ export function MobileGarmentPhotoBatch({
       >
         {phase === 'review' ? strings.review : strings.results}
       </NativeText>
+      {blocked && (
+        <Text
+          accessibilityRole="alert"
+          testID="garment-batch-blocked"
+          style={themed.danger}
+        >
+          {t(
+            blocked === 'consentRequired'
+              ? 'wardrobe.error.consent_required'
+              : 'wardrobe.error.sign_in_required'
+          )}
+        </Text>
+      )}
       <ScrollView contentContainerStyle={styles.rows}>
         {rows.map((row) => (
           <View
@@ -212,7 +227,7 @@ export function MobileGarmentPhotoBatch({
                 </Text>
               )}
             </View>
-            {row.status === 'failed' && (
+            {row.status === 'failed' && !blocked && (
               <Pressable
                 accessibilityRole="button"
                 accessibilityHint={strings.photo(row.id)}

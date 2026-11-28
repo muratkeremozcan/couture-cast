@@ -6,6 +6,7 @@ import {
   WARDROBE_UPLOAD_CACHE_CONTROL,
   type UploadAttemptSession,
 } from '@couture/api-client/contracts/http'
+import type { GarmentPhotoBatchBlock } from '@couture/utils'
 import { resolveMobileApiBaseUrl } from './api-client'
 import { sha256Hex } from './expo-native-helpers'
 import type { PreparedGarmentImage } from './garment-capture-image'
@@ -16,6 +17,7 @@ import {
   resolveUploadBearer,
   runTrackedUpload,
   throwUploadStepError,
+  uploadFailureOf,
 } from './upload-attempts'
 
 const garmentUploadAttempts = createUploadAttempts<{
@@ -31,6 +33,17 @@ const GARMENT_REQUEST_DEADLINE_MS = 15_000
 export class GarmentUploadError extends Error {
   constructor(readonly kind: 'image_too_large' | 'sign_in_required') {
     super(kind)
+  }
+}
+
+export function garmentUploadBlock(error: unknown): GarmentPhotoBatchBlock | undefined {
+  if (error instanceof GarmentUploadError && error.kind === 'sign_in_required') {
+    return 'signedOut'
+  }
+  const failure = uploadFailureOf(error)
+  if (failure?.status === 401) return 'signedOut'
+  if (failure?.status === 403 && failure.code === 'GUARDIAN_CONSENT_REQUIRED') {
+    return 'consentRequired'
   }
 }
 
@@ -157,6 +170,7 @@ export async function uploadGarmentImageFromMobile({
           mimeType: prepared.mimeType,
           body: bytes.buffer,
           signal,
+          timeoutMs: 30_000,
         })
       },
       commit: async (allocation, idempotencyKey) => {

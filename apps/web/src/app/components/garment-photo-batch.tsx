@@ -1,6 +1,7 @@
 'use client'
 
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -20,6 +21,7 @@ import {
   type GarmentPhotoBatchState,
 } from '@couture/utils'
 import { useTranslation } from 'react-i18next'
+import { garmentUploadErrorKey } from '../../lib/garment-upload-errors'
 import { currentUploadSession, isUploadSessionCurrent } from '../../lib/upload-attempts'
 import {
   garmentImageFingerprint,
@@ -96,37 +98,50 @@ export function WebGarmentPhotoBatch({
               attemptId,
               signal,
             }),
+          classifyBlock: (error) => {
+            const key = garmentUploadErrorKey(error)
+            if (key === 'consentRequired' || key === 'signedOut') return key
+          },
           onCommitted: (result) => callbacks.current.onGarmentCommitted(result),
         },
         setState
       )
   )
-  useLayoutEffect(() => {
-    resetRef.current = () => batch.reset()
-    return () => {
-      resetRef.current = null
-      batch.reset(false)
-    }
-  }, [batch, resetRef])
-
   const initialInput = useRef<HTMLInputElement>(null)
   const retryInput = useRef<HTMLInputElement>(null)
   const initialPick = useRef<GarmentPhotoBatchPick | null>(null)
   const retryPick = useRef<GarmentPhotoBatchPick | null>(null)
   const heading = useRef<HTMLHeadingElement>(null)
-  const { phase, rows, keptCount, busy, pickerError } = state ?? batch.state
+  const { phase, rows, keptCount, busy, pickerError, blocked } = state ?? batch.state
+  useLayoutEffect(() => {
+    const reset = (publish: boolean) => {
+      initialPick.current = null
+      retryPick.current = null
+      batch.reset(publish)
+    }
+    resetRef.current = () => reset(true)
+    return () => {
+      resetRef.current = null
+      reset(false)
+    }
+  }, [batch, resetRef])
   useEffect(() => {
     if (phase !== 'source') heading.current?.focus()
   }, [phase])
+  const cancelPick = useCallback(
+    (ref: RefObject<GarmentPhotoBatchPick | null>) => {
+      const pick = ref.current
+      ref.current = null
+      if (pick) batch.cancelPicker(pick)
+    },
+    [batch]
+  )
   useEffect(() => {
     const bindCancel = (
       input: HTMLInputElement | null,
       ref: RefObject<GarmentPhotoBatchPick | null>
     ) => {
-      const cancel = () => {
-        if (ref.current) batch.cancelPicker(ref.current)
-        ref.current = null
-      }
+      const cancel = () => cancelPick(ref)
       input?.addEventListener('cancel', cancel)
       return () => input?.removeEventListener('cancel', cancel)
     }
@@ -136,9 +151,12 @@ export function WebGarmentPhotoBatch({
       removeInitial()
       removeRetry()
     }
-  }, [batch])
+  }, [cancelPick])
 
   const openPicker = (id?: number) => {
+    // A new click means the previous picker closed, even if it missed its cancel event.
+    cancelPick(initialPick)
+    cancelPick(retryPick)
     if (id === undefined) {
       const pick = batch.open(currentUploadSession())
       if (!pick) return
@@ -156,8 +174,7 @@ export function WebGarmentPhotoBatch({
     const files = Array.from(event.currentTarget.files ?? [])
     event.currentTarget.value = ''
     const ref = retry ? retryPick : initialPick
-    // Programmatic selection and file drops deliver change without a picker click.
-    const pick = ref.current ?? (retry ? null : batch.open(currentUploadSession()))
+    const pick = ref.current
     ref.current = null
     if (pick) void batch.accept(pick, files)
   }
@@ -203,6 +220,15 @@ export function WebGarmentPhotoBatch({
           <h3 ref={heading} tabIndex={-1} className="text-base font-semibold text-ink">
             {phase === 'review' ? strings.review : strings.results}
           </h3>
+          {blocked && (
+            <p
+              role="alert"
+              data-testid="garment-batch-blocked"
+              className="text-sm text-danger-ink"
+            >
+              {t(`wardrobe.capture.errors.${blocked}`)}
+            </p>
+          )}
           <ul className="max-h-[55dvh] space-y-2 overflow-y-auto">
             {rows.map((row) => (
               <li
@@ -243,7 +269,7 @@ export function WebGarmentPhotoBatch({
                     </p>
                   )}
                 </div>
-                {row.status === 'failed' && (
+                {row.status === 'failed' && !blocked && (
                   <button
                     type="button"
                     data-testid={`garment-batch-retry-${row.id}`}

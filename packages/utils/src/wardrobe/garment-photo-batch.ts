@@ -10,6 +10,7 @@ type RowStatus =
   | 'failed'
 
 export type GarmentPhotoBatchPickerError = 'tooMany' | 'pickerFailed'
+export type GarmentPhotoBatchBlock = 'consentRequired' | 'signedOut'
 
 export type GarmentPhotoBatchRow = {
   id: number
@@ -25,6 +26,7 @@ export type GarmentPhotoBatchState = {
   busy: boolean
   keptCount: number
   pickerError?: GarmentPhotoBatchPickerError
+  blocked?: GarmentPhotoBatchBlock
 }
 
 type PreparedPhoto<Image> = { image: Image; preview: string; fingerprint: string }
@@ -42,6 +44,7 @@ type BatchAdapter<Source, Image, Session, Result> = {
     attemptId: string,
     signal: AbortSignal
   ) => Promise<Result>
+  classifyBlock: (error: unknown) => GarmentPhotoBatchBlock | undefined
   onCommitted: (result: Result) => void
 }
 
@@ -92,6 +95,7 @@ export class GarmentPhotoBatch<Source, Image, Session, Result> {
       !this.owns(this.active) ||
       this.pick ||
       this.state.busy ||
+      this.state.blocked ||
       this.state.rows.find((row) => row.id === rowId)?.status !== 'failed'
     ) {
       return null
@@ -174,11 +178,11 @@ export class GarmentPhotoBatch<Source, Image, Session, Result> {
     })
     this.update({ phase: 'results', rows, busy: true })
     for (const row of rows) {
-      if (!this.owns(batch)) return
+      if (!this.owns(batch) || this.state.blocked) return
       const photo = this.prepared.get(row.id)
       if (photo) await this.upload(batch, row.id, photo)
     }
-    if (this.owns(batch)) this.update({ busy: false })
+    if (this.owns(batch) && !this.state.blocked) this.update({ busy: false })
   }
 
   /** Cleanup also runs on unmount, when there is no state to publish. */
@@ -186,9 +190,7 @@ export class GarmentPhotoBatch<Source, Image, Session, Result> {
     this.active?.controller.abort()
     this.active = null
     this.pick = null
-    this.prepared.forEach(this.adapter.releasePrepared)
-    this.prepared.clear()
-    this.fingerprints.clear()
+    this.clearPhotos()
     this.state = emptyState
     if (publish) this.onChange(this.state)
   }
@@ -226,7 +228,7 @@ export class GarmentPhotoBatch<Source, Image, Session, Result> {
       if (photo) this.adapter.releasePrepared(photo)
       this.updateRow(id, { status: 'failed', differentPhoto: true })
     }
-    if (this.owns(batch)) this.update({ busy: false })
+    if (this.owns(batch) && !this.state.blocked) this.update({ busy: false })
   }
 
   private async upload(
@@ -236,6 +238,7 @@ export class GarmentPhotoBatch<Source, Image, Session, Result> {
   ) {
     this.updateRow(id, { status: 'uploading' })
     let outcome: { result: Result } | undefined
+    let blocked: GarmentPhotoBatchBlock | undefined
     try {
       const result = await this.adapter.upload(
         photo.image,
@@ -244,10 +247,24 @@ export class GarmentPhotoBatch<Source, Image, Session, Result> {
         batch.controller.signal
       )
       outcome = { result }
-    } catch {
-      // Keep the fingerprint and row identity for an explicit retry.
+    } catch (error) {
+      blocked = this.adapter.classifyBlock(error)
     }
     if (!this.owns(batch)) return
+    if (blocked) {
+      this.clearPhotos()
+      this.update({
+        blocked,
+        busy: false,
+        rows: this.state.rows.map((row) =>
+          row.status === 'uploading' || row.status === 'queued'
+            ? { ...row, status: 'failed', preview: undefined }
+            : row
+        ),
+      })
+      return
+    }
+    // Other failures keep the fingerprint and row identity for an explicit retry.
     this.release(id)
     this.updateRow(id, { status: outcome ? 'saved' : 'failed', preview: undefined })
     if (outcome) {
@@ -261,6 +278,12 @@ export class GarmentPhotoBatch<Source, Image, Session, Result> {
     if (!photo) return
     this.prepared.delete(id)
     this.adapter.releasePrepared(photo)
+  }
+
+  private clearPhotos() {
+    this.prepared.forEach(this.adapter.releasePrepared)
+    this.prepared.clear()
+    this.fingerprints.clear()
   }
 
   private updateRow(id: number, patch: Partial<GarmentPhotoBatchRow>) {

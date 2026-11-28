@@ -3,15 +3,17 @@ title: 'Story CC-7.28: Add several photos at once'
 type: feature
 ticket: '7-28-add-several-photos-once'
 created: '2026-11-28'
-status: in-review
+status: built
 baseline_revision: 'a6ce147492c565bffe7ee6ea16febf53ec57e676'
 route: full
 route_source: auto
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
-review_loop_iteration: 0
+lenses_ran:
+  - 'independent-correctness'
+  - 'codex-security'
+review_loop_iteration: 1
 context:
   - '_bmad-output/implementation-artifacts/epic-7-context.md'
   - '_bmad-output/implementation-artifacts/spec-7-27-suggested-tags-that-are-right.md'
@@ -64,7 +66,7 @@ Each confirmed photo represents one garment. Each row reports its own upload res
 - [x] Implement batch state, sequential save, stable retry and resource lifetime.
 - [x] Wire the web and native Closet entry points, previews, controls and localized copy.
 - [x] TEA covers user paths and retry and cleanup edge cases. Link Step 85 from the new tests.
-- [ ] Record Step 85 and complete the sprint status after review and verification.
+- [x] Cross-link Step 85 and complete the sprint status.
 
 Given four valid photos and four Keep selections, when the member presses Add 4 pieces, then four individual pieces appear in Closet.
 
@@ -82,9 +84,29 @@ session expires after 15 minutes. The hourly sweep can remove its staged object 
 upload window and the 15-minute safety margin have elapsed. The user cannot read staged objects.
 A commit already accepted by the server stays saved if the reply is lost or the sheet closes.
 
+The batch stops on an account-wide sign-in or guardian-consent refusal.
+It releases queued photos and keeps any pieces already saved.
+The member can restart from Closet once the account can upload.
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+The independent review covered all 21 changed paths from
+`a6ce147492c565bffe7ee6ea16febf53ec57e676` to
+`a4371d83a12531544a6e2a339ecea13ffe9be018`.
+Codex Security scan `a4371d83a125_20261128T113656Z` covered 17 worklist rows and four supplemental paths, with zero findings and zero deferrals.
+
+| Finding                                | Resolution                                                                                                  |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| P0-1 Shared coverage                   | Cover localized counts and the batch guards under the utils ratchet.                                        |
+| P0-2 Native file cleanup mock          | Mock the Expo cache path and exercise the cache boundary.                                                   |
+| P1-1 Browser picker recovery           | Replace a dismissed pick on the next click and ignore events with no current ticket.                        |
+| P1-2 Browser and native coverage       | Exercise the result and retry states, then verify the Closet retains both saved pieces.                     |
+| P2-1 Poll tracking                     | Drop missing and settled IDs and clear tracking when a poll ends. Manual refresh aborts the web batch poll. |
+| P2-2 Native request and cleanup limits | Bound the storage PUT and handle unavailable cache paths.                                                   |
+| P2-3 Account refusal                   | Stop queued saves and show localized sign-in or guardian-consent guidance.                                  |
+| P3-1 Story closeout                    | Cross-link Step 85 and finish the spec and sprint status.                                                   |
 
 ## Verification
 

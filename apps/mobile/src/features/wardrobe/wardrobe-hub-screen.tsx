@@ -557,10 +557,15 @@ function MemberWardrobeHub({
           refreshGarmentList
         )) {
           if (controller.signal.aborted || epoch !== mobileIdentityEpoch()) return
-          for (const item of persisted) {
-            if (item.status !== 'processing') batchPendingIds.current.delete(item.id)
+          const pending = batchPendingIds.current
+          for (const id of pending) {
+            if (
+              !persisted.some((item) => item.id === id && item.status === 'processing')
+            ) {
+              pending.delete(id)
+            }
           }
-          if (batchPendingIds.current.size === 0) return
+          if (pending.size === 0) return
         }
         if (!controller.signal.aborted && epoch === mobileIdentityEpoch()) {
           setErrorMessage(t('wardrobe.tagging.poll_timeout'))
@@ -570,6 +575,12 @@ function MemberWardrobeHub({
           setErrorMessage(
             error instanceof Error ? error.message : t('wardrobe.tagging.load_failed')
           )
+        }
+      } finally {
+        // A poll superseded by another commit shares the new poll's pending IDs.
+        if (batchPollingAbortRef.current === controller) {
+          batchPendingIds.current.clear()
+          batchPollingAbortRef.current = null
         }
       }
     })()

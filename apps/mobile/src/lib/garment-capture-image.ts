@@ -30,15 +30,20 @@ export function releaseGarmentCaptureFile(file: File) {
 
 /** Expo ImagePicker copies assets into its own app cache directory on iOS and Android. */
 export function releaseImagePickerCopy(uri: string) {
-  const cacheUri = typeof Paths.cache === 'string' ? Paths.cache : Paths.cache.uri
-  const prefix = `${cacheUri.replace(/\/$/, '')}/ImagePicker/`
-  if (
-    !uri.startsWith(prefix) ||
-    !/^[a-z0-9][a-z0-9_.-]*$/i.test(uri.slice(prefix.length))
-  ) {
-    return
+  try {
+    const cache = Paths.cache
+    const cacheUri = typeof cache === 'string' ? cache : cache?.uri
+    if (!cacheUri) return
+    const prefix = `${cacheUri.replace(/\/$/, '')}/ImagePicker/`
+    if (
+      uri.startsWith(prefix) &&
+      /^[a-z0-9][a-z0-9_.-]*$/i.test(uri.slice(prefix.length))
+    ) {
+      releaseGarmentCaptureFile(new File(uri))
+    }
+  } catch {
+    // Some runtimes cannot resolve the native cache directory.
   }
-  releaseGarmentCaptureFile(new File(uri))
 }
 
 function cropForAspect(image: GarmentCaptureSource, aspectRatio: GarmentCropRatio) {

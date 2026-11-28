@@ -879,6 +879,8 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
 
   useEffect(() => {
     pollingControllerRef.current?.abort()
+    batchPollingControllerRef.current?.abort()
+    batchPendingIds.current.clear()
     const controller = new AbortController()
     listController.current = controller
     setIsLoading(true)
@@ -941,10 +943,22 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     })
 
   const settleBatchRows = (persisted: GarmentItemContract[] | null) => {
-    for (const garment of persisted ?? []) {
-      if (garment.status !== 'processing') batchPendingIds.current.delete(garment.id)
+    if (!persisted) return false
+    const pending = batchPendingIds.current
+    for (const id of pending) {
+      if (!persisted.some((item) => item.id === id && item.status === 'processing')) {
+        pending.delete(id)
+      }
     }
-    return batchPendingIds.current.size === 0
+    return pending.size === 0
+  }
+
+  const handleSinglePolledGarment = (garment: GarmentItemContract) => {
+    if (garment.status === 'ready') setConfirmedGarment(true)
+    if (garment.status === 'awaiting_tags') {
+      if (isCaptureOpenRef.current) pendingTaggingGarmentIdRef.current = garment.id
+      else openTagging(garment.id)
+    }
   }
 
   const pollCommittedGarment = (garmentId: string, batch = false) => {
@@ -975,14 +989,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
           }
           const current = persisted?.find((garment) => garment.id === garmentId)
           if (!current || current.status === 'processing') continue
-          if (current.status === 'ready') setConfirmedGarment(true)
-          if (current.status === 'awaiting_tags') {
-            if (isCaptureOpenRef.current) {
-              pendingTaggingGarmentIdRef.current = current.id
-            } else {
-              openTagging(current.id)
-            }
-          }
+          handleSinglePolledGarment(current)
           return
         }
         setGarmentError(t('wardrobe.hub.taggingSlow'))
@@ -991,6 +998,12 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
           setGarmentError(
             error instanceof Error ? error.message : t('wardrobe.hub.statusRefreshFailed')
           )
+        }
+      } finally {
+        // A poll superseded by another commit shares the new poll's pending IDs.
+        if (batch && poll.current === controller) {
+          batchPendingIds.current.clear()
+          poll.current = null
         }
       }
     })()
