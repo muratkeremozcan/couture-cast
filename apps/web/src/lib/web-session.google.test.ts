@@ -55,14 +55,14 @@ function session(principal: string, token: string): Session {
   }
 }
 
-function profile(id: string) {
+function profile(id: string, role = 'guardian') {
   return {
     user: {
       id,
       email: `${id}@synthetic.test`,
       displayName: null,
       birthdate: null,
-      role: 'guardian',
+      role,
     },
     linkedGuardians: [],
     linkedTeens: [],
@@ -321,24 +321,103 @@ describe('completeWebOAuth: one outcome per callback, never a throw', () => {
     expect(sdk.signOut).toHaveBeenCalledTimes(1)
   })
 
-  // Owner's production loop (2026-11-15): the guardian lock answers a pending teen's profile
-  // check 403. The status names awaiting_guardian, so the session stays and nothing refuses.
-  it('awaiting_guardian: a teen the guardian lock refuses keeps the session and is not refused', async () => {
-    const seen = profileAnswers(json({ message: 'Guardian consent required' }, 403))
-    const federated = federatedAnswer(
-      json({ status: 'awaiting_guardian', accountId: 'teen-pending-1' })
-    )
+  it.each([403, 200])(
+    'awaiting_guardian preserves the identity when the profile responds %i',
+    async (status) => {
+      const seen = profileAnswers(
+        status === 200
+          ? json(profile('teen-pending-1', 'teen'))
+          : json({ message: 'Guardian consent required' }, status)
+      )
+      const federated = federatedAnswer(
+        json({ status: 'awaiting_guardian', accountId: 'teen-pending-1' })
+      )
+      const auth = await load()
+      await expect(
+        auth.completeWebOAuth(params(`code=pending-teen-${status}`))
+      ).resolves.toEqual({ kind: 'awaiting_guardian' })
+      expect(seen).toHaveLength(1)
+      expect(federated).toHaveLength(1)
+      expect(sdk.signOut).not.toHaveBeenCalled()
+      expect(sessionStorage.getItem(FINISH_MARKER)).toBeNull()
+      await expect(auth.fetchWebAwaitingGuardianAccount('signed-google')).resolves.toBe(
+        'teen-pending-1'
+      )
+    }
+  )
+
+  it('reports unavailable when the verified teen guardian status cannot be read', async () => {
+    profileAnswers(json(profile('teen-status-unavailable', 'teen')))
+    const federated = federatedAnswer(json({ message: 'Unavailable' }, 503))
     const auth = await load()
-    await expect(auth.completeWebOAuth(params('code=pending-teen'))).resolves.toEqual({
-      kind: 'awaiting_guardian',
-    })
-    expect(seen).toHaveLength(1)
-    expect(federated).toHaveLength(1)
+
+    await expect(
+      auth.completeWebOAuth(params('code=teen-status-unavailable'))
+    ).resolves.toEqual({ kind: 'unavailable' })
+
+    expect(federated).toEqual(['Bearer signed-google-session'])
     expect(sdk.signOut).not.toHaveBeenCalled()
-    expect(sessionStorage.getItem(FINISH_MARKER)).toBeNull()
-    await expect(auth.fetchWebAwaitingGuardianAccount('signed-google')).resolves.toBe(
-      'teen-pending-1'
+  })
+
+  it('recovers a duplicate Google signup into the pending guardian step for the same account', async () => {
+    profileAnswers(unauthorized)
+    federatedAnswer(json({ status: 'needs_birthdate' }))
+    const auth = await load()
+    await expect(
+      auth.completeWebOAuth(params('code=pending-guardian-conflict'))
+    ).resolves.toEqual({ kind: 'no_account' })
+    profileAnswers(json(profile('teen-conflict', 'teen')))
+    federatedAnswer(json({ status: 'awaiting_guardian', accountId: 'teen-conflict' }))
+    installHandlers(
+      http.post(federatedPath, json({ message: 'Account already exists' }, 409))
     )
+
+    await expect(auth.finishWebFederatedSignup('1990-01-01')).resolves.toEqual({
+      kind: 'awaiting_guardian',
+      accountId: 'teen-conflict',
+    })
+    expect(sdk.signOut).not.toHaveBeenCalled()
+  })
+
+  it('clears the finish step when a duplicate Google signup re-verifies the adult account', async () => {
+    const seen = profileAnswers(unauthorized, json(profile('adult-conflict')))
+    federatedAnswer(json({ status: 'needs_birthdate' }))
+    const auth = await load()
+    await expect(auth.completeWebOAuth(params('code=adult-conflict'))).resolves.toEqual({
+      kind: 'no_account',
+    })
+    installHandlers(
+      http.post(federatedPath, json({ message: 'Account already exists' }, 409))
+    )
+
+    await expect(auth.finishWebFederatedSignup('1990-01-01')).resolves.toEqual({
+      kind: 'signed_in',
+    })
+    expect(seen).toHaveLength(2)
+    expect(auth.webSessionIdentity()).toBe('adult-conflict')
+    expect(sessionStorage.getItem(FINISH_MARKER)).toBeNull()
+  })
+
+  it.each([
+    ['sign-out', null, 'no_session'],
+    ['account switch', session('other-google', 'other-bearer'), 'unavailable'],
+  ] as const)('stops duplicate signup recovery after %s', async (change, next, kind) => {
+    const seen = profileAnswers(unauthorized)
+    const federated = federatedAnswer(json({ status: 'needs_birthdate' }))
+    const auth = await load()
+    await expect(
+      auth.completeWebOAuth(params(`code=conflict-${encodeURIComponent(change)}`))
+    ).resolves.toEqual({ kind: 'no_account' })
+    installHandlers(
+      http.post(federatedPath, () => {
+        sdk.session = next
+        return HttpResponse.json({ message: 'Account already exists' }, { status: 409 })
+      })
+    )
+
+    await expect(auth.finishWebFederatedSignup('1990-01-01')).resolves.toEqual({ kind })
+    expect(seen).toEqual(['Bearer signed-google-session'])
+    expect(federated).toEqual(['Bearer signed-google-session'])
   })
 
   it('complete then a 200 re-verify answers member', async () => {

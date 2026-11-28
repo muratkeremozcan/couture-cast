@@ -13,11 +13,13 @@ import {
   evaluateBirthdateInput,
   getBirthdateNotice,
   getFederatedSignInStrings,
+  getGuestPreviewStrings,
   type FederatedSignInStrings,
 } from '@couture/utils'
 import { Text, View, createSchemeStyles } from '@/components/themed'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { inviteGuardianFromMobile } from '@/src/lib/guardian'
+import { mobileGuestPreviewBirthdate } from '@/src/lib/guest-preview-birthdate'
 import type {
   NativeFederatedFinishResult,
   readNativeFederatedIdentity as ReadIdentity,
@@ -45,6 +47,8 @@ export type FinishSignupExit =
   | 'until_approved'
 
 type FinishSignupScreenProps = {
+  fromPreview?: boolean
+  savingGuestLook?: boolean | null
   /** The route navigates; this screen stays router-free. */
   onExit: (exit: FinishSignupExit) => void
   /** Story 6.16 D2: an age refusal outranks the preview's self-reported gate. */
@@ -57,7 +61,10 @@ type FinishSignupScreenProps = {
   readIdentity?: typeof ReadIdentity
   /** The teen account the identity waits on a guardian for, or null (the birthdate form). */
   awaitingAccount?: (accessToken: string) => Promise<string | null>
-  finish?: (birthdate: string) => Promise<NativeFederatedFinishResult>
+  finish?: (
+    birthdate: string,
+    fromPreview?: boolean
+  ) => Promise<NativeFederatedFinishResult>
   cancel?: () => Promise<void>
   inviteGuardian?: (input: GuardianInvitationInput) => Promise<GuardianInvitationResponse>
 }
@@ -70,8 +77,8 @@ const session = () => import('../../lib/native-session.js')
 // teen's guardian step with the form again.
 const readSessionIdentity: typeof ReadIdentity = async () =>
   (await session()).readNativeFederatedIdentity()
-const finishSession = async (birthdate: string) =>
-  (await session()).finishNativeFederatedSignup(birthdate)
+const finishSession = async (birthdate: string, fromPreview?: boolean) =>
+  (await session()).finishNativeFederatedSignup(birthdate, fromPreview)
 const cancelSession = async () => (await session()).cancelNativeFederatedSignup()
 const awaitingSessionAccount = async (accessToken: string) =>
   (await session()).fetchNativeAwaitingGuardianAccount(accessToken)
@@ -91,15 +98,20 @@ function useFinishStepChrome({
   phase,
   message,
   inlineError,
+  savingGuestLook,
   onTitleChange,
 }: {
   phase: Phase['kind']
   message: string | null
   inlineError: string | null
+  savingGuestLook: boolean | null
   onTitleChange?: (title: string) => void
 }) {
   const { i18n } = useTranslation()
   const strings = getFederatedSignInStrings(i18n.language)
+  const guardianPending = savingGuestLook
+    ? getGuestPreviewStrings(i18n.language).firstRun.guardianPending
+    : undefined
   const { announce } = useAccessibilityAnnouncer()
 
   useEffect(() => {
@@ -125,12 +137,16 @@ function useFinishStepChrome({
     if (phase === 'underage') announce('error', strings.underage)
     else if (phase === 'refused') announce('error', strings.refused)
     else if (phase === 'no_session') announce('error', strings.noSession)
-    else if (phase === 'created') announce('feedback', strings.createdGuardianPending)
-    else if (phase === 'awaiting_guardian') announce('feedback', strings.awaitingGuardian)
-  }, [announce, phase, strings])
+    else if (phase === 'created')
+      announce('feedback', guardianPending ?? strings.createdGuardianPending)
+    else if (phase === 'awaiting_guardian')
+      announce('feedback', guardianPending ?? strings.awaitingGuardian)
+  }, [announce, guardianPending, phase, strings])
 }
 
 export function FinishSignupScreen({
+  fromPreview = false,
+  savingGuestLook = false,
   onExit,
   onUnderage = ignoreUnderage,
   readIdentity = readSessionIdentity,
@@ -152,6 +168,12 @@ export function FinishSignupScreen({
     birthdate,
     strings
   )
+
+  useEffect(() => {
+    if (!fromPreview) return
+    const date = mobileGuestPreviewBirthdate.read()
+    if (date) setBirthdate((draft) => draft || date)
+  }, [fromPreview])
 
   useEffect(() => {
     let active = true
@@ -181,7 +203,13 @@ export function FinishSignupScreen({
     if (phase.kind === 'form') birthdateRef.current?.focus()
   }, [phase.kind])
 
-  useFinishStepChrome({ phase: phase.kind, message, inlineError, onTitleChange })
+  useFinishStepChrome({
+    phase: phase.kind,
+    message,
+    inlineError,
+    savingGuestLook,
+    onTitleChange,
+  })
 
   function cancelFinish() {
     setBusy('cancel')
@@ -208,7 +236,11 @@ export function FinishSignupScreen({
     setBusy('create')
     try {
       // An under-13 birthdate still goes to the server, which deletes the Google identity.
-      const result = await finish(birthdate)
+      const result = fromPreview ? await finish(birthdate, true) : await finish(birthdate)
+      if (result.kind !== 'unavailable') {
+        mobileGuestPreviewBirthdate.clear()
+        setBirthdate('')
+      }
       switch (result.kind) {
         case 'created':
           if (result.account.guardianConsentRequired)
@@ -217,6 +249,9 @@ export function FinishSignupScreen({
           return
         case 'signed_in':
           onExit('continue')
+          return
+        case 'awaiting_guardian':
+          setPhase({ kind: 'awaiting_guardian', accountId: result.accountId })
           return
         case 'underage':
           onUnderage()
@@ -281,7 +316,8 @@ export function FinishSignupScreen({
       <GuardianStep
         phase={phase}
         inviteGuardian={inviteGuardian}
-        onLeave={() => onExit('until_approved')}
+        savingGuestLook={savingGuestLook}
+        onLeave={() => onExit(savingGuestLook ? 'continue' : 'until_approved')}
       />
     )
 
@@ -372,23 +408,25 @@ const onGuardianStep = (phase: Phase): phase is GuardianPhase =>
   phase.kind === 'created' || phase.kind === 'awaiting_guardian'
 
 /**
- * The teen's guardian step: a new account (`created`) or a returning teen still waiting
- * (`awaiting_guardian`). Leaving it ends the session, because every signed-in request refuses
- * the teen until a guardian approves.
+ * A waiting teen can send the invitation and continue a guest look save.
  */
 function GuardianStep({
   phase,
   inviteGuardian,
+  savingGuestLook,
   onLeave,
 }: {
   phase: GuardianPhase
   inviteGuardian: (input: GuardianInvitationInput) => Promise<GuardianInvitationResponse>
+  savingGuestLook: boolean | null
   onLeave: () => void
 }) {
   const styles = useStyles()
   const { i18n } = useTranslation()
   const strings = getFederatedSignInStrings(i18n.language)
+  const firstRun = getGuestPreviewStrings(i18n.language).firstRun
   const created = phase.kind === 'created'
+  const pending = created ? strings.createdGuardianPending : strings.awaitingGuardian
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.container}>
       <Text
@@ -396,19 +434,24 @@ function GuardianStep({
         accessibilityRole="alert"
         style={styles.success}
       >
-        {created ? strings.createdGuardianPending : strings.awaitingGuardian}
+        {savingGuestLook ? firstRun.guardianPending : pending}
       </Text>
       <GuardianInvitePanel
         teenId={created ? phase.account.userId : phase.accountId}
         inviteGuardian={inviteGuardian}
+        intro={savingGuestLook ? firstRun.guardianInvite : strings.guardianIntro}
       />
       <Pressable
         accessibilityRole="button"
         testID="guardian-step-continue"
         onPress={onLeave}
-        style={styles.button}
+        style={[styles.button, savingGuestLook === null && styles.disabled]}
+        disabled={savingGuestLook === null}
+        accessibilityState={{ disabled: savingGuestLook === null }}
       >
-        <Text style={styles.buttonText}>{strings.guardianStepLeave}</Text>
+        <Text style={styles.buttonText}>
+          {savingGuestLook ? strings.continue : strings.guardianStepLeave}
+        </Text>
       </Pressable>
     </ScrollView>
   )
@@ -417,9 +460,11 @@ function GuardianStep({
 function GuardianInvitePanel({
   teenId,
   inviteGuardian,
+  intro,
 }: {
   teenId: string
   inviteGuardian: (input: GuardianInvitationInput) => Promise<GuardianInvitationResponse>
+  intro: string
 }) {
   const styles = useStyles()
   const { i18n } = useTranslation()
@@ -455,7 +500,7 @@ function GuardianInvitePanel({
   return (
     <View style={styles.card}>
       <Text style={styles.eyebrow}>{strings.guardianTitle}</Text>
-      <Text style={styles.body}>{strings.guardianIntro}</Text>
+      <Text style={styles.body}>{intro}</Text>
       <Text style={styles.label}>{strings.guardianEmail}</Text>
       <TextInput
         testID="guardian-invite-email"

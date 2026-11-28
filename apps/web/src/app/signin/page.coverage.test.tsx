@@ -61,12 +61,12 @@ describe('OTP sign-in recovery', () => {
     fireEvent.change(code, { target: { value: '123456' } })
     fireEvent.click(screen.getByRole('button', { name: label('verify') }))
     await screen.findByText(label('signinCodeInvalid'))
-    expect(auth.verify).toHaveBeenCalledWith('member@example.test', '123456')
+    expect(auth.verify).toHaveBeenCalledWith('member@example.test', '123456', false)
     expect(code).toHaveValue('123456')
     fireEvent.change(code, { target: { value: '654321' } })
     fireEvent.click(screen.getByRole('button', { name: label('verify') }))
     await waitFor(() =>
-      expect(auth.verify).toHaveBeenLastCalledWith('member@example.test', '654321')
+      expect(auth.verify).toHaveBeenLastCalledWith('member@example.test', '654321', false)
     )
     await waitFor(() =>
       expect(screen.getByRole('button', { name: label('verify') })).toBeEnabled()

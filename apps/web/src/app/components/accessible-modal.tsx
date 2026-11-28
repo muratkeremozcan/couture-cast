@@ -53,6 +53,9 @@ export interface AccessibleModalProps {
    * no X: its back arrow always reads `shell.back`.
    */
   closeLabel?: string
+  /** Validate or prepare an in-app link before its navigation replaces the layer. */
+  onBeforeLinkNavigate?: (destination: string) => boolean
+  testId?: string
   children: React.ReactNode
   ariaLiveMessage?: string | null
   errorMessage?: string | null
@@ -138,6 +141,8 @@ export function AccessibleModal({
   closeLabel,
   fallbackFocusSelector,
   finalFocusSelector,
+  onBeforeLinkNavigate,
+  testId,
   children,
   ariaLiveMessage,
   errorMessage,
@@ -274,6 +279,7 @@ export function AccessibleModal({
     if (!router || destination === null) return
     event.preventDefault()
     event.stopPropagation()
+    if (onBeforeLinkNavigate && !onBeforeLinkNavigate(destination)) return
     layerHistoryRef.current?.handOff()
     router.replace(destination)
   }
@@ -329,6 +335,7 @@ export function AccessibleModal({
   return createPortal(
     <div
       role="dialog"
+      data-testid={testId}
       data-modal-overlay=""
       data-presentation={presentation}
       aria-modal={!suspended}

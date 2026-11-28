@@ -12,8 +12,8 @@ export function GuestPreviewConversion({
 }: {
   strings: GuestPreviewStrings
   offline: boolean
-  onCreateAccount: () => void
-  onSignIn: () => void
+  onCreateAccount: () => boolean
+  onSignIn: () => boolean
 }) {
   const detail = strings.conversionDetail
   return (
@@ -44,16 +44,20 @@ export function GuestPreviewConversion({
       <div className="flex flex-wrap gap-3">
         <Link
           href="/signup?from=preview"
-          onClick={onCreateAccount}
-          data-testid="guest-preview-create-account"
+          onClick={(event) => {
+            if (!onCreateAccount()) event.preventDefault()
+          }}
+          data-testid="guest-preview-garment-create-account"
           className="inline-flex min-h-11 items-center rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse"
         >
           {strings.chrome.createAccount}
         </Link>
         <Link
           href="/signin?from=preview"
-          onClick={onSignIn}
-          data-testid="guest-preview-sign-in"
+          onClick={(event) => {
+            if (!onSignIn()) event.preventDefault()
+          }}
+          data-testid="guest-preview-garment-sign-in"
           className="inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
         >
           {strings.chrome.signIn}

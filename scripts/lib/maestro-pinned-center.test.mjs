@@ -251,10 +251,8 @@ describe('pinnedCenterScrollCauses', () => {
 
 describe('google-preview-conversion.yaml centerElement steps', () => {
   test('moved between tries or were accepted on the first try in CI run 44082557117', () => {
-    // Android google sign-in lane, flow google-preview-conversion: thermal-cold and
-    // rain-high were accepted at once, wind-low moved from y=1843 to y=744 and
-    // create-account from y=2190 to y=1574. Runs 44013989992 and 44008122141 agree, so the
-    // four steps keep centerElement.
+    // Thermal-cold was accepted at once and wind-low moved between tries.
+    // CC-7.21 moved account creation to Preferences and exposed rain-high near a scroll edge.
     assert.deepEqual(
       findPinnedCenterScrolls(fixture('google-preview-conversion-centered.txt')),
       []
@@ -263,7 +261,13 @@ describe('google-preview-conversion.yaml centerElement steps', () => {
       path.join(root, 'maestro/google-sign-in/google-preview-conversion.yaml'),
       'utf8'
     )
-    assert.equal(flow.match(/centerElement: true/g)?.length, 4)
+    const centeredSelectors = [
+      ...flow.matchAll(/id: '([^']+)'\n {4}direction: \w+\n {4}centerElement: true/g),
+    ].map((match) => match[1])
+    assert.deepEqual(centeredSelectors, [
+      'guest-preview-thermal-cold',
+      'guest-preview-wind-low',
+    ])
   })
 })
 

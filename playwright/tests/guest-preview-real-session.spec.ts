@@ -3,13 +3,17 @@
 // Story 6.16 E-CONV-REAL-STACK (web): a guest signs up from the preview, signs in through
 // the real local OTP, and applies the preview's comfort settings through the verified API.
 // Runs only in the owned real-session lane (npm run test:pw-real-session).
+// CC-7.21: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-78-first-look-and-account-save
 import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { PrismaClient } from '@prisma/client'
 import { signupResponseSchema } from '@couture/api-client/contracts/http'
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
+import { CONSENT_REQUIRED_TAG } from '../../scripts/e2e-real-session/harness.mjs'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
   createRealCommunityAuthAccount,
+  type RealCommunityAccount,
   provisionRealCommunityAccount,
   readGeneratedCommunityCode,
   realCommunityEmail,
@@ -50,6 +54,73 @@ async function denyCameraAndCountRequests(page: Page) {
 const cameraRequests = (page: Page) =>
   page.evaluate((key) => Number(sessionStorage.getItem(key)), cameraRequestKey)
 
+// Pick a date away from birthdays and year boundaries in either client or server time.
+function teenBirthdate() {
+  const now = new Date()
+  now.setUTCFullYear(now.getUTCFullYear() - 14)
+  now.setUTCDate(now.getUTCDate() - 182)
+  return now.toISOString().slice(0, 10)
+}
+
+async function signInFromPreview(page: Page, account: RealCommunityAccount) {
+  await page.getByTestId('signup-sign-in-to-continue').click()
+  await expect(page).toHaveURL(/\/signin\?from=preview$/)
+  await page.locator('input[name="email"]').fill(account.email)
+  await page.locator('button[type="submit"]').click()
+  const code = page.locator('input[name="code"]')
+  await expect(code).toBeVisible()
+  await code.fill(readGeneratedCommunityCode(account))
+  await page.locator('button[type="submit"]').click()
+  await expect(page).toHaveURL(/\/preview\/continue$/)
+}
+
+async function createFirstRunAccount(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  birthdate: string,
+  email: string
+) {
+  await page.getByTestId('sample-save-look').click()
+  const sheet = page.getByTestId('guest-preview-save-sheet')
+  await expect(sheet).toBeVisible()
+  await sheet.getByTestId('guest-preview-create-account').click()
+  await expect(page).toHaveURL(/\/signup\?from=preview$/)
+  await expect(page.getByLabel('Birthdate')).toHaveValue(birthdate)
+  await page.getByLabel('Email').fill(email)
+  const signup = interceptNetworkCall({
+    method: 'POST',
+    url: '**/api/v1/auth/signup',
+  })
+  await page.getByRole('button', { name: 'Create account', exact: true }).click()
+  const created = await signup
+  expect(created.status).toBe(201)
+  expect(created.requestJson).toMatchObject({ birthdate })
+  return signupResponseSchema.parse(created.responseJson)
+}
+
+async function prepareFirstRunLook(page: Page, birthdate: string) {
+  await page.goto('/')
+  await page.getByTestId('guest-preview-entry').click()
+  await page.getByTestId('guest-preview-birthdate').fill(birthdate)
+  await page.getByTestId('guest-preview-gate-submit').click()
+  await page.getByTestId('style-mood-cozy').click()
+  await page.getByText('Pick your style (optional)', { exact: true }).click()
+  await page
+    .getByRole('combobox', { name: 'Colors', exact: true })
+    .selectOption('colorful')
+  await page.getByTestId('guest-preview-comfort-toggle').click()
+  await choose(page, 'guest-preview-thermal-cold')
+  await page.getByTestId('guest-preview-swap-shoes').click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('radio', { checked: false }).first().click()
+  await expect(dialog).toBeHidden()
+  const garments = page.getByTestId('guest-preview-garment')
+  await expect(garments.nth(2)).toBeVisible()
+  return garments.evaluateAll((items) =>
+    items.map((item) => item.getAttribute('data-garment-id'))
+  )
+}
+
 test.describe('Guest preview and first garment with verified auth', () => {
   test('6.16 guest preview carries comfort settings and lets the verified member save a first garment', async ({
     interceptNetworkCall,
@@ -63,10 +134,12 @@ test.describe('Guest preview and first garment with verified auth', () => {
       await page.goto('/preview')
       await page.getByTestId('guest-preview-birthdate').fill('1990-06-15')
       await page.getByTestId('guest-preview-gate-submit').click()
+      await page.getByTestId('guest-preview-comfort-toggle').click()
       await choose(page, 'guest-preview-thermal-cold')
       await choose(page, 'guest-preview-wind-low')
       await choose(page, 'guest-preview-rain-high')
 
+      await page.getByTestId('guest-preview-nav-preferences').click()
       await page
         .getByRole('region', { name: 'Add your clothes' })
         .getByRole('link', { name: 'Create account' })
@@ -101,15 +174,7 @@ test.describe('Guest preview and first garment with verified auth', () => {
         mapping: 'email',
         label: 'guest-preview-carryover',
       })
-      await page.getByTestId('signup-sign-in-to-continue').click()
-      await expect(page).toHaveURL(/\/signin\?from=preview$/)
-      await page.locator('input[name="email"]').fill(email)
-      await page.locator('button[type="submit"]').click()
-      await page.locator('input[name="code"]').waitFor({ state: 'visible' })
-      await page.locator('input[name="code"]').fill(readGeneratedCommunityCode(account))
-      await page.locator('button[type="submit"]').click()
-
-      await expect(page).toHaveURL(/\/preview\/continue$/)
+      await signInFromPreview(page, account)
       await expect(page.getByTestId('guest-preview-review-proposed')).toContainText(
         'I tend to feel cold'
       )
@@ -235,6 +300,7 @@ test.describe('Guest preview and first garment with verified auth', () => {
       await page.goto('/preview')
       await page.getByTestId('guest-preview-birthdate').fill('1990-06-15')
       await page.getByTestId('guest-preview-gate-submit').click()
+      await page.getByTestId('guest-preview-comfort-toggle').click()
       await choose(page, 'guest-preview-thermal-cold')
       await page.getByTestId('guest-preview-swap-shoes').click()
       await page.getByTestId('guest-preview-swap-option-white-sneakers').click()
@@ -251,4 +317,135 @@ test.describe('Guest preview and first garment with verified auth', () => {
       await prisma.$disconnect()
     }
   })
+})
+
+test.describe('CC-7.21 first-run save with verified auth', () => {
+  const prisma = new PrismaClient()
+  test.use({ viewport: { width: 390, height: 844 } })
+  test.afterAll(() => prisma.$disconnect())
+
+  const scenarios = [
+    { member: 'adult', tag: '@first-run', decision: 'use' },
+    { member: 'approved teen', tag: CONSENT_REQUIRED_TAG, decision: 'keep' },
+    { member: 'guardian-pending teen', tag: CONSENT_REQUIRED_TAG, decision: 'use' },
+    { member: 'adult leaving review', tag: '@first-run', decision: 'cancel' },
+  ] as const
+
+  for (const { member, tag, decision } of scenarios) {
+    test(
+      `[P0] [7.21-SAVE] ${member} can ${decision} guest answers after signup`,
+      {
+        tag,
+        ...(member === 'guardian-pending teen'
+          ? { annotation: [{ type: 'expectGuardianCapsuleRefusal' }] }
+          : {}),
+      },
+      async ({ apiRequest, interceptNetworkCall, page }) => {
+        const birthdate = tag === CONSENT_REQUIRED_TAG ? teenBirthdate() : '1990-06-15'
+        const guestPieces = await prepareFirstRunLook(page, birthdate)
+        const email = realCommunityEmail()
+        const { userId } = await createFirstRunAccount(
+          page,
+          interceptNetworkCall,
+          birthdate,
+          email
+        )
+
+        if (tag === CONSENT_REQUIRED_TAG) {
+          await expect(page.getByLabel('Guardian email')).toBeVisible()
+        }
+        if (member === 'approved teen') {
+          await page.getByLabel('Guardian email').fill(realCommunityEmail())
+          await page.getByRole('button', { name: 'Send guardian invite' }).click()
+          const invitation = page.getByTestId('guardian-invite-link')
+          await expect(invitation).toContainText('/guardian/accept?token=')
+          const link = await invitation.innerText()
+          const token = new URL(link, page.url()).searchParams.get('token')
+          expect(token).toBeTruthy()
+          const accepted = await apiRequest({
+            method: 'POST',
+            baseUrl: 'http://127.0.0.1:4077',
+            path: '/api/v1/guardian/accept',
+            body: { token },
+          })
+          expect(accepted.status).toBe(200)
+        }
+
+        // The owned real-session harness issues an actual OTP for this synthetic identity.
+        const account = await createRealCommunityAuthAccount({
+          email,
+          appUserId: userId,
+          mapping: 'email',
+          label: `first-run-${decision}`,
+        })
+        await signInFromPreview(page, account)
+        const proposed = page.getByTestId('guest-preview-review-proposed')
+        await expect(proposed).toContainText('I tend to feel cold')
+        await expect(proposed).toContainText('Cozy')
+        await expect(proposed).toContainText('Colorful')
+
+        const where = { user_id: userId }
+        const savedLooks = () =>
+          prisma.savedLook.findMany({ where, select: { id: true, comfort: true } })
+        const style = () => prisma.styleProfile.findUnique({ where })
+        const comfort = () => prisma.comfortPreferences.findUnique({ where })
+        expect(await savedLooks()).toEqual([])
+        expect(await style()).toBeNull()
+        expect(await comfort()).toMatchObject({ runs_cold_warm: 'neutral' })
+
+        await page.getByTestId(`guest-preview-review-${decision}`).click()
+        if (decision === 'cancel') {
+          await expect(page).toHaveURL(/\/$/)
+          await page.goto('/looks?segment=saved')
+          await expect(page.getByTestId('looks-filter-empty')).toBeVisible()
+          expect(await savedLooks()).toEqual([])
+        } else {
+          await expect(page).toHaveURL(/\/looks\?segment=saved$/)
+          await expect(page.getByTestId('status-feedback-bar')).toContainText(
+            'Saved to your looks.'
+          )
+          const [look, ...extra] = await savedLooks()
+          expect(look).toBeDefined()
+          expect(look?.comfort).toBeNull()
+          expect(extra).toEqual([])
+          const card = page.getByTestId(`saved-look-card-${look!.id}`)
+          // The Saved feed settles the capsule read before it shows the card.
+          await expect(card).toBeVisible()
+          await page.reload()
+          await card.click()
+          const detail = page.getByTestId('saved-look-detail')
+          await expect(detail).toBeVisible()
+          const pieces = detail.locator('[data-slot-item-id]')
+          await expect(pieces).toHaveCount(guestPieces.length)
+          expect(
+            await pieces.evaluateAll((items) =>
+              items.map((item) => item.getAttribute('data-slot-item-id'))
+            )
+          ).toEqual(guestPieces)
+        }
+
+        if (decision === 'use') {
+          expect(await style()).toMatchObject({
+            mood: 'cozy',
+            palette: 'colorful',
+            texture: null,
+          })
+          expect(await comfort()).toMatchObject({ runs_cold_warm: 'cold' })
+        } else {
+          expect(await style()).toBeNull()
+          expect(await comfort()).toMatchObject({ runs_cold_warm: 'neutral' })
+        }
+
+        if (tag === CONSENT_REQUIRED_TAG) {
+          const profile = await prisma.userProfile.findUnique({ where })
+          expect(profile?.preferences).toMatchObject({
+            compliance: {
+              accountStatus:
+                member === 'approved teen' ? 'active' : 'pending_guardian_consent',
+            },
+          })
+        }
+      }
+    )
+  }
 })

@@ -36,8 +36,8 @@ it('puts the top-level destinations in keyboard order and offers a sample on Hom
   }
 
   expect(
-    within(screen.getByRole('region', { name: 'Outfit idea' })).getByRole('link', {
-      name: 'Try sample looks',
+    within(screen.getByRole('region', { name: 'Sample outfit' })).getByRole('link', {
+      name: 'Show me looks',
     })
   ).toHaveAttribute('href', '/preview')
   expect(screen.queryByTestId('health-indicator')).not.toBeInTheDocument()

@@ -155,6 +155,9 @@ beforeEach(async () => {
         linkedTeens: [],
       })
     }),
+    http.get('*/api/v1/auth/signup/federated', () =>
+      HttpResponse.json({ status: 'complete' })
+    ),
     http.post('*/api/v1/notifications/push-tokens', ({ request }) => {
       registrations.push(request.headers.get('authorization') ?? '')
       return HttpResponse.json({

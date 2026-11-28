@@ -20,7 +20,7 @@ import {
   listSavedLooksPageFromMobile,
   subscribeMobileSavedLooksChanged,
 } from '@/src/lib/saved-looks'
-import { listCapsulesFromMobile } from '@/src/lib/wardrobe'
+import { listCapsulesFromMobile, type WardrobeMobileError } from '@/src/lib/wardrobe'
 
 /** D3: one page of each list per read. */
 const LOOKS_FEED_PAGE = 50
@@ -134,8 +134,14 @@ export function useLooksFeed({
         owner ?? '',
         { sort: 'created_desc', limit: LOOKS_FEED_PAGE, offset },
         signal
-      ),
-    [owner]
+      ).catch((error: unknown) => {
+        // Pending teens can open their saved catalog looks while capsules require approval.
+        if (filter === 'all' && (error as WardrobeMobileError | null)?.status === 403) {
+          return { items: [], total: 0 }
+        }
+        throw error
+      }),
+    [filter, owner]
   )
 
   useEffect(() => {

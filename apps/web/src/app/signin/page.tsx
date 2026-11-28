@@ -92,7 +92,9 @@ export default function SignInPage() {
                 event.preventDefault()
                 setBusy(true)
                 setMessage(null)
-                const action = sent ? verifyWebOtp(email, code) : requestWebOtp(email)
+                const action = sent
+                  ? verifyWebOtp(email, code, fromPreview)
+                  : requestWebOtp(email)
                 void action
                   .then(async () => {
                     if (sent)
@@ -168,6 +170,7 @@ export default function SignInPage() {
             {fromPreview ? (
               <Link
                 href="/preview"
+                replace
                 data-testid="signin-back-to-preview"
                 className="inline-flex min-h-11 items-center text-ink underline underline-offset-4"
               >

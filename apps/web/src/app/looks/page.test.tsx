@@ -26,7 +26,7 @@ import {
   type SavedLookPageResult,
 } from '../../lib/saved-looks'
 import { screenSnapshot } from '../../lib/screen-snapshot'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import { WardrobeRequestError, WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { signInFixtureMember } from '../../test-utils/member-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import LooksPage from './page'
@@ -589,6 +589,23 @@ describe('7.12 Looks Saved filters (D4, P2, T1)', () => {
     // The fixture bearer's profile id stands in for its owner on the saved looks read.
     expect(userId).toHaveBeenCalledTimes(1)
     expect(screen.queryByTestId('looks-manage-capsules')).toBeNull()
+  })
+
+  it('CC-7.21 keeps catalog looks available when the guardian lock refuses capsules', async () => {
+    signInFixtureMember()
+    list.mockResolvedValue(page([look('first-run-look', 'Sample morning')]))
+    capsules.mockRejectedValue(
+      new WardrobeRequestError(
+        'Guardian consent required before continuing',
+        undefined,
+        403
+      )
+    )
+    moveAddress('/looks?segment=saved')
+    render(<LooksPage />)
+    expect(await screen.findByTestId('saved-look-card-first-run-look')).toBeVisible()
+    expect(screen.queryByTestId('saved-looks-retry')).toBeNull()
+    expect(capsules).toHaveBeenCalledOnce()
   })
 
   it('7.12-UNIT-024b Capsules reads capsules only and ends with Manage capsules', async () => {

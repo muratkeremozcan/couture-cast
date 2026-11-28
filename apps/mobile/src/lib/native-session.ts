@@ -12,6 +12,7 @@ import { AppState } from 'react-native'
 import {
   userProfileResponseSchema,
   type SignupResponse,
+  type UserProfileResponse,
 } from '@couture/api-client/contracts/http'
 import {
   finishStepHref,
@@ -37,6 +38,7 @@ let clientPromise: Promise<SupabaseClient> | undefined
 let session: Session | null = null
 let member: string | null = null
 let verifiedAccessToken: string | null = null
+let memberRole: UserProfileResponse['user']['role'] | undefined
 let generation = 0
 type VerificationFlight = {
   principal: string
@@ -187,6 +189,7 @@ async function verifySession(next: Session | null) {
       throw new Error('Session verification is unavailable.')
     }
     member = profile.user.id
+    memberRole = profile.user.role
     verifiedAccessToken = next.access_token
     setMobileApplicationUserId(member)
   } catch (error) {
@@ -335,7 +338,7 @@ export async function requestNativeOtp(email: string) {
   })
   if (error) throw new NativeSignInError('unavailable', 'Sign-in could not be started.')
 }
-export async function verifyNativeOtp(email: string, token: string) {
+export async function verifyNativeOtp(email: string, token: string, fromPreview = false) {
   const client = await nativeSupabase()
   if (member) await signOutNativeSession()
   const { data, error } = await client.auth.verifyOtp({ email, token, type: 'email' })
@@ -366,18 +369,34 @@ export async function verifyNativeOtp(email: string, token: string) {
       if (sessionDenied(error)) break
     }
   }
+  await finishNativeOtpVerification(data.session.access_token, fromPreview, failure)
+}
+
+async function finishNativeOtpVerification(
+  accessToken: string,
+  fromPreview: boolean,
+  failure: unknown
+) {
   if (failure && !sessionDenied(failure))
     throw new NativeSignInError('unavailable', 'Session verification is unavailable.')
   if (failure || !member) {
     // A denial is the server saying this identity has no account, unless the account is a
     // teen the guardian lock refuses until a guardian approves.
-    if (await awaitingGuardian(data.session.access_token))
+    if (await awaitingGuardian(accessToken))
       throw new NativeSignInError(
         'awaiting_guardian',
         'A guardian has to approve this account.'
       )
     throw new NativeSignInError('denied', 'This account is unavailable.')
   }
+  const needsInvitation = await needsGuardianInvitation(accessToken, fromPreview)
+  if (needsInvitation === null)
+    throw new NativeSignInError('unavailable', 'Session verification is unavailable.')
+  if (needsInvitation)
+    throw new NativeSignInError(
+      'awaiting_guardian',
+      'A guardian has to approve this account.'
+    )
 }
 export async function signOutNativeSession() {
   const client = await nativeSupabase()
@@ -583,9 +602,16 @@ async function verifyWithRetry(
  * After a session exists: a member is done; a denied profile check asks the API whether the
  * finish step applies. `complete` gets exactly one more verification (TEA-3).
  */
-async function settleFederatedSession(next: Session): Promise<NativeOAuthOutcome> {
+async function settleFederatedSession(
+  next: Session,
+  fromPreview = false
+): Promise<NativeOAuthOutcome> {
   const first = await verifyWithRetry(next)
-  if (first === 'member') return { kind: 'member' }
+  if (first === 'member') {
+    const needsInvitation = await needsGuardianInvitation(next.access_token, fromPreview)
+    if (needsInvitation === null) return { kind: 'unavailable' }
+    return needsInvitation ? { kind: 'awaiting_guardian' } : { kind: 'member' }
+  }
   if (first === 'unavailable') return { kind: 'unavailable' }
   let status
   try {
@@ -665,7 +691,7 @@ export function completeNativeOAuth(url: string): Promise<NativeOAuthOutcome> {
         return { kind: 'unavailable' }
       }
       localSignedOut = false
-      const outcome = await settleFederatedSession(data.session)
+      const outcome = await settleFederatedSession(data.session, from === 'preview')
       if (outcome.kind === 'no_account') await writeFederatedFinishMarker(from, door)
       else await clearFederatedFinishMarker()
       return outcome
@@ -713,6 +739,19 @@ async function awaitingGuardian(accessToken: string) {
   return (await fetchNativeAwaitingGuardianAccount(accessToken)) !== null
 }
 
+async function needsGuardianInvitation(accessToken: string, fromPreview: boolean) {
+  if (memberRole !== 'teen' || verifiedAccessToken !== accessToken) return false
+  if (
+    fromPreview &&
+    (await (await import('./post-signin-destination.js')).hasGuestLookSave())
+  )
+    return false
+  return fetchMobileFederatedSignupStatus(accessToken).then(
+    ({ status }) => status === 'awaiting_guardian',
+    () => null
+  )
+}
+
 /**
  * The teen account a stored identity is waiting on a guardian for, or null. Only the
  * identity-keyed status endpoint answers for such a teen; the finish step shows the guardian
@@ -747,18 +786,42 @@ export async function readNativeFederatedIdentity(): Promise<{
 export type NativeFederatedFinishResult =
   | { kind: 'created'; account: SignupResponse }
   | { kind: 'signed_in' }
+  | { kind: 'awaiting_guardian'; accountId: string }
   | { kind: 'underage' }
   | { kind: 'guardian_minor' }
   | { kind: 'refused' }
   | { kind: 'no_session' }
   | { kind: 'unavailable' }
 
+async function recoverNativeFederatedSignup(
+  accessToken: string,
+  fromPreview: boolean
+): Promise<NativeFederatedFinishResult> {
+  const client = await nativeSupabase()
+  const { data } = await client.auth.getSession()
+  if (!data.session) return { kind: 'no_session' }
+  if (data.session.access_token !== accessToken) return { kind: 'unavailable' }
+  const outcome = await settleFederatedSession(data.session, fromPreview)
+  if (outcome.kind === 'member') {
+    await clearFederatedFinishMarker()
+    return { kind: 'signed_in' }
+  }
+  if (outcome.kind === 'awaiting_guardian') {
+    const accountId = await fetchNativeAwaitingGuardianAccount(accessToken)
+    const current = await readNativeFederatedIdentity()
+    if (accountId && current?.accessToken === accessToken)
+      return { kind: 'awaiting_guardian', accountId }
+  }
+  return outcome.kind === 'refused' ? { kind: 'refused' } : { kind: 'unavailable' }
+}
+
 /**
  * Story 6.17 D3: submits the birthdate for the waiting identity, then verifies the new account
  * like any sign-in. Under 13 the server deletes the identity, so this signs out.
  */
 export async function finishNativeFederatedSignup(
-  birthdate: string
+  birthdate: string,
+  fromPreview = false
 ): Promise<NativeFederatedFinishResult> {
   const identity = await readNativeFederatedIdentity()
   if (!identity) return { kind: 'no_session' }
@@ -767,17 +830,8 @@ export async function finishNativeFederatedSignup(
     account = await submitMobileFederatedSignup(identity.accessToken, { birthdate })
   } catch (error) {
     const status = error instanceof FederatedSignupError ? error.status : undefined
-    if (status === 409) {
-      const client = await nativeSupabase()
-      const { data } = await client.auth.getSession()
-      if (!data.session) return { kind: 'no_session' }
-      const outcome = await settleFederatedSession(data.session)
-      if (outcome.kind === 'member') {
-        await clearFederatedFinishMarker()
-        return { kind: 'signed_in' }
-      }
-      return outcome.kind === 'refused' ? { kind: 'refused' } : { kind: 'unavailable' }
-    }
+    if (status === 409)
+      return recoverNativeFederatedSignup(identity.accessToken, fromPreview)
     if (status === 403) {
       if (
         error instanceof FederatedSignupError &&

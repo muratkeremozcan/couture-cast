@@ -6,12 +6,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  beginGuestLookSave,
   GUEST_PREVIEW_GARMENT_INTENT,
+  GUEST_PREVIEW_SAVE_INTENT,
   GUEST_PREVIEW_VIEWS,
   getGuestPreviewStrings,
   nextSampleLook,
-  openSampleBookmark,
-  saveSampleBookmark,
   SAMPLE_CATALOG,
   sampleGarmentText,
   sampleLookText,
@@ -23,7 +23,6 @@ import {
   formatPreviewString,
   type GuestPreviewSnapshot,
   type GuestPreviewState,
-  type GuestPreviewStore,
   type GuestPreviewStrings,
   type GuestPreviewView,
   type SampleGarmentCategory,
@@ -43,11 +42,13 @@ import { GuestPreviewConversion } from './guest-preview-conversion'
 import { GuestPreviewFeedback } from './guest-preview-feedback'
 import { GuestPreviewGate } from './guest-preview-gate'
 import { GuestPreviewOutfit } from './guest-preview-outfit'
+import { GuestPreviewSaveSheet } from './guest-preview-save-sheet'
 import { GuestPreviewSwapDialog } from './guest-preview-swap-dialog'
 import { GuestPreviewWardrobe } from './guest-preview-wardrobe'
 import { useGuestPreviewSnapshot } from './use-guest-preview'
 import { StyleMoodRow } from '../style-profile-controls'
-import { SampleIdeaControls } from './sample-idea-controls'
+import { GuestStyleChoices } from './sample-idea-controls'
+import { webGuestPreviewBirthdate } from '../../../lib/guest-preview-birthdate'
 
 function parseView(value: string | null): GuestPreviewView {
   return GUEST_PREVIEW_VIEWS.find((view) => view === value) ?? 'outfit'
@@ -81,6 +82,7 @@ function useWebPreviewSession(): [WebPreviewSession | 'checking', () => void] {
       setSession(resolved)
       if (resolved === 'member') {
         // Review F3: guest state left on this browser never reaches a member.
+        webGuestPreviewBirthdate.clear()
         webGuestPreviewStore().clear()
         router.replace('/')
       }
@@ -136,6 +138,9 @@ export function GuestPreview() {
   const [announcement, setAnnouncement] = useState('')
   const [swapCategory, setSwapCategory] = useState<SampleGarmentCategory | null>(null)
   const swapInvoker = useRef<HTMLElement | null>(null)
+  const saveInvoker = useRef<HTMLButtonElement | null>(null)
+  const [savePreviewStartedAt, setSavePreviewStartedAt] = useState<number | null>(null)
+  const [previewExpired, setPreviewExpired] = useState(false)
 
   const update = useCallback(
     (change: (current: GuestPreviewState) => GuestPreviewState) => {
@@ -153,7 +158,19 @@ export function GuestPreview() {
     if (next === 'wardrobe') guestPreviewAnalytics.interacted('wardrobe_opened')
   }
 
-  const status = previewStatusScreen({ session, snapshot, strings, retrySession, store })
+  const status = previewStatusScreen({
+    session,
+    snapshot,
+    strings,
+    retrySession,
+    previewExpired,
+    onEligible: (birthdate) => {
+      webGuestPreviewBirthdate.remember(store.start(), birthdate)
+      setPreviewExpired(false)
+      if (view !== 'outfit') router.replace('/preview')
+      guestPreviewAnalytics.started()
+    },
+  })
   if (status || !state || !result) return status
 
   const input = toSampleSelectionInput(state)
@@ -190,6 +207,30 @@ export function GuestPreview() {
     guestPreviewAnalytics.interacted('control_changed', control)
   }
 
+  const beginSave = (action: 'create_account' | 'sign_in') => {
+    if (!online) return false
+    const next = update((current) => beginGuestLookSave(current, result))
+    setSavePreviewStartedAt(null)
+    if (!next) {
+      webGuestPreviewBirthdate.clear()
+      setPreviewExpired(true)
+      return false
+    }
+    if (next.conversion?.intent !== GUEST_PREVIEW_SAVE_INTENT) return false
+    guestPreviewAnalytics.signupClicked(action)
+    return true
+  }
+
+  const beginGarment = (action: 'create_account' | 'sign_in') => {
+    const next = update((current) => ({
+      ...current,
+      conversion: { intent: GUEST_PREVIEW_GARMENT_INTENT },
+    }))
+    if (!next) return false
+    guestPreviewAnalytics.signupClicked(action)
+    return true
+  }
+
   return (
     <PreviewFrame
       strings={strings}
@@ -205,8 +246,9 @@ export function GuestPreview() {
       }}
       onExit={() => {
         guestPreviewAnalytics.interacted('preview_exited')
+        webGuestPreviewBirthdate.clear()
         store.clear()
-        router.push('/')
+        router.replace('/')
       }}
     >
       <p aria-live="polite" className="sr-only" data-testid="guest-preview-announcement">
@@ -229,103 +271,96 @@ export function GuestPreview() {
           onBackToOutfit={() => navigate('outfit')}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-          <div className="min-w-0 space-y-6">
-            {view === 'outfit' ? (
-              <>
-                <GuestPreviewOutfit
-                  result={result}
-                  strings={strings}
-                  locale={locale}
-                  noAlternative={noAlternative}
-                  onTryAnother={() => {
-                    const next = nextSampleLook(result)
-                    if ('lookId' in next) {
-                      update((current) => ({ ...current, selectedLookId: next.lookId }))
-                      guestPreviewAnalytics.interacted('look_changed')
-                      const nextLook = SAMPLE_CATALOG.looks.find(
-                        (look) => look.id === next.lookId
+        <div className="min-w-0 space-y-6">
+          {view === 'outfit' ? (
+            <>
+              <GuestPreviewOutfit
+                result={result}
+                strings={strings}
+                locale={locale}
+                noAlternative={noAlternative}
+                onTryAnother={() => {
+                  const next = nextSampleLook(result)
+                  if ('lookId' in next) {
+                    update((current) => ({ ...current, selectedLookId: next.lookId }))
+                    guestPreviewAnalytics.interacted('look_changed')
+                    const nextLook = SAMPLE_CATALOG.looks.find(
+                      (look) => look.id === next.lookId
+                    )
+                    if (nextLook) {
+                      setAnnouncement(
+                        formatPreviewString(strings.outfit.updated, {
+                          look: sampleLookText(nextLook, strings).name,
+                        })
                       )
-                      if (nextLook) {
-                        setAnnouncement(
-                          formatPreviewString(strings.outfit.updated, {
-                            look: sampleLookText(nextLook, strings).name,
-                          })
-                        )
-                      }
-                    } else {
-                      setNoAlternative(true)
                     }
-                  }}
-                  onSwap={(category, invoker) => {
-                    swapInvoker.current = invoker
-                    setSwapCategory(category)
-                  }}
-                  onUndoSwaps={() => {
-                    if (!lookId) return
-                    update((current) => {
-                      const { [lookId]: _removed, ...rest } = current.swaps
-                      void _removed
-                      return { ...current, swaps: rest }
-                    })
-                    guestPreviewAnalytics.interacted('swaps_undone')
-                  }}
-                  onBrowseWardrobe={() => navigate('wardrobe')}
-                  onReviewChoices={() => navigate('preferences')}
-                  onResetChoices={() => {
-                    update((current) => ({ ...current, votes: {} }))
-                    guestPreviewAnalytics.interacted('votes_reset')
-                  }}
-                />
-                <StyleMoodRow
-                  selected={state.preferences?.style}
-                  onSelect={(style) =>
-                    update((current) => ({
-                      ...current,
-                      preferences: {
-                        ...current.preferences,
-                        style: current.preferences?.style === style ? undefined : style,
-                      },
-                      selectedLookId: undefined,
-                    }))
+                  } else {
+                    setNoAlternative(true)
                   }
-                />
-                <SampleIdeaControls
-                  strings={strings}
-                  preferences={state.preferences}
-                  persistent={snapshot?.persistent}
-                  onPreferences={(preferences) =>
-                    update((current) => ({
-                      ...current,
-                      preferences,
-                      selectedLookId: undefined,
-                    }))
-                  }
-                  bookmarks={state.bookmarks ?? []}
-                  lookId={lookId}
-                  onSave={() =>
-                    update((current) => ({
-                      ...current,
-                      bookmarks: saveSampleBookmark(current.bookmarks ?? [], result),
-                    }))
-                  }
-                  onOpen={(bookmark) =>
-                    update((current) => ({
-                      ...current,
-                      ...openSampleBookmark(bookmark, current),
-                    }))
-                  }
-                  onRemove={(id) =>
-                    update((current) => ({
-                      ...current,
-                      bookmarks: current.bookmarks?.filter(
-                        (bookmark) => bookmark.lookId !== id
-                      ),
-                    }))
-                  }
-                />
-              </>
-            ) : (
+                }}
+                onSwap={(category, invoker) => {
+                  swapInvoker.current = invoker
+                  setSwapCategory(category)
+                }}
+                onUndoSwaps={() => {
+                  if (!lookId) return
+                  update((current) => {
+                    const { [lookId]: _removed, ...rest } = current.swaps
+                    void _removed
+                    return { ...current, swaps: rest }
+                  })
+                  guestPreviewAnalytics.interacted('swaps_undone')
+                }}
+                onBrowseWardrobe={() => navigate('wardrobe')}
+                onReviewChoices={() => navigate('preferences')}
+                onResetChoices={() => {
+                  update((current) => ({ ...current, votes: {} }))
+                  guestPreviewAnalytics.interacted('votes_reset')
+                }}
+                shuffleLabel={strings.firstRun.shuffle}
+                saveAction={
+                  <button
+                    ref={saveInvoker}
+                    type="button"
+                    data-testid="sample-save-look"
+                    aria-haspopup="dialog"
+                    data-primary-action="true"
+                    className="min-h-11 rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse"
+                    onClick={() => setSavePreviewStartedAt(state.startedAt)}
+                  >
+                    {strings.firstRun.save}
+                  </button>
+                }
+                mood={
+                  <StyleMoodRow
+                    selected={state.preferences?.style}
+                    onSelect={(style) =>
+                      update((current) => ({
+                        ...current,
+                        preferences: {
+                          ...current.preferences,
+                          style: current.preferences?.style === style ? undefined : style,
+                        },
+                        selectedLookId: undefined,
+                      }))
+                    }
+                  />
+                }
+              />
+              <GuestStyleChoices
+                labels={strings.styleIdeas}
+                preferences={state.preferences}
+                onPreferences={(preferences) =>
+                  update((current) => ({
+                    ...current,
+                    preferences,
+                    selectedLookId: undefined,
+                  }))
+                }
+              />
+            </>
+          ) : (
+            <>
               <GuestPreviewFeedback
                 votes={state.votes}
                 strings={strings}
@@ -341,41 +376,45 @@ export function GuestPreview() {
                   guestPreviewAnalytics.interacted('votes_reset')
                 }}
               />
-            )}
-            <GuestPreviewConversion
+              <GuestPreviewConversion
+                strings={strings}
+                offline={!online}
+                onCreateAccount={() => beginGarment('create_account')}
+                onSignIn={() => beginGarment('sign_in')}
+              />
+            </>
+          )}
+          <details>
+            <summary
+              data-testid="guest-preview-comfort-toggle"
+              className="cursor-pointer py-2 text-sm font-semibold"
+            >
+              {strings.firstRun.optionalComfort}
+            </summary>
+            <GuestPreviewControls
+              state={state}
               strings={strings}
-              offline={!online}
-              onCreateAccount={() => {
-                update((current) => ({
-                  ...current,
-                  conversion: { intent: GUEST_PREVIEW_GARMENT_INTENT },
-                }))
-                guestPreviewAnalytics.signupClicked('create_account')
+              locale={locale}
+              onWeather={(weather) => {
+                update((current) => ({ ...current, weather }))
+                changeControl('weather')
               }}
-              onSignIn={() => {
-                update((current) => ({
-                  ...current,
-                  conversion: { intent: GUEST_PREVIEW_GARMENT_INTENT },
-                }))
-                guestPreviewAnalytics.signupClicked('sign_in')
+              onComfort={(comfort, control) => {
+                update((current) => ({ ...current, comfort }))
+                changeControl(control)
               }}
             />
-          </div>
-          <GuestPreviewControls
-            state={state}
-            strings={strings}
-            locale={locale}
-            onWeather={(weather) => {
-              update((current) => ({ ...current, weather }))
-              changeControl('weather')
-            }}
-            onComfort={(comfort, control) => {
-              update((current) => ({ ...current, comfort }))
-              changeControl(control)
-            }}
-          />
+          </details>
         </div>
       )}
+      <GuestPreviewSaveSheet
+        isOpen={savePreviewStartedAt === state.startedAt}
+        offline={!online}
+        strings={strings}
+        invokerRef={saveInvoker}
+        onClose={() => setSavePreviewStartedAt(null)}
+        onChoose={beginSave}
+      />
       <GuestPreviewSwapDialog
         category={swapCategory}
         {...sampleOutfitSwapOptions(result, swapCategory)}
@@ -397,13 +436,15 @@ function previewStatusScreen({
   snapshot,
   strings,
   retrySession,
-  store,
+  previewExpired,
+  onEligible,
 }: {
   session: WebPreviewSession | 'checking'
   snapshot: GuestPreviewSnapshot | null
   strings: GuestPreviewStrings
   retrySession: () => void
-  store: GuestPreviewStore
+  previewExpired: boolean
+  onEligible: (birthdate: string) => void
 }): React.ReactNode | null {
   if (
     session === 'checking' ||
@@ -447,10 +488,8 @@ function previewStatusScreen({
       <PreviewFrame strings={strings} showNav={false}>
         <GuestPreviewGate
           strings={strings}
-          onEligible={() => {
-            store.start()
-            guestPreviewAnalytics.started()
-          }}
+          onEligible={onEligible}
+          expired={previewExpired}
         />
       </PreviewFrame>
     )
@@ -493,32 +532,12 @@ function PreviewFrame({
       <AppTopBar title={strings.chrome.entry} parentHref="/" wrapTitle />
       <main id="main-content" tabIndex={-1} className={`${APP_MAIN_CLASS} gap-6`}>
         <div className="flex flex-col gap-3">
-          {showNav ? (
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={onReset}
-                data-testid="guest-preview-reset"
-                className={outlineButton}
-              >
-                {strings.chrome.resetPreview}
-              </button>
-              <button
-                type="button"
-                onClick={onExit}
-                data-testid="guest-preview-exit"
-                className={outlineButton}
-              >
-                {strings.chrome.exitPreview}
-              </button>
-            </div>
-          ) : null}
           <p
             role="note"
             data-testid="guest-preview-label"
-            className="rounded-lg border border-notice-line bg-notice-surface px-3 py-2 text-sm font-medium text-notice-ink"
+            className="text-sm text-ink-muted"
           >
-            {strings.chrome.sampleLabel}
+            {strings.firstRun.sampleLabel}
           </p>
           {!persistent ? (
             <p
@@ -561,6 +580,26 @@ function PreviewFrame({
           ) : null}
         </div>
         {children}
+        {showNav ? (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onReset}
+              data-testid="guest-preview-reset"
+              className={outlineButton}
+            >
+              {strings.chrome.resetPreview}
+            </button>
+            <button
+              type="button"
+              onClick={onExit}
+              data-testid="guest-preview-exit"
+              className={outlineButton}
+            >
+              {strings.chrome.exitPreview}
+            </button>
+          </div>
+        ) : null}
       </main>
     </AppPage>
   )

@@ -206,20 +206,19 @@ test.describe('Guardian consent browser smoke', { tag: CONSENT_REQUIRED_TAG }, (
     )
     await expect(linkedTeen).toContainText('revoked')
 
-    await log.step('Assert revoked teen is blocked at the API boundary')
-    const revokedTeenProfileResponse = await apiRequest({
-      method: 'GET',
-      path: '/api/v1/user/profile',
+    await log.step('Assert revocation blocks the teen from changing account preferences')
+    const revokedTeenResponse = await apiRequest({
+      method: 'PUT',
+      path: '/api/v1/user/preferences',
       baseUrl: resolveApiBaseUrl(testInfo),
       headers: authHeaders(consent.teenId, 'teen'),
+      body: { locale: 'en-US' },
       retryConfig: { maxRetries: 0 },
     })
 
-    expect(revokedTeenProfileResponse.status).toBe(403)
-    const revokedTeenProfileBody = forbiddenHttpErrorSchema.parse(
-      revokedTeenProfileResponse.body
-    )
-    expect(revokedTeenProfileBody.message).toContain(
+    expect(revokedTeenResponse.status).toBe(403)
+    const revokedTeenBody = forbiddenHttpErrorSchema.parse(revokedTeenResponse.body)
+    expect(revokedTeenBody.message).toContain(
       'Guardian consent required before continuing'
     )
   })

@@ -19,9 +19,8 @@ export function GuestPreviewEntry() {
       className="min-w-0 space-y-3 rounded-xl border border-line bg-card p-3 min-[361px]:p-5"
     >
       <h2 id="home-sample-heading" className="text-2xl font-semibold">
-        {strings.firstUse.outfitIdea}
+        {strings.firstRun.teaser}
       </h2>
-      <p className="max-w-prose text-sm text-ink-soft">{strings.chrome.sampleLabel}</p>
       <div className="flex flex-wrap gap-2" aria-hidden="true">
         {createMemberSampleOutfit().garments.map((garment) => (
           <span key={garment.id} className="rounded-md bg-page p-1">

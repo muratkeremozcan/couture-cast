@@ -1,14 +1,28 @@
 // Story 6.17 D3: route for the Google finish step.
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { router, useLocalSearchParams, useNavigation, type Href } from 'expo-router'
 import { parsePreviewFrom, parseSignInDoor, signInDoorHref } from '@couture/utils'
 import { FinishSignupScreen } from '@/src/features/signup/finish-signup-screen'
 import { mobileGuestPreviewStore } from '@/src/lib/guest-preview-store'
-import { continuesToPreviewReview } from '@/src/lib/post-signin-destination'
+import {
+  continuesToPreviewReview,
+  hasGuestLookSave,
+} from '@/src/lib/post-signin-destination'
 
 export default function SignupFinishRoute() {
   const { from, door } = useLocalSearchParams<{ from?: string; door?: string }>()
   const fromPreview = parsePreviewFrom(from) !== null
+  const [savingGuestLook, setSavingGuestLook] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (!fromPreview) return
+    let active = true
+    void hasGuestLookSave().then((hasSave) => {
+      if (active) setSavingGuestLook(hasSave)
+    })
+    return () => {
+      active = false
+    }
+  }, [fromPreview])
   // D5: Cancel and refusals return to the page that started the round trip.
   const doorHref = signInDoorHref(parseSignInDoor(door), { fromPreview }) as Href
   const navigation = useNavigation()
@@ -19,6 +33,8 @@ export default function SignupFinishRoute() {
   const clearing = useRef<Promise<void>>(Promise.resolve())
   return (
     <FinishSignupScreen
+      fromPreview={fromPreview}
+      savingGuestLook={fromPreview ? savingGuestLook : false}
       onTitleChange={setTitle}
       onUnderage={() => {
         // D3: an age refusal clears any guest preview stored on this device, whichever door
@@ -34,7 +50,12 @@ export default function SignupFinishRoute() {
           )
           return
         }
-        if (exit === 'home') void clearing.current.then(() => router.replace('/'))
+        if (exit === 'cancelled' && fromPreview)
+          void hasGuestLookSave().then((hasSave) => {
+            if (hasSave) router.dismissTo('/preview')
+            else router.replace(doorHref)
+          })
+        else if (exit === 'home') void clearing.current.then(() => router.replace('/'))
         else if (exit === 'until_approved')
           // Every signed-in request refuses the teen until a guardian approves.
           void import('../src/lib/native-session.js')

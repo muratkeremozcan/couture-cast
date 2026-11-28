@@ -37,11 +37,29 @@ export const frFR: GuestPreviewStrings = {
     checkGarment: 'Vérifie ton vêtement',
     backToWardrobe: 'Retour à la garde-robe',
     outfitFailed: 'Impossible de charger la tenue du jour.',
-    sampleEntry: 'Essaie des tenues',
+    sampleEntry: 'Voir des tenues',
     outfitIdea: 'Idée de tenue',
   },
+  firstRun: {
+    sampleLabel: 'Exemples de tenues et de météo',
+    teaser: 'Tenue d’exemple',
+    shuffle: 'Mélanger',
+    save: 'Enregistrer la tenue',
+    saveTitle: 'Garde cette tenue',
+    saveBody: 'Crée un compte gratuit ou connecte-toi pour garder cette tenue.',
+    cancel: 'Annuler',
+    optionalComfort: 'Météo et confort (facultatif)',
+    previewExpired: 'Ton aperçu a expiré. Vérifie ton âge pour recommencer.',
+    saveWithSettings: 'Enregistrer la tenue et les réglages',
+    saveOnly: 'Enregistrer uniquement la tenue',
+    guardianPending:
+      'Ton compte est prêt. Ton parent ou tuteur peut autoriser l’accès aux photos.',
+    guardianInvite: 'Invite ton parent ou tuteur à examiner l’accès aux photos.',
+    cancelReview: 'Annuler',
+    reviewFailed: 'Impossible d’enregistrer ta tenue. Réessaie.',
+  },
   chrome: {
-    entry: 'Essaie des tenues',
+    entry: 'Exemples de tenues',
     exampleLabel: 'Exemple',
     welcomeHeading: 'Des tenues pour la météo du jour',
     welcomeBody:
@@ -71,7 +89,7 @@ export const frFR: GuestPreviewStrings = {
   },
   gate: {
     heading: 'Vérifie ton âge',
-    body: 'Saisis ta date de naissance. Cet appareil la vérifie. L’appli ne l’enregistre pas et ne l’envoie pas.',
+    body: 'Saisis ta date de naissance pour vérifier ton âge. Si tu crées un compte, elle servira à ton inscription.',
     field: 'Date de naissance (YYYY-MM-DD)',
     submit: 'Continuer',
     selfReported:

@@ -434,6 +434,10 @@ export function doesSavedLookResolve(
     swaps?: Readonly<Partial<Record<SampleGarmentCategory, string>>> | null
     collection?: string | null
     comfort?: SavedLookComfortPayload | null
+    composition?: readonly Pick<
+      SavedLookCompositionSlotPayload,
+      'category' | 'kind' | 'itemId'
+    >[]
   },
   catalog: SampleCatalog = SAMPLE_CATALOG
 ): boolean {
@@ -444,6 +448,20 @@ export function doesSavedLookResolve(
   const swaps = cleanSwaps(input.swaps ?? undefined)
   if (input.source === 'style_piece') {
     return doesStylePieceLookResolve(input, swaps, catalog)
+  }
+  if (!input.comfort && input.composition) {
+    // A first-run save stores the exact pieces without carrying account preferences.
+    return (
+      catalog.looks.some((look) => look.id === input.lookId) &&
+      input.composition.length > 0 &&
+      input.composition.every(
+        (slot) =>
+          slot.kind === 'catalog' &&
+          catalog.garments.some(
+            (item) => item.id === slot.itemId && item.category === slot.category
+          )
+      )
+    )
   }
   return doesHomeSampleLookResolve(input, swaps, catalog)
 }

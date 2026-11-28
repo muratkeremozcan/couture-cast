@@ -317,4 +317,28 @@ describe('sign-in failure reasons', () => {
       expect(auth.webSessionIdentity()).toBeNull()
     }
   )
+
+  it.each([
+    [{ status: 'awaiting_guardian', accountId: 'teen-1' }, 200, 'awaiting_guardian'],
+    [{ status: 'complete' }, 200, 'resolved'],
+    [{}, 503, 'unavailable'],
+  ] as const)(
+    'checks guardian status %j (%i) for a verified teen before routing email sign-in',
+    async (body, status, expected) => {
+      const teen = profile('teen-1')
+      useMswHandlers(
+        http.get('*/api/v1/user/profile', () =>
+          HttpResponse.json({ ...teen, user: { ...teen.user, role: 'teen' } })
+        ),
+        http.get('*/api/v1/auth/signup/federated', () =>
+          HttpResponse.json(body, { status })
+        )
+      )
+      const auth = await import('./web-session')
+
+      expect(await reason(auth.verifyWebOtp('teen@example.test', '123456'))).toBe(
+        expected
+      )
+    }
+  )
 })

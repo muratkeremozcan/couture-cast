@@ -106,6 +106,30 @@ describe('CC-7.20 Profile style on native', () => {
     expect(scroll.scrollLeft).toBeGreaterThan(0)
   })
 
+  it.each([
+    [1, 'row'],
+    [2, 'column'],
+  ] as const)(
+    'keeps the German Tune style title and Close readable at %ix',
+    async (fontScale, direction) => {
+      device.fontScale = fontScale
+      await i18n.changeLanguage('de-DE')
+      server.use(http.get(PATH, () => HttpResponse.json({ data: EMPTY_PROFILE })))
+      renderStyleSettings()
+
+      await userEvent.click(await screen.findByTestId('style-tune-open'))
+      const close = await screen.findByRole('button', { name: 'Schließen' })
+      const heading = screen.getByRole('heading', { name: 'Meinen Stil anpassen' })
+      const header = screen.getByTestId('layer-swipe-handle')
+      expect(header).toContainElement(heading)
+      expect(header).toContainElement(close)
+      expect(getComputedStyle(header).flexDirection).toBe(direction)
+
+      await userEvent.click(close)
+      await waitFor(() => expect(close).not.toBeInTheDocument())
+    }
+  )
+
   it('[P1] [7.20-NATIVE] retries the same answers after a save failure, then reads and clears them', async () => {
     let profile: StyleProfile = {
       ...EMPTY_PROFILE,

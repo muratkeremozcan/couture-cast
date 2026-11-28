@@ -26,11 +26,14 @@ describe('signed-out Home welcome', () => {
     await render(<SignedOutWelcome />)
     const de = GUEST_PREVIEW_STRINGS['de-DE']
     expect(screen.getByTestId('home-signed-out-welcome').textContent).toContain(
-      de.chrome.welcomeHeading
+      de.firstRun.teaser
     )
     expect(screen.getByTestId('home-try-sample').textContent).toBe(
       de.firstUse.sampleEntry
     )
+    expect(screen.getByRole('button', { name: de.firstUse.sampleEntry })).toBeVisible()
+    expect(screen.getByRole('link', { name: de.chrome.createAccount })).toBeVisible()
+    expect(screen.getByRole('link', { name: de.chrome.signIn })).toBeVisible()
     press(screen.getByTestId('home-try-sample'))
     press(screen.getByTestId('home-create-account'))
     press(screen.getByTestId('home-sign-in'))

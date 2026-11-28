@@ -8,10 +8,20 @@ appId: ${MAESTRO_APP_ID}
       id: 'profile-${PROFILE_TOPIC}-row'
     direction: DOWN
     timeout: 15000
-- tapOn:
-    id: 'profile-${PROFILE_TOPIC}-row'
-    retryTapIfNoChange: true
-- extendedWaitUntil:
-    visible:
-      id: 'app-top-bar-back'
-    timeout: 15000
+# Reacquire the Profile row before another tap. On the small 2x Android device,
+# the row's old coordinates can land on Tune my style after navigation.
+- retry:
+    maxRetries: 1
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: 'profile-${PROFILE_TOPIC}-row'
+          commands:
+            - tapOn:
+                id: 'profile-${PROFILE_TOPIC}-row'
+                retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible:
+            id: 'app-top-bar-back'
+          timeout: 15000

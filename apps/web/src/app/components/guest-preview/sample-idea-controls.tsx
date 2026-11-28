@@ -68,7 +68,6 @@ export function SampleIdeaControls<Weather extends SampleWeatherKey>({
   nested = false,
 }: Props<Weather>) {
   const labels = strings.styleIdeas
-  const dimensions = ['palette', 'texture'] as const
   const isBookmarked = Boolean(
     lookId && bookmarks.some((bookmark) => bookmark.lookId === lookId)
   )
@@ -173,36 +172,58 @@ export function SampleIdeaControls<Weather extends SampleWeatherKey>({
         </label>
       )}
       {onPreferences && (
-        <details>
-          <summary className="cursor-pointer py-2 font-semibold">
-            {labels.heading}
-          </summary>
-          <div className="mt-2 grid gap-3 sm:grid-cols-3">
-            {dimensions.map((dimension) => (
-              <label key={dimension} className="flex flex-col gap-1 font-medium">
-                {labels[dimension]}
-                <select
-                  className="min-h-11 rounded-lg border border-line-strong bg-page px-2 text-ink"
-                  value={preferences?.[dimension] ?? ''}
-                  onChange={(event) =>
-                    onPreferences({
-                      ...preferences,
-                      [dimension]: event.currentTarget.value || undefined,
-                    })
-                  }
-                >
-                  <option value="">{labels.any}</option>
-                  {SAMPLE_STYLE_OPTIONS[dimension].map((option) => (
-                    <option key={option} value={option}>
-                      {labels[option]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
-          </div>
-        </details>
+        <GuestStyleChoices
+          labels={labels}
+          preferences={preferences}
+          onPreferences={onPreferences}
+        />
       )}
     </div>
+  )
+}
+
+export function GuestStyleChoices({
+  labels,
+  preferences,
+  onPreferences,
+}: {
+  labels: GuestPreviewStrings['styleIdeas']
+  preferences?: SampleStylePreferences
+  onPreferences: (preferences: SampleStylePreferences) => void
+}) {
+  const dimensions = ['palette', 'texture'] as const
+  return (
+    <details>
+      <summary
+        className="cursor-pointer py-2 text-sm font-semibold"
+        data-testid="sample-style-preferences"
+      >
+        {labels.heading}
+      </summary>
+      <div className="mt-2 grid gap-3 text-sm sm:grid-cols-3">
+        {dimensions.map((dimension) => (
+          <label key={dimension} className="flex flex-col gap-1 font-medium">
+            {labels[dimension]}
+            <select
+              className="min-h-11 rounded-lg border border-line-strong bg-page px-2 text-ink"
+              value={preferences?.[dimension] ?? ''}
+              onChange={(event) =>
+                onPreferences({
+                  ...preferences,
+                  [dimension]: event.currentTarget.value || undefined,
+                })
+              }
+            >
+              <option value="">{labels.any}</option>
+              {SAMPLE_STYLE_OPTIONS[dimension].map((option) => (
+                <option key={option} value={option}>
+                  {labels[option]}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
+    </details>
   )
 }

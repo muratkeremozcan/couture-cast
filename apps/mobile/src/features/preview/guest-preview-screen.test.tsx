@@ -10,6 +10,7 @@
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 // Learning path Step 76: Garment subtypes.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
+// CC-7.21: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-78-first-look-and-account-save
 import {
   act,
   configure,
@@ -209,7 +210,8 @@ describe('mobile guest preview session check (D1)', () => {
     const view = await render(<GuestPreviewScreen />)
     await screen.findByTestId('guest-preview-outfit')
     await waitFor(() => expect(storedConversion()).toBeUndefined())
-    press(screen.getByTestId('guest-preview-create-account'))
+    press(screen.getByTestId('guest-preview-nav-preferences'))
+    press(await screen.findByTestId('guest-preview-garment-create-account'))
     await waitFor(() => expect(storedConversion()).toEqual(directConversion))
     act(() => screenFocus.set(false))
     session.state = 'member'
@@ -230,12 +232,14 @@ describe('mobile guest preview session check (D1)', () => {
     })
     press(screen.getByTestId('guest-preview-gate-submit'))
     await screen.findByTestId('guest-preview-outfit')
-    press(screen.getByTestId('guest-preview-create-account'))
+    press(screen.getByTestId('guest-preview-nav-preferences'))
+    press(await screen.findByTestId('guest-preview-garment-create-account'))
     await waitFor(() => expect(storedConversion()).toEqual(directConversion))
     act(() => screenFocus.set(false))
     act(() => screenFocus.set(true))
     await waitFor(() => expect(storedConversion()).toBeUndefined())
-    expect(screen.getByTestId('guest-preview-outfit')).toBeTruthy()
+    press(screen.getByTestId('guest-preview-nav-outfit'))
+    expect(await screen.findByTestId('guest-preview-outfit')).toBeTruthy()
   })
 
   it('shows a status while restoring and a retry when the session is unavailable', async () => {
@@ -283,7 +287,7 @@ describe('mobile guest preview gate (M-GATE-*)', () => {
     await waitFor(() => expect(adapter.value()).not.toBeNull())
     expect(adapter.value()).not.toContain('2000-01-15')
     expect(screen.getByTestId('guest-preview-label').textContent).toBe(
-      en.chrome.sampleLabel
+      en.firstRun.sampleLabel
     )
     expect(analytics.capture).toHaveBeenCalledWith('guest_preview_started', {
       platform: expect.stringMatching(/^(ios|android)$/) as string,
@@ -296,6 +300,7 @@ describe('mobile guest preview surfaces', () => {
   it('changes the outfit with comfort and weather controls (AC2)', async () => {
     await passGate()
     expect(garmentIds()).toEqual(['oxford-shirt', 'dark-jeans', 'loafers'])
+    press(screen.getByTestId('guest-preview-comfort-toggle'))
     press(screen.getByTestId('guest-preview-thermal-cold'))
     await waitFor(() => expect(garmentIds()[0]).toBe('fleece-zip'))
     expect(screen.getByTestId('guest-preview-explanation').textContent).toContain(
@@ -368,27 +373,19 @@ describe('mobile guest preview surfaces', () => {
     expect(screen.getByText(baseCopy)).toBeVisible()
   })
 
-  it('reopens an unedited bookmark without an Undo swaps action', async () => {
-    await passGate()
-    press(screen.getByTestId('sample-save-look'))
-    const reopen = await screen.findByTestId('sample-open-sample:l:office-oxford')
-    press(screen.getByTestId('guest-preview-try-another'))
-    expect(screen.getByText('Silk midi')).toBeVisible()
-    press(reopen)
-    expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent('School day')
-    expect(screen.queryByTestId('guest-preview-undo-swaps')).toBeNull()
-    expect(screen.getByText(en.looks['office-oxford'].description)).toBeVisible()
-  })
-
-  it('reopens saved swaps without describing the original garments', async () => {
+  it('keeps the exact edited composition when the account sheet is cancelled', async () => {
     await passGate()
     press(screen.getByTestId('guest-preview-swap-shoes'))
     press(await screen.findByTestId('guest-preview-swap-option-white-sneakers'))
+    await waitFor(() => expect(garmentIds()).toContain('white-sneakers'))
+    const pieces = garmentIds()
     press(screen.getByTestId('sample-save-look'))
-    const reopen = await screen.findByTestId('sample-open-sample:l:office-oxford')
-    press(screen.getByTestId('guest-preview-try-another'))
-    press(reopen)
-    expect(garmentIds()).toContain('white-sneakers')
+    const sheet = await screen.findByTestId('guest-preview-save-sheet')
+    press(within(sheet).getByTestId('guest-preview-save-cancel'))
+    await waitFor(() =>
+      expect(screen.queryByTestId('guest-preview-save-sheet')).toBeNull()
+    )
+    expect(garmentIds()).toEqual(pieces)
     expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent(
       en.outfit.heading
     )
@@ -398,6 +395,7 @@ describe('mobile guest preview surfaces', () => {
 
   it('shows no suitable alternative and closes the sheet', async () => {
     await passGate()
+    press(screen.getByTestId('guest-preview-comfort-toggle'))
     press(screen.getByTestId('guest-preview-weather-warm-rainy'))
     press(screen.getByTestId('guest-preview-thermal-warm'))
     press(await screen.findByTestId('guest-preview-swap-outerwear'))
@@ -567,7 +565,8 @@ describe('mobile guest preview item detail swipe', () => {
 describe('mobile guest preview lifecycle', () => {
   it('stores the intent, reports the click, rotates the id and opens signup', async () => {
     await passGate()
-    press(screen.getByTestId('guest-preview-create-account'))
+    press(screen.getByTestId('guest-preview-nav-preferences'))
+    press(await screen.findByTestId('guest-preview-garment-create-account'))
     await waitFor(() => expect(adapter.value()).toContain(directConversion.intent))
     expect(analytics.capture).toHaveBeenLastCalledWith('guest_preview_signup_clicked', {
       platform: expect.any(String) as string,
@@ -576,12 +575,13 @@ describe('mobile guest preview lifecycle', () => {
     })
     expect(analytics.reset).toHaveBeenCalledOnce()
     expect(navigation.push).toHaveBeenCalledWith('/signup?from=preview')
-    press(screen.getByTestId('guest-preview-sign-in'))
+    press(screen.getByTestId('guest-preview-garment-sign-in'))
     expect(navigation.push).toHaveBeenCalledWith('/signin?from=preview')
   })
 
   it('resets to defaults and exits by deleting stored state', async () => {
     await passGate()
+    press(screen.getByTestId('guest-preview-comfort-toggle'))
     press(screen.getByTestId('guest-preview-thermal-cold'))
     await waitFor(() => expect(garmentIds()[0]).toBe('fleece-zip'))
     press(screen.getByTestId('guest-preview-reset'))
@@ -597,6 +597,7 @@ describe('mobile guest preview lifecycle', () => {
     expect((await screen.findByTestId('guest-preview-storage')).textContent).toBe(
       en.chrome.storageUnavailable
     )
+    press(screen.getByTestId('guest-preview-comfort-toggle'))
     press(screen.getByTestId('guest-preview-thermal-cold'))
     await waitFor(() => expect(garmentIds()[0]).toBe('fleece-zip'))
   })

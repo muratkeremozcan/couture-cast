@@ -96,6 +96,7 @@ describe('HTTP contract parity (integration)', () => {
     } as unknown as PrismaClient
     const guardianConsentStateService = {
       canTeenAccess: guardianCanTeenAccessMock,
+      canTeenAccessNonUploadSurface: guardianCanTeenAccessMock,
     } as unknown as GuardianConsentStateService
     const accessTokenIdentityService = {
       resolveIdentity: identityResolveMock,

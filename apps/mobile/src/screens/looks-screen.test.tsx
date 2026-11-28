@@ -810,6 +810,22 @@ describe('Native Looks tab (Story CC-7.12)', () => {
   })
 
   describe('[7.12-NAT-002] Saved tiles, filters and Load more', () => {
+    it('CC-7.21 keeps catalog looks available when the guardian lock refuses capsules', async () => {
+      serveFeed({ looks: [look('first-run-look', at(22))] })
+      server.use(
+        http.get('*/api/v1/wardrobe/:ownerUserId/capsules', () =>
+          HttpResponse.json(
+            { message: 'Guardian consent required before continuing' },
+            { status: 403 }
+          )
+        )
+      )
+      tabParams.set({ segment: 'saved' })
+      await openLooks()
+      expect(await screen.findByTestId('saved-look-card-first-run-look')).toBeVisible()
+      expect(screen.queryByTestId('saved-looks-retry')).toBeNull()
+    })
+
     it('[P0] [D3, TEA P3] interleaves looks and capsules newest first; an exact tie puts the look first', async () => {
       const reads = serveFeed({
         // Each list newest first, as `sort=created_desc` answers; ids out of time order.

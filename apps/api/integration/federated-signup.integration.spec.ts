@@ -337,8 +337,8 @@ describe('A-FED-GET-STATUS: GET decides the route after a 401 profile check', ()
   describe('under policy required_13_15', () => {
     useGuardianConsentPolicy('required_13_15')
 
-    // The guardian lock refuses a pending teen's profile check (403), which a client read as
-    // "no account" and looped between sign-in and Google; the status names the state instead.
+    // The federated status retains the guardian invitation state while the owner can read
+    // their profile to verify a session and use the first-run sample look.
     it('A-FED-AWAITING-GUARDIAN: a pending teen answers awaiting_guardian with its account id', async () => {
       const email = address()
       const { bearer } = googleUser(email)
@@ -351,7 +351,10 @@ describe('A-FED-GET-STATUS: GET decides the route after a 401 profile check', ()
         status: 'awaiting_guardian',
         accountId: userId,
       })
-      // The status names the state; the lock RequestAuthGuard applies is unchanged.
+      expect((await signedIn('GET', '/api/v1/user/profile', bearer)).status).toBe(200)
+      await expect(
+        signedIn('PUT', '/api/v1/user/preferences', bearer, { locale: 'en-US' })
+      ).resolves.toHaveProperty('status', 403)
       await expect(identity.resolveIdentity(bearer)).resolves.toEqual({
         userId,
         role: 'teen',
@@ -434,20 +437,21 @@ describe('A-FED-GET-STATUS: GET decides the route after a 401 profile check', ()
       })
     })
 
-    it('A-LOCK-HOLDS: the waiting teen gets 403 from every signed-in endpoint', async () => {
+    it('A-LOCK-HOLDS: a pending teen can read their profile while the preferences write stays gated', async () => {
       const email = address()
       const { bearer } = googleUser(email)
-      expect((await federated('POST', bearer, { birthdate: birthdate(14) })).status).toBe(
-        201
-      )
+      const created = await federated('POST', bearer, { birthdate: birthdate(14) })
+      expect(created.status).toBe(201)
+      const { userId } = (await created.json()) as { userId: string }
       const profile = await signedIn('GET', '/api/v1/user/profile', bearer)
-      expect(profile.status).toBe(403)
-      expect(await profile.json()).toMatchObject({
+      expect(profile.status).toBe(200)
+      expect(await profile.json()).toMatchObject({ user: { id: userId, role: 'teen' } })
+      const preferences = await signedIn('PUT', '/api/v1/user/preferences', bearer, {})
+      expect(preferences.status).toBe(403)
+      expect(await preferences.json()).toMatchObject({
         statusCode: 403,
         message: 'Guardian consent required before continuing',
       })
-      const preferences = await signedIn('PUT', '/api/v1/user/preferences', bearer, {})
-      expect(preferences.status).toBe(403)
     })
   })
 

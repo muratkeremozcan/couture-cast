@@ -13,12 +13,15 @@ import {
   evaluateBirthdateInput,
   getBirthdateNotice,
   getFederatedSignInStrings,
+  getGuestPreviewStrings,
+  GUEST_PREVIEW_SAVE_INTENT,
   type SignInDoor,
 } from '@couture/utils'
 import { getI18n } from '../../../i18n'
 import { AppTopBar } from '../../components/app-top-bar'
 import { inviteGuardianFromWeb } from '../../../lib/guardian'
 import { webGuestPreviewStore } from '../../../lib/guest-preview'
+import { webGuestPreviewBirthdate } from '../../../lib/guest-preview-birthdate'
 import { destinationAfterSignIn } from '../../../lib/post-signin-destination'
 import {
   cancelWebFederatedSignup,
@@ -59,12 +62,12 @@ const CARD_CLASS = 'space-y-6 rounded-xl border border-line bg-card p-8'
  * Story CC-7.9 D6: the finish step's top bar, titled in the browser's language. A client
  * component, so the server page can render it above the form.
  */
-export function FinishSignupTopBar() {
+export function FinishSignupTopBar({ fromPreview = false }: { fromPreview?: boolean }) {
   const { i18n } = useTranslation('translation', { i18n: getI18n() })
   return (
     <AppTopBar
       title={getFederatedSignInStrings(i18n.language).finishTitle}
-      parentHref="/"
+      parentHref={fromPreview ? undefined : '/'}
     />
   )
 }
@@ -81,6 +84,7 @@ export function FinishSignupForm({
   const strings = getFederatedSignInStrings(i18n.language)
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' })
   const [birthdate, setBirthdate] = useState('')
+  const [savingLook, setSavingLook] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState<'create' | 'cancel' | null>(null)
   const birthdateRef = useRef<HTMLInputElement>(null)
@@ -113,6 +117,22 @@ export function FinishSignupForm({
   }, [])
 
   useEffect(() => {
+    if (!fromPreview) return
+    let active = true
+    void webGuestPreviewStore()
+      .load()
+      .then(({ state }) => {
+        if (!active || state?.conversion?.intent !== GUEST_PREVIEW_SAVE_INTENT) return
+        setSavingLook(true)
+        const date = webGuestPreviewBirthdate.read()
+        if (date) setBirthdate((current) => current || date)
+      })
+    return () => {
+      active = false
+    }
+  }, [fromPreview])
+
+  useEffect(() => {
     if (phase.kind === 'form') birthdateRef.current?.focus()
   }, [phase.kind])
 
@@ -130,7 +150,13 @@ export function FinishSignupForm({
     setBusy('create')
     try {
       // An under-13 birthdate still goes to the server, which deletes the Google identity.
-      const result = await finishWebFederatedSignup(birthdate)
+      const result = savingLook
+        ? await finishWebFederatedSignup(birthdate, true)
+        : await finishWebFederatedSignup(birthdate)
+      if (result.kind !== 'unavailable') {
+        webGuestPreviewBirthdate.clear()
+        setBirthdate('')
+      }
       switch (result.kind) {
         case 'created':
           if (result.account.guardianConsentRequired)
@@ -140,6 +166,9 @@ export function FinishSignupForm({
         case 'signed_in':
           setMessage(strings.alreadyRegistered)
           await continueToApp()
+          return
+        case 'awaiting_guardian':
+          setPhase({ kind: 'awaiting_guardian', accountId: result.accountId })
           return
         case 'underage':
           // The age refusal outranks the preview's self-reported gate (6.16 D2), and any guest
@@ -167,7 +196,7 @@ export function FinishSignupForm({
   async function handleCancel() {
     setBusy('cancel')
     await cancelWebFederatedSignup()
-    window.location.replace(doorHref)
+    window.location.replace(savingLook ? '/preview' : doorHref)
   }
 
   if (phase.kind === 'loading')
@@ -206,7 +235,14 @@ export function FinishSignupForm({
     )
   }
 
-  if (onGuardianStep(phase)) return <GuardianStep phase={phase} />
+  if (onGuardianStep(phase)) {
+    return (
+      <GuardianStep
+        phase={phase}
+        continueToLook={savingLook ? continueToApp : undefined}
+      />
+    )
+  }
 
   return (
     <form
@@ -288,32 +324,46 @@ export function FinishSignupForm({
  * The teen's guardian step: a new account (`created`) or a returning teen still waiting
  * (`awaiting_guardian`). Continue ends the session.
  */
-function GuardianStep({ phase }: { phase: GuardianPhase }) {
+function GuardianStep({
+  phase,
+  continueToLook,
+}: {
+  phase: GuardianPhase
+  continueToLook?: () => Promise<void>
+}) {
   const { i18n } = useTranslation('translation', { i18n: getI18n() })
   const strings = getFederatedSignInStrings(i18n.language)
+  const firstRun = getGuestPreviewStrings(i18n.language).firstRun
   const created = phase.kind === 'created'
   return (
     <section data-surface="card" className={CARD_CLASS}>
       <h2 className="text-2xl font-semibold text-ink">{strings.guardianStepTitle}</h2>
       <p data-testid="finish-signup-outcome" role="status" className="text-success-ink">
-        {created ? strings.createdGuardianPending : strings.awaitingGuardian}
+        {continueToLook
+          ? firstRun.guardianPending
+          : created
+            ? strings.createdGuardianPending
+            : strings.awaitingGuardian}
       </p>
-      <GuardianInvitePanel teenId={created ? phase.account.userId : phase.accountId} />
+      <GuardianInvitePanel
+        teenId={created ? phase.account.userId : phase.accountId}
+        intro={continueToLook ? firstRun.guardianInvite : strings.guardianIntro}
+      />
       <button
         type="button"
         onClick={() => {
-          void leaveUntilApproved()
+          void (continueToLook ?? leaveUntilApproved)()
         }}
         data-gold="primary"
         className="min-h-12 w-full rounded-full bg-primary px-5 py-3 text-sm font-semibold text-on-primary"
       >
-        {strings.guardianStepLeave}
+        {continueToLook ? strings.continue : strings.guardianStepLeave}
       </button>
     </section>
   )
 }
 
-function GuardianInvitePanel({ teenId }: { teenId: string }) {
+function GuardianInvitePanel({ teenId, intro }: { teenId: string; intro: string }) {
   const { i18n } = useTranslation('translation', { i18n: getI18n() })
   const strings = getFederatedSignInStrings(i18n.language)
   const [guardianEmail, setGuardianEmail] = useState('')
@@ -354,7 +404,7 @@ function GuardianInvitePanel({ teenId }: { teenId: string }) {
       <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-ink-muted">
         {strings.guardianTitle}
       </h3>
-      <p className="text-sm text-ink-soft">{strings.guardianIntro}</p>
+      <p className="text-sm text-ink-soft">{intro}</p>
       <label htmlFor="finish-guardian-email" className="block text-sm text-ink">
         {strings.guardianEmail}
       </label>

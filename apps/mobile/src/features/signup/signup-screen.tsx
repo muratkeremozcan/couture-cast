@@ -17,6 +17,7 @@ import {
 import { Text, View, createSchemeStyles } from '@/components/themed'
 import { inviteGuardianFromMobile } from '@/src/lib/guardian'
 import { mobileGuestPreviewStore } from '@/src/lib/guest-preview-store'
+import { mobileGuestPreviewBirthdate } from '@/src/lib/guest-preview-birthdate'
 import { SignupRefusedError, submitMobileSignup } from '@/src/lib/signup'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { SignupGoogleEntry } from './google-sign-in-button'
@@ -47,7 +48,9 @@ export function SignupScreen({
   const styles = useStyles()
   const { announce } = useAccessibilityAnnouncer()
   const { i18n } = useTranslation()
-  const previewStrings = getGuestPreviewStrings(i18n.language).conversionDetail
+  const { conversionDetail: previewStrings, firstRun } = getGuestPreviewStrings(
+    i18n.language
+  )
   const strings = getFederatedSignInStrings(i18n.language)
   const [accountCreated, setAccountCreated] = useState(false)
   const [email, setEmail] = useState('')
@@ -63,6 +66,12 @@ export function SignupScreen({
   const [pendingTeenId, setPendingTeenId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isInviting, setIsInviting] = useState(false)
+
+  useEffect(() => {
+    if (!fromPreview) return
+    const date = mobileGuestPreviewBirthdate.read()
+    if (date) setBirthdate((draft) => draft || date)
+  }, [fromPreview])
 
   const birthdateEvaluation = evaluateBirthdateInput(birthdate)
   const inlineMessage = getBirthdateNotice(birthdateEvaluation, strings)
@@ -91,6 +100,8 @@ export function SignupScreen({
 
     if (!gate.allowed) {
       setErrorMessage(strings.underage)
+      mobileGuestPreviewBirthdate.clear()
+      setBirthdate('')
       // Story 6.16 D2: an age refusal outranks the preview's self-reported gate.
       if (fromPreview) mobileGuestPreviewStore().clear()
       return
@@ -100,10 +111,14 @@ export function SignupScreen({
 
     try {
       const response = await submitSignup({ email, birthdate })
+      mobileGuestPreviewBirthdate.clear()
+      setBirthdate('')
       if (response.guardianConsentRequired) {
         setAccountCreated(true)
         setPendingTeenId(response.userId)
-        setSuccessMessage(strings.createdGuardianPending)
+        setSuccessMessage(
+          fromPreview ? firstRun.guardianPending : strings.createdGuardianPending
+        )
         return
       }
 
@@ -113,8 +128,11 @@ export function SignupScreen({
     } catch (error) {
       setErrorMessage(failureText(error, strings.createUnavailable))
       // D2: the server's refusal outranks the preview gate, as the client's does.
-      if (fromPreview && error instanceof SignupRefusedError)
-        mobileGuestPreviewStore().clear()
+      if (error instanceof SignupRefusedError) {
+        mobileGuestPreviewBirthdate.clear()
+        setBirthdate('')
+        if (fromPreview) mobileGuestPreviewStore().clear()
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -237,7 +255,9 @@ export function SignupScreen({
         {pendingTeenId ? (
           <View style={styles.invitationCard}>
             <Text style={styles.invitationEyebrow}>{strings.guardianTitle}</Text>
-            <Text style={styles.description}>{strings.guardianIntro}</Text>
+            <Text style={styles.description}>
+              {fromPreview ? firstRun.guardianInvite : strings.guardianIntro}
+            </Text>
 
             <Text style={styles.label}>{strings.guardianEmail}</Text>
             <TextInput

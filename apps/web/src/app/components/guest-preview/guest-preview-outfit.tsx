@@ -27,6 +27,9 @@ export function GuestPreviewOutfit({
   onResetChoices,
   heading,
   continuation,
+  shuffleLabel,
+  saveAction,
+  mood,
   nested = false,
 }: {
   result: SampleOutfitResult
@@ -41,6 +44,9 @@ export function GuestPreviewOutfit({
   onResetChoices: () => void
   heading?: string
   continuation?: React.ReactNode
+  shuffleLabel?: string
+  saveAction?: React.ReactNode
+  mood?: React.ReactNode
   /**
    * Story CC-7.9 D7: true where a parent card already holds the outfit (Home's hero), so it
    * renders as a plain section; on /preview it is its own card.
@@ -68,6 +74,7 @@ export function GuestPreviewOutfit({
             ? strings.outfit.allDisliked
             : strings.outfit.noEligible}
         </h2>
+        {mood}
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
@@ -97,12 +104,13 @@ export function GuestPreviewOutfit({
       data-testid="guest-preview-outfit"
       data-look-id={look.id}
       data-surface={cardSurface}
-      className={`min-w-0 space-y-5 [overflow-wrap:anywhere] ${nested ? '' : 'p-3 min-[361px]:p-5 sm:p-6'} ${cardClass}`}
+      data-first-run={Boolean(saveAction)}
+      className={`group min-w-0 space-y-5 [overflow-wrap:anywhere] ${nested ? '' : 'p-3 min-[361px]:p-5 sm:p-6'} ${cardClass}`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0 max-w-full">
           {(heading || !hasSwaps) && (
-            <p className="text-xs uppercase tracking-[0.12em] text-ink-muted">
+            <p className="text-xs uppercase tracking-[0.12em] text-ink-muted group-data-[first-run=true]:hidden">
               {heading ?? strings.outfit.heading}
             </p>
           )}
@@ -126,15 +134,12 @@ export function GuestPreviewOutfit({
 
       <div className="space-y-2">
         {continuation}
-        <button
-          type="button"
-          onClick={onTryAnother}
-          data-testid="guest-preview-try-another"
-          data-primary-action="true"
-          className="min-h-11 max-w-full rounded-lg bg-inverse px-2 text-sm font-semibold text-on-inverse min-[361px]:px-4"
-        >
-          {strings.outfit.tryAnother}
-        </button>
+        <OutfitActions
+          saveAction={saveAction}
+          shuffleLabel={shuffleLabel}
+          defaultShuffleLabel={strings.outfit.tryAnother}
+          onShuffle={onTryAnother}
+        />
         {noAlternative ? (
           <p
             role="status"
@@ -146,10 +151,12 @@ export function GuestPreviewOutfit({
         ) : null}
       </div>
 
-      <p className="text-xs text-ink-muted">{strings.styleIdeas.illustrations}</p>
+      <p className="text-xs text-ink-muted group-data-[first-run=true]:hidden">
+        {strings.styleIdeas.illustrations}
+      </p>
       <ul
         data-testid="guest-preview-garments"
-        className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 sm:grid-cols-3"
+        className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 group-data-[first-run=true]:grid-cols-[repeat(auto-fit,minmax(min(100%,5.5rem),1fr))] group-data-[first-run=true]:gap-2 sm:grid-cols-3"
       >
         {result.garments.map((garment) => {
           const text = sampleGarmentText(garment, strings)
@@ -159,12 +166,12 @@ export function GuestPreviewOutfit({
               key={garment.category}
               data-testid="guest-preview-garment"
               data-garment-id={garment.id}
-              className="flex flex-col items-center gap-2 rounded-lg border border-line bg-page p-3 text-center"
+              className="flex min-w-0 flex-col items-center gap-2 rounded-lg border border-line bg-page p-3 text-center group-data-[first-run=true]:p-2"
             >
               <SampleGarmentArt
                 garment={garment}
                 label={text.description}
-                className="h-auto w-20 max-w-full"
+                className="h-auto w-20 max-w-full group-data-[first-run=true]:w-16"
               />
               <span className="text-sm font-medium text-ink">{text.name}</span>
               <button
@@ -172,7 +179,7 @@ export function GuestPreviewOutfit({
                 onClick={(event) => onSwap(garment.category, event.currentTarget)}
                 data-testid={`guest-preview-swap-${garment.category}`}
                 aria-label={`${formatPreviewString(strings.outfit.swap, { category })}: ${text.name}`}
-                className="min-h-11 rounded-lg border border-line-strong bg-page px-3 text-xs font-semibold text-ink hover:border-ink"
+                className="mt-auto min-h-11 max-w-full rounded-lg border border-line-strong bg-page px-3 text-xs font-semibold text-ink hover:border-ink group-data-[first-run=true]:px-1"
               >
                 {formatPreviewString(strings.outfit.swap, { category })}
               </button>
@@ -180,6 +187,7 @@ export function GuestPreviewOutfit({
           )
         })}
       </ul>
+      {mood}
 
       <div className="space-y-2">
         <h3 className="text-sm font-semibold text-ink">{strings.outfit.whyThisWorks}</h3>
@@ -217,5 +225,32 @@ export function GuestPreviewOutfit({
         )}
       </div>
     </section>
+  )
+}
+
+function OutfitActions({
+  saveAction,
+  shuffleLabel,
+  defaultShuffleLabel,
+  onShuffle,
+}: {
+  saveAction: React.ReactNode
+  shuffleLabel?: string
+  defaultShuffleLabel: string
+  onShuffle: () => void
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {saveAction}
+      <button
+        type="button"
+        onClick={onShuffle}
+        data-testid="guest-preview-try-another"
+        data-primary-action={saveAction ? undefined : 'true'}
+        className={`min-h-11 max-w-full rounded-lg px-2 text-sm font-semibold min-[361px]:px-4 ${saveAction ? 'border border-line-strong bg-page text-ink' : 'bg-inverse text-on-inverse'}`}
+      >
+        {shuffleLabel ?? defaultShuffleLabel}
+      </button>
+    </div>
   )
 }

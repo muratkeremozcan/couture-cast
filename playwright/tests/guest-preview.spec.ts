@@ -5,6 +5,7 @@
 // W-GATE-TAMPER, E-NO-DB-WRITES, E-GATE-SERVER-WINS, T-NO-PAGEVIEW, T-BEFORE-ELIGIBILITY,
 // L-MEMBER-OPENS-PREVIEW and the AC2 timing record.
 // CC-7.17 copy acceptance: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
+// CC-7.21 first run: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-78-first-look-and-account-save
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Page, Request } from '@playwright/test'
@@ -24,7 +25,7 @@ import {
 } from '../support/helpers/commerce-session'
 
 const STORAGE_KEY = 'couturecast.guest-preview'
-const LABEL = 'Sample looks and weather. Your closet and live weather stay separate.'
+const LABEL = 'Sample looks and weather'
 
 type CapturedEvent = { event: string; properties: Record<string, unknown> }
 
@@ -112,31 +113,37 @@ async function expectPageFitsWidth(page: Page, width: number) {
 test.describe('Guest preview (signed out)', () => {
   test.use({ authSessionEnabled: false })
 
-  test('[P0] [UX-FIRST-001] [7.17-COPY-001/002] a phone visitor can find and edit a sample outfit', async ({
+  test('[P0] [7.21-ENTRY] a phone visitor can find and edit a sample outfit', async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 })
+    const openedAt = performance.now()
     await page.goto('/')
-    const teaser = page.getByRole('region', { name: 'Outfit idea' })
-    const entry = teaser.getByRole('link', { name: 'Try sample looks' })
-    await expect(teaser.getByRole('heading', { name: 'Outfit idea' })).toBeInViewport({
+    const teaser = page.getByRole('region', { name: 'Sample outfit' })
+    await expect(teaser).toHaveCount(1)
+    const entry = teaser.getByRole('link', { name: 'Show me looks', exact: true })
+    await expect(teaser.getByRole('heading', { name: 'Sample outfit' })).toBeInViewport({
       ratio: 1,
     })
-    await expect(teaser.getByText(LABEL, { exact: true })).toBeInViewport({ ratio: 1 })
     await expect(entry).toBeInViewport({ ratio: 1 })
+    await expect(entry).toHaveAttribute('data-gold', 'primary')
+    await expect(teaser.locator('[data-gold="primary"]')).toHaveCount(1)
+    for (const name of ['Sign in', 'Create account']) {
+      await expect(teaser.getByRole('link', { name, exact: true })).toHaveCSS(
+        'text-decoration-line',
+        'underline'
+      )
+    }
     await expect(
       page.getByText('All personalization services reporting healthy.', { exact: true })
     ).toHaveCount(0)
     await entry.click()
     const gate = page.getByTestId('guest-preview-gate')
     await expect(gate.getByRole('heading', { name: 'Check your age' })).toBeVisible()
-    await expect(gate).toContainText(
-      'Enter your birthdate. This device checks it. The app never saves or sends it.'
-    )
     await passGate(page)
 
     const outfit = page.getByTestId('guest-preview-outfit')
-    const nextLook = outfit.getByRole('button', { name: 'Try another look' })
+    const nextLook = outfit.getByRole('button', { name: 'Shuffle', exact: true })
     await expect(outfit.getByRole('heading', { name: 'School day' })).toBeInViewport({
       ratio: 1,
     })
@@ -144,6 +151,13 @@ test.describe('Guest preview (signed out)', () => {
     await expect(weather).toHaveText('Mild and dry')
     await expect(weather).toBeInViewport({ ratio: 1 })
     await expect(nextLook).toBeInViewport({ ratio: 1 })
+    await expect(page.getByTestId('style-mood-cozy')).toBeVisible()
+    await expect(page.getByTestId('sample-save-look')).toBeEnabled()
+    await expect(page.getByTestId('guest-preview-garment')).toHaveCount(3)
+    await testInfo.attach('time-to-first-look', {
+      body: JSON.stringify({ elapsedMs: Math.round(performance.now() - openedAt) }),
+      contentType: 'application/json',
+    })
 
     const explanation = outfit.getByTestId('guest-preview-explanation')
     await expect(
@@ -209,7 +223,9 @@ test.describe('Guest preview (signed out)', () => {
           const outfit = page.getByTestId('guest-preview-outfit')
           const firstLook = de.looks['office-oxford']
           await expect(outfit).toHaveAttribute('data-look-id', 'sample:l:office-oxford')
-          await expectReadable(outfit.getByText(de.outfit.heading, { exact: true }))
+          const sampleLabel = page.getByTestId('guest-preview-label')
+          await expect(sampleLabel).toHaveText(de.firstRun.sampleLabel)
+          await expectReadable(sampleLabel)
           await expectReadable(outfit.getByRole('heading', { name: firstLook.name }))
           await expectReadable(outfit.getByText(firstLook.description, { exact: true }))
           await expectReadable(outfit.getByTestId('guest-preview-try-another'))
@@ -219,10 +235,12 @@ test.describe('Guest preview (signed out)', () => {
             contentType: 'image/png',
           })
 
+          await page.getByTestId('guest-preview-nav-preferences').click()
           const conversion = page.getByTestId('guest-preview-conversion')
           await expectReadable(
             conversion.getByText(de.conversionDetail.canSave, { exact: true })
           )
+          await page.getByTestId('guest-preview-comfort-toggle').click()
           await expectReadable(
             page
               .getByTestId('guest-preview-thermal')
@@ -243,16 +261,126 @@ test.describe('Guest preview (signed out)', () => {
   }) => {
     await page.goto('/preview')
     await passGate(page)
-    await page.getByRole('button', { name: 'Try another look' }).click()
+    await page.getByRole('button', { name: 'Shuffle', exact: true }).click()
     const editedOutfit = page.getByRole('heading', { name: 'Silk midi' })
     await expect(editedOutfit).toBeVisible()
+    await page.getByTestId('guest-preview-nav-preferences').click()
     const add = page.getByRole('region', { name: 'Add your clothes' })
     await expect(add).toContainText('Make an account to add your clothes')
     await add.getByRole('link', { name: 'Create account' }).click()
     await expect(page).toHaveURL(/\/signup\?from=preview$/)
     await page.getByRole('link', { name: 'Back to preview' }).click()
+    await page.getByTestId('guest-preview-nav-outfit').click()
     await expect(editedOutfit).toBeVisible()
   })
+
+  test('[P0] [7.21-CANCEL] leaving the gate, sheet, and auth returns to the guest experience', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    const entry = page.getByTestId('guest-preview-entry')
+    await entry.click()
+    await page.getByTestId('guest-preview-gate-exit').click()
+    await expect(entry).toBeVisible()
+    await entry.click()
+    await expect(page.getByTestId('guest-preview-birthdate')).toHaveValue('')
+    const requests = recordRequests(page, new URL(page.url()).origin)
+    await passGate(page)
+    await page.getByTestId('guest-preview-swap-shoes').click()
+    await page.getByTestId('guest-preview-swap-option-white-sneakers').click()
+    const sneakers = page
+      .getByTestId('guest-preview-outfit')
+      .getByText('White sneakers', {
+        exact: true,
+      })
+    await expect(sneakers).toBeVisible()
+    expect(
+      await page.evaluate(
+        (key) => localStorage.getItem(key)?.includes('2000-01-15'),
+        STORAGE_KEY
+      )
+    ).toBe(false)
+    expect(
+      requests.all.some(
+        (request) =>
+          request.url().includes('2000-01-15') ||
+          request.postData()?.includes('2000-01-15')
+      )
+    ).toBe(false)
+    const editedPieces = await garmentIds(page)
+    const save = page.getByTestId('sample-save-look')
+    const sheet = page.getByTestId('guest-preview-save-sheet')
+
+    await save.click()
+    await expect(sheet).toBeVisible()
+    await sheet.getByTestId('guest-preview-save-cancel').click()
+    await expect(sheet).toBeHidden()
+    await expect(sneakers).toBeVisible()
+    expect(await garmentIds(page)).toEqual(editedPieces)
+
+    await save.click()
+    await sheet.getByTestId('guest-preview-create-account').click()
+    await expect(page.getByLabel('Birthdate')).toHaveValue('2000-01-15')
+    await page.getByTestId('signup-back-to-preview').click()
+    await expect(sneakers).toBeVisible()
+    expect(await garmentIds(page)).toEqual(editedPieces)
+
+    await save.click()
+    await sheet.getByTestId('guest-preview-sign-in').click()
+    await expect(page).toHaveURL(/\/signin\?from=preview$/)
+    await page.getByTestId('signin-back-to-preview').click()
+    await expect(sneakers).toBeVisible()
+    expect(await garmentIds(page)).toEqual(editedPieces)
+  })
+
+  for (const [door, path] of [
+    ['create-account', '/signup'],
+    ['sign-in', '/signin'],
+  ] as const) {
+    test(`[P0] [7.21-PRIVACY] leaving ${path} clears the date and keeps the guest look`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1100, height: 820 })
+      await page.goto('/')
+      const origin = await page.evaluate(() => performance.timeOrigin)
+      const entry = page.getByTestId('guest-preview-entry')
+      await entry.click()
+      await passGate(page)
+      await page.getByTestId('guest-preview-swap-shoes').click()
+      await page.getByTestId('guest-preview-swap-option-white-sneakers').click()
+      const shoe = page.getByTestId('guest-preview-outfit').getByText('White sneakers', {
+        exact: true,
+      })
+      await expect(shoe).toBeVisible()
+      const pieces = await garmentIds(page)
+      const save = page.getByTestId('sample-save-look')
+      const sheet = page.getByTestId('guest-preview-save-sheet')
+      await save.click()
+      await sheet.getByTestId(`guest-preview-${door}`).click()
+      await expect(page).toHaveURL(`${path}?from=preview`)
+      if (door === 'create-account') {
+        await expect(page.getByLabel('Birthdate')).toHaveValue('2000-01-15')
+        await page.getByTestId('primary-nav').getByTestId('nav-ritual').click()
+      } else {
+        const legal = page.getByRole('navigation', { name: 'Legal', exact: true })
+        await legal.getByRole('link', { name: 'Privacy Policy', exact: true }).click()
+        await expect(page).toHaveURL('/privacy')
+        expect(await page.evaluate(() => performance.timeOrigin)).toBe(origin)
+        await legal.getByRole('link', { name: 'Home', exact: true }).click()
+      }
+      await expect(page).toHaveURL('/')
+      // Keep the same document so a reload cannot clear the memory on the test's behalf.
+      expect(await page.evaluate(() => performance.timeOrigin)).toBe(origin)
+      await entry.click()
+      await expect(shoe).toBeVisible()
+      expect(await garmentIds(page)).toEqual(pieces)
+      await save.click()
+      await sheet.getByTestId('guest-preview-create-account').click()
+      await expect(page).toHaveURL('/signup?from=preview')
+      expect(await page.evaluate(() => performance.timeOrigin)).toBe(origin)
+      await expect(page.getByLabel('Birthdate')).toHaveValue('')
+    })
+  }
 
   test('[P1] [UX-FIRST-004] the first outfit actions fit at 320 px with enlarged text', async ({
     page,
@@ -267,9 +395,9 @@ test.describe('Guest preview (signed out)', () => {
     await page.goto('/')
     await expect(page.locator('html')).toHaveCSS('font-size', '32px')
 
-    const teaser = page.getByRole('region', { name: 'Outfit idea' })
-    const entry = teaser.getByRole('link', { name: 'Try sample looks' })
-    await expect(teaser.getByText(LABEL, { exact: true })).toBeVisible()
+    const teaser = page.getByRole('region', { name: 'Sample outfit' })
+    const entry = teaser.getByRole('link', { name: 'Show me looks', exact: true })
+    await expect(teaser.getByRole('heading', { name: 'Sample outfit' })).toBeVisible()
     await entry.scrollIntoViewIfNeeded()
     await expect(entry).toBeInViewport({ ratio: 1 })
     await expectPageFitsWidth(page, width)
@@ -277,18 +405,19 @@ test.describe('Guest preview (signed out)', () => {
     await passGate(page)
 
     const outfit = page.getByTestId('guest-preview-outfit')
-    const nextLook = outfit.getByRole('button', { name: 'Try another look' })
+    const nextLook = outfit.getByRole('button', { name: 'Shuffle', exact: true })
     await expect(outfit.getByRole('heading', { name: 'School day' })).toBeVisible()
     await nextLook.scrollIntoViewIfNeeded()
     await expect(nextLook).toBeInViewport({ ratio: 1 })
     await expectPageFitsWidth(page, width)
   })
 
-  test('[P0] [6.16-E2E-001] the gate blocks under-13 with no request, no storage and no event', async ({
+  test('[P0] [7.21-AGE] [6.16-E2E-001] the gate blocks under-13 with no request, no storage and no event', async ({
     page,
   }) => {
     await enableAnalyticsHook(page)
-    await page.goto('/preview')
+    await page.goto('/')
+    await page.getByRole('link', { name: 'Show me looks', exact: true }).click()
     const requests = recordRequests(page, new URL(page.url()).origin)
     await passGate(page, '2020-01-01')
     await expect(page.getByTestId('guest-preview-gate-error')).toHaveText(
@@ -296,6 +425,7 @@ test.describe('Guest preview (signed out)', () => {
     )
     await expect(page.getByTestId('guest-preview-birthdate')).toHaveValue('')
     await expect(page.getByTestId('guest-preview-outfit')).toHaveCount(0)
+    await expect(page.getByTestId('sample-save-look')).toHaveCount(0)
     expect(
       await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)
     ).toBeNull()
@@ -317,6 +447,7 @@ test.describe('Guest preview (signed out)', () => {
     expect(posts(requests)).toEqual([])
     await passGate(page)
     await expect(page.getByTestId('guest-preview-label')).toHaveText(LABEL)
+    await page.getByTestId('guest-preview-comfort-toggle').click()
     await choose(page, 'guest-preview-thermal-cold')
     await page.getByTestId('guest-preview-swap-shoes').click()
     await page.getByTestId('guest-preview-swap-option-white-sneakers').click()
@@ -343,6 +474,7 @@ test.describe('Guest preview (signed out)', () => {
     await expect
       .poll(() => garmentIds(page))
       .toEqual(['sample:g:oxford-shirt', 'sample:g:dark-jeans', 'sample:g:loafers'])
+    await page.getByTestId('guest-preview-comfort-toggle').click()
     await choose(page, 'guest-preview-thermal-cold')
     await expect.poll(async () => (await garmentIds(page))[0]).toBe('sample:g:fleece-zip')
     await expect(page.getByTestId('guest-preview-explanation')).toContainText(
@@ -366,6 +498,7 @@ test.describe('Guest preview (signed out)', () => {
   }) => {
     await page.goto('/preview')
     await passGate(page)
+    await page.getByTestId('guest-preview-comfort-toggle').click()
     await choose(page, 'guest-preview-thermal-cold')
     await page.getByTestId('guest-preview-nav-wardrobe').click()
     await expect(page).toHaveURL(/\/preview\?view=wardrobe$/)
@@ -434,7 +567,8 @@ test.describe('Guest preview (signed out)', () => {
     async ({ page }) => {
       await page.goto('/preview')
       await passGate(page)
-      await page.getByTestId('guest-preview-create-account').click()
+      await page.getByTestId('guest-preview-nav-preferences').click()
+      await page.getByTestId('guest-preview-garment-create-account').click()
       await expect(page).toHaveURL(/\/signup\?from=preview$/)
       expect(
         await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)
@@ -469,7 +603,8 @@ test.describe('Guest preview (signed out)', () => {
   }) => {
     await page.goto('/preview')
     await passGate(page)
-    await page.getByTestId('guest-preview-create-account').click()
+    await page.getByTestId('guest-preview-nav-preferences').click()
+    await page.getByTestId('guest-preview-garment-create-account').click()
     await expect(page).toHaveURL(/\/signup\?from=preview$/)
     await page.getByLabel('Email').fill('guest-preview-kid@example.test')
     await page.getByLabel('Birthdate').fill('2020-01-01')
@@ -490,6 +625,7 @@ test.describe('Guest preview (signed out)', () => {
     await passGate(page, '2010-02-30')
     expect(await capturedEvents(page)).toEqual([])
     await passGate(page)
+    await page.getByTestId('guest-preview-comfort-toggle').click()
     await choose(page, 'guest-preview-thermal-cold')
     const events = await capturedEvents(page)
     expect(events.map((event) => event.event)).toEqual([
@@ -522,6 +658,7 @@ test.describe('Guest preview (signed out)', () => {
     await passGate(page)
     await expect(page.getByTestId('guest-preview-outfit')).toBeVisible()
     const firstUseful = Date.now() - start
+    await page.getByTestId('guest-preview-comfort-toggle').click()
     const controls = [
       'guest-preview-thermal-cold',
       'guest-preview-thermal-warm',

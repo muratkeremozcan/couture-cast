@@ -3,6 +3,7 @@
 // Story 6.16 W-GATE-*, W-* functional, W-STORAGE-DENIED, W-OFFLINE-AFTER-LOAD and
 // L-CROSS-TAB-* for the web guest preview, through the real store and policy.
 // CC-7.17 sample copy: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
+// CC-7.21: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-78-first-look-and-account-save
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -13,6 +14,10 @@ import {
 } from '@couture/utils'
 import type * as GuestPreviewLib from '../../../lib/guest-preview'
 import { setWebGuestPreviewStoreForTests } from '../../../lib/guest-preview'
+import {
+  destinationAfterSignIn,
+  hasGuestLookSave,
+} from '../../../lib/post-signin-destination'
 import { GuestPreview } from './guest-preview'
 import { GuestPreviewReview } from './guest-preview-review'
 
@@ -57,9 +62,9 @@ function memoryAdapter(options: { failWrites?: boolean } = {}) {
 
 let adapter: ReturnType<typeof memoryAdapter>
 
-function useStore(next = memoryAdapter()) {
+function useStore(next = memoryAdapter(), now?: () => number) {
   adapter = next
-  const store = createGuestPreviewStore({ adapter, catalog: SAMPLE_CATALOG })
+  const store = createGuestPreviewStore({ adapter, catalog: SAMPLE_CATALOG, now })
   setWebGuestPreviewStoreForTests(store)
   return store
 }
@@ -211,7 +216,7 @@ describe('guest preview surfaces', () => {
   it('shows the label, a complete outfit, sample weather and why it works (AC1, D4)', async () => {
     const outfit = await passGate()
     expect(screen.getByTestId('guest-preview-label').textContent).toBe(
-      en.chrome.sampleLabel
+      en.firstRun.sampleLabel
     )
     expect(garmentIds()).toEqual([
       'sample:g:oxford-shirt',
@@ -267,21 +272,100 @@ describe('guest preview surfaces', () => {
     )
   })
 
-  it('saves School day in the preview and can reopen and remove it', async () => {
+  it('opens the account sheet and keeps the exact outfit after cancellation', async () => {
     const outfit = await passGate()
-    fireEvent.click(screen.getByTestId('sample-save-look'))
-    const saved = await screen.findByTestId('sample-saved-looks')
-    const schoolDay = within(saved).getByRole('button', { name: 'School day' })
-
     fireEvent.click(within(outfit).getByTestId('guest-preview-try-another'))
     expect(within(outfit).getByRole('heading', { name: 'Silk midi' })).toBeVisible()
-    fireEvent.click(schoolDay)
+    const pieces = garmentIds()
+    fireEvent.click(screen.getByTestId('sample-save-look'))
+    const sheet = await screen.findByTestId('guest-preview-save-sheet')
+    fireEvent.click(within(sheet).getByTestId('guest-preview-save-cancel'))
+    await waitFor(() => expect(sheet).not.toBeInTheDocument())
+    expect(within(outfit).getByRole('heading', { name: 'Silk midi' })).toBeVisible()
+    expect(garmentIds()).toEqual(pieces)
+  })
 
-    const heading = within(outfit).getByRole('heading', { name: 'School day' })
-    await waitFor(() => expect(heading).toHaveFocus())
-    fireEvent.click(within(saved).getByRole('button', { name: 'Remove School day' }))
-    expect(screen.queryByTestId('sample-saved-looks')).not.toBeInTheDocument()
-    expect(heading).toBeVisible()
+  it('keeps the Save sheet open and preserves the look when account actions are offline', async () => {
+    const outfit = await passGate()
+    const lookId = outfit.dataset.lookId
+    fireEvent.click(screen.getByTestId('sample-save-look'))
+    const sheet = await screen.findByTestId('guest-preview-save-sheet')
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    try {
+      act(() => {
+        window.dispatchEvent(new Event('offline'))
+      })
+      expect(within(sheet).getByText(en.chrome.connectionNeeded)).toHaveAttribute(
+        'role',
+        'status'
+      )
+      expect(within(sheet).getByTestId('guest-preview-sign-in')).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+      const create = within(sheet).getByTestId('guest-preview-create-account')
+      expect(create).toHaveAttribute('aria-disabled', 'true')
+      expect(fireEvent.click(create)).toBe(false)
+      await expect(hasGuestLookSave()).resolves.toBe(false)
+      expect(sheet).toBeVisible()
+      expect(outfit.dataset.lookId).toBe(lookId)
+    } finally {
+      online.mockRestore()
+    }
+  })
+
+  it.each(['create-account', 'sign-in'] as const)(
+    'stores a first-run intent when the guest chooses %s in the account sheet',
+    async (door) => {
+      await passGate()
+      fireEvent.click(screen.getByTestId('sample-save-look'))
+      const sheet = await screen.findByTestId('guest-preview-save-sheet')
+      const link = within(sheet).getByTestId(`guest-preview-${door}`)
+      fireEvent.click(link, { ctrlKey: true })
+      expect(JSON.parse(adapter.value() ?? '{}')).not.toHaveProperty('conversion')
+      await expect(hasGuestLookSave()).resolves.toBe(false)
+      fireEvent.click(link)
+      await waitFor(() =>
+        expect(JSON.parse(adapter.value() ?? '{}')).toHaveProperty(
+          'conversion.intent',
+          'guest-preview-save-look'
+        )
+      )
+      await expect(hasGuestLookSave()).resolves.toBe(true)
+      await expect(destinationAfterSignIn(true)).resolves.toBe('/preview/continue')
+    }
+  )
+
+  it('returns to the age check when the in-progress preview expires at the account sheet', async () => {
+    let now = Date.now()
+    const store = useStore(memoryAdapter(), () => now)
+    await passGate()
+    fireEvent.click(screen.getByTestId('sample-save-look'))
+    const link = await screen.findByTestId('guest-preview-create-account')
+    now = store.snapshot().state!.eligibility.expiresAt
+    fireEvent.click(link)
+    const gate = await screen.findByTestId('guest-preview-gate')
+    expect(screen.getByText(en.firstRun.previewExpired)).toBeVisible()
+    expect(within(gate).getByTestId('guest-preview-birthdate')).toHaveValue('')
+  })
+
+  it('updates the look with optional colors and toggles a selected mood off', async () => {
+    const store = useStore()
+    await passGate()
+    const cozy = screen.getByTestId('style-mood-cozy')
+    fireEvent.click(cozy)
+    expect(cozy).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByTestId('sample-style-preferences'))
+    fireEvent.change(screen.getByRole('combobox', { name: en.styleIdeas.palette }), {
+      target: { value: 'colorful' },
+    })
+    expect(store.snapshot().state?.preferences).toMatchObject({
+      style: 'cozy',
+      palette: 'colorful',
+    })
+    fireEvent.click(cozy)
+    expect(cozy).toHaveAttribute('aria-pressed', 'false')
+    expect(store.snapshot().state?.preferences).toMatchObject({ palette: 'colorful' })
   })
 
   it('reports no alternative when only one look suits', async () => {
@@ -448,8 +532,9 @@ async function passGateOn(testId: string) {
 
 describe('guest preview lifecycle', () => {
   it('stores the conversion intent, reports a click and rotates the anonymous id', async () => {
-    await passGate()
-    const link = screen.getByTestId('guest-preview-create-account')
+    navigation.params = new URLSearchParams('view=preferences')
+    await passGateOn('guest-preview-conversion')
+    const link = screen.getByTestId('guest-preview-garment-create-account')
     expect(link.getAttribute('href')).toBe('/signup?from=preview')
     fireEvent.click(link)
     await waitFor(() =>
@@ -468,7 +553,7 @@ describe('guest preview lifecycle', () => {
       },
     })
     expect(window.__analyticsIdentityResets).toBe(1)
-    fireEvent.click(screen.getByTestId('guest-preview-sign-in'))
+    fireEvent.click(screen.getByTestId('guest-preview-garment-sign-in'))
     expect(window.__capturedAnalyticsEvents?.at(-1)?.properties).toMatchObject({
       action: 'sign_in',
     })
@@ -481,7 +566,7 @@ describe('guest preview lifecycle', () => {
     expect(garmentIds()[0]).toBe('sample:g:oxford-shirt')
     fireEvent.click(screen.getByTestId('guest-preview-exit'))
     await waitFor(() => expect(adapter.value()).toBeNull())
-    expect(navigation.push).toHaveBeenCalledWith('/')
+    expect(navigation.replace).toHaveBeenCalledWith('/')
   })
 
   it('discloses in-memory mode when storage fails (W-STORAGE-DENIED)', async () => {
@@ -495,7 +580,8 @@ describe('guest preview lifecycle', () => {
   })
 
   it('keeps working offline and says signup needs a connection (W-OFFLINE-AFTER-LOAD)', async () => {
-    await passGate()
+    navigation.params = new URLSearchParams('view=preferences')
+    await passGateOn('guest-preview-conversion')
     const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
     act(() => {
       window.dispatchEvent(new Event('offline'))
@@ -503,6 +589,8 @@ describe('guest preview lifecycle', () => {
     expect(screen.getByTestId('guest-preview-offline').textContent).toBe(
       en.chrome.connectionNeeded
     )
+    fireEvent.click(screen.getByTestId('guest-preview-comfort-toggle'))
+    navigation.params = new URLSearchParams()
     fireEvent.click(screen.getByTestId('guest-preview-thermal-cold'))
     expect(garmentIds()[0]).toBe('sample:g:fleece-zip')
     online.mockRestore()

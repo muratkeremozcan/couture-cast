@@ -31,6 +31,12 @@ env:
     timeout: 15000
 - scrollUntilVisible:
     element:
+      id: 'guest-preview-comfort-toggle'
+    direction: DOWN
+- tapOn:
+    id: 'guest-preview-comfort-toggle'
+- scrollUntilVisible:
+    element:
       id: 'guest-preview-thermal-cold'
     direction: DOWN
     centerElement: true
@@ -47,16 +53,20 @@ env:
     element:
       id: 'guest-preview-rain-high'
     direction: DOWN
-    centerElement: true
 - tapOn:
     id: 'guest-preview-rain-high'
 - scrollUntilVisible:
     element:
-      id: 'guest-preview-create-account'
-    direction: DOWN
-    centerElement: true
+      id: 'guest-preview-nav-preferences'
+    direction: UP
 - tapOn:
-    id: 'guest-preview-create-account'
+    id: 'guest-preview-nav-preferences'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-garment-create-account'
+    direction: DOWN
+- tapOn:
+    id: 'guest-preview-garment-create-account'
 - extendedWaitUntil:
     visible:
       id: 'signup-back-to-preview'
@@ -64,7 +74,10 @@ env:
     label: 'Signup opened from the preview'
 - runFlow: steps/continue-with-google.yaml
 - runFlow: steps/finish-step.yaml
-- runFlow: steps/enter-birthdate.yaml
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: 'finish-signup-create'
 - extendedWaitUntil:
     visible:
       id: 'guest-preview-review-proposed'

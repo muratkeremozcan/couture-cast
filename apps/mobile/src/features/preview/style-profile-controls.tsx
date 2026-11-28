@@ -282,6 +282,31 @@ function TuneWizard({
   )
 }
 
+function TuneModalHeader({ title, onClose }: { title: string; onClose: () => void }) {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  const { fontScale, width } = useWindowDimensions()
+  const stackHeader = fontScale >= 1.5 && width <= 400
+  return (
+    <LayerSwipeHandle
+      style={[styles.modalHeader, stackHeader && styles.stackedModalHeader]}
+    >
+      <Text
+        accessibilityRole="header"
+        style={[styles.title, !stackHeader && styles.inlineTitle, { color: palette.ink }]}
+      >
+        {title}
+      </Text>
+      <PreviewButton
+        label={t('feedback.close')}
+        testID="style-tune-close"
+        palette={palette}
+        onPress={onClose}
+      />
+    </LayerSwipeHandle>
+  )
+}
+
 export function StyleMemberControls({
   style,
   showClear = false,
@@ -291,7 +316,6 @@ export function StyleMemberControls({
   showClear?: boolean
   showMood?: boolean
 }) {
-  const { t } = useTranslation()
   const copy = useStyleCopy()
   const palette = useHeroPalette()
   const { scope, profile, status, saving, store } = style
@@ -365,20 +389,7 @@ export function StyleMemberControls({
           accessibilityViewIsModal
           style={[styles.modal, { backgroundColor: palette.page }]}
         >
-          <LayerSwipeHandle style={styles.modalHeader}>
-            <Text
-              accessibilityRole="header"
-              style={[styles.title, { color: palette.ink }]}
-            >
-              {copy.tune}
-            </Text>
-            <PreviewButton
-              label={t('shell.close')}
-              testID="style-tune-close"
-              palette={palette}
-              onPress={close}
-            />
-          </LayerSwipeHandle>
+          <TuneModalHeader title={copy.tune} onClose={close} />
           <ScrollView contentContainerStyle={styles.modalBody}>
             {open &&
               (profile ? (
@@ -447,6 +458,8 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 16,
   },
-  title: { flex: 1, fontSize: 20, fontWeight: '600' },
+  stackedModalHeader: { flexDirection: 'column', alignItems: 'stretch' },
+  title: { fontSize: 20, fontWeight: '600' },
+  inlineTitle: { flex: 1 },
   modalBody: { padding: 16 },
 })

@@ -39,11 +39,31 @@ export const deDE: GuestPreviewStrings = {
     checkGarment: 'Teil prüfen',
     backToWardrobe: 'Zum Kleiderschrank',
     outfitFailed: 'Das heutige Outfit konnte nicht geladen werden.',
-    sampleEntry: 'Beispieloutfits testen',
+    sampleEntry: 'Looks ansehen',
     outfitIdea: 'Outfitidee',
   },
+  firstRun: {
+    sampleLabel: 'Beispiel-Looks und Beispielwetter',
+    teaser: 'Beispiel-Look',
+    shuffle: 'Mischen',
+    save: 'Look speichern',
+    saveTitle: 'Diesen Look speichern',
+    saveBody:
+      'Erstelle ein kostenloses Konto oder melde dich an, um diesen Look zu behalten.',
+    cancel: 'Abbrechen',
+    optionalComfort: 'Wetter und Tragekomfort (optional)',
+    previewExpired: 'Deine Vorschau ist abgelaufen. Prüfe dein Alter, um neu zu starten.',
+    saveWithSettings: 'Look und Einstellungen speichern',
+    saveOnly: 'Nur den Look speichern',
+    guardianPending:
+      'Dein Konto ist bereit. Ein Elternteil oder eine erziehungsberechtigte Person kann den Fotozugriff erlauben.',
+    guardianInvite:
+      'Bitte ein Elternteil oder eine erziehungsberechtigte Person, den Fotozugriff zu prüfen.',
+    cancelReview: 'Abbrechen',
+    reviewFailed: 'Dein Look konnte nicht gespeichert werden. Versuch es erneut.',
+  },
   chrome: {
-    entry: 'Looks testen',
+    entry: 'Beispiel-Looks',
     exampleLabel: 'Beispiel',
     welcomeHeading: 'Outfits für das Wetter von heute',
     welcomeBody:
@@ -73,7 +93,7 @@ export const deDE: GuestPreviewStrings = {
   },
   gate: {
     heading: 'Prüfe dein Alter',
-    body: 'Gib dein Geburtsdatum ein. Nur dieses Gerät prüft es. Die App speichert und sendet es nicht.',
+    body: 'Gib dein Geburtsdatum ein, um dein Alter zu prüfen. Wenn du ein Konto erstellst, verwenden wir es für die Registrierung.',
     field: 'Geburtsdatum (YYYY-MM-DD)',
     submit: 'Weiter',
     selfReported:

@@ -1,4 +1,10 @@
 import { webGuestPreviewStore } from './guest-preview'
+import { GUEST_PREVIEW_SAVE_INTENT } from '@couture/utils'
+
+export async function hasGuestLookSave() {
+  const { state } = await webGuestPreviewStore().load()
+  return state?.conversion?.intent === GUEST_PREVIEW_SAVE_INTENT
+}
 
 /**
  * Story 6.16 D7, D8 (shared with 6.17): a sign-in that came from the preview

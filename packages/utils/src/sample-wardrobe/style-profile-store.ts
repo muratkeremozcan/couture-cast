@@ -5,7 +5,7 @@ import {
   type StyleProfileAnswers,
 } from './style-profile'
 
-type StyleProfilePatch = Partial<StyleProfileAnswers>
+export type StyleProfilePatch = Partial<StyleProfileAnswers>
 
 export type StyleProfileRequest =
   | { method: 'GET' | 'DELETE' }
@@ -72,7 +72,8 @@ export function createStyleProfileStore(
 
   async function perform(
     owner: string,
-    operation: StyleProfileRequest
+    operation: StyleProfileRequest,
+    propagateError = false
   ): Promise<boolean> {
     const state = read()
     if (owner !== scope || state.status === 'loading' || state.saving) return false
@@ -85,11 +86,12 @@ export function createStyleProfileStore(
       if (owner !== scope) return false
       publish({ ...latest, profile, status: 'ready', saving: false })
       return true
-    } catch {
+    } catch (error) {
       const latest = read()
       if (owner === scope) {
         publish({ ...latest, status: reading ? 'failed' : latest.status, saving: false })
       }
+      if (propagateError) throw error
       return false
     }
   }
@@ -104,8 +106,11 @@ export function createStyleProfileStore(
     },
     refreshDay,
     load: (owner: string) => perform(owner, { method: 'GET' }),
-    save: (owner: string, input: StyleProfilePatch) =>
-      perform(owner, { method: 'PATCH', input }),
+    save: (
+      owner: string,
+      input: StyleProfilePatch,
+      options?: { propagateError?: boolean }
+    ) => perform(owner, { method: 'PATCH', input }, options?.propagateError),
     clear: (owner: string) => perform(owner, { method: 'DELETE' }),
     updateDay(
       owner: string,

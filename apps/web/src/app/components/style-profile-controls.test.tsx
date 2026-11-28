@@ -11,7 +11,7 @@ import {
   type UpdateStyleProfileInput,
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
-import { useWebStyleProfile } from '../../lib/style-profile'
+import { saveWebStyleProfileForScope, useWebStyleProfile } from '../../lib/style-profile'
 import { useMswHandlers as registerMswHandlers } from '../../test-utils/msw/runtime'
 import { StyleDayControls, StyleMemberControls } from './style-profile-controls'
 
@@ -88,6 +88,17 @@ function serveProfile(options: { failedReads?: number; failPatch?: boolean } = {
 }
 
 describe('CC-7.20 web style profile controls', () => {
+  it('writes first-run style choices only for the captured account session', async () => {
+    const writes = serveProfile()
+    session.scope = 'first-run-owner'
+    await saveWebStyleProfileForScope(session.scope, { mood: 'cozy' })
+    session.scope = 'later-owner'
+    await expect(
+      saveWebStyleProfileForScope('first-run-owner', { palette: 'colorful' })
+    ).rejects.toThrow('Unable to save style profile for this session.')
+    expect(writes).toEqual([{ mood: 'cozy' }])
+  })
+
   it('recovers a failed initial read inline, then saves and clears a mood', async () => {
     session.scope = 'style-load-and-clear'
     const writes = serveProfile({ failedReads: 1 })

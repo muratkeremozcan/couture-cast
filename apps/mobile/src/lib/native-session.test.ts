@@ -131,7 +131,12 @@ beforeEach(async () => {
     user: { id: 'distinct-auth-principal-a' },
   }
   server.use(
-    http.get('*/api/v1/user/profile', () => HttpResponse.json(profile(owner), { status }))
+    http.get('*/api/v1/user/profile', () =>
+      HttpResponse.json(profile(owner), { status })
+    ),
+    http.get('*/api/v1/auth/signup/federated', () =>
+      HttpResponse.json({ status: 'complete' })
+    )
   )
 })
 afterEach(async () => {

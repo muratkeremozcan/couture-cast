@@ -119,9 +119,11 @@ test('at the cap the checkout itself lists the specs, by policy', () => {
     assert.ok(file.startsWith('playwright/tests/') && lane.test(file), file)
     assert.ok(fs.existsSync(new URL(`../../${file}`, import.meta.url)), file)
   }
-  assert.equal(consent.length, 1)
-  assert.ok(off.includes(consent[0]))
-  assert.match(consent[0], /google-sign-in-real-session\.spec\.ts$/)
+  assert.equal(consent.length, 2)
+  for (const file of consent) {
+    assert.ok(off.includes(file), file)
+    assert.match(file, /(?:google-sign-in|guest-preview)-real-session\.spec\.ts$/)
+  }
 })
 
 test('runs run.mjs directly: the specs three times, no retries, on the existing web build', () => {

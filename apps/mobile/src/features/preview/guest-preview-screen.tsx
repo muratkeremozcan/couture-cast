@@ -2,16 +2,23 @@
 // gates on self-reported age (D2), then runs the shared sample policy over local guest
 // state (D5, D7). Members go back to Home; nothing here calls a member API.
 import { router, useFocusEffect } from 'expo-router'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentRef,
+} from 'react'
 import { ScrollView, Text, View, Pressable } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
+  beginGuestLookSave,
   formatPreviewString,
   GUEST_PREVIEW_GARMENT_INTENT,
+  GUEST_PREVIEW_SAVE_INTENT,
   getGuestPreviewStrings,
   nextSampleLook,
-  openSampleBookmark,
-  saveSampleBookmark,
   SAMPLE_CATALOG,
   sampleGarmentText,
   sampleSwapCandidates,
@@ -29,7 +36,8 @@ import {
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { guestPreviewAnalytics, mobileGuestPreviewStore } from '@/src/lib/guest-preview'
 import { StyleMoodRow } from './style-profile-controls'
-import { SampleIdeaControls } from './sample-idea-controls'
+import { GuestStyleChoices } from './sample-idea-controls'
+import { mobileGuestPreviewBirthdate } from '@/src/lib/guest-preview-birthdate'
 import { useMemberSessionState } from '@/src/lib/member-session'
 import {
   PreviewButton,
@@ -38,6 +46,7 @@ import {
   PreviewFeedback,
   PreviewGate,
   PreviewOutfit,
+  PreviewSheet,
   PreviewSwapSheet,
   PreviewWardrobe,
   previewStyles,
@@ -97,6 +106,10 @@ export function GuestPreviewScreen() {
   const [noAlternative, setNoAlternative] = useState(false)
   const [announcement, setAnnouncement] = useState('')
   const [swapCategory, setSwapCategory] = useState<SampleGarmentCategory | null>(null)
+  const saveInvoker = useRef<ComponentRef<typeof Pressable>>(null)
+  const [savePreviewStartedAt, setSavePreviewStartedAt] = useState<number | null>(null)
+  const [previewExpired, setPreviewExpired] = useState(false)
+  const [comfortExpanded, setComfortExpanded] = useState(false)
 
   // TEA M1: the preview stays mounted under signup and sign-in, so it acts on the session
   // only while focused. A sign-in from the preview makes the session a member while the
@@ -105,6 +118,7 @@ export function GuestPreviewScreen() {
     useCallback(() => {
       if (session === 'member') {
         // Review F3: guest state left on this device never reaches a member.
+        mobileGuestPreviewBirthdate.clear()
         store.clear()
         router.replace('/')
         return
@@ -141,12 +155,9 @@ export function GuestPreviewScreen() {
       <Text
         testID="guest-preview-label"
         accessibilityRole="text"
-        style={[
-          previewStyles.label,
-          { backgroundColor: palette.noticeSurface, color: palette.noticeInk },
-        ]}
+        style={[previewStyles.label, { color: palette.inkMuted }]}
       >
-        {strings.chrome.sampleLabel}
+        {strings.firstRun.sampleLabel}
       </Text>
       {children}
     </ScrollView>
@@ -184,11 +195,16 @@ export function GuestPreviewScreen() {
       <PreviewGate
         strings={strings}
         palette={palette}
-        onEligible={() => {
-          store.start()
+        expired={previewExpired}
+        onEligible={(birthdate) => {
+          mobileGuestPreviewBirthdate.remember(store.start(), birthdate)
+          setPreviewExpired(false)
           guestPreviewAnalytics.started()
         }}
-        onExit={() => router.replace('/')}
+        onExit={() => {
+          mobileGuestPreviewBirthdate.clear()
+          router.replace('/')
+        }}
       />
     )
   }
@@ -228,11 +244,22 @@ export function GuestPreviewScreen() {
   }
   const control = (name: PreviewControl | 'collection' | 'category') =>
     guestPreviewAnalytics.interacted('control_changed', name)
-  const convert = (action: 'create_account' | 'sign_in') => {
-    update((current) => ({
-      ...current,
-      conversion: { intent: GUEST_PREVIEW_GARMENT_INTENT },
-    }))
+  const convert = (action: 'create_account' | 'sign_in', saveLook: boolean) => {
+    const next = update((current) =>
+      saveLook
+        ? beginGuestLookSave(current, result)
+        : {
+            ...current,
+            conversion: { intent: GUEST_PREVIEW_GARMENT_INTENT },
+          }
+    )
+    setSavePreviewStartedAt(null)
+    if (!next) {
+      mobileGuestPreviewBirthdate.clear()
+      setPreviewExpired(true)
+      return
+    }
+    if (saveLook && next.conversion?.intent !== GUEST_PREVIEW_SAVE_INTENT) return
     guestPreviewAnalytics.signupClicked(action)
     router.push(
       action === 'create_account' ? '/signup?from=preview' : '/signin?from=preview'
@@ -311,22 +338,30 @@ export function GuestPreviewScreen() {
           onBackToOutfit={() => navigate('outfit')}
         />
       ) : view === 'preferences' ? (
-        <PreviewFeedback
-          votes={state.votes}
-          strings={strings}
-          palette={palette}
-          onVote={(id, vote) => {
-            update((current) => ({
-              ...current,
-              votes: toggleSampleVote(current.votes, id, vote),
-            }))
-            guestPreviewAnalytics.interacted('look_voted')
-          }}
-          onReset={() => {
-            update((current) => ({ ...current, votes: {} }))
-            guestPreviewAnalytics.interacted('votes_reset')
-          }}
-        />
+        <>
+          <PreviewFeedback
+            votes={state.votes}
+            strings={strings}
+            palette={palette}
+            onVote={(id, vote) => {
+              update((current) => ({
+                ...current,
+                votes: toggleSampleVote(current.votes, id, vote),
+              }))
+              guestPreviewAnalytics.interacted('look_voted')
+            }}
+            onReset={() => {
+              update((current) => ({ ...current, votes: {} }))
+              guestPreviewAnalytics.interacted('votes_reset')
+            }}
+          />
+          <PreviewConversion
+            strings={strings}
+            palette={palette}
+            onCreateAccount={() => convert('create_account', false)}
+            onSignIn={() => convert('sign_in', false)}
+          />
+        </>
       ) : (
         <>
           <PreviewOutfit
@@ -361,25 +396,37 @@ export function GuestPreviewScreen() {
               update((current) => ({ ...current, votes: {} }))
               guestPreviewAnalytics.interacted('votes_reset')
             }}
-          />
-          <StyleMoodRow
-            selected={state.preferences?.style}
-            onSelect={(style) =>
-              update((current) => ({
-                ...current,
-                preferences: {
-                  ...current.preferences,
-                  style: current.preferences?.style === style ? undefined : style,
-                },
-                selectedLookId: undefined,
-              }))
+            shuffleLabel={strings.firstRun.shuffle}
+            saveAction={
+              <PreviewButton
+                buttonRef={saveInvoker}
+                label={strings.firstRun.save}
+                onPress={() => setSavePreviewStartedAt(state.startedAt)}
+                testID="sample-save-look"
+                palette={palette}
+                primary
+              />
+            }
+            mood={
+              <StyleMoodRow
+                selected={state.preferences?.style}
+                onSelect={(style) =>
+                  update((current) => ({
+                    ...current,
+                    preferences: {
+                      ...current.preferences,
+                      style: current.preferences?.style === style ? undefined : style,
+                    },
+                    selectedLookId: undefined,
+                  }))
+                }
+              />
             }
           />
-          <SampleIdeaControls
-            strings={strings}
+          <GuestStyleChoices
+            labels={strings.styleIdeas}
             palette={palette}
             preferences={state.preferences}
-            persistent={snapshot.persistent}
             onPreferences={(preferences) =>
               update((current) => ({
                 ...current,
@@ -387,32 +434,19 @@ export function GuestPreviewScreen() {
                 selectedLookId: undefined,
               }))
             }
-            bookmarks={state.bookmarks ?? []}
-            lookId={lookId}
-            onSave={() =>
-              update((current) => ({
-                ...current,
-                bookmarks: saveSampleBookmark(current.bookmarks ?? [], result),
-              }))
-            }
-            onOpen={(bookmark) =>
-              update((current) => ({
-                ...current,
-                ...openSampleBookmark(bookmark, current),
-              }))
-            }
-            onRemove={(id) =>
-              update((current) => ({
-                ...current,
-                bookmarks: current.bookmarks?.filter(
-                  (bookmark) => bookmark.lookId !== id
-                ),
-              }))
-            }
           />
         </>
       )}
-      {view !== 'wardrobe' ? (
+      {view !== 'wardrobe' && (
+        <PreviewButton
+          label={strings.firstRun.optionalComfort}
+          onPress={() => setComfortExpanded((expanded) => !expanded)}
+          testID="guest-preview-comfort-toggle"
+          palette={palette}
+          expanded={comfortExpanded}
+        />
+      )}
+      {view !== 'wardrobe' && comfortExpanded && (
         <PreviewControls
           state={state}
           strings={strings}
@@ -427,13 +461,7 @@ export function GuestPreviewScreen() {
             control(name)
           }}
         />
-      ) : null}
-      <PreviewConversion
-        strings={strings}
-        palette={palette}
-        onCreateAccount={() => convert('create_account')}
-        onSignIn={() => convert('sign_in')}
-      />
+      )}
       <PreviewButton
         label={strings.chrome.resetPreview}
         onPress={() => {
@@ -448,12 +476,43 @@ export function GuestPreviewScreen() {
         label={strings.chrome.exitPreview}
         onPress={() => {
           guestPreviewAnalytics.interacted('preview_exited')
+          mobileGuestPreviewBirthdate.clear()
           store.clear()
           router.replace('/')
         }}
         testID="guest-preview-exit"
         palette={palette}
       />
+      <PreviewSheet
+        visible={savePreviewStartedAt === state.startedAt}
+        title={strings.firstRun.saveTitle}
+        description={strings.firstRun.saveBody}
+        strings={strings}
+        palette={palette}
+        returnFocusRef={saveInvoker}
+        onClose={() => setSavePreviewStartedAt(null)}
+        testID="guest-preview-save-sheet"
+      >
+        <PreviewButton
+          label={strings.chrome.createAccount}
+          onPress={() => convert('create_account', true)}
+          testID="guest-preview-create-account"
+          palette={palette}
+          primary
+        />
+        <PreviewButton
+          label={strings.chrome.signIn}
+          onPress={() => convert('sign_in', true)}
+          testID="guest-preview-sign-in"
+          palette={palette}
+        />
+        <PreviewButton
+          label={strings.firstRun.cancel}
+          onPress={() => setSavePreviewStartedAt(null)}
+          testID="guest-preview-save-cancel"
+          palette={palette}
+        />
+      </PreviewSheet>
       <PreviewSwapSheet
         category={swapCategory}
         {...sampleOutfitSwapOptions(result, swapCategory)}

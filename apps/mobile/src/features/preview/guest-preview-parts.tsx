@@ -53,6 +53,7 @@ import {
 import { type useHeroPalette } from '@/components/hero/hero-theme'
 import { useTokens, withAlpha } from '@/src/theme/tokens'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { mobileGuestPreviewBirthdate } from '@/src/lib/guest-preview-birthdate'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
 export type PreviewPalette = ReturnType<typeof useHeroPalette>
@@ -119,6 +120,7 @@ export function PreviewButton({
   palette,
   primary = false,
   todayPrimary = false,
+  compact = false,
   disabled = false,
   expanded,
   selected,
@@ -131,6 +133,7 @@ export function PreviewButton({
   palette: PreviewPalette
   primary?: boolean
   todayPrimary?: boolean
+  compact?: boolean
   disabled?: boolean
   expanded?: boolean
   selected?: boolean
@@ -153,6 +156,7 @@ export function PreviewButton({
       onPress={onPress}
       style={[
         styles.button,
+        compact && styles.compactButton,
         // Story CC-7.9 D3: a filled button is ink; any other is the neutral outline.
         primary
           ? { backgroundColor: todayPrimary ? palette.primary : palette.inverse }
@@ -163,6 +167,7 @@ export function PreviewButton({
       <Text
         style={[
           styles.buttonText,
+          compact && styles.compactButtonText,
           {
             color: todayPrimary
               ? palette.onPrimary
@@ -234,11 +239,13 @@ export function PreviewGate({
   palette,
   onEligible,
   onExit,
+  expired,
 }: {
   strings: GuestPreviewStrings
   palette: PreviewPalette
-  onEligible: () => void
+  onEligible: (birthdate: string) => void
   onExit: () => void
+  expired: boolean
 }) {
   const [birthdate, setBirthdate] = useState('')
   const [error, setError] = useState<'underage' | 'invalid' | null>(null)
@@ -247,9 +254,10 @@ export function PreviewGate({
     setBirthdate('')
     if (result.eligible) {
       setError(null)
-      onEligible()
+      onEligible(birthdate)
       return
     }
+    mobileGuestPreviewBirthdate.clear()
     setError(result.reason === 'underage' ? 'underage' : 'invalid')
   }
   return (
@@ -261,6 +269,11 @@ export function PreviewGate({
         {strings.gate.heading}
       </Text>
       <Text style={{ color: palette.inkMuted }}>{strings.gate.body}</Text>
+      {expired && !error && (
+        <Text accessibilityLiveRegion="polite" style={{ color: palette.ink }}>
+          {strings.firstRun.previewExpired}
+        </Text>
+      )}
       <Text style={{ color: palette.ink }}>{strings.gate.field}</Text>
       <TextInput
         testID="guest-preview-birthdate"
@@ -337,6 +350,9 @@ export function PreviewOutfit({
   onResetChoices,
   heading,
   continuation,
+  shuffleLabel,
+  saveAction,
+  mood,
   swapCategory = null,
 }: {
   result: SampleOutfitResult
@@ -352,9 +368,13 @@ export function PreviewOutfit({
   onResetChoices: () => void
   heading?: string
   continuation?: React.ReactNode
+  shuffleLabel?: string
+  saveAction?: React.ReactNode
+  mood?: React.ReactNode
   swapCategory?: SampleGarmentCategory | null
 }) {
   const swapButtons = useSwapButtonFocus(swapCategory)
+  const guestLayout = Boolean(saveAction)
   const look = result.look
   const hasSwaps = hasAppliedSampleSwaps(result)
   if (!look) {
@@ -371,6 +391,7 @@ export function PreviewOutfit({
             ? strings.outfit.allDisliked
             : strings.outfit.noEligible}
         </Text>
+        {mood}
         <PreviewButton
           label={strings.outfit.reviewChoices}
           onPress={onReviewChoices}
@@ -393,7 +414,7 @@ export function PreviewOutfit({
       testID="guest-preview-outfit"
       style={[styles.card, { backgroundColor: palette.card, borderColor: palette.line }]}
     >
-      {(heading || !hasSwaps) && (
+      {!guestLayout && (heading || !hasSwaps) && (
         <Text style={[styles.eyebrow, { color: palette.inkMuted }]}>
           {heading ?? strings.outfit.heading}
         </Text>
@@ -415,14 +436,21 @@ export function PreviewOutfit({
         {strings.values.weather[result.context.weather]}
       </Text>
       {continuation}
-      <PreviewButton
-        label={strings.outfit.tryAnother}
-        onPress={onTryAnother}
-        testID="guest-preview-try-another"
-        palette={palette}
-        primary
-      />
-      <Text style={{ color: palette.inkMuted }}>{strings.styleIdeas.illustrations}</Text>
+      <View style={saveAction ? styles.wrap : undefined}>
+        {saveAction}
+        <PreviewButton
+          label={shuffleLabel ?? strings.outfit.tryAnother}
+          onPress={onTryAnother}
+          testID="guest-preview-try-another"
+          palette={palette}
+          primary={!saveAction}
+        />
+      </View>
+      {!guestLayout && (
+        <Text style={{ color: palette.inkMuted }}>
+          {strings.styleIdeas.illustrations}
+        </Text>
+      )}
       <View testID="guest-preview-garments" style={styles.wrap}>
         {result.garments.map((garment) => {
           const text = sampleGarmentText(garment, strings)
@@ -433,9 +461,13 @@ export function PreviewOutfit({
               key={garment.category}
               testID={`guest-preview-garment-${garment.id.slice('sample:g:'.length)}`}
               // Inside the outfit card, so a plain section (Story CC-7.9 D7: one card level).
-              style={styles.garment}
+              style={[styles.garment, guestLayout && styles.guestGarment]}
             >
-              <SampleGarmentArt garment={garment} label={text.description} />
+              <SampleGarmentArt
+                garment={garment}
+                label={text.description}
+                size={guestLayout ? 56 : undefined}
+              />
               <Text style={[styles.garmentName, { color: palette.ink }]}>
                 {text.name}
               </Text>
@@ -449,11 +481,13 @@ export function PreviewOutfit({
                 onPress={() => onSwap(garment.category)}
                 testID={`guest-preview-swap-${garment.category}`}
                 palette={palette}
+                compact={guestLayout}
               />
             </View>
           )
         })}
       </View>
+      {mood}
       <Text style={[styles.subheading, { color: palette.ink }]}>
         {strings.outfit.whyThisWorks}
       </Text>
@@ -872,6 +906,7 @@ export function PreviewSheet({
   visible,
   title,
   strings,
+  description = strings.chrome.sampleLabel,
   palette,
   onClose,
   returnFocusRef = null,
@@ -880,6 +915,7 @@ export function PreviewSheet({
 }: {
   visible: boolean
   title: string
+  description?: string
   strings: GuestPreviewStrings
   palette: PreviewPalette
   onClose: () => void
@@ -925,9 +961,7 @@ export function PreviewSheet({
             <Text style={{ color: palette.ink, fontSize: 20 }}>{'×'}</Text>
           </Pressable>
         </LayerSwipeHandle>
-        <Text style={[styles.small, { color: palette.inkMuted }]}>
-          {strings.chrome.sampleLabel}
-        </Text>
+        <Text style={[styles.small, { color: palette.inkMuted }]}>{description}</Text>
         {children}
       </View>
     </EdgeToEdgeModal>
@@ -1149,14 +1183,14 @@ export function PreviewConversion({
       <PreviewButton
         label={strings.chrome.createAccount}
         onPress={onCreateAccount}
-        testID="guest-preview-create-account"
+        testID="guest-preview-garment-create-account"
         palette={palette}
         primary
       />
       <PreviewButton
         label={strings.chrome.signIn}
         onPress={onSignIn}
-        testID="guest-preview-sign-in"
+        testID="guest-preview-garment-sign-in"
         palette={palette}
       />
       <Text style={[styles.small, { color: palette.inkMuted }]}>
@@ -1196,6 +1230,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  compactButton: { alignSelf: 'stretch', paddingHorizontal: 4, marginTop: 'auto' },
+  compactButtonText: { fontSize: 12 },
   disabled: { opacity: 0.6 },
   group: { gap: 8 },
   legend: {
@@ -1234,6 +1270,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   garmentCard: { borderWidth: 1 },
+  guestGarment: { width: '31%', minWidth: 0, paddingHorizontal: 2 },
   garmentName: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
   feedbackCard: { borderTopWidth: 1, paddingTop: 12, gap: 8 },
   voteButton: {

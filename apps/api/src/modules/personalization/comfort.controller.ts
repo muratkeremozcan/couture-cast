@@ -18,7 +18,7 @@ import {
   type UpdateComfortPreferencesInput,
   type UpdateComfortPreferencesResponse,
 } from '../../contracts/http.js'
-import { AuthContext } from '../auth/security.decorators.js'
+import { AllowPendingGuardianTeen, AuthContext } from '../auth/security.decorators.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { ComfortService } from './comfort.service.js'
@@ -35,6 +35,7 @@ export class ComfortController {
   ) {}
 
   @Get()
+  @AllowPendingGuardianTeen()
   async getComfortPreferences(
     @AuthContext() auth: RequestAuthContext
   ): Promise<ComfortPreferencesResponse> {
@@ -52,6 +53,7 @@ export class ComfortController {
   }
 
   @Put()
+  @AllowPendingGuardianTeen()
   @HttpCode(200)
   async updateComfortPreferences(
     @AuthContext() auth: RequestAuthContext,

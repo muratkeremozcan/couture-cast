@@ -40,7 +40,7 @@ export type GuestPreviewStore = {
    * G1: another tab or process changed the stored state. Drops this store's queued
    * writes and adopts what storage now holds, so an exit or sign-in elsewhere sticks.
    */
-  syncExternal(): Promise<GuestPreviewSnapshot>
+  syncExternal(options?: { onReadError?: 'reject' }): Promise<GuestPreviewSnapshot>
   epoch(): number
   /** Resolves when every queued storage operation has settled. */
   flush(): Promise<void>
@@ -161,15 +161,23 @@ export function createGuestPreviewStore(options: {
       removeStored()
       emit()
     },
-    syncExternal() {
+    syncExternal(options) {
       currentEpoch += 1
       const syncEpoch = currentEpoch
-      return new Promise<GuestPreviewSnapshot>((resolve) => {
+      return new Promise<GuestPreviewSnapshot>((resolve, reject) => {
         enqueue(async () => {
           let raw: string | null = null
           try {
             raw = await adapter.read()
-          } catch {
+          } catch (error) {
+            if (options?.onReadError === 'reject') {
+              reject(
+                error instanceof Error
+                  ? error
+                  : new Error('Unable to read guest preview storage.')
+              )
+              return
+            }
             failStorage()
           }
           if (syncEpoch === currentEpoch) {

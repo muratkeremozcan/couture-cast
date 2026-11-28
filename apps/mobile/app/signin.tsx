@@ -81,7 +81,7 @@ export default function SignInScreen() {
     try {
       if (sent) {
         traceShareCardOpener('signin-verify-press', code.length)
-        await verifyNativeOtp(email, code)
+        await verifyNativeOtp(email, code, fromPreview)
         traceShareCardOpener('signin-verify-ok')
         await leaveSignedIn()
       } else {
@@ -186,7 +186,7 @@ export default function SignInScreen() {
         <Pressable
           testID="signin-back-to-preview"
           accessibilityRole="link"
-          onPress={() => router.replace('/preview')}
+          onPress={() => router.dismissTo('/preview')}
           style={styles.previewLink}
         >
           <Text style={styles.previewLinkText}>

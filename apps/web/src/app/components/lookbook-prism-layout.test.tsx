@@ -11,7 +11,7 @@ vi.mock('next/navigation', () => {
 
 it('shows one guest sample entry and leaves Community to its tab', async () => {
   render(<LookbookPrismLayout />)
-  expect(await screen.findByRole('link', { name: 'Try sample looks' })).toHaveAttribute(
+  expect(await screen.findByRole('link', { name: 'Show me looks' })).toHaveAttribute(
     'href',
     '/preview'
   )
