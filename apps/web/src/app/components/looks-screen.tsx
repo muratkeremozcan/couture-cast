@@ -602,19 +602,23 @@ function SavedPanel({
 function IdeasPanel({
   owner,
   showEmptyLine,
+  explicit,
 }: {
   owner: string | null
   showEmptyLine: boolean
+  explicit: boolean
 }) {
   const { t } = useTranslation('translation', { useSuspense: false })
   const style = useWebStyleProfile()
+  const emptyLineBelow = explicit && owner !== null
+  const emptyLine = showEmptyLine && (
+    <p data-testid="looks-ideas-empty-line" className="text-base text-ink-muted">
+      {t('looks.empty')}
+    </p>
+  )
   return (
     <div data-testid="looks-first-content" className="space-y-3">
-      {showEmptyLine && (
-        <p data-testid="looks-ideas-empty-line" className="text-base text-ink-muted">
-          {t('looks.empty')}
-        </p>
-      )}
+      {!emptyLineBelow && emptyLine}
       {owner ? (
         style.scope && (
           <MemberLookbook
@@ -633,6 +637,7 @@ function IdeasPanel({
           ))}
         </LooksTileGrid>
       )}
+      {emptyLineBelow && emptyLine}
     </div>
   )
 }
@@ -691,9 +696,7 @@ function LooksBody({ owner }: { owner: string | null }) {
   const shownSegmentRef = useRef<LooksSegment | null>(null)
   const segment = addressSegment ?? shownSegmentRef.current ?? defaultSegment ?? decided
   shownSegmentRef.current = segment
-  // TEA M2: Saved and Ideas both wait for the first reads, so Ideas' first-save line never
-  // lands above a grid already on screen (a CC-7.7 shift).
-  const ready = segment !== null && (segment === 'plan' || feed.settled)
+  const ready = segment !== null && (segment !== 'saved' || feed.settled)
   const select = (next: { segment: LooksSegment; filter?: LooksFilter }) => {
     router.replace(looksHref(next.segment, next.filter ?? filter), { scroll: false })
   }
@@ -725,6 +728,8 @@ function LooksBody({ owner }: { owner: string | null }) {
               {segment === 'ideas' && (
                 <IdeasPanel
                   owner={owner}
+                  // An explicit Ideas visit paints before Saved loads. A late line stays below it.
+                  explicit={addressSegment === 'ideas'}
                   // Codex #11: only an empty All says the member has saved nothing yet.
                   showEmptyLine={
                     !owner ||

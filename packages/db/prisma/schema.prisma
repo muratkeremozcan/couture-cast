@@ -306,6 +306,7 @@ model User {
   profile                             UserProfile?
   comfort_profile                     ComfortPreferences?
   style_profile                       StyleProfile?
+  look_idea_daily_quota               LookIdeaDailyQuota?
   garments                            GarmentItem[]
   palette_insights                    PaletteInsights[]
   outfits                             OutfitRecommendation[]
@@ -363,6 +364,20 @@ model User {
   complimentary_access_grants         ComplimentaryAccessGrant[]        @relation("ComplimentaryAccessMember")
   complimentary_access_granted        ComplimentaryAccessGrant[]        @relation("ComplimentaryAccessGranter")
   complimentary_access_revoked        ComplimentaryAccessGrant[]        @relation("ComplimentaryAccessRevoker")
+}
+
+/// RLS: API-only daily quota, deleted with the account.
+model LookIdeaDailyQuota {
+  user_id        String   @id
+  utc_day        DateTime @db.Date
+  dispatch_count Int
+  user           User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+/// RLS: API-only singleton cumulative dispatch budget.
+model LookIdeaBudget {
+  id             Int @id
+  dispatch_count Int @default(0)
 }
 
 /// RLS: user-scoped profile data keyed by user_id

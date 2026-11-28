@@ -3,7 +3,12 @@ import pinoHttp, { type HttpLogger } from 'pino-http'
 import type { Request, Response } from 'express'
 import type { Logger } from 'pino'
 import { createBaseLogger } from './pino.config'
-import { extractUserId, inferFeatureFromPath, resolveRequestId } from './request-context'
+import {
+  extractUserId,
+  inferFeatureFromPath,
+  isLookIdeasRoute,
+  resolveRequestId,
+} from './request-context'
 
 /** Story 0.7 support file: HTTP request/response logging middleware.
  * Why this exists:
@@ -60,7 +65,10 @@ export function createRequestLoggerMiddleware(
     },
     genReqId(request, response) {
       // Flow ref S0.7/T5/1: attach or reuse x-request-id on the HTTP boundary.
-      const requestId = resolveRequestId(request.headers['x-request-id'])
+      const privateRoute = isLookIdeasRoute(request.originalUrl ?? request.url)
+      const requestId = resolveRequestId(
+        privateRoute ? undefined : request.headers['x-request-id']
+      )
       request.id = requestId
       response.setHeader('x-request-id', requestId)
       return requestId
@@ -99,7 +107,7 @@ export function createRequestLoggerMiddleware(
       const path = normalizeRequestPath(request.originalUrl ?? request.url)
       return {
         durationMs: extractDurationMs(value),
-        error,
+        ...(isLookIdeasRoute(path) ? {} : { error }),
         feature: inferFeatureFromPath(path),
         method: request.method,
         path,

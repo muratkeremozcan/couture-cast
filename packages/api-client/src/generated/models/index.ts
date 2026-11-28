@@ -12154,6 +12154,116 @@ export type LocationsFromCoordinatesInputLocaleEnum =
 /**
  *
  * @export
+ * @interface LookIdeasInput
+ */
+export interface LookIdeasInput {
+  /**
+   *
+   * @type {LookIdeasInputWeatherEnum}
+   * @memberof LookIdeasInput
+   */
+  weather: LookIdeasInputWeatherEnum
+  /**
+   *
+   * @type {StyleProfileResponseData}
+   * @memberof LookIdeasInput
+   */
+  profile: StyleProfileResponseData | null
+}
+
+/**
+ * @export
+ */
+export const LookIdeasInputWeatherEnum = {
+  cool_windy: 'cool-windy',
+  mild_dry: 'mild-dry',
+  warm_rainy: 'warm-rainy',
+  cool_rainy: 'cool-rainy',
+  mild_rainy: 'mild-rainy',
+  warm_dry: 'warm-dry',
+} as const
+export type LookIdeasInputWeatherEnum =
+  (typeof LookIdeasInputWeatherEnum)[keyof typeof LookIdeasInputWeatherEnum]
+
+/**
+ *
+ * @export
+ * @interface LookIdeasResponse
+ */
+export interface LookIdeasResponse {
+  /**
+   *
+   * @type {Array<LookIdeasResponseDataInner>}
+   * @memberof LookIdeasResponse
+   */
+  data: Array<LookIdeasResponseDataInner> | null
+}
+/**
+ *
+ * @export
+ * @interface LookIdeasResponseDataInner
+ */
+export interface LookIdeasResponseDataInner {
+  /**
+   *
+   * @type {string}
+   * @memberof LookIdeasResponseDataInner
+   */
+  lookId: string
+  /**
+   *
+   * @type {LookIdeasResponseDataInnerDescriptionEnum}
+   * @memberof LookIdeasResponseDataInner
+   */
+  description: LookIdeasResponseDataInnerDescriptionEnum
+}
+
+/**
+ * @export
+ */
+export const LookIdeasResponseDataInnerDescriptionEnum = {
+  A_polished_mix_for_the_day: 'A polished mix for the day.',
+  A_simple_mix_for_the_day: 'A simple mix for the day.',
+  A_cozy_mix_for_the_day: 'A cozy mix for the day.',
+  A_sporty_mix_for_the_day: 'A sporty mix for the day.',
+  A_classic_mix_for_the_day: 'A classic mix for the day.',
+  A_casual_mix_for_the_day: 'A casual mix for the day.',
+  A_relaxed_mix_for_the_day: 'A relaxed mix for the day.',
+  A_polished_mix_for_a_cool_day: 'A polished mix for a cool day.',
+  A_polished_mix_for_a_mild_day: 'A polished mix for a mild day.',
+  A_polished_mix_for_a_warm_day: 'A polished mix for a warm day.',
+  A_polished_mix_for_a_rainy_day: 'A polished mix for a rainy day.',
+  A_simple_mix_for_a_cool_day: 'A simple mix for a cool day.',
+  A_simple_mix_for_a_mild_day: 'A simple mix for a mild day.',
+  A_simple_mix_for_a_warm_day: 'A simple mix for a warm day.',
+  A_simple_mix_for_a_rainy_day: 'A simple mix for a rainy day.',
+  A_cozy_mix_for_a_cool_day: 'A cozy mix for a cool day.',
+  A_cozy_mix_for_a_mild_day: 'A cozy mix for a mild day.',
+  A_cozy_mix_for_a_warm_day: 'A cozy mix for a warm day.',
+  A_cozy_mix_for_a_rainy_day: 'A cozy mix for a rainy day.',
+  A_sporty_mix_for_a_cool_day: 'A sporty mix for a cool day.',
+  A_sporty_mix_for_a_mild_day: 'A sporty mix for a mild day.',
+  A_sporty_mix_for_a_warm_day: 'A sporty mix for a warm day.',
+  A_sporty_mix_for_a_rainy_day: 'A sporty mix for a rainy day.',
+  A_classic_mix_for_a_cool_day: 'A classic mix for a cool day.',
+  A_classic_mix_for_a_mild_day: 'A classic mix for a mild day.',
+  A_classic_mix_for_a_warm_day: 'A classic mix for a warm day.',
+  A_classic_mix_for_a_rainy_day: 'A classic mix for a rainy day.',
+  A_casual_mix_for_a_cool_day: 'A casual mix for a cool day.',
+  A_casual_mix_for_a_mild_day: 'A casual mix for a mild day.',
+  A_casual_mix_for_a_warm_day: 'A casual mix for a warm day.',
+  A_casual_mix_for_a_rainy_day: 'A casual mix for a rainy day.',
+  A_relaxed_mix_for_a_cool_day: 'A relaxed mix for a cool day.',
+  A_relaxed_mix_for_a_mild_day: 'A relaxed mix for a mild day.',
+  A_relaxed_mix_for_a_warm_day: 'A relaxed mix for a warm day.',
+  A_relaxed_mix_for_a_rainy_day: 'A relaxed mix for a rainy day.',
+} as const
+export type LookIdeasResponseDataInnerDescriptionEnum =
+  (typeof LookIdeasResponseDataInnerDescriptionEnum)[keyof typeof LookIdeasResponseDataInnerDescriptionEnum]
+
+/**
+ *
+ * @export
  * @interface ModerationActionInput
  */
 export interface ModerationActionInput {

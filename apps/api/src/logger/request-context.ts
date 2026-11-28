@@ -21,6 +21,7 @@ export type RequestContext = {
   feature?: string
   requestId: string
   userId?: string
+  suppressAccountContext?: boolean
   communityAuthorizationDeadline?: number
 }
 
@@ -32,6 +33,11 @@ type RequestLike = Pick<Request, 'headers' | 'originalUrl' | 'url'> & {
 
 const REQUEST_ID_HEADER = 'x-request-id'
 const requestContextStorage = new AsyncLocalStorage<RequestContext>()
+export const LOOK_IDEAS_ROUTE = '/api/v1/personalization/look-ideas'
+
+export function isLookIdeasRoute(path: string | undefined): boolean {
+  return path?.split('?')[0]?.replace(/\/+$/, '').toLowerCase() === LOOK_IDEAS_ROUTE
+}
 
 function normalizeHeaderValue(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) {
@@ -69,6 +75,7 @@ export function inferFeatureFromPath(path?: string): string {
 }
 
 export function extractUserId(request: RequestLike): string | undefined {
+  if (isLookIdeasRoute(request.originalUrl ?? request.url)) return undefined
   return request.auth?.userId ?? normalizeHeaderValue(request.headers['x-user-id'])
 }
 
@@ -84,6 +91,7 @@ export function createRequestContext(request: RequestLike): RequestContext {
     (request.method === 'GET' || path.endsWith('/targets/resolve'))
   return {
     requestId,
+    ...(isLookIdeasRoute(path) && { suppressAccountContext: true }),
     ...(communityRead
       ? {
           communityAuthorizationDeadline:
@@ -112,6 +120,7 @@ export function updateRequestContext(context: Partial<RequestContext>) {
   }
 
   Object.assign(currentContext, context)
+  if (currentContext.suppressAccountContext) delete currentContext.userId
 }
 
 export function bindRequestContext(
@@ -119,9 +128,15 @@ export function bindRequestContext(
   response: Response,
   next: NextFunction
 ) {
-  const requestId = resolveRequestId(request.headers[REQUEST_ID_HEADER])
+  const privateRoute = isLookIdeasRoute(request.originalUrl ?? request.url)
+  const requestId = resolveRequestId(
+    privateRoute ? undefined : request.headers[REQUEST_ID_HEADER]
+  )
   request.id = requestId
   response.setHeader(REQUEST_ID_HEADER, requestId)
+  if (privateRoute) {
+    response.setHeader('Cache-Control', 'private, no-store')
+  }
 
   const authRequest = request as AuthenticatedRequest
   const context = createRequestContext({

@@ -11,7 +11,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { updateRequestContext } from '../../logger/request-context'
+import { isLookIdeasRoute, updateRequestContext } from '../../logger/request-context'
 import { AccessTokenIdentityService } from './access-token-identity.service.js'
 import { GuardianConsentStateService } from './guardian-consent-state.service'
 import {
@@ -77,12 +77,16 @@ export class RequestAuthGuard implements CanActivate {
   private async verifyTeenAccess(
     userId: string,
     allowPendingGuardianTeen: boolean,
+    requireActiveAccount: boolean,
     budget?: CommunityAuthorizationBudget
   ): Promise<void> {
-    const checkTeenAccess = () =>
-      allowPendingGuardianTeen
+    const checkTeenAccess = () => {
+      if (requireActiveAccount)
+        return this.guardianConsentStateService.canTeenAccessActiveSurface(userId)
+      return allowPendingGuardianTeen
         ? this.guardianConsentStateService.canTeenAccessNonUploadSurface(userId)
         : this.guardianConsentStateService.canTeenAccess(userId)
+    }
     const allowed = await (budget ? budget.run(checkTeenAccess) : checkTeenAccess())
     if (!allowed) {
       throw new ForbiddenException('Guardian consent required before continuing')
@@ -127,7 +131,12 @@ export class RequestAuthGuard implements CanActivate {
         reflector,
         context
       )
-      await this.verifyTeenAccess(userId, allowPendingGuardianTeen, budget)
+      await this.verifyTeenAccess(
+        userId,
+        allowPendingGuardianTeen,
+        isLookIdeasRoute(path),
+        budget
+      )
     }
 
     budget?.check()

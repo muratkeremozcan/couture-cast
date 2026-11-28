@@ -1,34 +1,50 @@
 'use client'
 
-import { ResponseError } from '@couture/api-client'
+import { requestLookIdeas, ResponseError } from '@couture/api-client'
 import type { SavedLookContract } from '@couture/api-client/contracts/http'
 import {
   buildHomeSampleSavedLookInput,
   canShuffleMemberLookbook,
   createIdempotencyKey,
   createMemberLookbook,
+  createMemberLookbookRanking,
   getGuestPreviewStrings,
   getMemberLookbookStrings,
   getStyleProfileStrings,
   isMemberLookbookDraftEdited,
   memberLookbookDraftKey,
   memberLookbookOutfitDraft,
+  memberLookbookRankingCandidates,
+  memberLookbookRankingInput,
   memberLookbookWeatherReason,
+  presentMemberLookbookRanking,
   readMemberLookbookDraft,
   resolveMemberLookbookDraft,
   sampleGarmentText,
   sampleLookText,
   shuffleMemberLookbook,
   styleForecastSampleWeather,
+  validateMemberLookbookRanking,
   type MemberLookbookDraft,
+  type MemberLookbookRankingInput,
   type SampleGarmentCategory,
   type SampleOutfitResult,
   type SampleWeatherKey,
 } from '@couture/utils'
 import { useRouter } from 'next/navigation'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { readStorage } from '../../../lib/browser-persistence'
+import { createWebApiClient } from '../../../lib/api-client'
 import { getRitualFromWeb } from '../../../lib/ritual'
 import {
   createSavedLookFromWeb,
@@ -112,6 +128,62 @@ const control =
 const neutral = 'border-line-strong bg-page text-ink'
 const secondary = `${control} ${neutral} rounded-lg`
 
+function useLookbookIdeas(
+  owner: string,
+  scope: string,
+  weather: SampleWeatherKey | undefined,
+  style: ReturnType<typeof useWebStyleProfile>,
+  draft: MemberLookbookDraft | null,
+  stillMember: () => boolean
+) {
+  const { day, profile, status } = style
+  const [stylist] = useState(createMemberLookbookRanking)
+  // Equivalent weather and profile reads share one request identity.
+  const inputKey = JSON.stringify(
+    memberLookbookRankingInput(weather ?? 'mild-dry', { profile, day })
+  )
+  const input = useMemo(
+    () => JSON.parse(inputKey) as MemberLookbookRankingInput,
+    [inputKey]
+  )
+  const ideas = useMemo(() => createMemberLookbook(input.weather, input), [input])
+  const requestKey =
+    weather && (status === 'ready' || status === 'failed') ? inputKey : null
+  const ranking = useSyncExternalStore(stylist.subscribe, stylist.read, () => null)
+  useLayoutEffect(() => {
+    if (draft) stylist.markEdited()
+  }, [draft, stylist])
+  useLayoutEffect(() => {
+    if (!requestKey) return
+    return stylist.request(requestKey, stillMember, async (signal) => {
+      const data = await readAsMember(
+        owner,
+        () => {
+          const accessToken = captureWebStyleBearer(scope)
+          if (!accessToken || signal.aborted || !stillMember())
+            return Promise.resolve(null)
+          return requestLookIdeas(createWebApiClient({ accessToken }), input, signal)
+        },
+        (error) => error instanceof ResponseError && error.response.status === 401,
+        signal
+      )
+      return validateMemberLookbookRanking(
+        data,
+        memberLookbookRankingCandidates(ideas),
+        input.weather
+      )
+    })
+  }, [ideas, input, owner, requestKey, scope, stillMember, stylist])
+
+  const currentRanking =
+    ranking && ranking.key === requestKey && stillMember() ? ranking : null
+  return {
+    ...presentMemberLookbookRanking(ideas, draft?.mood, currentRanking),
+    markEdited: stylist.markEdited,
+    apply: () => stylist.apply(currentRanking, stillMember),
+  }
+}
+
 export function MemberLookbook({
   owner,
   scope,
@@ -130,10 +202,9 @@ export function MemberLookbook({
   const headingId = useId()
   const mountSignal = useMountSignal()
   const weather = useLookbookWeather(owner, scope, locale)
-  const { day, profile, status } = style
-  const ideas = useMemo(
-    () => createMemberLookbook(weather, { profile, day }),
-    [weather, profile, day]
+  const stillMember = useCallback(
+    () => !mountSignal().aborted && currentWebStyleScope() === scope,
+    [mountSignal, scope]
   )
   const storageKey =
     owner === UNVERIFIED_BEARER_OWNER ? null : memberLookbookDraftKey(owner)
@@ -144,27 +215,27 @@ export function MemberLookbook({
   const [mutation, setMutation] = useState<Mutation | null>(null)
   const pendingMutation = useRef<Mutation | null>(null)
   const attempts = useRef(new Map<string, SaveAttempt>())
+  const {
+    orderedIdeas,
+    selected: idea,
+    pending: newIdeas,
+    description,
+    markEdited,
+    apply,
+  } = useLookbookIdeas(owner, scope, weather, style, draft, stillMember)
   useEffect(() => {
     if (!storageKey) return
     const sync = ({ key }: StorageEvent) => {
       if ((key !== storageKey && key !== null) || currentWebStyleScope() !== scope) return
       const next = readMemberLookbookDraft(readStorage('local', storageKey))
+      if (next) markEdited()
       latestDraft.current = next
       setDraft(next)
     }
     window.addEventListener('storage', sync)
     return () => window.removeEventListener('storage', sync)
-  }, [scope, storageKey])
+  }, [scope, storageKey, markEdited])
 
-  if (!weather || status === 'idle' || status === 'loading') {
-    return (
-      <p role="status" className="text-sm text-ink-soft">
-        {styleCopy.loading}
-      </p>
-    )
-  }
-
-  const idea = ideas.find(({ mood }) => mood === draft?.mood) ?? ideas[0]
   if (!idea) return null
   const { mood, result: base } = idea
   const { result, pinned } = resolveMemberLookbookDraft(base, draft?.looks[mood])
@@ -178,6 +249,7 @@ export function MemberLookbook({
 
   function updateDraft(next: MemberLookbookDraft) {
     if (!isCurrent(mountSignal())) return
+    markEdited()
     latestDraft.current = next
     setDraft(next)
     if (storageKey) {
@@ -206,7 +278,10 @@ export function MemberLookbook({
   }
 
   function edit(outfit: SampleOutfitResult, pins: readonly SampleGarmentCategory[]) {
-    if (!pendingMutation.current) updateOutfit(outfit, pins)
+    if (!pendingMutation.current) {
+      markEdited()
+      updateOutfit(outfit, pins)
+    }
   }
 
   function setMutationStatus(next: Mutation | null) {
@@ -218,6 +293,7 @@ export function MemberLookbook({
     const signal = mountSignal()
     const token = captureWebStyleBearer(scope)
     if (pendingMutation.current || !payload || !token || !isCurrent(signal)) return false
+    markEdited()
     const records = attempts.current
     const attempt = records.get(key) ?? {
       idempotencyKey: createIdempotencyKey(),
@@ -291,7 +367,7 @@ export function MemberLookbook({
       <fieldset className="min-w-0 space-y-2" disabled={busy}>
         <legend className="sr-only">{styleCopy.mood}</legend>
         <div data-testid="lookbook-mood-row" className="grid grid-cols-3 gap-2">
-          {ideas.map(({ mood: option }) => (
+          {orderedIdeas.map(({ mood: option }) => (
             <button
               key={option}
               type="button"
@@ -325,6 +401,15 @@ export function MemberLookbook({
           <p data-testid="lookbook-weather-reason" className="text-sm text-ink-soft">
             {memberLookbookWeatherReason(result, locale)}
           </p>
+          {description && (
+            <p
+              data-testid="lookbook-ai-description"
+              className="text-sm text-ink-soft"
+              lang="en"
+            >
+              {description}
+            </p>
+          )}
         </div>
         <ul className="grid grid-cols-2 gap-2 min-[361px]:grid-cols-3">
           {result.garments.map((piece) => {
@@ -390,8 +475,24 @@ export function MemberLookbook({
           </div>
         )}
         <fieldset disabled={busy} className="min-w-0">
-          <StyleDayControls style={style} showMood={false} nested />
+          <StyleDayControls
+            style={style}
+            showMood={false}
+            nested
+            onInteract={markEdited}
+          />
         </fieldset>
+        {newIdeas && (
+          <button
+            type="button"
+            className={secondary}
+            data-testid="lookbook-new-ideas"
+            disabled={busy}
+            onClick={apply}
+          >
+            {controls.newIdeas}
+          </button>
+        )}
       </div>
       {payload && (
         <SaveActionButton

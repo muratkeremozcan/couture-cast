@@ -117,11 +117,13 @@ export function StyleDayControls({
   showTune = false,
   showMood = true,
   nested = false,
+  onInteract,
 }: {
   style: StyleState
   showTune?: boolean
   showMood?: boolean
   nested?: boolean
+  onInteract?: () => void
 }) {
   const copy = useStyleCopy()
   const { scope, day, store } = style
@@ -135,6 +137,7 @@ export function StyleDayControls({
       <summary
         data-testid="style-day-open"
         className="cursor-pointer py-3 text-sm font-semibold text-ink"
+        onClick={onInteract}
       >
         {copy.day}
       </summary>

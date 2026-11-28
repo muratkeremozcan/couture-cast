@@ -9,7 +9,7 @@ export const styleTextureEnum = z.enum(SAMPLE_STYLE_OPTIONS.texture)
 export const styleFitEnum = z.enum(SAMPLE_STYLE_OPTIONS.fit)
 export const styleAvoidEnum = z.enum(STYLE_AVOID_OPTIONS)
 
-const styleProfileSchema = z.strictObject({
+export const styleProfileSchema = z.strictObject({
   mood: styleMoodEnum.nullable(),
   palette: stylePaletteEnum.nullable(),
   texture: styleTextureEnum.nullable(),

@@ -132,11 +132,13 @@ export function StyleDayControls({
   showTune = false,
   showMood = true,
   disabled = false,
+  onInteract,
 }: {
   style: StyleState
   showTune?: boolean
   showMood?: boolean
   disabled?: boolean
+  onInteract?: () => void
 }) {
   const copy = useStyleCopy()
   const palette = useHeroPalette()
@@ -148,7 +150,10 @@ export function StyleDayControls({
       <PreviewButton
         label={copy.day}
         testID="style-day-open"
-        onPress={() => setOpen(!open)}
+        onPress={() => {
+          onInteract?.()
+          setOpen(!open)
+        }}
         palette={palette}
         disabled={disabled}
         expanded={open}

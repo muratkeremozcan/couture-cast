@@ -12,7 +12,16 @@
  */
 
 import * as runtime from '../runtime'
-import type { StyleProfileResponse, UpdateStyleProfileInput } from '../models/index'
+import type {
+  LookIdeasInput,
+  LookIdeasResponse,
+  StyleProfileResponse,
+  UpdateStyleProfileInput,
+} from '../models/index'
+
+export interface ApiV1PersonalizationLookIdeasPostRequest {
+  lookIdeasInput: LookIdeasInput
+}
 
 export interface ApiV1PersonalizationStyleProfilePatchRequest {
   updateStyleProfileInput: UpdateStyleProfileInput
@@ -22,6 +31,73 @@ export interface ApiV1PersonalizationStyleProfilePatchRequest {
  *
  */
 export class PersonalizationApi extends runtime.BaseAPI {
+  /**
+   * Creates request options for apiV1PersonalizationLookIdeasPost without sending the request
+   */
+  async apiV1PersonalizationLookIdeasPostRequestOpts(
+    requestParameters: ApiV1PersonalizationLookIdeasPostRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['lookIdeasInput'] == null) {
+      throw new runtime.RequiredError(
+        'lookIdeasInput',
+        'Required parameter "lookIdeasInput" was null or undefined when calling apiV1PersonalizationLookIdeasPost().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/personalization/look-ideas`
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['lookIdeasInput'],
+    }
+  }
+
+  /**
+   * Rank and describe weather-eligible catalog outfits
+   */
+  async apiV1PersonalizationLookIdeasPostRaw(
+    requestParameters: ApiV1PersonalizationLookIdeasPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<LookIdeasResponse>> {
+    const requestOptions =
+      await this.apiV1PersonalizationLookIdeasPostRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Rank and describe weather-eligible catalog outfits
+   */
+  async apiV1PersonalizationLookIdeasPost(
+    requestParameters: ApiV1PersonalizationLookIdeasPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<LookIdeasResponse> {
+    const response = await this.apiV1PersonalizationLookIdeasPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
   /**
    * Creates request options for apiV1PersonalizationStyleProfileDelete without sending the request
    */

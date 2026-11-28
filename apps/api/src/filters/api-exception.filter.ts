@@ -9,6 +9,7 @@ import {
 import { BaseExceptionFilter, HttpAdapterHost } from '@nestjs/core'
 import { TelemetryService } from '../modules/telemetry/telemetry.service'
 import { createBaseLogger } from '../logger/pino.config'
+import { isLookIdeasRoute } from '../logger/request-context.js'
 
 interface AuthenticatedRequest {
   url?: string
@@ -87,19 +88,17 @@ export class ApiExceptionFilter extends BaseExceptionFilter {
         })
       : exception
     super.catch(responseException, host)
+    const request = host.switchToHttp().getRequest<AuthenticatedRequest | undefined>()
+    const route = request?.path || request?.url?.split('?')[0] || 'unknown'
+    if (isLookIdeasRoute(route)) return
     if (unexpected) {
       this.logger.error({ err: exception }, 'Unhandled API exception')
     }
 
     try {
-      const ctx = host.switchToHttp()
-      const request = ctx.getRequest<AuthenticatedRequest | undefined>()
-
       if (!request) {
         return
       }
-
-      const route = request.path || request.url?.split('?')[0] || 'unknown'
 
       if (TELEMETRY_EXCLUDED_ROUTES.has(normalizeRoute(route))) {
         // The response has already been sent by `super.catch` above. Only the

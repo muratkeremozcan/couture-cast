@@ -20,6 +20,7 @@ type TraceRuntime = {
 type CreateBaseLoggerOptions = {
   destination?: DestinationStream
   env?: EnvVars
+  includeRequestMetadata?: boolean
   traceRuntime?: TraceRuntime
 }
 
@@ -167,6 +168,7 @@ export function createBaseLogger(options: CreateBaseLoggerOptions = {}) {
       // Flow ref S0.7/T5/2: inject request + trace context via Pino mixins so
       // call sites do not have to repeat those fields manually.
       mixin() {
+        if (options.includeRequestMetadata === false) return {}
         const requestContext = getRequestContext()
         return removeUndefined({
           feature: requestContext?.feature,
