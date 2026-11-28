@@ -13,6 +13,7 @@
 // picked photo asks "Discard this photo?" first; an upload in flight keeps the sheet open (busy guard).
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import React from 'react'
+import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -181,7 +182,7 @@ async function pickLibraryPhoto() {
 
 async function pickLibraryPhotoAndConfirm() {
   await pickLibraryPhoto()
-  fireEvent.click(screen.getByTestId('garment-confirm-image'))
+  await browserUser.click(screen.getByTestId('garment-confirm-image'))
 }
 
 function captureSuccessfulGarmentUpload() {
@@ -413,7 +414,7 @@ describe('MobileGarmentCaptureModal', () => {
     fireEvent.click(screen.getByTestId('garment-aspect-portrait'))
     const preview = await screen.findByTestId('garment-crop-preview')
     expect(preview).toHaveAttribute('data-source-uri', 'file:///crop-675x900.jpeg')
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await browserUser.click(screen.getByTestId('garment-confirm-image'))
 
     expect(await screen.findByTestId('garment-capture-complete')).toBeInTheDocument()
     expect(imageManipulator.manipulateAsync).toHaveBeenCalledWith(
@@ -468,7 +469,7 @@ describe('MobileGarmentCaptureModal', () => {
     expect(Array.from(cutout.data.subarray(center, center + 4))).toEqual([
       36, 92, 161, 255,
     ])
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await browserUser.click(screen.getByTestId('garment-confirm-image'))
 
     expect(await screen.findByTestId('garment-capture-complete')).toBeInTheDocument()
     expect(seen.allocation).toMatchObject({
@@ -515,7 +516,7 @@ describe('MobileGarmentCaptureModal', () => {
     )
     expect(fileSystem.files.has(stale.uri)).toBe(false)
     expect(imageManipulator.manipulateAsync).toHaveBeenCalledTimes(2)
-    fireEvent.click(confirm)
+    await browserUser.click(confirm)
     expect(await screen.findByTestId('garment-capture-complete')).toBeInTheDocument()
     expect(seen.allocation).toMatchObject({ widthPx: 675, heightPx: 900 })
     expect(seen.commit).toMatchObject({ hasBgCleanup: false })
@@ -543,7 +544,7 @@ describe('MobileGarmentCaptureModal', () => {
       'file:///crop-900x900.jpeg'
     )
     expect(fileSystem.files.has(uri)).toBe(false)
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await browserUser.click(screen.getByTestId('garment-confirm-image'))
 
     expect(await screen.findByTestId('garment-capture-complete')).toBeInTheDocument()
     expect(seen.uploadedContentType).toBe('image/jpeg')
@@ -733,7 +734,7 @@ describe('MobileGarmentCaptureModal', () => {
       await waitFor(() => {
         expect(screen.getByText('Service Unavailable')).toBeInTheDocument()
       })
-      fireEvent.click(screen.getByTestId('garment-confirm-image'))
+      await browserUser.click(screen.getByTestId('garment-confirm-image'))
       await waitFor(() => {
         expect(screen.getByTestId('garment-capture-complete')).toBeInTheDocument()
       })
@@ -878,7 +879,7 @@ describe('MobileGarmentCaptureModal', () => {
       return 'member-b-access-token'
     })
 
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await browserUser.click(screen.getByTestId('garment-confirm-image'))
     await waitFor(() => {
       expect(screen.getByTestId('garment-source-library')).toBeInTheDocument()
     })
@@ -964,7 +965,7 @@ describe('MobileGarmentCaptureModal', () => {
     await waitFor(() => {
       expect(screen.getByText('Service Unavailable')).toBeInTheDocument()
     })
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await browserUser.click(screen.getByTestId('garment-confirm-image'))
     await waitFor(() => {
       expect(screen.getByTestId('garment-capture-complete')).toBeInTheDocument()
     })
@@ -999,7 +1000,7 @@ describe('MobileGarmentCaptureModal', () => {
         screen.getByText('This photo is still being saved. Try again in a moment.')
       ).toBeInTheDocument()
     })
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await browserUser.click(screen.getByTestId('garment-confirm-image'))
     await waitFor(() => {
       expect(screen.getByTestId('garment-capture-complete')).toBeInTheDocument()
     })
@@ -1133,7 +1134,7 @@ describe('MobileGarmentCaptureModal', () => {
 
     fireEvent.click(screen.getByTestId('garment-aspect-portrait'))
     await screen.findByTestId('garment-crop-preview')
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await browserUser.click(screen.getByTestId('garment-confirm-image'))
 
     await waitFor(() => {
       expect(imageManipulator.manipulateAsync).toHaveBeenCalledWith(
