@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
 // Learning path Step 71: Today's outfit as a picture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
+// Learning path Step 87: Style this piece with my own garments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-87-style-this-piece-with-my-own-garments
 import {
   ConflictException,
   ForbiddenException,
@@ -393,6 +395,243 @@ describe('WardrobeSavedLookService', () => {
       'https://storage.example.test/signed.png'
     )
     expect(signReadUrl).toHaveBeenCalledWith('wardrobe/user-1/garment-1.png', 900)
+  })
+
+  it.each([
+    { reason: 'outside the member’s ready closet', companion: null },
+    {
+      reason: 'retagged for a different slot',
+      companion: { category: 'shoes', comfort_range: 'mild' },
+    },
+    {
+      reason: 'incompatible with the selected weather',
+      companion: { category: 'bottom', comfort_range: 'cold' },
+    },
+    {
+      reason: 'missing its comfort tag',
+      companion: { category: 'bottom', comfort_range: null },
+    },
+  ])('[7.30-ACCOUNT] rejects a companion $reason', async ({ companion }) => {
+    const { prisma, service, signReadUrl } = createHarness()
+    const base = makeStylePieceInput()
+    const companionId = 'unavailable-companion'
+    const input = createSavedLookInputSchema.parse({
+      ...base,
+      composition: base.composition.map((slot) =>
+        slot.category === 'bottom'
+          ? { ...slot, kind: 'garment', itemId: companionId }
+          : slot
+      ),
+    })
+    prisma.garmentItem.findMany.mockResolvedValueOnce([
+      { id: base.anchorGarmentId, category: 'top', comfort_range: 'mild' },
+      ...(companion ? [{ id: companionId, ...companion }] : []),
+    ])
+
+    await expect(service.createSavedLook(ACTOR, input)).rejects.toThrow(NotFoundException)
+
+    expect(prisma.garmentItem.findMany.mock.calls).toMatchObject([
+      [
+        {
+          where: {
+            user_id: ACTOR.userId,
+            id: { in: [base.anchorGarmentId, companionId] },
+            upload_status: 'ready',
+            retention_status: 'active',
+            deletion_requested_at: null,
+          },
+          select: { id: true },
+        },
+      ],
+    ])
+    expect(prisma.savedLook.create).not.toHaveBeenCalled()
+    expect(signReadUrl).not.toHaveBeenCalled()
+  })
+
+  it('[7.30-ACCOUNT] rejects use of the anchor in a companion slot', async () => {
+    const { prisma, service } = createHarness()
+    const base = makeStylePieceInput()
+    const input = createSavedLookInputSchema.parse({
+      ...base,
+      composition: base.composition.map((slot) =>
+        slot.slotIndex === 1
+          ? { ...slot, kind: 'garment', itemId: base.anchorGarmentId }
+          : slot
+      ),
+    })
+    prisma.garmentItem.findMany.mockResolvedValueOnce([
+      { id: base.anchorGarmentId, category: 'top', comfort_range: 'mild' },
+    ])
+
+    await expect(service.createSavedLook(ACTOR, input)).rejects.toThrow(NotFoundException)
+    expect(prisma.savedLook.create).not.toHaveBeenCalled()
+  })
+
+  it('[7.30-ACCOUNT] verifies the weather tags of an owned non-anchor in slot zero', async () => {
+    const { prisma, service } = createHarness()
+    const base = makeStylePieceInput()
+    const nonAnchor = 'cold-weather-top'
+    const input = createSavedLookInputSchema.parse({
+      ...base,
+      composition: base.composition.map((slot) =>
+        slot.slotIndex === 0 ? { ...slot, itemId: nonAnchor } : slot
+      ),
+    })
+    prisma.garmentItem.findMany.mockResolvedValueOnce([
+      { id: base.anchorGarmentId, category: 'top', comfort_range: 'mild' },
+      { id: nonAnchor, category: 'top', comfort_range: 'cold' },
+    ])
+
+    await expect(service.createSavedLook(ACTOR, input)).rejects.toThrow(NotFoundException)
+    expect(prisma.savedLook.create).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { weather: 'warm-rainy', comfort: 'warm' },
+    { weather: 'cool-windy', comfort: 'cold' },
+  ])(
+    '[7.30-WEATHER] refuses an unverified owned rain or wind layer for $weather',
+    async ({ weather, comfort }) => {
+      const { prisma, service } = createHarness()
+      const input = createSavedLookInputSchema.parse({
+        ...makeStylePieceInput(),
+        weather,
+        composition: [
+          ...makeStylePieceInput().composition,
+          {
+            slotIndex: 3,
+            category: 'outerwear',
+            kind: 'garment',
+            itemId: 'unverified-layer',
+          },
+        ],
+      })
+      prisma.garmentItem.findMany.mockResolvedValueOnce([
+        { id: input.anchorGarmentId, category: 'top', comfort_range: 'mild' },
+        { id: 'unverified-layer', category: 'outerwear', comfort_range: comfort },
+      ])
+
+      await expect(service.createSavedLook(ACTOR, input)).rejects.toThrow(
+        NotFoundException
+      )
+      expect(prisma.savedLook.create).not.toHaveBeenCalled()
+    }
+  )
+
+  it('[7.30-ACCOUNT] creates a mixed look and distinguishes tag changes from deleted companions on read', async () => {
+    const { prisma, service, signReadUrl } = createHarness()
+    const anchor = {
+      id: 'garment-1',
+      user_id: ACTOR.userId,
+      category: 'top',
+      comfort_range: 'mild',
+      upload_status: 'ready',
+      retention_status: 'active',
+      deletion_requested_at: null,
+      object_path: 'wardrobe/user-1/garment-1.png',
+    }
+    const companion = {
+      ...anchor,
+      id: 'owned-bottom',
+      category: 'bottom',
+      object_path: 'wardrobe/user-1/owned-bottom.png',
+    }
+    const row = makeSavedLookRow({
+      look_id: 'sample:l:office-oxford',
+      weather: 'mild-dry',
+      composition: [
+        { slotIndex: 0, category: 'top', kind: 'garment', itemId: anchor.id },
+        { slotIndex: 1, category: 'bottom', kind: 'garment', itemId: companion.id },
+        { slotIndex: 2, category: 'shoes', kind: 'catalog', itemId: 'sample:g:loafers' },
+      ],
+      swaps: {},
+    })
+    const input = createSavedLookInputSchema.parse({
+      ...makeStylePieceInput(),
+      lookId: row.look_id,
+      weather: row.weather,
+      composition: row.composition,
+      swaps: {},
+    })
+    prisma.savedLook.create.mockResolvedValueOnce(row)
+    prisma.savedLook.findFirst.mockResolvedValue(row)
+    prisma.garmentItem.findMany
+      .mockResolvedValueOnce([anchor, companion])
+      .mockResolvedValueOnce([anchor, companion])
+      .mockResolvedValueOnce([
+        anchor,
+        { ...companion, category: 'accessory', object_path: null },
+      ])
+      .mockResolvedValueOnce([
+        anchor,
+        { ...companion, deletion_requested_at: new Date(0) },
+      ])
+
+    const created = await service.createSavedLook(ACTOR, input)
+    expect(created.data.availabilityStatus).toBe('ready')
+    expect(created.data.composition[1]).toMatchObject({
+      itemId: companion.id,
+      kind: 'garment',
+      missing: false,
+    })
+    expect(created.data.composition[1]?.imageAccess?.url).toBe(
+      'https://storage.example.test/signed.png'
+    )
+    expect(signReadUrl).toHaveBeenCalledWith(companion.object_path, 900)
+
+    const retagged = await service.getSavedLook(ACTOR, row.id)
+    expect(retagged.data.availabilityStatus).toBe('needs_review')
+    expect(retagged.data.composition[1]).toMatchObject({
+      itemId: companion.id,
+      missing: false,
+      imageAccess: null,
+    })
+
+    signReadUrl.mockClear()
+    const deleted = await service.getSavedLook(ACTOR, row.id)
+    expect(deleted.data.availabilityStatus).toBe('missing_garment')
+    expect(deleted.data.missingGarmentIds).toEqual([companion.id])
+    expect(deleted.data.composition[1]).toMatchObject({
+      itemId: companion.id,
+      missing: true,
+      imageAccess: null,
+    })
+    expect(signReadUrl).not.toHaveBeenCalledWith(companion.object_path, 900)
+  })
+
+  it('[7.30-ACCOUNT] preserves a legacy saved look with its anchor in a later slot', async () => {
+    const { prisma, service } = createHarness()
+    const row = makeSavedLookRow({
+      look_id: 'legacy-capsule',
+      weather: 'mild',
+      composition: [
+        { slotIndex: 0, category: 'bottom', kind: 'garment', itemId: 'legacy-bottom' },
+        { slotIndex: 1, category: 'top', kind: 'garment', itemId: 'garment-1' },
+      ],
+    })
+    const garment = {
+      id: 'garment-1',
+      user_id: ACTOR.userId,
+      category: 'top',
+      comfort_range: 'mild',
+      upload_status: 'ready',
+      retention_status: 'active',
+      deletion_requested_at: null,
+      object_path: null,
+    }
+    prisma.savedLook.findFirst.mockResolvedValueOnce(row)
+    prisma.garmentItem.findMany.mockResolvedValueOnce([
+      garment,
+      { ...garment, id: 'legacy-bottom', category: 'bottom' },
+    ])
+
+    const saved = await service.getSavedLook(ACTOR, row.id)
+
+    expect(saved.data.availabilityStatus).toBe('ready')
+    expect(saved.data.composition.map(({ itemId }) => itemId)).toEqual([
+      'legacy-bottom',
+      'garment-1',
+    ])
   })
 
   it('replays idempotently with matching payload hash and rejects mismatched payload with 409', async () => {

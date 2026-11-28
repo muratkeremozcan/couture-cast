@@ -268,7 +268,7 @@ realTest.describe('Garment delete against the local API', () => {
               body: {
                 source: 'style_piece',
                 lookId: `delete-${randomUUID().slice(0, 8)}`,
-                weather: 'mild',
+                weather: 'mild-dry',
                 anchorGarmentId: anchor,
                 anchorSnapshot: {
                   garmentId: anchor,
@@ -276,8 +276,20 @@ realTest.describe('Garment delete against the local API', () => {
                   comfortRange: 'mild',
                 },
                 composition: [
-                  { slotIndex: 0, category: 'top', kind: 'garment', itemId: topId },
-                  { slotIndex: 1, category: 'bottom', kind: 'garment', itemId: bottomId },
+                  {
+                    slotIndex: 0,
+                    category: anchorCategory,
+                    kind: 'garment',
+                    itemId: anchor,
+                  },
+                  anchorCategory === 'top'
+                    ? {
+                        slotIndex: 1,
+                        category: 'bottom',
+                        kind: 'garment',
+                        itemId: bottomId,
+                      }
+                    : { slotIndex: 1, category: 'top', kind: 'garment', itemId: topId },
                 ],
               },
             })

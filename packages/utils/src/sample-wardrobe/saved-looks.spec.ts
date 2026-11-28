@@ -2,10 +2,17 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 // Learning path Step 61: Import device-saved looks for the same member.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
+// Learning path Step 87: Style this piece with my own garments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-87-style-this-piece-with-my-own-garments
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SAMPLE_CATALOG } from './catalog'
 import { DEFAULT_SAMPLE_COMFORT, selectSampleOutfit } from './selector'
-import { stylePieceLooks, stylePieceStorageKey } from './style-one-piece'
+import {
+  applyStylePieceRecipe,
+  stylePieceLooks,
+  stylePieceStorageKey,
+  type StylePieceOwnedCompanion,
+} from './style-one-piece'
 import {
   buildHomeSampleSavedLookInput,
   buildStylePieceSavedLookInput,
@@ -17,10 +24,14 @@ import {
   parseLegacyStylePieceRecipesForImport,
   parseMemberSampleBookmarksStorageKey,
   parseStylePieceStorageKey,
+  reopenStylePieceAnchor,
+  reopenStylePieceRecipe,
   savedLookMatchesHomeSample,
   savedLookMatchesStylePiece,
   savedLookToSampleBookmark,
   savedLookToStylePieceRecipe,
+  savedStylePieceEditorRecipe,
+  stylePieceLookHasCurrentCompanions,
   type SavedLookLike,
 } from './saved-looks'
 
@@ -110,6 +121,130 @@ describe('saved-looks helpers', () => {
     expect(savedLookToStylePieceRecipe(savedRow)).toEqual(swappedLook.recipe)
     expect(savedLookToStylePieceRecipe({ ...savedRow, source: 'home_sample' })).toBeNull()
     expect(savedLookToStylePieceRecipe({ ...savedRow, weather: 'unknown' })).toBeNull()
+  })
+
+  it('[7.30-ACCOUNT] restores the saved mixed slots after compatible inventory grows', () => {
+    const anchor = { id: 'owned-top', category: 'top', comfortRange: 'mild' } as const
+    const owned = {
+      id: 'owned-jeans',
+      category: 'bottom',
+      kind: 'garment',
+      comfortRange: 'mild',
+      photo: {
+        url: 'https://example.test/signed-jeans',
+        expiresAt: '2099-01-01T00:00:00Z',
+      },
+    } satisfies StylePieceOwnedCompanion
+    const alternative = { ...owned, id: 'another-pair' }
+    const base = stylePieceLooks(anchor, 'mild-dry').looks.find(
+      ({ recipe }) => recipe.lookId === 'sample:l:office-oxford'
+    )!
+    const look = applyStylePieceRecipe(
+      base,
+      { ...base.recipe, swaps: { bottom: owned.id } },
+      SAMPLE_CATALOG,
+      [owned]
+    )
+
+    const payload = buildStylePieceSavedLookInput(anchor, look)
+    expect(payload.composition).toEqual([
+      { slotIndex: 0, category: 'top', kind: 'garment', itemId: anchor.id },
+      { slotIndex: 1, category: 'bottom', kind: 'garment', itemId: owned.id },
+      { slotIndex: 2, category: 'shoes', kind: 'catalog', itemId: 'sample:g:loafers' },
+    ])
+    expect(payload.swaps).toEqual({})
+
+    const saved = {
+      ...payload,
+      id: 'saved-mixed',
+      availabilityStatus: 'ready',
+      anchorGarmentId: anchor.id,
+      collection: null,
+      comfort: null,
+    }
+    const available = [alternative, { ...owned, photo: null }]
+    const recipe = reopenStylePieceRecipe(saved, anchor, available)
+    expect(recipe).not.toBeNull()
+    const reopened = applyStylePieceRecipe(base, recipe!, SAMPLE_CATALOG, available)
+    expect(buildStylePieceSavedLookInput(anchor, reopened).composition).toEqual(
+      payload.composition
+    )
+
+    expect(reopenStylePieceRecipe(saved, anchor, [alternative])).toBeNull()
+    const replacement = reopenStylePieceRecipe(saved, anchor, [alternative], {
+      bottom: 'sample:g:dark-jeans',
+    })
+    expect(replacement?.swaps).toMatchObject({ bottom: 'sample:g:dark-jeans' })
+    expect(
+      reopenStylePieceRecipe(saved, anchor, [alternative], {
+        bottom: 'not-an-eligible-piece',
+      })
+    ).toBeNull()
+    expect(
+      reopenStylePieceRecipe(
+        { ...saved, availabilityStatus: 'needs_review' },
+        anchor,
+        available
+      )
+    ).toBeNull()
+    expect(
+      reopenStylePieceRecipe(saved, { ...anchor, id: 'wrong-anchor' }, available)
+    ).toBeNull()
+    expect(
+      reopenStylePieceRecipe({ ...saved, lookId: 'sample:l:unknown' }, anchor, available)
+    ).toBeNull()
+    expect(
+      reopenStylePieceRecipe(
+        {
+          ...saved,
+          composition: saved.composition.slice(0, 2),
+        },
+        anchor,
+        available
+      )
+    ).toBeNull()
+    expect(savedStylePieceEditorRecipe({ ...saved, source: 'home_sample' })).toBeNull()
+    expect(savedStylePieceEditorRecipe({ ...saved, weather: 'unknown' })).toBeNull()
+
+    expect(savedLookMatchesStylePiece(saved, anchor.id, look)).toBe(true)
+    expect(savedLookMatchesStylePiece(saved, anchor.id, base)).toBe(false)
+    expect(
+      savedLookMatchesStylePiece(
+        { ...saved, composition: saved.composition.slice(0, 2) },
+        anchor.id,
+        look
+      )
+    ).toBe(false)
+    expect(stylePieceLookHasCurrentCompanions(look, available)).toBe(true)
+    expect(stylePieceLookHasCurrentCompanions(look, [alternative])).toBe(false)
+    expect(
+      stylePieceLookHasCurrentCompanions(look, [{ ...owned, category: 'shoes' }])
+    ).toBe(false)
+    expect(
+      stylePieceLookHasCurrentCompanions(look, [{ ...owned, comfortRange: 'cold' }])
+    ).toBe(false)
+    expect(stylePieceLookHasCurrentCompanions(base, [])).toBe(true)
+
+    const anchorItem = {
+      ...anchor,
+      status: 'ready',
+      retentionStatus: 'active',
+      imageAccess: owned.photo,
+    }
+    const ownedItem = {
+      id: owned.id,
+      category: owned.category,
+      comfortRange: owned.comfortRange,
+      status: 'ready',
+      retentionStatus: 'active',
+      imageAccess: null,
+    }
+    expect(reopenStylePieceAnchor(saved, [ownedItem, anchorItem])).toBe(anchorItem)
+    expect(reopenStylePieceAnchor(saved, [ownedItem])).toBeNull()
+    expect(
+      reopenStylePieceAnchor(saved, [{ ...anchorItem, imageAccess: null }, ownedItem])
+    ).toBeNull()
+    expect(reopenStylePieceAnchor(saved, [anchorItem])).toBeNull()
   })
 
   it('builds, converts, and matches Home sample saved look inputs', () => {

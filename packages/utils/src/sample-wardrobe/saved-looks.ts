@@ -20,14 +20,20 @@ import {
   type SampleWeatherKey,
 } from './selector'
 import {
+  applyStylePieceRecipe,
+  isStylePieceOwnedCompanion,
   MAX_STYLE_PIECE_STORAGE_BYTES,
   STYLE_PIECE_WEATHER_KEYS,
+  stylePieceAnchor,
+  stylePieceCompanionSuitsWeather,
   stylePieceLooks,
+  stylePieceOwnedCompanions,
   stylePieceRecipeKey,
   stylePieceStorageKey,
   stylePieceSwapOptions,
   type StylePieceAnchor,
   type StylePieceLook,
+  type StylePieceOwnedCompanion,
   type StylePieceRecipe,
   type StylePieceSelection,
   type StylePieceWeatherKey,
@@ -89,6 +95,7 @@ export type SavedLookLike = {
   swaps: Partial<Record<SampleGarmentCategory, string>>
   collection: string | null
   comfort: SavedLookComfortPayload | null
+  composition?: readonly SavedLookCompositionSlotPayload[]
 }
 
 export type LegacySavedLookImportEntry<TRaw> = {
@@ -870,16 +877,11 @@ export function parseLegacyStylePieceRecipesForImport(
   return { entries, hadInvalidEntries, malformedPayload: false }
 }
 
-/**
- * Builds the canonical account-backed SavedLook payload for a Style this piece look.
- * Slot 0 is always the anchor wardrobe garment; companion catalog pieces follow in
- * display order so reopening reproduces the exact slot order and swaps.
- */
-export function buildStylePieceSavedLookInput(
-  garment: StylePieceSelection,
+function stylePieceComposition(
+  garment: Pick<StylePieceSelection, 'id' | 'category'>,
   look: StylePieceLook
-): CreateSavedLookPayload {
-  const composition: SavedLookCompositionSlotPayload[] = [
+): SavedLookCompositionSlotPayload[] {
+  return [
     {
       slotIndex: 0,
       category: garment.category,
@@ -889,11 +891,39 @@ export function buildStylePieceSavedLookInput(
     ...look.companions.map((companion, index) => ({
       slotIndex: index + 1,
       category: companion.category,
-      kind: 'catalog' as const,
+      kind: isStylePieceOwnedCompanion(companion)
+        ? ('garment' as const)
+        : ('catalog' as const),
       itemId: companion.id,
     })),
   ]
+}
 
+function sameOrderedComposition(
+  stored: readonly SavedLookCompositionSlotPayload[],
+  expected: readonly SavedLookCompositionSlotPayload[],
+  swaps?: StylePieceRecipe['swaps']
+) {
+  const ordered = [...stored].sort((a, b) => a.slotIndex - b.slotIndex)
+  return (
+    ordered.length === expected.length &&
+    expected.every((slot, index) => {
+      const previous = ordered[index]
+      return (
+        previous?.slotIndex === slot.slotIndex &&
+        previous.category === slot.category &&
+        ((previous.kind === slot.kind && previous.itemId === slot.itemId) ||
+          (slot.slotIndex > 0 && swaps?.[slot.category] === slot.itemId))
+      )
+    })
+  )
+}
+
+/** Builds the saved payload with the anchor followed by companions in display order. */
+export function buildStylePieceSavedLookInput(
+  garment: StylePieceSelection,
+  look: StylePieceLook
+): CreateSavedLookPayload {
   return {
     source: 'style_piece',
     lookId: look.recipe.lookId,
@@ -904,8 +934,17 @@ export function buildStylePieceSavedLookInput(
       category: garment.category,
       comfortRange: garment.comfortRange,
     },
-    composition,
-    swaps: cleanSwaps(look.recipe.swaps),
+    composition: stylePieceComposition(garment, look),
+    swaps: cleanSwaps(
+      Object.fromEntries(
+        look.companions.flatMap((companion) =>
+          !isStylePieceOwnedCompanion(companion) &&
+          look.recipe.swaps[companion.category] === companion.id
+            ? [[companion.category, companion.id]]
+            : []
+        )
+      )
+    ),
   }
 }
 
@@ -961,6 +1000,89 @@ export function savedLookToStylePieceRecipe(
   }
 }
 
+type StylePieceEditorSavedLook = SavedLookLike & {
+  availabilityStatus: string
+  composition: readonly SavedLookCompositionSlotPayload[]
+}
+
+export function savedStylePieceEditorRecipe(
+  saved: StylePieceEditorSavedLook
+): StylePieceRecipe | null {
+  const recipe = savedLookToStylePieceRecipe(saved)
+  if (!recipe) return null
+  return {
+    ...recipe,
+    swaps: {},
+    savedCompanions: Object.fromEntries(
+      saved.composition
+        .filter((slot) => slot.slotIndex !== 0)
+        .map(({ category, kind, itemId }) => [category, { kind, itemId }])
+    ),
+  }
+}
+
+/** Confirm that saved slots and any explicit edits still resolve in the current inventory. */
+export function reopenStylePieceRecipe(
+  saved: StylePieceEditorSavedLook,
+  anchor: StylePieceSelection,
+  owned: readonly StylePieceOwnedCompanion[],
+  draftSwaps?: StylePieceRecipe['swaps']
+): StylePieceRecipe | null {
+  if (saved.availabilityStatus !== 'ready' || saved.anchorGarmentId !== anchor.id)
+    return null
+  const recipe = savedStylePieceEditorRecipe(saved)
+  if (!recipe) return null
+  const base = stylePieceLooks(anchor, recipe.weather).looks.find(
+    (look) => look.recipe.lookId === recipe.lookId
+  )
+  if (!base) return null
+  const restored = applyStylePieceRecipe(
+    base,
+    draftSwaps ? { ...recipe, swaps: draftSwaps } : recipe,
+    SAMPLE_CATALOG,
+    owned
+  )
+  return sameOrderedComposition(
+    saved.composition,
+    stylePieceComposition(anchor, restored),
+    restored.recipe.swaps
+  )
+    ? restored.recipe
+    : null
+}
+
+export function reopenStylePieceAnchor<
+  G extends Parameters<typeof stylePieceOwnedCompanions>[0][number],
+>(saved: StylePieceEditorSavedLook, garments: readonly G[]): G | null {
+  const garment = garments.find(({ id }) => id === saved.anchorGarmentId)
+  if (!garment) return null
+  const anchor = stylePieceAnchor(garment)
+  if (!anchor) return null
+  return reopenStylePieceRecipe(
+    saved,
+    { ...anchor, id: garment.id },
+    stylePieceOwnedCompanions(garments, garment.id)
+  )
+    ? garment
+    : null
+}
+
+export function stylePieceLookHasCurrentCompanions(
+  look: StylePieceLook,
+  owned: readonly StylePieceOwnedCompanion[]
+) {
+  return look.companions.every(
+    (companion) =>
+      !isStylePieceOwnedCompanion(companion) ||
+      owned.some(
+        (item) =>
+          item.id === companion.id &&
+          item.category === companion.category &&
+          stylePieceCompanionSuitsWeather(item, look.recipe.weather)
+      )
+  )
+}
+
 /** Extracts a `SampleBookmark` for reopening a Home sample saved look. */
 export function savedLookToSampleBookmark(
   savedLook: SavedLookLike
@@ -988,14 +1110,29 @@ export function savedLookToSampleBookmark(
 export function savedLookMatchesStylePiece(
   savedLook: SavedLookLike,
   garmentId: string,
-  look: StylePieceLook
+  look: StylePieceLook,
+  anchorCategory?: SampleGarmentCategory
 ): boolean {
-  return (
-    savedLook.source === 'style_piece' &&
-    savedLook.anchorGarmentId === garmentId &&
-    savedLook.lookId === look.recipe.lookId &&
-    savedLook.weather === look.recipe.weather &&
-    swapsEqual(cleanSwaps(savedLook.swaps), cleanSwaps(look.recipe.swaps))
+  if (
+    savedLook.source !== 'style_piece' ||
+    savedLook.anchorGarmentId !== garmentId ||
+    savedLook.lookId !== look.recipe.lookId ||
+    savedLook.weather !== look.recipe.weather
+  )
+    return false
+  if (!savedLook.composition) {
+    return swapsEqual(cleanSwaps(savedLook.swaps), cleanSwaps(look.recipe.swaps))
+  }
+  const anchor = savedLook.composition.find((slot) => slot.slotIndex === 0)
+  return Boolean(
+    anchor &&
+      sameOrderedComposition(
+        savedLook.composition,
+        stylePieceComposition(
+          { id: garmentId, category: anchorCategory ?? anchor.category },
+          look
+        )
+      )
   )
 }
 

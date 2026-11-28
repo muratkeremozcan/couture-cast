@@ -4,7 +4,8 @@ import type { GuestPreviewLocale } from './strings'
 const en = {
   start: 'Style this piece',
   anchor: 'Your piece',
-  companions: 'Example pieces',
+  companions: 'Companion pieces',
+  occasions: { school: 'School', weekend: 'Weekend', goingOut: 'Going out' },
   weather: 'Example weather',
   idea: 'Look {number}',
   save: 'Save look',
@@ -28,7 +29,8 @@ const strings: Record<GuestPreviewLocale, typeof en> = {
   'es-419': {
     start: 'Combinar esta prenda',
     anchor: 'Tu prenda',
-    companions: 'Prendas de ejemplo',
+    companions: 'Prendas para combinar',
+    occasions: { school: 'Escuela', weekend: 'Fin de semana', goingOut: 'Para salir' },
     weather: 'Clima de ejemplo',
     idea: 'Conjunto {number}',
     save: 'Guardar conjunto',
@@ -47,7 +49,8 @@ const strings: Record<GuestPreviewLocale, typeof en> = {
   'fr-CA': {
     start: 'Agencer ce vêtement',
     anchor: 'Votre vêtement',
-    companions: 'Vêtements en exemple',
+    companions: 'Vêtements assortis',
+    occasions: { school: 'École', weekend: 'Fin de semaine', goingOut: 'Sortie' },
     weather: 'Exemple de météo',
     idea: 'Tenue {number}',
     save: 'Enregistrer la tenue',
@@ -68,7 +71,8 @@ const strings: Record<GuestPreviewLocale, typeof en> = {
   'fr-FR': {
     start: 'Associer ce vêtement',
     anchor: 'Votre vêtement',
-    companions: 'Exemples de vêtements',
+    companions: 'Vêtements assortis',
+    occasions: { school: 'École', weekend: 'Week-end', goingOut: 'Sortie' },
     weather: 'Exemple de météo',
     idea: 'Tenue {number}',
     save: 'Enregistrer la tenue',
@@ -89,7 +93,8 @@ const strings: Record<GuestPreviewLocale, typeof en> = {
   'tr-TR': {
     start: 'Bu parçayı kombinle',
     anchor: 'Senin parçan',
-    companions: 'Örnek parçalar',
+    companions: 'Tamamlayıcı parçalar',
+    occasions: { school: 'Okul', weekend: 'Hafta sonu', goingOut: 'Dışarı çıkarken' },
     weather: 'Örnek hava durumu',
     idea: 'Kombin {number}',
     save: 'Kombini kaydet',
@@ -108,7 +113,8 @@ const strings: Record<GuestPreviewLocale, typeof en> = {
   'de-DE': {
     start: 'Dieses Kleidungsstück kombinieren',
     anchor: 'Dein Kleidungsstück',
-    companions: 'Beispielkleidung',
+    companions: 'Passende Kleidungsstücke',
+    occasions: { school: 'Schule', weekend: 'Wochenende', goingOut: 'Ausgehen' },
     weather: 'Beispielwetter',
     idea: 'Outfit {number}',
     save: 'Outfit speichern',
@@ -129,7 +135,8 @@ const strings: Record<GuestPreviewLocale, typeof en> = {
   'it-IT': {
     start: 'Abbina questo capo',
     anchor: 'Il tuo capo',
-    companions: 'Capi di esempio',
+    companions: 'Capi da abbinare',
+    occasions: { school: 'Scuola', weekend: 'Fine settimana', goingOut: 'Per uscire' },
     weather: 'Meteo di esempio',
     idea: 'Look {number}',
     save: 'Salva il look',
@@ -149,7 +156,8 @@ const strings: Record<GuestPreviewLocale, typeof en> = {
   'pt-BR': {
     start: 'Combinar esta peça',
     anchor: 'Sua peça',
-    companions: 'Peças de exemplo',
+    companions: 'Peças para combinar',
+    occasions: { school: 'Escola', weekend: 'Fim de semana', goingOut: 'Para sair' },
     weather: 'Exemplo de clima',
     idea: 'Look {number}',
     save: 'Salvar look',
@@ -168,7 +176,8 @@ const strings: Record<GuestPreviewLocale, typeof en> = {
   'pt-PT': {
     start: 'Combinar esta peça',
     anchor: 'A tua peça',
-    companions: 'Peças de exemplo',
+    companions: 'Peças para combinar',
+    occasions: { school: 'Escola', weekend: 'Fim de semana', goingOut: 'Para sair' },
     weather: 'Exemplo de tempo',
     idea: 'Conjunto {number}',
     save: 'Guardar conjunto',

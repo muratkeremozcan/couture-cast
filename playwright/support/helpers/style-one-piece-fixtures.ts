@@ -11,6 +11,7 @@ import {
   wardrobeOnboardingStateResponseSchema,
   type GarmentItemContract,
   type GarmentWithColor,
+  type ParsedCreateSavedLookInput,
   type SavedLookContract,
 } from '@couture/api-client/contracts/http'
 import {
@@ -64,14 +65,15 @@ export async function switchStyleMember(page: Page, id: string) {
   )
 }
 
-/** Mock inventory and auth only. The app supplies the catalog, recipes, swaps and local saves. */
+/** Mock auth, inventory and account storage. The app supplies look selection and rendering. */
 export async function mockStyleWardrobe(
   page: Page,
   baseURL: string,
   intercept: InterceptNetworkCallFn,
   // Story 7.5: web lists garments with x-couture-garment-color: 1, so an inventory entry may
   // carry colorFamily; one without it answers as a legacy garment would (colorFamily null).
-  inventory: Record<string, (GarmentItemContract | GarmentWithColor)[]>
+  inventory: Record<string, (GarmentItemContract | GarmentWithColor)[]>,
+  onSavedLookCreate?: (input: ParsedCreateSavedLookInput) => void
 ) {
   const origin = new URL(baseURL).origin
   const writes: string[] = []
@@ -233,6 +235,7 @@ export async function mockStyleWardrobe(
       return
     }
     const input = createSavedLookInputSchema.parse(request.postDataJSON())
+    onSavedLookCreate?.(input)
     const now = new Date().toISOString()
     const created: SavedLookContract = {
       id: `saved-look-mock-${savedLookSeq++}`,

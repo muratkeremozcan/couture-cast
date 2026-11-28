@@ -12,6 +12,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 // Learning path Step 61: Import device-saved looks for the same member.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
+// Learning path Step 87: Style this piece with my own garments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-87-style-this-piece-with-my-own-garments
 import {
   act,
   cleanup,
@@ -139,7 +141,7 @@ const renewed = {
   },
 }
 const defaultRecipe = {
-  lookId: 'sample:l:soft-pleats',
+  lookId: 'sample:l:office-oxford',
   weather: 'mild-dry',
   swaps: {},
 } satisfies StylePieceRecipe
@@ -190,7 +192,7 @@ async function startStyling() {
   const user = userEvent.setup()
   await user.click(await openButton())
   const dialog = await screen.findByRole('dialog', dialogName)
-  await within(dialog).findByRole('heading', { name: 'Look 1' })
+  await within(dialog).findByRole('heading', { name: 'School' })
   return { user, dialog }
 }
 
@@ -245,6 +247,104 @@ afterEach(() => {
 })
 
 describe('Wardrobe styling', () => {
+  it('[7.30-PHOTO] [7.30-ACCOUNT] handles owned photo errors and changing saved-look availability', async () => {
+    const bottom = createReadyGarmentFixture({
+      id: 'owned-bottom',
+      category: 'bottom',
+      imageAccess: null,
+    })
+    const shoes = createReadyGarmentFixture({
+      id: 'owned-shoes',
+      category: 'shoes',
+      imageAccess: {
+        ...renewed.imageAccess,
+        url: 'https://photos.example.test/owned-shoes.png',
+      },
+    })
+    inventory.mockImplementation(() => list(garment, bottom, shoes))
+    publishOwner(owner)
+    render(<WardrobePage />)
+    const { user, dialog } = await startStyling()
+    const school = within(
+      within(dialog).getByRole('heading', { name: 'School' }).closest('article')!
+    )
+    expect(school.getAllByTestId('style-piece-owned-companion')).toHaveLength(2)
+    expect(school.getByTestId('style-piece-companion-placeholder')).toHaveTextContent(
+      'Photo unavailable'
+    )
+    const signedPhoto = school
+      .getAllByTestId('style-piece-owned-companion')
+      .flatMap((piece) => [...piece.querySelectorAll('img')])
+      .find((image) => image.getAttribute('src') === shoes.imageAccess?.url)
+    expect(signedPhoto).toHaveAttribute('referrerpolicy', 'no-referrer')
+    fireEvent.error(signedPhoto!)
+    expect(school.getAllByTestId('style-piece-companion-placeholder')).toHaveLength(2)
+
+    await user.click(school.getByTestId('style-piece-swap-shoes'))
+    await user.click(school.getByRole('button', { name: 'Loafers' }))
+    await user.click(school.getByRole('button', { name: 'Save look' }))
+    const savedRegion = await within(dialog).findByRole('region', { name: 'Saved looks' })
+    const [saved] = savedLooksStore.items
+    expect(saved?.composition.map(({ kind, itemId }) => [kind, itemId])).toEqual([
+      ['garment', garmentId],
+      ['garment', bottom.id],
+      ['catalog', 'sample:g:loafers'],
+    ])
+    await user.click(
+      within(savedRegion).getByRole('button', { name: /open saved look/i })
+    )
+    await waitFor(() =>
+      expect(school.getByRole('heading', { name: 'School' })).toHaveFocus()
+    )
+    expect(school.getByText('Loafers')).toBeVisible()
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog', dialogName)).toBeNull())
+    inventory.mockImplementation(() => list(garment, shoes))
+    savedLooksStore.items = [
+      {
+        ...saved!,
+        availabilityStatus: 'missing_garment',
+        missingGarmentIds: [bottom.id],
+        composition: saved!.composition.map((slot) => ({
+          ...slot,
+          missing: slot.itemId === bottom.id,
+        })),
+      },
+    ]
+    const { dialog: reopened } = await startStyling()
+    const missingRegion = within(
+      await within(reopened).findByRole('region', { name: 'Saved looks' })
+    )
+    expect(missingRegion.getByText('Missing piece')).toBeVisible()
+    expect(missingRegion.queryByRole('button', { name: /open saved look/i })).toBeNull()
+    expect(
+      missingRegion.getByRole('button', { name: /remove saved look/i })
+    ).toBeVisible()
+  })
+
+  it('[7.30-ACCOUNT] refreshes before saving and stops when the owned companion leaves the closet', async () => {
+    const bottom = createReadyGarmentFixture({
+      id: 'departing-bottom',
+      category: 'bottom',
+      imageAccess: null,
+    })
+    inventory.mockImplementation(() => list(garment, bottom))
+    publishOwner(owner)
+    render(<WardrobePage />)
+    const { user, dialog } = await startStyling()
+    const school = within(
+      within(dialog).getByRole('heading', { name: 'School' }).closest('article')!
+    )
+    expect(school.getByTestId('style-piece-owned-companion')).toBeVisible()
+    inventory.mockImplementationOnce(() => list(garment))
+    await user.click(school.getByRole('button', { name: 'Save look' }))
+    await waitFor(() =>
+      expect(school.queryByTestId('style-piece-owned-companion')).toBeNull()
+    )
+    expect(savedLooksStore.items).toEqual([])
+  })
+
   it('waits for a verified owner, then checks the current wardrobe before showing their photo', async () => {
     const reply = Promise.withResolvers<Response>()
     render(<WardrobePage />)
@@ -279,7 +379,7 @@ describe('Wardrobe styling', () => {
       renewed.imageAccess.url
     )
     expect(
-      within(dialog).getAllByRole('heading', { name: 'Example pieces' })
+      within(dialog).getAllByRole('heading', { name: 'Companion pieces' })
     ).toHaveLength(3)
   })
 
@@ -290,6 +390,8 @@ describe('Wardrobe styling', () => {
     const { user, dialog } = await startStyling()
     await user.click(within(dialog).getByRole('button', { name: 'Warm and rainy' }))
     const look = firstLook(dialog)
+    const occasion = look.getByTestId('style-piece-look-title').textContent
+    if (!occasion) throw new Error('Expected an occasion heading for the saved look')
     const swap = look.getByTestId('style-piece-swap-shoes')
     expect(look.getByText('White sneakers')).toBeVisible()
     expect(look.getByText('Rain shell')).toBeVisible()
@@ -311,7 +413,7 @@ describe('Wardrobe styling', () => {
     expect(look.getByText('Loafers')).toBeVisible()
     await user.click(look.getByRole('button', { name: 'Save look' }))
     expect(
-      await within(dialog).findByRole('region', { name: 'Saved on this device' })
+      await within(dialog).findByRole('region', { name: 'Saved looks' })
     ).toBeVisible()
     expect(readRecipes()).toEqual([
       {
@@ -335,7 +437,7 @@ describe('Wardrobe styling', () => {
     await waitFor(() => expect(selectedWeather).toHaveAttribute('aria-pressed', 'true'))
     expect(firstLook(reopened).getByText('Loafers')).toBeVisible()
     await waitFor(() =>
-      expect(within(reopened).getByRole('heading', { name: 'Look 1' })).toHaveFocus()
+      expect(within(reopened).getByRole('heading', { name: occasion })).toHaveFocus()
     )
 
     await user.click(within(reopened).getByRole('button', { name: /remove saved look/i }))
@@ -779,6 +881,24 @@ describe('Wardrobe styling', () => {
               category: 'top',
               kind: 'garment',
               itemId: garmentId,
+              label: null,
+              missing: false,
+              imageAccess: null,
+            },
+            {
+              slotIndex: 1,
+              category: 'bottom',
+              kind: 'catalog',
+              itemId: 'sample:g:dark-jeans',
+              label: null,
+              missing: false,
+              imageAccess: null,
+            },
+            {
+              slotIndex: 2,
+              category: 'shoes',
+              kind: 'catalog',
+              itemId: 'sample:g:loafers',
               label: null,
               missing: false,
               imageAccess: null,
