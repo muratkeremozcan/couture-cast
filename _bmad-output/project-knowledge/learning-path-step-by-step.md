@@ -22702,5 +22702,9 @@ Wait for the crop preview and check that the garment keeps its edges and fabric 
   [shared mask tests](../../packages/utils/src/garment-background.spec.ts), and
   [phone browser capture](../../playwright/tests/wardrobe-garment-capture-phone.spec.ts).
 - [Web encoding fallback](../../apps/web/src/lib/wardrobe.test.ts),
-  [native capture](../../apps/mobile/components/wardrobe/garment-capture-modal.test.tsx),
-  and [Step 81](#step-81-photo-ai-consent-and-processor-approval) for the external processing policy.
+  [native crop preparation](../../apps/mobile/src/lib/garment-capture-image.test.ts), and
+  [native capture](../../apps/mobile/components/wardrobe/garment-capture-modal.test.tsx).
+- Android Maestro covers
+  [capture](../../maestro/garment-capture-flow.yaml) and
+  [capture through tagging](../../maestro/garment-smart-tagging-flow.yaml).
+- [Step 81](#step-81-photo-ai-consent-and-processor-approval) covers external processing policy.

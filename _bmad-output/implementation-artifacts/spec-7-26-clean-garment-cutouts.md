@@ -3,15 +3,17 @@ title: 'Story CC-7.26: Clean garment cutouts'
 type: feature
 ticket: '7-26-clean-garment-cutouts'
 created: '2026-11-28'
-status: in-review
+status: built
 baseline_revision: 'f127de4b98b4cedfa9920a51aed92454fb39641b'
 route: full
 route_source: auto
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
-review_loop_iteration: 0
+lenses_ran:
+  - 'independent-correctness'
+  - 'codex-security'
+review_loop_iteration: 1
 context:
   - '_bmad-output/implementation-artifacts/epic-7-context.md'
   - '_bmad-output/test-artifacts/test-design-7-26-clean-garment-cutouts.md'
@@ -68,7 +70,7 @@ When the scene is uncertain, the crop keeps its original background.
 - [x] Share the RGBA mask and wire the web Canvas path to it.
 - [x] Prepare the native preview before confirmation. Send that file through the existing
       signed upload, with its actual format and cleanup state.
-- [ ] Add [acceptance evidence](../test-artifacts/test-design-7-26-clean-garment-cutouts.md),
+- [x] Add [acceptance coverage](../test-artifacts/test-design-7-26-clean-garment-cutouts.md),
       link Step 83, and close the sprint story.
 
 Given four fixed labeled photo scenes (plain, cluttered, pale-on-pale, and patterned), when
@@ -93,6 +95,19 @@ and pale-on-pale references kept the original pixels.
 ## Plan Change Log
 
 ## Review Triage Log
+
+The independent review and static Codex Security scan covered
+`f127de4b98b4cedfa9920a51aed92454fb39641b..56c33450327903b8cd1af07193d48744ecae9575`.
+Scan `56c3345_20261128T075214Z` covered 27 changed paths and reported zero security findings.
+
+| Finding                         | Resolution                                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------------------------ |
+| P0-1 Expo decoder compatibility | Use the `pngjs/browser` codec and check expected PNG dimensions before decoding.           |
+| P1-1 Acceptance coverage        | Cover crop fallback and failure, stale preparation, codec compatibility, and web encoding. |
+| P2-1 Native preparation overlap | Serialize the platform work and skip superseded previews before they start.                |
+| P2-2 Maestro readiness          | Wait for the async preview before confirming in both garment journeys.                     |
+| P2-3 Capture parity             | Clear hidden RGB on cutouts and clear stale native errors when crop settings change.       |
+| P3-1 Story closeout             | Record the review, link Step 83, align the JPEG test mocks, and close the sprint story.    |
 
 ## Verification
 

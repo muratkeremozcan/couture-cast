@@ -1,7 +1,8 @@
 import { maskGarmentBackground } from '@couture/utils'
+import { Buffer } from 'buffer'
 import { File } from 'expo-file-system'
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
-import { decode, encode } from 'fast-png'
+import { PNG } from 'pngjs/browser'
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 // Keep the native pixel analysis and PNG encoding bounded on the JS thread.
@@ -66,47 +67,42 @@ async function cropImage(
   }
 }
 
-function toRgba(png: ReturnType<typeof decode>): Uint8Array | Uint8ClampedArray | null {
-  const { channels, data, depth, transparency, palette, width, height } = png
-  if (depth !== 8 || data instanceof Uint16Array || transparency || palette) return null
-  if (channels === 4) return data
-  if (channels !== 3) return null
-  const rgba = new Uint8Array(width * height * 4)
-  for (let from = 0, to = 0; to < rgba.length; from += 3, to += 4) {
-    rgba[to] = data[from]!
-    rgba[to + 1] = data[from + 1]!
-    rgba[to + 2] = data[from + 2]!
-    rgba[to + 3] = 255
-  }
-  return rgba
-}
-
 async function applyCutout(prepared: PreparedGarmentImage, signal: AbortSignal) {
   // The decoder sees only bounded PNGs re-encoded by the platform image manipulator.
   const bytes = await prepared.file.bytes()
   if (signal.aborted || bytes.byteLength > MAX_IMAGE_BYTES) return false
-  const png = decode(bytes)
-  if (png.width !== prepared.width || png.height !== prepared.height) return false
-  const data = toRgba(png)
-  if (!data) return false
+  const input = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  if (!matchesCutoutHeader(input, prepared)) return false
+  const { width, height, data } = PNG.sync.read(input)
 
-  const removed = maskGarmentBackground(data, png.width, png.height)
+  const removed = maskGarmentBackground(data, width, height)
   if (!removed) return false
   // Fully transparent pixels can still contain RGB in a PNG. Remove the hidden backdrop.
   for (let offset = 0; offset < data.length; offset += 4) {
     if (data[offset + 3] === 0) data.fill(0, offset, offset + 3)
   }
-  const cutout = encode(
-    { width: png.width, height: png.height, data },
-    { zlib: { level: 3 } }
-  )
+  const cutout = PNG.sync.write({ width, height, data }, { deflateLevel: 3 })
   if (cutout.byteLength > MAX_IMAGE_BYTES) return false
   prepared.file.write(cutout)
   prepared.backgroundRemoved = true
   return true
 }
 
-export async function prepareGarmentCaptureImage(
+function matchesCutoutHeader(input: Buffer, prepared: PreparedGarmentImage) {
+  // Read the fixed IHDR fields before invoking the decoder. Only decode the expected,
+  // non-interlaced crop. pngjs checks the signature and CRCs.
+  return (
+    input.length >= 33 &&
+    input.readUInt32BE(8) === 13 &&
+    input.toString('ascii', 12, 16) === 'IHDR' &&
+    input.readUInt32BE(16) === prepared.width &&
+    input.readUInt32BE(20) === prepared.height &&
+    Math.max(prepared.width, prepared.height) <= MAX_CUTOUT_EDGE &&
+    input[28] === 0
+  )
+}
+
+async function prepareCrop(
   source: GarmentCaptureSource,
   aspectRatio: GarmentCropRatio,
   useBgCleanup: boolean,
@@ -132,4 +128,24 @@ export async function prepareGarmentCaptureImage(
   if (!signal.aborted) return original
   releaseGarmentCaptureFile(original.file)
   return null
+}
+
+// Expo cannot cancel an in-flight decode. Drain it before starting the newest preview,
+// including when the previous capture sheet closed. Superseded requests skip preparation.
+let preparationQueue = Promise.resolve()
+
+export function prepareGarmentCaptureImage(
+  source: GarmentCaptureSource,
+  aspectRatio: GarmentCropRatio,
+  useBgCleanup: boolean,
+  signal: AbortSignal
+): Promise<PreparedGarmentImage | null> {
+  const prepared = preparationQueue.then(() =>
+    prepareCrop(source, aspectRatio, useBgCleanup, signal)
+  )
+  preparationQueue = prepared.then(
+    () => undefined,
+    () => undefined
+  )
+  return prepared
 }

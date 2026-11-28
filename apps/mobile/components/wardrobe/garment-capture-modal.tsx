@@ -176,6 +176,18 @@ export function MobileGarmentCaptureModal({
   const preparedCrop = usePreparedCrop(visible, selectedImage, aspectRatio, useBgCleanup)
   const [uploadStatus, setUploadStatus] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const changeAspectRatio = (next: GarmentCropRatio) => {
+    if (next === aspectRatio) return
+    setAspectRatio(next)
+    setErrorMessage(null)
+  }
+
+  const changeCleanup = (enabled: boolean) => {
+    setUseBgCleanup(enabled)
+    setErrorMessage(null)
+  }
+
   const uploadAbortRef = useRef<AbortController | null>(null)
   const titleRef = useRef<ElementRef<typeof NativeText> | null>(null)
   const invokingNodeHandleRef = useRef(invokingNodeHandle)
@@ -563,14 +575,14 @@ export function MobileGarmentCaptureModal({
               <Pressable
                 testID="garment-aspect-square"
                 style={[styles.optionButton, themed.option]}
-                onPress={() => setAspectRatio('1:1')}
+                onPress={() => changeAspectRatio('1:1')}
               >
                 <Text>{t('wardrobe.crop.aspect_square')}</Text>
               </Pressable>
               <Pressable
                 testID="garment-aspect-portrait"
                 style={[styles.optionButton, themed.option]}
-                onPress={() => setAspectRatio('4:3')}
+                onPress={() => changeAspectRatio('4:3')}
               >
                 <Text>{t('wardrobe.crop.aspect_four_three')}</Text>
               </Pressable>
@@ -581,7 +593,7 @@ export function MobileGarmentCaptureModal({
                 accessibilityLabel={t('wardrobe.cleanup.title')}
                 testID="garment-cleanup-switch"
                 value={useBgCleanup}
-                onValueChange={setUseBgCleanup}
+                onValueChange={changeCleanup}
               />
             </View>
             {useBgCleanup &&
