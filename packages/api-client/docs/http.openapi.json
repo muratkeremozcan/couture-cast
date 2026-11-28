@@ -16997,7 +16997,8 @@
               "caption": {
                 "type": "string",
                 "minLength": 1,
-                "maxLength": 280
+                "maxLength": 280,
+                "description": "A nonblank, single-line description. Control characters, Unicode line and paragraph separators, and links and email addresses matching the Community caption rules are disallowed."
               }
             },
             "required": [

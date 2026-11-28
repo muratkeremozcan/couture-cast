@@ -895,7 +895,11 @@ export const describeCommunityDraftResponseSchema = z
               !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(caption) &&
               communityPostCaptionSchema.safeParse(caption).success,
             { message: 'Invalid suggested Community caption.' }
-          ),
+          )
+          .openapi({
+            description:
+              'A nonblank, single-line description. Control characters, Unicode line and paragraph separators, and links and email addresses matching the Community caption rules are disallowed.',
+          }),
       })
       .strict(),
   })
