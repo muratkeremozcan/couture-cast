@@ -170,6 +170,7 @@ const STARTS = {
     'apps/api/test/fixtures/garment-tagging/holdout-v1/manifest.json',
     'apps/api/model-manifests/fashion-clip-7e3ba62.json',
     'packages/utils/src/sample-wardrobe/garment-subtypes.ts',
+    'packages/utils/test/fixtures/garment-cutouts/plain.jpg',
   ],
   contract: [
     'apps/api/src/main.ts',

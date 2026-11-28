@@ -177,16 +177,22 @@ test('the quality gate accepts a check skipped by the plan and nothing else', ()
       lighthouse: 'success',
       lint: 'success',
       typecheck: 'success',
+      'garment-tagging-model': 'success',
       ...overrides,
     })
       .map(([job, result]) => `${job}=${result}`)
       .join(' ')
-  const skips = '{"typecheck":false,"lighthouse":false}'
-  const runs = '{"typecheck":true,"lighthouse":true}'
+  const skips = '{"typecheck":false,"lighthouse":false,"garment-tagging-model":false}'
+  const runs = '{"typecheck":true,"lighthouse":true,"garment-tagging-model":true}'
   assert.equal(gate(all(), runs, '["api"]'), 0)
   assert.equal(
     gate(
-      all({ 'tests-shard': 'skipped', lighthouse: 'skipped', typecheck: 'skipped' }),
+      all({
+        'tests-shard': 'skipped',
+        lighthouse: 'skipped',
+        typecheck: 'skipped',
+        'garment-tagging-model': 'skipped',
+      }),
       skips,
       '[]'
     ),
@@ -195,6 +201,8 @@ test('the quality gate accepts a check skipped by the plan and nothing else', ()
   // A skip the plan did not order, a lint skip, a failure and an unreadable plan all fail.
   assert.equal(gate(all({ lighthouse: 'skipped' }), runs, '["api"]'), 1)
   assert.equal(gate(all({ 'tests-shard': 'skipped' }), runs, '["api"]'), 1)
+  assert.equal(gate(all({ 'garment-tagging-model': 'skipped' }), runs, '["api"]'), 1)
+  assert.equal(gate(all({ 'garment-tagging-model': 'failure' }), runs, '["api"]'), 1)
   assert.equal(gate(all({ lint: 'skipped' }), skips, '[]'), 1)
   assert.equal(gate(all({ typecheck: 'failure' }), skips, '[]'), 1)
   assert.equal(gate(all({ typecheck: 'cancelled' }), skips, '[]'), 1)

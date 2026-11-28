@@ -646,7 +646,7 @@ describe('WardrobeOnboardingScreen', () => {
       status: 'awaiting_tags',
       category: null,
       imageAccess: {
-        url: 'https://example.test/private/owner-a.png?token=fixture-owner-a',
+        url: `${window.location.origin}/mock-storage/owner-a.png?token=fixture-owner-a`,
         expiresAt: '2030-08-09T00:15:00.000Z',
       },
     }
@@ -660,6 +660,17 @@ describe('WardrobeOnboardingScreen', () => {
     const restoreToken = setMobileAccessTokenResolver(() => token)
     const otherBearer = `Bearer ${otherToken}`
     server.use(
+      http.get('*/mock-storage/owner-a.png', () => {
+        const png = atob(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+        )
+        return HttpResponse.arrayBuffer(
+          Uint8Array.from(png, (byte) => byte.charCodeAt(0)).buffer,
+          {
+            headers: { 'content-type': 'image/png' },
+          }
+        )
+      }),
       http.get('*/api/v1/user/profile', ({ request }) => {
         const userId =
           request.headers.get('authorization') === otherBearer ? 'user-2' : 'user-1'

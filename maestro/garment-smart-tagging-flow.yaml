@@ -4,6 +4,8 @@
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
 # Learning path Step 83: Clean garment cutouts.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-83-clean-garment-cutouts
+# Learning path Step 84: Suggested tags that are right.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 # Story 4.2 mobile E2E: worker-backed smart tagging and persisted confirmation
 appId: ${MAESTRO_APP_ID}
 name: 'Garment smart tagging flow'
@@ -135,6 +137,12 @@ tags:
 
 - tapOn:
     id: 'garment-tag-comfort-mild'
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-tagging-save'
+      enabled: true
+    timeout: 15000
 
 - tapOn:
     id: 'garment-tagging-save'

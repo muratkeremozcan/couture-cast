@@ -139,32 +139,41 @@ describe('WardrobeService Smart Tagging Operations', () => {
     expect(mockUpdateMany).not.toHaveBeenCalled()
   })
 
-  it('returns structured suggestions when valid snapshot exists', async () => {
-    const validSnapshot = createGarmentTagSuggestionSnapshotFixture({
-      category: { confidence: 0.88 },
-    })
-    mockFindFirst.mockResolvedValueOnce({
-      id: 'g_1',
-      user_id: 'user_1',
-      upload_status: 'awaiting_tags',
-      retention_status: 'active',
-      tag_suggestions: validSnapshot,
-    })
+  it.each([false, true])(
+    'serves v1 snapshots without subtype (opt-in: %s)',
+    async (includeSubtype) => {
+      const validSnapshot = createGarmentTagSuggestionSnapshotFixture({
+        category: { confidence: 0.88 },
+      })
+      mockFindFirst.mockResolvedValueOnce({
+        id: 'g_1',
+        user_id: 'user_1',
+        upload_status: 'awaiting_tags',
+        retention_status: 'active',
+        tag_suggestions: validSnapshot,
+      })
 
-    const res = await service.suggestGarmentTags('user_1', 'teen', 'g_1')
-    expect(res.data).toMatchObject({
-      garmentId: 'g_1',
-      analysisVersion: validSnapshot.analysisVersion,
-      suggestions: { category: { value: 'top' } },
-    })
-    // The original wire shape (R4): a client from before manual mode rejects an unknown key.
-    expect(res.data).not.toHaveProperty('mode')
-    expect(Object.keys(res.data).toSorted()).toEqual([
-      'analysisVersion',
-      'garmentId',
-      'suggestions',
-    ])
-  })
+      const res = await service.suggestGarmentTags(
+        'user_1',
+        'teen',
+        'g_1',
+        includeSubtype
+      )
+      expect(res.data).toMatchObject({
+        garmentId: 'g_1',
+        analysisVersion: validSnapshot.analysisVersion,
+        suggestions: { category: { value: 'top' } },
+      })
+      // The original wire shape (R4): a client from before manual mode rejects an unknown key.
+      expect(res.data).not.toHaveProperty('mode')
+      expect(res.data).not.toHaveProperty('suggestions.subtype')
+      expect(Object.keys(res.data).toSorted()).toEqual([
+        'analysisVersion',
+        'garmentId',
+        'suggestions',
+      ])
+    }
+  )
 
   it('serves a v2 subtype only to opted-in clients while keeping the legacy literal', async () => {
     const { category, material, comfortRange } =

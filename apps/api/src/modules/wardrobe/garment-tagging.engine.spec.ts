@@ -7,6 +7,7 @@ import {
   CATEGORY_KEYS,
   CATEGORY_PROMPTS,
   GARMENT_DETAIL_PROMPTS,
+  GarmentTaggingOutputError,
   MATERIAL_KEYS,
   MATERIAL_PROMPTS,
   classifyCategory,
@@ -111,16 +112,35 @@ describe('GarmentTaggingEngine Core Logic', () => {
     expect(result.comfortRange.isConfident).toBe(false)
   })
 
-  it('rejects non-finite detail logits as an invalid inference result', () => {
+  it('confidently categorizes a dress without offering a subtype', () => {
+    const result = classifyTagSuggestions({
+      categoryLogits: CATEGORY_KEYS.map((category) => (category === 'dress' ? 9 : 0)),
+      materialLogits: MATERIAL_KEYS.map(() => 0),
+      detailLogits: GARMENT_DETAIL_PROMPTS.map(() => 0),
+    })
+    expect(result.category).toMatchObject({ value: 'dress', isConfident: true })
+    expect(result.subtype).toEqual({ value: null, confidence: 1, isConfident: true })
+  })
+
+  it.each([
+    { group: 'categoryLogits', invalid: [NaN, 0, 0, 0, 0, 0] },
+    { group: 'materialLogits', invalid: [0] },
+    { group: 'detailLogits', invalid: [0] },
+    {
+      group: 'detailLogits',
+      invalid: GARMENT_DETAIL_PROMPTS.map(({ subtype }) =>
+        subtype === 'tank' ? NaN : 0
+      ),
+    },
+  ])('rejects malformed $group as an invalid inference result', ({ group, invalid }) => {
     expect(() =>
       classifyTagSuggestions({
         categoryLogits: CATEGORY_KEYS.map(() => 0),
         materialLogits: MATERIAL_KEYS.map(() => 0),
-        detailLogits: GARMENT_DETAIL_PROMPTS.map(({ subtype }) =>
-          subtype === 'tank' ? Number.NaN : 0
-        ),
+        detailLogits: GARMENT_DETAIL_PROMPTS.map(() => 0),
+        [group]: invalid,
       })
-    ).toThrow('Invalid garment prompt logits')
+    ).toThrow(GarmentTaggingOutputError)
   })
 
   it('evaluates comfort derivation rules in strict order', () => {

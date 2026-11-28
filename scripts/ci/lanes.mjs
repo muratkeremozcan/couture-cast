@@ -218,6 +218,7 @@ export const LANES = {
       'apps/api/vitest.config.ts',
       'packages/api-client/src/contracts/http/wardrobe.ts',
       'packages/utils/src/sample-wardrobe/garment-subtypes.ts',
+      'packages/utils/test/fixtures/garment-cutouts/plain.jpg',
     ],
   },
   contract: {

@@ -10,6 +10,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 // Learning path Step 76: Garment subtypes.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
+import { WARDROBE_GARMENT_SUBTYPE_HEADER } from '@couture/api-client/contracts/http'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -387,13 +388,15 @@ describe('wardrobe request error handling', () => {
    * or the modal falls through to generic "load failed" copy.
    */
   it('4.4-MOB-LIB-18 infers the analysis-pending code from a bare message', async () => {
+    const optIn = vi.fn()
     server.use(
-      http.post('*/api/v1/wardrobe/garments/:garmentId/suggest-tags', () =>
-        HttpResponse.json(
+      http.post('*/api/v1/wardrobe/garments/:garmentId/suggest-tags', ({ request }) => {
+        optIn(request.headers.get(WARDROBE_GARMENT_SUBTYPE_HEADER))
+        return HttpResponse.json(
           { statusCode: 409, message: 'GARMENT_ANALYSIS_PENDING', error: 'Conflict' },
           { status: 409 }
         )
-      )
+      })
     )
 
     const error = await suggestGarmentTagsFromMobile('token', 'g-1').catch(
@@ -402,6 +405,7 @@ describe('wardrobe request error handling', () => {
 
     expect(error).toBeInstanceOf(Error)
     expect((error as Error & { code?: string }).code).toBe('GARMENT_ANALYSIS_PENDING')
+    expect(optIn).toHaveBeenCalledExactlyOnceWith('1')
   })
 
   /** A caller that aborts before the request starts must not reach the network. */

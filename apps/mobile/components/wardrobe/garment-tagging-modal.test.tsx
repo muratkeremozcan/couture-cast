@@ -216,7 +216,14 @@ describe('MobileGarmentTaggingModal Component', () => {
         visible={true}
         onClose={handleClose}
         garmentId="g_123"
-        initialGarment={createReadyGarmentFixture({ id: 'g_123', category: null })}
+        initialGarment={createReadyGarmentFixture({
+          id: 'g_123',
+          category: null,
+          imageAccess: {
+            url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+            expiresAt: '2030-08-09T00:15:00.000Z',
+          },
+        })}
         accessToken="test_token"
         onTagsConfirmed={handleConfirmed}
         suggestTagsFn={mockSuggestTagsFn}
@@ -431,6 +438,96 @@ describe('MobileGarmentTaggingModal Component', () => {
         'test_token',
         'g_123',
         { category: 'top', subtype: null, material: null, comfortRange: 'mild' },
+        expect.any(AbortSignal)
+      )
+    )
+  })
+
+  it('asks for a category and comfort when neither suggestion is confident', async () => {
+    mockSuggestTagsFn.mockResolvedValue(
+      createSuggestGarmentTagsDataFixture({
+        garmentId: 'g_123',
+        category: { confidence: 0.31, isConfident: false },
+        comfortRange: { confidence: 0.32, isConfident: false },
+      })
+    )
+    render(
+      <MobileGarmentTaggingModal
+        visible={true}
+        onClose={vi.fn()}
+        garmentId="g_123"
+        accessToken="test_token"
+        suggestTagsFn={mockSuggestTagsFn}
+      />
+    )
+    const confirm = await screen.findByRole('button', { name: 'Looks right' })
+    expect(screen.getAllByText('Pick one')).toHaveLength(2)
+    expect(screen.getByTestId('garment-tag-category-top')).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
+    expect(screen.getByTestId('garment-tag-comfort-mild')).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
+    expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(screen.getByTestId('garment-tag-category-top'))
+    expect(screen.getAllByText('Pick one')).toHaveLength(1)
+    expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(screen.getByTestId('garment-tag-comfort-mild'))
+    expect(confirm).not.toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('keeps explicit choices on suggestion arrival and asks for a subtype after a category change', async () => {
+    const suggested = createSuggestGarmentTagsDataFixture({ garmentId: 'g_123' })
+    let resolve!: (data: typeof suggested) => void
+    const pendingSuggestion = new Promise<typeof suggested>((settle) => {
+      resolve = settle
+    })
+    mockSuggestTagsFn.mockReturnValue(pendingSuggestion)
+    render(
+      <MobileGarmentTaggingModal
+        visible={true}
+        onClose={vi.fn()}
+        garmentId="g_123"
+        accessToken="test_token"
+        suggestTagsFn={mockSuggestTagsFn}
+        updateTagsFn={mockUpdateTagsFn}
+      />
+    )
+    fireEvent.click(screen.getByTestId('garment-tag-category-top'))
+    fireEvent.click(screen.getByTestId('garment-tagging-subtype-none'))
+    const skipMaterial = screen.getByRole('radio', { name: 'wardrobe.tagging.not_sure' })
+    fireEvent.click(skipMaterial)
+    await act(async () => {
+      resolve({
+        ...suggested,
+        suggestions: {
+          ...suggested.suggestions,
+          subtype: { value: 'tank', confidence: 0.9, isConfident: true },
+        },
+      })
+      await pendingSuggestion
+    })
+    const confirm = await screen.findByRole('button', { name: 'Looks right' })
+    expect(screen.getByTestId('garment-tagging-subtype-none')).toBeChecked()
+    expect(screen.getByTestId('garment-tag-comfort-mild')).toBeChecked()
+    expect(skipMaterial).toBeChecked()
+    expect(confirm).not.toHaveAttribute('aria-disabled', 'true')
+
+    fireEvent.click(screen.getByTestId('garment-tag-category-bottom'))
+    expect(screen.queryByTestId('garment-tagging-subtype-tank')).toBeNull()
+    expect(screen.getByTestId('garment-tagging-subtype-none')).not.toBeChecked()
+    expect(screen.getByText('Pick one')).toBeVisible()
+    expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(screen.getByTestId('garment-tagging-subtype-leggings'))
+    await waitFor(() => expect(confirm).not.toHaveAttribute('aria-disabled', 'true'))
+    fireEvent.click(confirm)
+    await waitFor(() =>
+      expect(mockUpdateTagsFn).toHaveBeenCalledExactlyOnceWith(
+        'test_token',
+        'g_123',
+        { category: 'bottom', subtype: 'leggings', material: null, comfortRange: 'mild' },
         expect.any(AbortSignal)
       )
     )

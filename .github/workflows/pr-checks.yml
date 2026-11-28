@@ -701,7 +701,9 @@ jobs:
           path: apps/api/.cache/garment-tagging-model
           key: fashion-clip-${{ runner.os }}-${{ hashFiles('apps/api/model-manifests/fashion-clip-7e3ba62.json') }}
       - name: Build garment tagging dependencies
-        run: npm run prepare:shared-deps --workspace api
+        run: |
+          npm run build --workspace @couture/utils
+          npm run build --workspace @couture/api-client
       - name: Enforce accuracy on the fixed wardrobe holdout
         run: npm run test:tagging-model:smoke --workspace api
 

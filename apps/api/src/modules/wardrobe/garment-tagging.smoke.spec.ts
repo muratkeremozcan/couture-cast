@@ -59,6 +59,16 @@ describe('Garment Tagging Model Smoke Test', () => {
     expect(parsed.comfortRange.value).toBeDefined()
   }, 30_000)
 
+  it('recognizes a plain top from the cutout fixtures as having no listed subtype', async () => {
+    const plainTop = path.resolve(
+      __dirname,
+      '../../../../../packages/utils/test/fixtures/garment-cutouts/plain.jpg'
+    )
+    const result = await infer(fs.readFileSync(plainTop))
+    expect(result.category).toMatchObject({ value: 'top', isConfident: true })
+    expect(result.subtype).toMatchObject({ value: null, isConfident: true })
+  }, 30_000)
+
   it('meets the fixed category and subtype top-1 targets with abstentions counted as misses', async () => {
     const manifest = holdoutManifestSchema.parse(
       JSON.parse(fs.readFileSync(path.join(holdout, 'manifest.json'), 'utf8'))

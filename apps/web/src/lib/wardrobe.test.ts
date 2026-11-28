@@ -21,6 +21,7 @@ import { Blob as NodeBlob } from 'node:buffer'
 import {
   GARMENT_TAGGING_ANALYSIS_VERSION,
   UploadSessionChangedError,
+  WARDROBE_GARMENT_SUBTYPE_HEADER,
 } from '@couture/api-client/contracts/http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -1202,6 +1203,7 @@ describe('garment tagging wrappers', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toContain('/api/v1/wardrobe/garments/garment-1/suggest-tags')
     expect(init.method).toBe('POST')
+    expect(new Headers(init.headers).get(WARDROBE_GARMENT_SUBTYPE_HEADER)).toBe('1')
   })
 
   it('returns the manual-mode answer, with no suggestions, as the API sent it', async () => {

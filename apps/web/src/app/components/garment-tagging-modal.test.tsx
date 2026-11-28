@@ -8,7 +8,15 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-84-suggested-tags-that-are-right
 // @vitest-environment jsdom
 import React from 'react'
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
@@ -32,6 +40,41 @@ afterEach(() => {
 })
 
 describe('GarmentTaggingModal Component', () => {
+  it('keeps an uncertain subtype editable if the garment preview fails to load', async () => {
+    const user = userEvent.setup()
+    const garment = createReadyGarmentFixture({ category: null })
+    const updateTagsFn = vi.fn().mockResolvedValue(mockUpdatedGarment)
+    renderModal({
+      initialGarment: garment,
+      updateTagsFn,
+      suggestTagsFn: vi.fn().mockResolvedValue({
+        ...mockSuggestions,
+        suggestions: {
+          ...mockSuggestions.suggestions,
+          subtype: { value: 'tank', confidence: 0.32, isConfident: false },
+        },
+      }),
+    })
+    const confirm = await screen.findByRole('button', { name: 'Looks right' })
+    const preview = screen.getByRole('img', { name: 'Garment preview' })
+    expect(preview).toHaveAttribute('src', garment.imageAccess?.url)
+    fireEvent.error(preview)
+    expect(preview).not.toBeInTheDocument()
+    expect(screen.getByText('Pick one')).toBeVisible()
+    expect(screen.getByTestId('garment-tagging-subtype-tank')).not.toBeChecked()
+    expect(confirm).toBeDisabled()
+    await user.click(screen.getByTestId('garment-tagging-subtype-none'))
+    expect(confirm).toBeEnabled()
+    await user.click(confirm)
+    await waitFor(() =>
+      expect(updateTagsFn).toHaveBeenCalledExactlyOnceWith(
+        'garment-1',
+        { category: 'top', subtype: null, material: 'cotton', comfortRange: 'mild' },
+        expect.any(AbortSignal)
+      )
+    )
+  })
+
   it('renders modal dialog when open and loads suggestions', async () => {
     const suggestTagsFn = vi.fn().mockResolvedValue(mockSuggestions)
     render(

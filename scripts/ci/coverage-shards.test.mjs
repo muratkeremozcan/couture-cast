@@ -155,7 +155,7 @@ test('the job other checks read keeps its name and waits for every shard', () =>
   const workflow = readFileSync('.github/workflows/pr-checks.yml', 'utf8')
   assert.match(
     workflow,
-    /\n {2}tests:\n {4}name: Workspace tests with coverage\n(?: {4}#.*\n)* {4}needs: \[lanes, tests-shard, typecheck, lint, lighthouse\]\n {4}if: \$\{\{ always\(\) \}\}/
+    /\n {2}tests:\n {4}name: Workspace tests with coverage\n(?: {4}#.*\n)* {4}needs: \[lanes, tests-shard, typecheck, lint, lighthouse, garment-tagging-model\]\n {4}if: \$\{\{ always\(\) \}\}/
   )
   assert.match(workflow, /needs\.tests-shard\.result != 'success'/)
   // The merge reads the plan's shard list, and a skipped matrix passes only when that list is
