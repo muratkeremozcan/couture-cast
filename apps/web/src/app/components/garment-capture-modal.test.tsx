@@ -15,6 +15,7 @@ import {
   render as renderUnwrapped,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -1041,6 +1042,17 @@ describe('GarmentCaptureModal Closet batch', () => {
     await user.click(retry)
     expect(openFile).toHaveBeenCalledTimes(2)
 
+    const failedRow = within(screen.getByTestId('garment-batch-row-3'))
+    vi.mocked(wardrobe.prepareGarmentImage).mockRejectedValueOnce(
+      new Error('Cannot decode')
+    )
+    await user.upload(retryInput, files(1))
+    expect(await failedRow.findByText('This photo could not be prepared.')).toBeVisible()
+    expect(failedRow.getByRole('button', { name: 'Retry' })).toBeEnabled()
+    expect(uploadGarment).toHaveBeenCalledTimes(2)
+
+    await user.click(failedRow.getByRole('button', { name: 'Retry' }))
+
     vi.mocked(wardrobe.prepareGarmentImage).mockResolvedValueOnce({
       ...preparedPhoto,
       sha256: 'different-photo',
@@ -1060,6 +1072,40 @@ describe('GarmentCaptureModal Closet batch', () => {
     expect(uploadGarment.mock.calls[2]?.[0].attemptId).toBe(attemptId)
     await user.click(screen.getByTestId('garment-batch-done'))
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the batch review when an earlier camera request finishes', async () => {
+    const user = userEvent.setup()
+    let finishCamera!: (stream: MediaStream) => void
+    const permission = new Promise<MediaStream>((resolve) => {
+      finishCamera = resolve
+    })
+    const getUserMedia = vi.fn().mockReturnValue(permission)
+    const stop = vi.fn()
+    installCameraMock(getUserMedia)
+    render(
+      <GarmentCaptureModal isOpen onClose={vi.fn()} onBatchGarmentCommitted={vi.fn()} />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Take Photo' }))
+    expect(getUserMedia).toHaveBeenCalledOnce()
+    await user.click(screen.getByRole('button', { name: 'Choose several photos' }))
+    await user.upload(screen.getByTestId('garment-batch-input'), files(1))
+    expect(await screen.findByRole('checkbox', { name: 'Keep piece' })).toBeVisible()
+
+    await act(async () => {
+      finishCamera({ getTracks: () => [{ stop }] } as unknown as MediaStream)
+      await permission
+    })
+    expect(stop).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: 'Snap Photo' })).toBeNull()
+    expect(screen.getByRole('checkbox', { name: 'Keep piece' })).toBeVisible()
+    expect(wardrobe.prepareGarmentImage).toHaveBeenCalledExactlyOnceWith(
+      'blob:batch-1',
+      '1:1',
+      false,
+      'compact'
+    )
   })
 
   it('stops the queued uploads and shows guardian guidance when the API refuses consent', async () => {

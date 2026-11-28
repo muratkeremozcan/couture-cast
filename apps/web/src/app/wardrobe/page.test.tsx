@@ -1062,6 +1062,23 @@ describe('WardrobePage tag confirmation', () => {
 describe('WardrobePage commit reconciliation', () => {
   beforeEach(resetWardrobeMocks)
 
+  async function saveTwoPhotos(user: ReturnType<typeof userEvent.setup>) {
+    await screen.findByText('No pieces yet')
+    await user.click(screen.getByRole('button', { name: '+ Add Garment' }))
+    await user.click(screen.getByRole('button', { name: 'Choose several photos' }))
+    await user.upload(screen.getByTestId('garment-batch-input'), [
+      new File(['coat'], 'coat.png', { type: 'image/png' }),
+      new File(['boots'], 'boots.png', { type: 'image/png' }),
+    ])
+    await user.click(await screen.findByTestId('garment-batch-keep-1'))
+    await user.click(await screen.findByTestId('garment-batch-keep-2'))
+    await user.click(screen.getByRole('button', { name: 'Add 2 pieces' }))
+    await waitFor(() =>
+      expect(screen.getAllByText('Saved', { exact: true })).toHaveLength(2)
+    )
+    await user.click(screen.getByTestId('garment-batch-done'))
+  }
+
   it('settles the remaining batch garment when a preceding garment leaves Closet', async () => {
     const user = userEvent.setup()
     const removed = garmentFixture('batch-removed', 'processing')
@@ -1075,20 +1092,7 @@ describe('WardrobePage commit reconciliation', () => {
     collapsePollSchedule()
     try {
       render(<WardrobePage />)
-      await screen.findByText('No pieces yet')
-      await user.click(screen.getByRole('button', { name: '+ Add Garment' }))
-      await user.click(screen.getByRole('button', { name: 'Choose several photos' }))
-      await user.upload(screen.getByTestId('garment-batch-input'), [
-        new File(['coat'], 'coat.png', { type: 'image/png' }),
-        new File(['boots'], 'boots.png', { type: 'image/png' }),
-      ])
-      await user.click(await screen.findByTestId('garment-batch-keep-1'))
-      await user.click(await screen.findByTestId('garment-batch-keep-2'))
-      await user.click(screen.getByRole('button', { name: 'Add 2 pieces' }))
-      await waitFor(() =>
-        expect(screen.getAllByText('Saved', { exact: true })).toHaveLength(2)
-      )
-      await user.click(screen.getByTestId('garment-batch-done'))
+      await saveTwoPhotos(user)
       expect(screen.getByTestId(`garment-card-${removed.id}`)).toBeInTheDocument()
       expect(screen.getByTestId(`garment-card-${remaining.id}`)).toBeInTheDocument()
 
@@ -1104,6 +1108,69 @@ describe('WardrobePage commit reconciliation', () => {
       expect(screen.queryByRole('dialog', { name: 'Organize Garment Tags' })).toBeNull()
     } finally {
       inventory.resolve([remaining])
+      vi.restoreAllMocks()
+    }
+  })
+
+  it('continues polling the second batch garment after the first garment is tagged', async () => {
+    const user = userEvent.setup()
+    const first = garmentFixture('batch-first', 'awaiting_tags')
+    const second = garmentFixture('batch-second', 'processing')
+    const tagged = garmentFixture(first.id, 'ready')
+    const settled = garmentFixture(second.id, 'awaiting_tags')
+    const beforeTags = Promise.withResolvers<GarmentItemContract[]>()
+    const afterTags = Promise.withResolvers<GarmentItemContract[]>()
+    let tagsConfirmed = false
+    let readsAfterTags = 0
+    listGarmentsFromWeb.mockResolvedValueOnce([]).mockImplementation(() => {
+      if (!tagsConfirmed) return beforeTags.promise
+      readsAfterTags++
+      return readsAfterTags === 1 ? Promise.resolve([tagged, second]) : afterTags.promise
+    })
+    uploadGarmentImageFromWeb.mockResolvedValueOnce(first).mockResolvedValueOnce(second)
+    updateGarmentTagsFromWeb.mockImplementation(() => {
+      tagsConfirmed = true
+      return Promise.resolve(tagged)
+    })
+    collapsePollSchedule()
+
+    try {
+      render(<WardrobePage />)
+      await saveTwoPhotos(user)
+      await waitFor(() =>
+        expect(listGarmentsFromWeb.mock.calls.length).toBeGreaterThan(1)
+      )
+      const firstCard = screen.getByTestId(`garment-card-${first.id}`)
+      await user.click(within(firstCard).getByRole('button', { name: 'Needs tags' }))
+      const confirmTags = await screen.findByRole('button', { name: 'Looks right' })
+      await waitFor(() => expect(confirmTags).toBeEnabled())
+      await user.click(confirmTags)
+      await waitFor(() => expect(readsAfterTags).toBeGreaterThan(0))
+      expect(
+        await within(screen.getByTestId(`garment-card-${second.id}`)).findByRole(
+          'button',
+          { name: /^Processing\./ }
+        )
+      ).toBeVisible()
+
+      await act(async () => {
+        beforeTags.resolve([first, second])
+        await beforeTags.promise
+      })
+      await waitFor(() => expect(readsAfterTags).toBeGreaterThan(1))
+      await act(async () => {
+        afterTags.resolve([tagged, settled])
+        await afterTags.promise
+      })
+      const secondCard = screen.getByTestId(`garment-card-${second.id}`)
+      expect(
+        await within(secondCard).findByRole('button', { name: 'Needs tags' })
+      ).toBeVisible()
+      expect(updateGarmentTagsFromWeb).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('dialog', { name: 'Organize Garment Tags' })).toBeNull()
+    } finally {
+      beforeTags.resolve([first, second])
+      afterTags.resolve([tagged, settled])
       vi.restoreAllMocks()
     }
   })

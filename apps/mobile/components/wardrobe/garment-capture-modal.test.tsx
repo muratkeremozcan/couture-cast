@@ -384,6 +384,19 @@ describe('MobileGarmentCaptureModal', () => {
       selectionLimit: 5,
     })
     expect(imagePicker.requestMediaLibraryPermissionsAsync).not.toHaveBeenCalled()
+    expect(imageManipulator.manipulateAsync).toHaveBeenCalledTimes(2)
+    expect(imageManipulator.manipulateAsync).toHaveBeenNthCalledWith(
+      1,
+      pickerCopy.uri,
+      expect.any(Array),
+      expect.objectContaining({ format: 'jpeg' })
+    )
+    expect(imageManipulator.manipulateAsync).toHaveBeenNthCalledWith(
+      2,
+      original.uri,
+      expect.any(Array),
+      expect.objectContaining({ format: 'jpeg' })
+    )
     expect(allocations).toHaveLength(0)
     expect(fileSystem.files.has(pickerCopy.uri)).toBe(false)
     expect(fileSystem.files.has(original.uri)).toBe(true)

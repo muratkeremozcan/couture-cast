@@ -198,7 +198,10 @@ describe('GarmentPhotoBatch', () => {
     expect(batch.state.rows[1]?.status).toBe('failed')
 
     await batch.accept(openRetry(2), ['scarf'])
-    expect(batch.state.rows[1]).toMatchObject({ status: 'failed', differentPhoto: true })
+    expect(batch.state.rows[1]).toMatchObject({
+      status: 'failed',
+      retryError: 'differentPhoto',
+    })
     expect(releasePrepared).toHaveBeenLastCalledWith(photo('scarf'))
     expect(upload).toHaveBeenCalledTimes(2)
 
@@ -305,7 +308,7 @@ describe('GarmentPhotoBatch', () => {
     ])
     prepare.mockRejectedValueOnce(new Error('Unreadable replacement'))
     await batch.accept(openRetry(1), ['unreadable'])
-    expect(batch.state.rows[0]).toMatchObject({ status: 'failed', differentPhoto: true })
+    expect(batch.state.rows[0]).toMatchObject({ status: 'failed', retryError: 'invalid' })
 
     const replacement = hold<ReturnType<typeof photo>>()
     prepare.mockReturnValueOnce(replacement.promise)
