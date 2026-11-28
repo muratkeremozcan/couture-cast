@@ -36,7 +36,7 @@ export type MemberLookbookOutfitDraft = z.infer<typeof outfitDraftSchema>
 export type MemberLookbookDraft = z.infer<typeof draftSchema>
 
 export function memberLookbookDraftKey(owner: string): string {
-  return `couture:member-lookbook:v1:${encodeURIComponent(owner)}`
+  return `couturecast.member-lookbook.v1.${encodeURIComponent(owner)}`
 }
 
 export function readMemberLookbookDraft(raw: string | null): MemberLookbookDraft | null {
@@ -153,6 +153,19 @@ export function resolveMemberLookbookDraft(
   return { result: withPieces(base, pieces), pinned }
 }
 
+export function isMemberLookbookDraftEdited(
+  base: SampleOutfitResult,
+  result: SampleOutfitResult,
+  pinned: readonly SampleGarmentCategory[]
+): boolean {
+  return (
+    pinned.length > 0 ||
+    base.look?.id !== result.look?.id ||
+    base.garments.length !== result.garments.length ||
+    result.garments.some((piece, index) => piece.id !== base.garments[index]?.id)
+  )
+}
+
 export function canShuffleMemberLookbook(
   result: SampleOutfitResult,
   pinned: readonly SampleGarmentCategory[]
@@ -189,7 +202,7 @@ export function memberLookbookWeatherReason(
   if (result.context.windLayer && !result.context.rainReady) {
     return strings.values.weather[result.context.weather]
   }
-  for (const key of ['layer-rain', 'layer-cold', 'no-layer']) {
+  for (const key of ['layer-rain', 'no-layer']) {
     const reason = result.explanation.find((item) => item.key === key)
     if (reason)
       return formatSampleExplanation(reason, { strings, locale, catalog: SAMPLE_CATALOG })
@@ -197,7 +210,10 @@ export function memberLookbookWeatherReason(
   return strings.values.weather[result.context.weather]
 }
 
-/** Today's wardrobe read includes up to three recent active pieces. */
+/** Let the first wardrobe read settle before the Today screen gate's fallback deadline. */
+export const TODAY_WARDROBE_READ_TIMEOUT_MS = 8_000
+
+/** Today's recent pieces include up to three active wardrobe items. */
 export function isSmallLookbookCloset(pieces: readonly unknown[] | null | undefined) {
   return Array.isArray(pieces) && pieces.length < 3
 }

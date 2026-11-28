@@ -116,16 +116,22 @@ export function StyleDayControls({
   style,
   showTune = false,
   showMood = true,
+  nested = false,
 }: {
   style: StyleState
   showTune?: boolean
   showMood?: boolean
+  nested?: boolean
 }) {
   const copy = useStyleCopy()
   const { scope, day, store } = style
   if (!scope) return null
   return (
-    <details className="rounded-lg border border-line bg-card px-3">
+    <details
+      className={
+        nested ? 'border-t border-line' : 'rounded-lg border border-line bg-card px-3'
+      }
+    >
       <summary
         data-testid="style-day-open"
         className="cursor-pointer py-3 text-sm font-semibold text-ink"

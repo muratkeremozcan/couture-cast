@@ -788,7 +788,9 @@ export default function TabOneScreen() {
   // The hero for the session on screen, in its own function to keep the screen's branching
   // readable. Story CC-7.7 D2: a member's slot stays empty until the ritual read settles.
   const styleDayPreview = Boolean(liveLook && styleProfile.day)
+  const outfitReady = ritualSettled && homeWardrobe !== undefined
   const smallCloset = isSmallLookbookCloset(homeWardrobe?.pieces)
+  const liveWardrobeLook = smallCloset ? null : liveLook
   const showSample =
     smallCloset || shouldShowStyleSample(ritual?.data.outfits, styleProfile)
   const sampleWeather = styleForecastSampleWeather(weather?.current)
@@ -803,7 +805,7 @@ export default function TabOneScreen() {
     )
   const renderStyleControls = () =>
     sessionState === 'member' &&
-    ritualSettled &&
+    outfitReady &&
     styleProfile.scope && (
       <NativeView key={styleProfile.scope} style={styles.styleControls}>
         <StyleDayControls style={styleProfile} showTune={!firstLook} />
@@ -838,7 +840,7 @@ export default function TabOneScreen() {
       </View>
     ) : sessionState === 'member' ? (
       <>
-        {ritualSettled && (ritual || !isLoading) && (
+        {outfitReady && (ritual || !isLoading) && (
           <FirstLookRegion firstLook={firstLook} minHeight={viewportHeight}>
             <WeatherHeader
               current={weather?.current}
@@ -854,11 +856,11 @@ export default function TabOneScreen() {
               />
             )}
             <NativeView testID="today-first-content">
-              {liveLook && (
+              {liveWardrobeLook && (
                 <NativeView style={showSample ? styles.hidden : undefined}>
                   <TodayLiveOutfit
                     key={identityEpoch}
-                    {...liveLook}
+                    {...liveWardrobeLook}
                     owner={applicationUserId}
                     epoch={identityEpoch}
                     locale={activeLocale}
@@ -983,7 +985,7 @@ export default function TabOneScreen() {
         <ScreenGate
           screen="home"
           session={sessionState}
-          ready={homeGateReady(sessionState, ritualSettled && homeWardrobe !== undefined)}
+          ready={homeGateReady(sessionState, outfitReady)}
         >
           {renderHero()}
 

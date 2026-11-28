@@ -22574,4 +22574,6 @@ With up to two pieces in your closet, Today starts with the top outfit from Idea
   [acceptance plan](../test-artifacts/test-design-7-22-lookbook-shuffle-pinned-pieces.md).
 - [Member lookbook journey](../../playwright/tests/member-lookbook.spec.ts) and
   [shared catalog lookbook rules](../../packages/utils/src/sample-wardrobe/member-lookbook.spec.ts).
+- [Web lookbook editor](../../apps/web/src/app/components/looks/member-lookbook.test.tsx) and
+  [native lookbook editor](../../apps/mobile/src/screens/looks-screen.test.tsx).
 - [Step 77](#step-77-account-style-profile) covers style settings and day overrides.

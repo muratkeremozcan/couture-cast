@@ -3,15 +3,17 @@ title: 'Story CC-7.22: Lookbook with shuffle and pinned pieces'
 type: feature
 ticket: '7-22-lookbook-shuffle-pinned-pieces'
 created: '2026-11-27'
-status: in-review
+status: built
 baseline_revision: 'e90debe40babc02312ae0d5a4bc4416b4118270f'
 route: full
 route_source: pinned
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
-review_loop_iteration: 0
+lenses_ran:
+  - 'independent-correctness'
+  - 'codex-security'
+review_loop_iteration: 1
 context:
   - '_bmad-output/planning-artifacts/epics.md'
   - '_bmad-output/implementation-artifacts/epic-7-context.md'
@@ -72,7 +74,7 @@ Members can keep individual pieces, shuffle the rest, and save the exact composi
 - [x] Build the shared chooser, weather-safe shuffle and draft reconciliation.
 - [x] Mount the Ideas editor in both clients and wire session-bound CC-7.2 save and feedback.
 - [x] Apply the small-closet rule to Today on both clients.
-- [ ] Land TEA's acceptance coverage, resolve the one full review, and link Step 79.
+- [x] Land TEA's acceptance coverage, resolve the one full review, and link Step 79.
 
 - Given a member in Looks > Ideas, selecting a mood shows one complete look and one weather reason.
 - Given a pinned piece and an unpinned piece, tapping Shuffle keeps the pin and replaces the
@@ -94,6 +96,23 @@ Members can keep individual pieces, shuffle the rest, and save the exact composi
 ## Plan Change Log
 
 ## Review Triage Log
+
+The full review used base `e90debe40babc02312ae0d5a4bc4416b4118270f` and
+head `73c98098a265325780a40c8a8bf7cbb7782c58aa`.
+Codex Security accounted for all 25 changed paths and reported zero security findings.
+
+| Finding                                        | Resolution                                                                                                                             |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| P1-1 Shared coverage                           | Exercise draft validation, weather safety and the localized controls.                                                                  |
+| P1-2 Today compatibility                       | Mount one outfit for a small closet. Legacy live-outfit fixtures use at least three garments.                                          |
+| P1-3 Editor coverage and missing forecast mock | Mock the existing ritual endpoint and exercise pinned edits, save feedback and session changes.                                        |
+| P2-1 Today wardrobe timing                     | Both clients already wait at the screen gate. The outfit now also waits for a bounded wardrobe read when the gate opens on a deadline. |
+| P2-2 Pin accessibility                         | Use a stable Pin name and pressed state.                                                                                               |
+| P2-3 Save and Undo                             | Bind feedback to the exact composition and live session. Replays do not offer Undo. Block same-tick edits during save.                 |
+| P2-4 Reset with an unedited outfit             | Discard a default draft with zero pins. Enable Reset only for a visible edit.                                                          |
+| P2-5 Native draft filename                     | Use the existing dot-delimited naming convention.                                                                                      |
+| P3-1 Nested day-control card                   | Use a flat disclosure inside the Ideas card.                                                                                           |
+| P3-2 Story closeout                            | Mark sprint status done and link editor coverage from Step 79.                                                                         |
 
 ## Verification
 

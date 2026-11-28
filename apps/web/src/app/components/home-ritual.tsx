@@ -1091,12 +1091,13 @@ function MemberRitual({
     </button>
   )
   const liveOutfit = ritual?.outfits.some(usableOutfit) ? ritual : null
+  const outfitReady = settled && pieces !== undefined
   const firstLook = !liveOutfit?.outfits.some(({ garmentIds }) =>
     garmentIds.some((id) => !id.startsWith('default-'))
   )
   return (
     <>
-      {settled && (
+      {outfitReady && (
         <div className={firstLook ? 'flex min-h-dvh flex-col gap-4' : 'contents'}>
           <TodayWeather ritual={ritual} city={city} locale={locale} />
           <MemberRitualOutfit
@@ -1144,7 +1145,7 @@ function MemberRitual({
         {t('home.today.planWeek')}
         <span aria-hidden="true">›</span>
       </Link>
-      {settled && (
+      {outfitReady && (
         <StyleDayControls key={style.scope} style={style} showTune={!firstLook} />
       )}
     </>
@@ -1187,7 +1188,7 @@ function MemberRitualOutfit({
   }, [showSample, style.scope])
   return (
     <>
-      {liveOutfit && (
+      {liveOutfit && !smallCloset && (
         <section
           data-testid={showSample ? undefined : 'today-first-content'}
           data-surface="card"

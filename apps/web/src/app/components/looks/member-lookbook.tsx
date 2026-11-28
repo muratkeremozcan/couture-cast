@@ -10,6 +10,7 @@ import {
   getGuestPreviewStrings,
   getMemberLookbookStrings,
   getStyleProfileStrings,
+  isMemberLookbookDraftEdited,
   memberLookbookDraftKey,
   memberLookbookOutfitDraft,
   memberLookbookWeatherReason,
@@ -103,7 +104,9 @@ function useLookbookWeather(owner: string, scope: string, locale: string) {
 
 type SaveReceipt = Pick<SavedLookContract, 'id' | 'revision'>
 type SaveAttempt = { idempotencyKey: string; receipt?: SaveReceipt }
+type Mutation = 'save' | 'undo'
 
+const MAX_SAVE_ATTEMPTS = 32
 const control =
   'min-h-touch min-w-0 border px-2 py-2 text-sm font-semibold disabled:opacity-60 [overflow-wrap:anywhere]'
 const neutral = 'border-line-strong bg-page text-ink'
@@ -138,7 +141,8 @@ export function MemberLookbook({
     storageKey ? readMemberLookbookDraft(readStorage('local', storageKey)) : null
   )
   const latestDraft = useRef(draft)
-  const [saving, setSaving] = useState(false)
+  const [mutation, setMutation] = useState<Mutation | null>(null)
+  const pendingMutation = useRef<Mutation | null>(null)
   const attempts = useRef(new Map<string, SaveAttempt>())
   useEffect(() => {
     if (!storageKey) return
@@ -167,6 +171,8 @@ export function MemberLookbook({
   const look = result.look
   const payload = buildHomeSampleSavedLookInput(result)
   const key = JSON.stringify(payload)
+  const busy = mutation !== null
+  const isEdited = isMemberLookbookDraftEdited(base, result, pinned)
   const isCurrent = (signal: AbortSignal) =>
     !signal.aborted && currentWebStyleScope() === scope
 
@@ -183,26 +189,48 @@ export function MemberLookbook({
     }
   }
 
-  const edit = (outfit: SampleOutfitResult, pins: readonly SampleGarmentCategory[]) =>
-    updateDraft({
-      mood,
-      looks: {
-        ...latestDraft.current?.looks,
-        [mood]: memberLookbookOutfitDraft(outfit, pins),
-      },
-    })
+  function updateOutfit(
+    outfit: SampleOutfitResult,
+    pins: readonly SampleGarmentCategory[],
+    selectedMood = mood
+  ) {
+    const looks = { ...latestDraft.current?.looks }
+    if (isMemberLookbookDraftEdited(base, outfit, pins)) {
+      looks[mood] = memberLookbookOutfitDraft(outfit, pins)
+    } else if (looks[mood]) {
+      delete looks[mood]
+    } else {
+      return
+    }
+    updateDraft({ mood: selectedMood, looks })
+  }
+
+  function edit(outfit: SampleOutfitResult, pins: readonly SampleGarmentCategory[]) {
+    if (!pendingMutation.current) updateOutfit(outfit, pins)
+  }
+
+  function setMutationStatus(next: Mutation | null) {
+    pendingMutation.current = next
+    setMutation(next)
+  }
 
   async function saveLook() {
     const signal = mountSignal()
     const token = captureWebStyleBearer(scope)
-    if (!payload || !token || !isCurrent(signal)) return false
-    const attempt = attempts.current.get(key) ?? {
+    if (pendingMutation.current || !payload || !token || !isCurrent(signal)) return false
+    const records = attempts.current
+    const attempt = records.get(key) ?? {
       idempotencyKey: createIdempotencyKey(),
     }
-    attempts.current.set(key, attempt)
+    records.delete(key)
+    records.set(key, attempt)
+    if (records.size > MAX_SAVE_ATTEMPTS) {
+      const oldest = records.keys().next()
+      if (!oldest.done) records.delete(oldest.value)
+    }
     const alreadySaved = Boolean(attempt.receipt)
     const startDraft = draft?.looks[mood]
-    setSaving(true)
+    setMutationStatus('save')
     try {
       const record = await createSavedLookFromWeb(payload, {
         accessToken: token,
@@ -214,20 +242,17 @@ export function MemberLookbook({
       const current = latestDraft.current
       // A live edit of this mood in another tab owns its newer pins.
       if (JSON.stringify(current?.looks[mood]) === JSON.stringify(startDraft)) {
-        updateDraft({
-          mood: current?.mood ?? mood,
-          looks: { ...current?.looks, [mood]: memberLookbookOutfitDraft(result, []) },
-        })
+        updateOutfit(result, [], current?.mood ?? mood)
       }
       notifySavedLooksChanged(owner)
       return { saved: true, undoable: !alreadySaved }
     } catch (error) {
       if (error instanceof SavedLookRequestError && error.status === 409) {
-        attempts.current.delete(key)
+        records.delete(key)
       }
       throw error
     } finally {
-      if (isCurrent(signal)) setSaving(false)
+      if (isCurrent(signal)) setMutationStatus(null)
     }
   }
 
@@ -235,7 +260,8 @@ export function MemberLookbook({
     const receipt = attempts.current.get(key)?.receipt
     const token = captureWebStyleBearer(scope)
     const signal = mountSignal()
-    if (!receipt || !token || !isCurrent(signal)) return false
+    if (pendingMutation.current || !receipt || !token || !isCurrent(signal)) return false
+    setMutationStatus('undo')
     try {
       await deleteSavedLookFromWeb(
         receipt.id,
@@ -247,6 +273,8 @@ export function MemberLookbook({
       )
     } catch (error) {
       if (!(error instanceof SavedLookRequestError && error.status === 404)) throw error
+    } finally {
+      if (isCurrent(signal)) setMutationStatus(null)
     }
     if (!isCurrent(signal)) return false
     attempts.current.delete(key)
@@ -260,7 +288,7 @@ export function MemberLookbook({
       aria-labelledby={headingId}
       className="space-y-3"
     >
-      <fieldset className="min-w-0 space-y-2" disabled={saving}>
+      <fieldset className="min-w-0 space-y-2" disabled={busy}>
         <legend className="sr-only">{styleCopy.mood}</legend>
         <div data-testid="lookbook-mood-row" className="grid grid-cols-3 gap-2">
           {ideas.map(({ mood: option }) => (
@@ -270,9 +298,10 @@ export function MemberLookbook({
               data-testid={`lookbook-mood-${option}`}
               aria-pressed={option === mood}
               className={`${control} rounded-full ${option === mood ? 'border-primary bg-card text-ink ring-1 ring-primary' : neutral}`}
-              onClick={() =>
-                updateDraft({ mood: option, looks: latestDraft.current?.looks ?? {} })
-              }
+              onClick={() => {
+                if (!pendingMutation.current)
+                  updateDraft({ mood: option, looks: latestDraft.current?.looks ?? {} })
+              }}
             >
               {styleCopy[option]}
             </button>
@@ -321,7 +350,7 @@ export function MemberLookbook({
                   data-testid={`lookbook-pin-${category}`}
                   aria-pressed={selected}
                   aria-label={`${controls.pin} ${name}`}
-                  disabled={saving}
+                  disabled={busy}
                   className={`mt-1 ${control} rounded-lg ${selected ? 'border-ink bg-inverse text-on-inverse' : neutral}`}
                   onClick={() =>
                     edit(
@@ -332,7 +361,7 @@ export function MemberLookbook({
                     )
                   }
                 >
-                  {selected ? controls.unpin : controls.pin}
+                  {controls.pin}
                 </button>
               </li>
             )
@@ -344,7 +373,7 @@ export function MemberLookbook({
               type="button"
               data-testid="lookbook-shuffle"
               className={secondary}
-              disabled={saving || !canShuffleMemberLookbook(result, pinned)}
+              disabled={busy || !canShuffleMemberLookbook(result, pinned)}
               onClick={() => edit(shuffleMemberLookbook(result, pinned), pinned)}
             >
               {strings.firstRun.shuffle}
@@ -353,19 +382,15 @@ export function MemberLookbook({
               type="button"
               data-testid="lookbook-reset"
               className={secondary}
-              disabled={saving || !draft?.looks[mood]}
-              onClick={() => {
-                const looks = { ...latestDraft.current?.looks }
-                delete looks[mood]
-                updateDraft({ mood, looks })
-              }}
+              disabled={busy || !isEdited}
+              onClick={() => edit(base, [])}
             >
               {controls.reset}
             </button>
           </div>
         )}
-        <fieldset disabled={saving} className="min-w-0">
-          <StyleDayControls style={style} showMood={false} />
+        <fieldset disabled={busy} className="min-w-0">
+          <StyleDayControls style={style} showMood={false} nested />
         </fieldset>
       </div>
       {payload && (
@@ -375,6 +400,7 @@ export function MemberLookbook({
           data-gold="primary"
           primary
           requiresNetwork
+          disabled={mutation === 'undo'}
           ownerKey={scope}
           resetKey={key}
           idleLabel={strings.firstRun.save}
@@ -382,7 +408,7 @@ export function MemberLookbook({
           onUndo={undoSave}
           onView={() => {
             const receipt = attempts.current.get(key)?.receipt
-            if (receipt && isCurrent(mountSignal()))
+            if (!pendingMutation.current && receipt && isCurrent(mountSignal()))
               router.push(savedLookHref(receipt.id))
           }}
         />

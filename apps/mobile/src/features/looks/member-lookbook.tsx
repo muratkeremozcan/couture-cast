@@ -13,6 +13,7 @@ import {
   getGuestPreviewStrings,
   getMemberLookbookStrings,
   getStyleProfileStrings,
+  isMemberLookbookDraftEdited,
   memberLookbookDraftKey,
   memberLookbookOutfitDraft,
   memberLookbookWeatherReason,
@@ -60,6 +61,12 @@ import { useTokens } from '@/src/theme/tokens'
 import { PreviewButton, SampleGarmentArt } from '../preview/guest-preview-parts'
 import { StyleDayControls } from '../preview/style-profile-controls'
 import { savedLookRoute } from './looks-routes'
+
+const MAX_SAVE_ATTEMPTS = 32
+type SaveAttempt = {
+  idempotencyKey: string
+  receipt?: Pick<SavedLookContract, 'id' | 'revision'>
+}
 
 function useLookbookForecast(locale: SupportedLocale, isCurrent: () => boolean) {
   const [weather, setWeather] = useState<SampleWeatherKey>()
@@ -176,20 +183,30 @@ export function MemberLookbook({
   const strings = getGuestPreviewStrings(locale)
   const copy = getMemberLookbookStrings(locale)
   const styleCopy = getStyleProfileStrings(locale)
+  const mounted = useRef(false)
   const isCurrent = useCallback(
-    () => mobileApplicationUserId() === owner && mobileIdentityEpoch() === epoch,
+    () =>
+      mounted.current &&
+      mobileApplicationUserId() === owner &&
+      mobileIdentityEpoch() === epoch,
     [epoch, owner]
   )
   const weather = useLookbookForecast(locale, isCurrent)
   const storage = useRef<SampleRecipeStorageHandle | null>(null)
   const draftRef = useRef<MemberLookbookDraft | null>(null)
   const [draft, setDraft] = useState<MemberLookbookDraft | null>()
-  const [saving, setSaving] = useState(false)
-  const saveRequest = useRef<AbortController | null>(null)
-  const attemptKeys = useRef(new Map<string, string>())
-  const saved = useRef<{ record: SavedLookContract; signature: string } | null>(null)
+  const [mutating, setMutating] = useState(false)
+  const activeMutation = useRef<AbortController | null>(null)
+  const attempts = useRef(new Map<string, SaveAttempt>())
 
-  useLayoutEffect(() => () => saveRequest.current?.abort(), [])
+  useLayoutEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      activeMutation.current?.abort()
+      activeMutation.current = null
+    }
+  }, [epoch, owner])
   useEffect(() => {
     let active = true
     void sampleRecipeStorage(memberLookbookDraftKey(owner))
@@ -223,6 +240,7 @@ export function MemberLookbook({
   const payload = buildHomeSampleSavedLookInput(result)
   const signature = JSON.stringify(payload)
   const canShuffle = canShuffleMemberLookbook(result, pinned)
+  const edited = isMemberLookbookDraftEdited(base, result, pinned)
   const singleColumn = fontScale >= 1.5 && width <= 400
 
   const commit = (next: MemberLookbookDraft) => {
@@ -232,69 +250,91 @@ export function MemberLookbook({
     setDraft(next)
   }
   const updateLook = (outfit: typeof result, pins: typeof pinned) => {
-    commit({
-      mood,
-      looks: {
-        ...draftRef.current?.looks,
-        [mood]: memberLookbookOutfitDraft(outfit, pins),
-      },
+    const looks = { ...draftRef.current?.looks }
+    if (isMemberLookbookDraftEdited(base, outfit, pins)) {
+      looks[mood] = memberLookbookOutfitDraft(outfit, pins)
+    } else {
+      if (!looks[mood]) return
+      delete looks[mood]
+    }
+    commit({ mood, looks })
+  }
+
+  const live = (signal: AbortSignal) => !signal.aborted && isCurrent()
+
+  async function runMutation<T>(
+    perform: (accessToken: string, signal: AbortSignal) => Promise<T>
+  ): Promise<T | false> {
+    if (!isCurrent() || activeMutation.current) return false
+    const request = new AbortController()
+    const { signal } = request
+    activeMutation.current = request
+    setMutating(true)
+    try {
+      const accessToken = await resolveMobileAccessToken()
+      if (!accessToken || !live(signal)) return false
+      return await perform(accessToken, signal)
+    } finally {
+      if (activeMutation.current === request) activeMutation.current = null
+      if (live(signal)) setMutating(false)
+    }
+  }
+
+  const onSave = () => {
+    if (!payload) return false
+    return runMutation(async (accessToken, signal) => {
+      const attempt = attempts.current.get(signature) ?? {
+        idempotencyKey: createIdempotencyKey(),
+      }
+      const alreadySaved = Boolean(attempt.receipt)
+      attempts.current.delete(signature)
+      attempts.current.set(signature, attempt)
+      if (attempts.current.size > MAX_SAVE_ATTEMPTS) {
+        attempts.current.delete(attempts.current.keys().next().value!)
+      }
+      try {
+        const { id, revision } = await createSavedLookFromMobile(payload, {
+          accessToken,
+          idempotencyKey: attempt.idempotencyKey,
+          signal,
+        })
+        if (!live(signal)) return false
+        attempt.receipt = { id, revision }
+        updateLook(result, [])
+        notifyMobileSavedLooksChanged(owner)
+        return { saved: true, undoable: !alreadySaved }
+      } catch (error) {
+        if (
+          live(signal) &&
+          error instanceof MobileSavedLookRequestError &&
+          error.status === 409
+        ) {
+          attempts.current.delete(signature)
+        }
+        throw error
+      }
     })
   }
 
-  const onSave = async () => {
-    if (!payload || !isCurrent() || saveRequest.current) return false
-    const request = new AbortController()
-    saveRequest.current = request
-    setSaving(true)
-    const live = () => !request.signal.aborted && isCurrent()
-    try {
-      const accessToken = await resolveMobileAccessToken()
-      if (!accessToken || !live()) return false
-      const idempotencyKey = attemptKeys.current.get(signature) ?? createIdempotencyKey()
-      attemptKeys.current.set(signature, idempotencyKey)
-      if (attemptKeys.current.size > 32)
-        attemptKeys.current.delete(attemptKeys.current.keys().next().value!)
-      const record = await createSavedLookFromMobile(payload, {
-        accessToken,
-        idempotencyKey,
-        signal: request.signal,
-      })
-      if (!live()) return false
-      saved.current = { record, signature }
-      updateLook(result, [])
+  const onUndo = () => {
+    const receipt = attempts.current.get(signature)?.receipt
+    if (!receipt) return false
+    return runMutation(async (accessToken, signal) => {
+      try {
+        const { id, revision } = receipt
+        await deleteSavedLookFromMobile(id, formatSavedLookIfMatch(id, revision), {
+          accessToken,
+          signal,
+        })
+      } catch (error) {
+        if (!(error instanceof MobileSavedLookRequestError && error.status === 404))
+          throw error
+      }
+      if (!live(signal)) return false
+      attempts.current.delete(signature)
       notifyMobileSavedLooksChanged(owner)
       return true
-    } catch (error) {
-      if (error instanceof MobileSavedLookRequestError && error.status === 409)
-        attemptKeys.current.delete(signature)
-      throw error
-    } finally {
-      saveRequest.current = null
-      if (live()) setSaving(false)
-    }
-  }
-
-  const onUndo = async () => {
-    const entry = saved.current
-    if (!entry || !isCurrent()) return false
-    const { record } = entry
-    const accessToken = await resolveMobileAccessToken()
-    if (!accessToken || !isCurrent()) return false
-    try {
-      await deleteSavedLookFromMobile(
-        record.id,
-        formatSavedLookIfMatch(record.id, record.revision),
-        { accessToken }
-      )
-    } catch (error) {
-      if (!(error instanceof MobileSavedLookRequestError && error.status === 404))
-        throw error
-    }
-    if (!isCurrent()) return false
-    attemptKeys.current.delete(entry.signature)
-    if (saved.current === entry) saved.current = null
-    notifyMobileSavedLooksChanged(owner)
-    return true
+    })
   }
 
   return (
@@ -311,10 +351,10 @@ export function MemberLookbook({
             id={`lookbook-mood-${value}`}
             label={styleCopy[value]}
             selected={mood === value}
-            disabled={saving}
+            disabled={mutating}
             pill
             onPress={() => {
-              if (!saveRequest.current && value !== mood)
+              if (!activeMutation.current && value !== mood)
                 commit({ mood: value, looks: draftRef.current?.looks ?? {} })
             }}
           />
@@ -378,12 +418,12 @@ export function MemberLookbook({
                 </Text>
                 <Choice
                   id={`lookbook-pin-${category}`}
-                  label={isPinned ? copy.unpin : copy.pin}
+                  label={copy.pin}
                   accessibilityLabel={`${copy.pin}: ${name}`}
                   selected={isPinned}
-                  disabled={saving}
+                  disabled={mutating}
                   onPress={() => {
-                    if (saveRequest.current) return
+                    if (activeMutation.current) return
                     updateLook(
                       result,
                       isPinned
@@ -402,9 +442,9 @@ export function MemberLookbook({
             testID="lookbook-shuffle"
             label={strings.firstRun.shuffle}
             palette={colors}
-            disabled={saving || !canShuffle}
+            disabled={mutating || !canShuffle}
             onPress={() => {
-              if (!saveRequest.current)
+              if (!activeMutation.current)
                 updateLook(shuffleMemberLookbook(result, pinned), pinned)
             }}
           />
@@ -412,16 +452,13 @@ export function MemberLookbook({
             testID="lookbook-reset"
             label={copy.reset}
             palette={colors}
-            disabled={saving || !draft?.looks[mood]}
+            disabled={mutating || !edited}
             onPress={() => {
-              if (saveRequest.current) return
-              const looks = { ...draftRef.current?.looks }
-              delete looks[mood]
-              commit({ mood, looks })
+              if (!activeMutation.current && edited) updateLook(base, [])
             }}
           />
         </View>
-        <StyleDayControls style={style} showMood={false} disabled={saving} />
+        <StyleDayControls style={style} showMood={false} disabled={mutating} />
       </View>
 
       <SaveActionButton
@@ -429,14 +466,14 @@ export function MemberLookbook({
         idleLabel={strings.firstRun.save}
         primary
         requiresNetwork
-        disabled={!payload}
+        disabled={!payload || mutating}
         ownerKey={style.scope}
         resetKey={signature}
         onSave={onSave}
         onUndo={onUndo}
         onView={() => {
-          if (isCurrent() && saved.current)
-            router.push(savedLookRoute(saved.current.record.id))
+          const receipt = attempts.current.get(signature)?.receipt
+          if (isCurrent() && receipt) router.push(savedLookRoute(receipt.id))
         }}
       />
     </View>

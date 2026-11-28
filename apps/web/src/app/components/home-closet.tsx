@@ -3,8 +3,13 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { withRequestDeadline } from '@couture/api-client'
 import type { GarmentCategory, GarmentWithTags } from '@couture/api-client/contracts/http'
-import { formatGarmentAlt, formatLocalizedList } from '@couture/utils'
+import {
+  formatGarmentAlt,
+  formatLocalizedList,
+  TODAY_WARDROBE_READ_TIMEOUT_MS,
+} from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { isLiveScope } from '../../lib/use-web-session'
 import { listGarmentsFromWeb } from '../../lib/wardrobe'
@@ -31,7 +36,11 @@ export function useHomeWardrobe(owner: string, scope: string | null) {
       beginRead()
       const request = new AbortController()
       controller = request
-      void listGarmentsFromWeb(request.signal, { today: true })
+      void withRequestDeadline(
+        TODAY_WARDROBE_READ_TIMEOUT_MS,
+        [request.signal],
+        (signal) => listGarmentsFromWeb(signal, { today: true })
+      )
         .then((garments) => {
           if (request.signal.aborted || !isLiveScope(scope)) return
           const recent = [...garments]
@@ -44,7 +53,7 @@ export function useHomeWardrobe(owner: string, scope: string | null) {
         })
         .catch(() => {
           if (!request.signal.aborted && isLiveScope(scope)) {
-            setPieces(null)
+            setPieces((current) => current ?? null)
             setWardrobe(noGarments)
             remember(undefined)
           }
