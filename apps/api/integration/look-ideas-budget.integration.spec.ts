@@ -9,6 +9,7 @@ import {
 import type { LookIdeaProvider } from '../src/modules/personalization/look-ideas.provider.js'
 import { LookIdeasService } from '../src/modules/personalization/look-ideas.service.js'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
@@ -84,8 +85,9 @@ describe('CC-7.23 persistent look-ideas budgets', () => {
       prisma.lookIdeaDailyQuota.findUnique({ where: { user_id: member.id } })
     ).resolves.toMatchObject({ dispatch_count: 1 })
 
-    await prisma.user.delete({ where: { id: member.id } })
+    await deleteMembers(prisma, { id: member.id })
 
+    await expect(prisma.user.findUnique({ where: { id: member.id } })).resolves.toBeNull()
     await expect(
       prisma.lookIdeaDailyQuota.findUnique({ where: { user_id: member.id } })
     ).resolves.toBeNull()

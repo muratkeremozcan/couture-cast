@@ -5,7 +5,6 @@ import {
   lookIdeasInputSchema,
   type LookIdeasInput,
 } from '../src/contracts/http/look-ideas'
-import { generateHttpOpenApiDocument } from '../src/contracts/http/openapi'
 import { Configuration, DefaultApi } from '../src/generated'
 import { requestLookIdeas } from '../src/look-ideas-client'
 
@@ -106,21 +105,10 @@ describe('CC-7.23 look ideas client', () => {
     }
   )
 
-  it('keeps the request strict and publishes private caching on every HTTP response', () => {
+  it('rejects extra fields in the request contract', () => {
     expect(lookIdeasInputSchema.parse(INPUT)).toEqual(INPUT)
     expect(
       lookIdeasInputSchema.safeParse({ ...INPUT, coordinates: [10, 20] }).success
     ).toBe(false)
-    const operation = generateHttpOpenApiDocument().paths?.[PATH]?.post
-    expect(operation?.security).toEqual([{ bearerAuth: [] }])
-    const responses = operation?.responses ?? {}
-    expect(Object.keys(responses)).toEqual(['200', '400', '401', '403', '503'])
-    for (const response of Object.values(responses)) {
-      expect(response).toMatchObject({
-        headers: {
-          'Cache-Control': { schema: { type: 'string', enum: ['private, no-store'] } },
-        },
-      })
-    }
   })
 })

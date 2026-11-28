@@ -2,14 +2,24 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-80-ai-written-look-ideas
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemberLookbook, createStyleProfileStore } from '@couture/utils'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import type { useMobileStyleProfile } from '@/src/lib/style-profile'
 import { initI18n } from '@/src/lib/i18n'
+import {
+  mobileApplicationUserId,
+  mobileIdentityEpoch,
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
+import type * as MobileApi from '@/src/lib/api-client'
+import type * as RecipeStorage from '@/src/lib/sample-recipe-storage'
 import type * as PreviewParts from '../preview/guest-preview-parts'
 import { MemberLookbook } from './member-lookbook'
 
-const identity = vi.hoisted(() => ({ owner: 'fixture-member-a', epoch: 1 }))
+const MEMBER = 'fixture-member-a'
+const SECOND_MEMBER = 'fixture-member-b'
+let restoreToken: (() => void) | undefined
 const network = vi.hoisted(() => ({
   forecast: vi.fn(),
   generate: vi.fn(),
@@ -22,20 +32,17 @@ vi.mock('expo-router', async () => ({
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
-vi.mock('@/src/lib/mobile-auth', () => ({
-  mobileApplicationUserId: () => identity.owner,
-  mobileIdentityEpoch: () => identity.epoch,
-  resolveMobileAccessToken: () => Promise.resolve('fixture-token'),
-}))
-vi.mock('@/src/lib/api-client', () => ({
+vi.mock('@/src/lib/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof MobileApi>()),
   createMobileApiClient: () => ({
     apiV1RitualGet: network.forecast,
     apiV1PersonalizationLookIdeasPost: network.generate,
   }),
 }))
-vi.mock('@/src/lib/sample-recipe-storage', () => ({
+vi.mock('@/src/lib/sample-recipe-storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof RecipeStorage>()),
   sampleRecipeStorage: () =>
-    Promise.resolve({ read: () => null, write: vi.fn(), flush: vi.fn() }),
+    Promise.resolve({ read: () => null, write: vi.fn(), remove: vi.fn() }),
 }))
 vi.mock('@/components/save-feedback', () => ({ SaveActionButton: () => null }))
 vi.mock('../preview/style-profile-controls', () => ({ StyleDayControls: () => null }))
@@ -62,10 +69,8 @@ const otherRanking = {
     description: 'A simple mix for the day.',
   })),
 }
-const store = createStyleProfileStore(
-  () => identity.owner,
-  () =>
-    Promise.resolve({ mood: null, palette: null, texture: null, fit: null, avoid: [] })
+const store = createStyleProfileStore(mobileApplicationUserId, () =>
+  Promise.resolve({ mood: null, palette: null, texture: null, fit: null, avoid: [] })
 )
 
 function deferred<T>() {
@@ -79,22 +84,17 @@ function deferred<T>() {
 }
 
 function editor() {
+  const owner = mobileApplicationUserId()!
+  const epoch = mobileIdentityEpoch()
   const style: ReturnType<typeof useMobileStyleProfile> = {
-    scope: identity.owner,
+    scope: owner,
     status: 'ready',
     profile: null,
     day: null,
     saving: false,
     store,
   }
-  return (
-    <MemberLookbook
-      key={`${identity.owner}:${identity.epoch}`}
-      owner={identity.owner}
-      epoch={identity.epoch}
-      style={style}
-    />
-  )
+  return <MemberLookbook key={epoch} owner={owner} epoch={epoch} style={style} />
 }
 
 const initialMood = () => screen.getByTestId(`lookbook-mood-${DEFAULT[0]!.mood}`)
@@ -112,10 +112,15 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
-  identity.owner = 'fixture-member-a'
-  identity.epoch = 1
+  restoreToken = setMobileAccessTokenResolver(() => 'fixture-token')
+  setMobileApplicationUserId(MEMBER)
   network.forecast.mockReset().mockRejectedValue(new Error('Forecast unavailable'))
   network.generate.mockReset().mockResolvedValue({ data: null })
+})
+
+afterEach(() => {
+  restoreToken?.()
+  setMobileApplicationUserId(null)
 })
 
 describe('CC-7.23 native look ideas', () => {
@@ -180,8 +185,10 @@ describe('CC-7.23 native look ideas', () => {
       const { rerender } = render(editor())
       await waitFor(() => expect(network.generate).toHaveBeenCalledTimes(1))
 
-      identity.epoch += 1
-      if (change === 'another account') identity.owner = 'fixture-member-b'
+      act(() => {
+        setMobileApplicationUserId(null)
+        setMobileApplicationUserId(change === 'another account' ? SECOND_MEMBER : MEMBER)
+      })
       rerender(editor())
       await waitFor(() => expect(network.generate).toHaveBeenCalledTimes(2))
       await act(async () => {

@@ -3,6 +3,8 @@
 // Learning path Step 15: Validate, generate, and consume the canonical contract.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-15-validate-generate-and-consume-the-canonical-contract
 // Step 15 step 5 owner: searchable owner anchor
+// Step 80 covers bearer authorization and cache headers on look ideas.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-80-ai-written-look-ideas
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -73,4 +75,24 @@ test('keeps the checked-in canonical HTTP OpenAPI document in sync with the buil
   ) as typeof spec
 
   expect(checkedInSpec).toEqual(spec)
+})
+
+test('publishes bearer authorization and private caching for every look ideas response', () => {
+  const document = generateHttpOpenApiDocument()
+  const operation = document.paths?.['/api/v1/personalization/look-ideas']?.post
+  expect(operation?.security).toEqual([{ bearerAuth: [] }])
+  const responses = operation?.responses ?? {}
+  expect(Object.keys(responses)).toEqual(['200', '400', '401', '403', '503'])
+  for (const response of Object.values(responses)) {
+    expect(response).toMatchObject({
+      headers: {
+        'Cache-Control': { schema: { type: 'string', enum: ['private, no-store'] } },
+      },
+    })
+  }
+  expect(document.components?.schemas?.LookIdeasResponse).toMatchObject({
+    properties: {
+      data: { type: ['array', 'null'], minItems: 3, maxItems: 3 },
+    },
+  })
 })
