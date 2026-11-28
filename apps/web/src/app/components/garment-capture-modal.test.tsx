@@ -1397,7 +1397,9 @@ describe('CC-7.29 flat-lay capture in Closet', () => {
 
     await user.click(choose)
     await user.upload(input, photo())
-    expect(screen.getByRole('status')).toHaveTextContent('Checking photo')
+    expect(
+      screen.getByText('Checking photo…', { selector: '[role="status"]' })
+    ).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Add 2 pieces' })).toBeNull()
     await act(async () => {
       finishReview(review())
@@ -1406,8 +1408,8 @@ describe('CC-7.29 flat-lay capture in Closet', () => {
 
     const editFirst = () => screen.getAllByRole('button', { name: 'Edit tags' })[0]!
     const field = (name: string) => screen.getByRole('combobox', { name })
+    expect(await screen.findByRole('button', { name: 'Add 2 pieces' })).toBeEnabled()
     expect(screen.getAllByRole('img')).toHaveLength(2)
-    expect(screen.getByRole('button', { name: 'Add 2 pieces' })).toBeEnabled()
     await user.click(editFirst())
     expect(field('Category')).toHaveFocus()
     await user.selectOptions(field('Subtype'), 'camisole')
