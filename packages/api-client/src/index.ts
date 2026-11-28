@@ -68,6 +68,12 @@ export {
   type ListSavedLooksQuery,
 } from './contracts/http/saved-looks'
 export * from './generated'
+export {
+  photoAiConsentResponseSchema,
+  type PhotoAiFeature,
+  type PhotoAiInputClass,
+} from './contracts/http/photo-ai-consent'
+export { requestPhotoAiConsent } from './photo-ai-consent-client'
 export { createApiClient, communityCommentsClient } from './client'
 export type { ApiClientAccessToken, ApiClientOptions } from './client'
 export * from './types/analytics-events'

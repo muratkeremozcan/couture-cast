@@ -6,7 +6,7 @@ import { createBaseLogger } from './pino.config'
 import {
   extractUserId,
   inferFeatureFromPath,
-  isLookIdeasRequest,
+  isPrivateAccountRequest,
   resolveRequestId,
 } from './request-context'
 
@@ -65,7 +65,7 @@ export function createRequestLoggerMiddleware(
     },
     genReqId(request, response) {
       // Flow ref S0.7/T5/1: attach or reuse x-request-id on the HTTP boundary.
-      const privateRoute = isLookIdeasRequest(request)
+      const privateRoute = isPrivateAccountRequest(request)
       const requestId = resolveRequestId(
         privateRoute ? undefined : request.headers['x-request-id']
       )
@@ -113,7 +113,7 @@ export function createRequestLoggerMiddleware(
       )
       return {
         durationMs: extractDurationMs(value),
-        ...(isLookIdeasRequest(request) ? {} : { error }),
+        ...(isPrivateAccountRequest(request) ? {} : { error }),
         feature: inferFeatureFromPath(path),
         method: request.method,
         path,

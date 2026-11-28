@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+// Learning path Step 81: Photo AI consent and processor approval.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-81-photo-ai-consent-and-processor-approval
 import { ConflictException, ServiceUnavailableException } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -294,7 +296,54 @@ describe('SupabaseWardrobeStorageAdapter', () => {
       ).resolves.toEqual({ status: 'present', bytes: Buffer.from('garment-bytes') })
       expect(fetchMock).toHaveBeenCalledExactlyOnceWith(OBJECT_URL, {
         headers: { Authorization: 'Bearer service-role-key', apikey: 'service-role-key' },
+        redirect: 'error',
+        cache: 'no-store',
+        signal: undefined,
       })
+    })
+
+    it('forwards abort and cancels a stalled body after clearing its partial bytes', async () => {
+      const controller = new AbortController()
+      const chunk = Uint8Array.from([3, 4, 5])
+      let markWaiting!: () => void
+      const waiting = new Promise<void>((resolve) => {
+        markWaiting = resolve
+      })
+      const cancel = vi.fn()
+      let first = true
+      const body = new ReadableStream<Uint8Array>(
+        {
+          pull(stream) {
+            if (first) {
+              first = false
+              stream.enqueue(chunk)
+            } else {
+              markWaiting()
+            }
+          },
+          cancel,
+        },
+        { highWaterMark: 0 }
+      )
+      const fetchMock = stubFetch(new Response(body, { status: 200 }))
+      const adapter = new SupabaseWardrobeStorageAdapter()
+
+      const result = adapter.downloadBounded(
+        'staging/u/garment/s.png',
+        1024,
+        controller.signal
+      )
+      const aborted = expect(result).rejects.toMatchObject({ name: 'AbortError' })
+      await waiting
+      controller.abort()
+      await aborted
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        OBJECT_URL,
+        expect.objectContaining({ signal: controller.signal })
+      )
+      expect(cancel).toHaveBeenCalledOnce()
+      expect(chunk).toEqual(Uint8Array.from([0, 0, 0]))
     })
 
     /**

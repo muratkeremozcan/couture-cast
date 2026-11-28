@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Step 80 covers private telemetry on the look ideas route.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-80-ai-written-look-ideas
+// Learning path Step 81: Photo AI consent and processor approval.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-81-photo-ai-consent-and-processor-approval
 import express from 'express'
 import request from 'supertest'
 import { Writable } from 'node:stream'
@@ -177,6 +179,48 @@ describe('request-logger middleware', () => {
         expect(log).not.toHaveProperty('userId')
         expect(log).not.toHaveProperty('error')
         expect(JSON.stringify(log)).not.toContain('synthetic-')
+      }
+    }
+  )
+
+  it.each([200, 503])(
+    'keeps photo AI revocation identifiers out of %i logs',
+    async (status) => {
+      const path = '/api/v1/privacy/photo-ai-consent'
+      const grant = 'cb6499c1-b8f1-4199-8891-ee5161829c21'
+      const stream = new MemoryStream()
+      const app = express()
+      const env = { LOG_LEVEL: 'info' }
+      const logger = createBaseLogger({ destination: stream, env })
+      app.use(bindRequestContext)
+      app.use(createRequestLoggerMiddleware({ env, logger }))
+      app.post(`${path}/revoke`, (req, res) => {
+        const authenticated = req as AuthenticatedRequest
+        authenticated.auth = {
+          role: 'teen',
+          token: 'synthetic-photo-bearer',
+          userId: 'synthetic-photo-member',
+        }
+        updateRequestContext({ userId: authenticated.auth.userId })
+        res.status(status).json({ detail: 'synthetic-photo-detail' })
+      })
+
+      await request(await serve(app))
+        .post(`${path}/revoke?objectKey=synthetic-photo-object`)
+        .set('x-user-id', 'synthetic-photo-header')
+        .set('x-request-id', 'synthetic-photo-correlation')
+        .send({ grantId: grant })
+        .expect(status)
+
+      const logs = parseLogs(stream)
+      expect(logs).toHaveLength(2)
+      expect(logs[0]).toMatchObject({ message: 'request_received', method: 'POST' })
+      expect(logs[1]).toMatchObject({ statusCode: status })
+      for (const log of logs) {
+        expect(log).not.toHaveProperty('userId')
+        expect(log).not.toHaveProperty('error')
+        expect(JSON.stringify(log)).not.toContain(grant)
+        expect(JSON.stringify(log)).not.toContain('synthetic-photo-')
       }
     }
   )

@@ -22611,3 +22611,38 @@ for each.
   [shared ranking](../../packages/utils/src/sample-wardrobe/member-lookbook-ranking.spec.ts).
 - [API client](../../packages/api-client/testing/look-ideas-client.spec.ts) and
   [web lookbook editor](../../apps/web/src/app/components/looks/member-lookbook.test.tsx).
+
+## Step 81: Photo AI consent and processor approval
+
+Open Profile > Account. Photo AI shows as off. You can still write a Community
+description, keep the original garment photo, choose tags or add garments one at a time.
+
+### Sequence to follow
+
+1. In the acceptance fixture, open Account with two photo AI permissions. Revoke one,
+   then reload and confirm that the other permission is still visible.
+2. Switch accounts while a permission request is pending. Check that the first
+   account's permissions disappear and that the late response leaves the second
+   account's list alone.
+3. Follow the server fixture from grant lookup to a fresh read of the member's photo.
+   Check that dispatch receives only re-encoded image bytes and their MIME type.
+4. Revoke while the photo read is held, then repeat while the processor response is
+   held. The first case stops dispatch. The second drops the late result.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-24-photo-ai-consent-processor-approval.md)
+  and [acceptance plan](../test-artifacts/test-design-7-24-photo-ai-consent-processor-approval.md).
+- [Web journey](../../playwright/tests/profile-photo-ai-consent.spec.ts),
+  [web permission controls](../../apps/web/src/app/components/photo-ai-consent.test.tsx),
+  and [native account switching](../../apps/mobile/src/features/settings/photo-ai-consent-settings.test.tsx).
+- [Client contract](../../packages/api-client/testing/photo-ai-consent-client.spec.ts)
+  and [HTTP log privacy](../../apps/api/src/logger/request-logger.middleware.spec.ts).
+- [Persisted grant and revocation races](../../apps/api/integration/photo-ai-consent.integration.spec.ts)
+  and [source reads](../../apps/api/src/modules/photo-ai/photo-ai-source.service.ts).
+- [Age and feature policy](../../apps/api/src/modules/photo-ai/photo-ai-policy.spec.ts)
+  [OpenAPI](../../packages/api-client/testing/http-openapi.spec.ts), and
+  [Profile translations](../../apps/web/src/i18n/profile-locales.spec.ts).
+- [Guardian revocation](../../apps/api/src/modules/guardian/guardian.service.revocation.spec.ts),
+  [bounded wardrobe reads](../../apps/api/src/modules/wardrobe/wardrobe-storage.adapter.spec.ts),
+  and [private API errors](../../apps/api/src/filters/api-exception.filter.spec.ts).

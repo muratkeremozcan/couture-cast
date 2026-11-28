@@ -70,6 +70,23 @@
     "precipitation": "Precipitation"
   },
   "settings": {
+    "photoAi": {
+      "heading": "Photo AI",
+      "off": "External photo AI is off.",
+      "manual": "You can still write descriptions and add clothes or choose tags yourself.",
+      "revoke": "Revoke",
+      "revokeLabel": "Revoke permission for {{feature}} ({{provider}})",
+      "loadError": "Could not load photo permissions.",
+      "revokeError": "Could not confirm that the permission was revoked. Try again.",
+      "revoked": "Permission revoked.",
+      "retry": "Try again",
+      "features": {
+        "community-description": "Community descriptions",
+        "garment-cutout": "Garment cutouts",
+        "garment-tags": "Garment tags",
+        "flat-lay-garments": "Flat-lay detection"
+      }
+    },
     "profile": {
       "account": "Account",
       "places": "Places",

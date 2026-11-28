@@ -7,6 +7,7 @@ import {
   communityCommentSubmissionsResponseSchema,
   communityPostResponseSchema,
   communitySpotlightResponseSchema,
+  photoAiConsentResponseSchema,
   publishCommunityPostResponseSchema,
   reportCommunityPostResponseSchema,
   styleProfileResponseSchema,
@@ -44,6 +45,13 @@ export const mockCommunityFeedItem: CommunityFeedItem = {
 }
 
 export const handlers = [
+  http.get('*/api/v1/privacy/photo-ai-consent', () =>
+    HttpResponse.json(
+      photoAiConsentResponseSchema.parse({
+        data: { externalProcessingEnabled: false, grants: [] },
+      })
+    )
+  ),
   http.post('*/api/v1/personalization/look-ideas', () =>
     HttpResponse.json({ data: null })
   ),

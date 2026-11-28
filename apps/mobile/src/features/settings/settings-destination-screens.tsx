@@ -71,6 +71,7 @@ import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announc
 import { useAppTheme } from '@/src/theme/theme-context'
 import { resolveThemePalette } from '@/src/theme/theme-palettes'
 import { TAB_BODY_INSET, useTokens } from '@/src/theme/tokens'
+import { PhotoAiConsentSettings } from './photo-ai-consent-settings'
 
 /** Exported so the screen test advances virtual time by the real bound rather
  *  than by a copy of it that silently stops matching when this changes. */
@@ -220,6 +221,7 @@ export function AccountSettingsScreen() {
     <TopicBody testID="settings-account-screen">
       <OwnerSettings>
         <ProfileAccountHeader />
+        <PhotoAiConsentSettings />
         <AccountDiagnostics />
       </OwnerSettings>
     </TopicBody>

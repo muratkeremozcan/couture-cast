@@ -15721,6 +15721,115 @@ export interface PatchCommunityNotificationPreferencesResponse {
   data: GetCommunityNotificationPreferences409ResponseCurrent
 }
 /**
+ *
+ * @export
+ * @interface PhotoAiConsentGrant
+ */
+export interface PhotoAiConsentGrant {
+  /**
+   *
+   * @type {string}
+   * @memberof PhotoAiConsentGrant
+   */
+  id: string
+  /**
+   *
+   * @type {PhotoAiConsentGrantFeatureEnum}
+   * @memberof PhotoAiConsentGrant
+   */
+  feature: PhotoAiConsentGrantFeatureEnum
+  /**
+   *
+   * @type {PhotoAiConsentGrantInputClassEnum}
+   * @memberof PhotoAiConsentGrant
+   */
+  inputClass: PhotoAiConsentGrantInputClassEnum
+  /**
+   *
+   * @type {string}
+   * @memberof PhotoAiConsentGrant
+   */
+  provider: string
+  /**
+   *
+   * @type {string}
+   * @memberof PhotoAiConsentGrant
+   */
+  policyVersion: string
+  /**
+   *
+   * @type {string}
+   * @memberof PhotoAiConsentGrant
+   */
+  expiresAt: string
+}
+
+/**
+ * @export
+ */
+export const PhotoAiConsentGrantFeatureEnum = {
+  community_description: 'community-description',
+  garment_cutout: 'garment-cutout',
+  garment_tags: 'garment-tags',
+  flat_lay_garments: 'flat-lay-garments',
+} as const
+export type PhotoAiConsentGrantFeatureEnum =
+  (typeof PhotoAiConsentGrantFeatureEnum)[keyof typeof PhotoAiConsentGrantFeatureEnum]
+
+/**
+ * @export
+ */
+export const PhotoAiConsentGrantInputClassEnum = {
+  community_photo: 'community-photo',
+  garment_photo: 'garment-photo',
+  flat_lay_photo: 'flat-lay-photo',
+} as const
+export type PhotoAiConsentGrantInputClassEnum =
+  (typeof PhotoAiConsentGrantInputClassEnum)[keyof typeof PhotoAiConsentGrantInputClassEnum]
+
+/**
+ *
+ * @export
+ * @interface PhotoAiConsentResponse
+ */
+export interface PhotoAiConsentResponse {
+  /**
+   *
+   * @type {PhotoAiConsentResponseData}
+   * @memberof PhotoAiConsentResponse
+   */
+  data: PhotoAiConsentResponseData
+}
+/**
+ *
+ * @export
+ * @interface PhotoAiConsentResponseData
+ */
+export interface PhotoAiConsentResponseData {
+  /**
+   *
+   * @type {PhotoAiConsentResponseDataExternalProcessingEnabledEnum}
+   * @memberof PhotoAiConsentResponseData
+   */
+  externalProcessingEnabled: PhotoAiConsentResponseDataExternalProcessingEnabledEnum
+  /**
+   *
+   * @type {Array<PhotoAiConsentGrant>}
+   * @memberof PhotoAiConsentResponseData
+   */
+  grants: Array<PhotoAiConsentGrant>
+}
+
+/**
+ * @export
+ */
+export const PhotoAiConsentResponseDataExternalProcessingEnabledEnum = {
+  false: false,
+} as const
+export type PhotoAiConsentResponseDataExternalProcessingEnabledEnum =
+  (typeof PhotoAiConsentResponseDataExternalProcessingEnabledEnum)[keyof typeof PhotoAiConsentResponseDataExternalProcessingEnabledEnum]
+
+/**
  * @type PlannerDayResult
  *
  * @export
@@ -18159,6 +18268,19 @@ export const ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum
 export type ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum =
   (typeof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum)[keyof typeof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum]
 
+/**
+ *
+ * @export
+ * @interface RevokePhotoAiConsentInput
+ */
+export interface RevokePhotoAiConsentInput {
+  /**
+   *
+   * @type {string}
+   * @memberof RevokePhotoAiConsentInput
+   */
+  grantId: string
+}
 /**
  *
  * @export

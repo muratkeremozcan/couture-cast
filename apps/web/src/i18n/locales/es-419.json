@@ -1040,6 +1040,23 @@
     }
   },
   "settings": {
+    "photoAi": {
+      "heading": "IA para fotos",
+      "off": "La IA externa para fotos está desactivada.",
+      "manual": "Puedes seguir escribiendo descripciones, agregando prendas y eligiendo etiquetas por tu cuenta.",
+      "revoke": "Revocar",
+      "revokeLabel": "Revocar permiso para {{feature}} ({{provider}})",
+      "loadError": "No se pudieron cargar los permisos de las fotos.",
+      "revokeError": "No se pudo confirmar la revocación. Inténtalo de nuevo.",
+      "revoked": "Permiso revocado.",
+      "retry": "Intentar de nuevo",
+      "features": {
+        "community-description": "Descripciones de la Comunidad",
+        "garment-cutout": "Recortes de prendas",
+        "garment-tags": "Etiquetas de prendas",
+        "flat-lay-garments": "Detección de prendas en una superficie plana"
+      }
+    },
     "profile": {
       "account": "Cuenta",
       "places": "Lugares",

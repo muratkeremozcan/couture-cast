@@ -10,7 +10,7 @@ import { BaseExceptionFilter, HttpAdapterHost } from '@nestjs/core'
 import { STATUS_CODES } from 'node:http'
 import { TelemetryService } from '../modules/telemetry/telemetry.service'
 import { createBaseLogger } from '../logger/pino.config'
-import { isLookIdeasRoute } from '../logger/request-context.js'
+import { isPrivateAccountRoute } from '../logger/request-context.js'
 
 interface AuthenticatedRequest {
   url?: string
@@ -96,7 +96,7 @@ export class ApiExceptionFilter extends BaseExceptionFilter {
   override catch(exception: unknown, host: ArgumentsHost): void {
     const request = host.switchToHttp().getRequest<AuthenticatedRequest | undefined>()
     const route = request?.path || request?.url?.split('?')[0] || 'unknown'
-    if (isLookIdeasRoute(route)) {
+    if (isPrivateAccountRoute(route)) {
       // Nest's unknown-error handler logs the original object, including parser metadata.
       super.catch(privateHttpException(exception), host)
       return

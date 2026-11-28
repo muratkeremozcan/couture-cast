@@ -307,6 +307,7 @@ model User {
   comfort_profile                     ComfortPreferences?
   style_profile                       StyleProfile?
   look_idea_daily_quota               LookIdeaDailyQuota?
+  photo_ai_grants                     PhotoAiGrant[]
   garments                            GarmentItem[]
   palette_insights                    PaletteInsights[]
   outfits                             OutfitRecommendation[]
@@ -380,6 +381,27 @@ model LookIdeaBudget {
   dispatch_count Int @default(0)
 }
 
+/// RLS: API-only, member-scoped grants. Each affirmative decision binds one policy scope.
+model PhotoAiGrant {
+  id                   String           @id @default(cuid())
+  user_id              String
+  user                 User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  feature              String
+  input_class          String
+  provider             String
+  policy_version       String
+  granted_at           DateTime
+  expires_at           DateTime
+  revoked_at           DateTime?
+  teen_assented_at     DateTime?
+  guardian_approved_at DateTime?
+  guardian_consent_id  String?
+  guardian_consent     GuardianConsent? @relation(fields: [guardian_consent_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id, revoked_at, expires_at])
+  @@index([guardian_consent_id])
+}
+
 /// RLS: user-scoped profile data keyed by user_id
 model UserProfile {
   id               String    @id @default(cuid())
@@ -406,6 +428,7 @@ model GuardianConsent {
   revoked_ip_address String?
   status             ConsentStatus @default(pending)
   created_at         DateTime      @default(now())
+  photo_ai_grants    PhotoAiGrant[]
 
   @@unique([guardian_id, teen_id])
   @@index([guardian_id])

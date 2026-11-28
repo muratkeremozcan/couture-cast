@@ -15,6 +15,33 @@ export function isolatedCommunityDatabase() {
   target.pathname = `/${name}`
   let created = false
 
+  async function reachable(): Promise<boolean> {
+    const probe = new Client({
+      connectionString: source.toString(),
+      connectionTimeoutMillis: 2_000,
+    })
+    try {
+      await probe.connect()
+      return true
+    } catch (error) {
+      if (error instanceof Error) {
+        const code = (error as NodeJS.ErrnoException).code
+        const unreachable = [
+          'ECONNREFUSED',
+          'ENOTFOUND',
+          'EHOSTUNREACH',
+          'ENETUNREACH',
+          'ETIMEDOUT',
+        ]
+        if (error.message === 'timeout expired' || (code && unreachable.includes(code)))
+          return false
+      }
+      throw error
+    } finally {
+      await probe.end()
+    }
+  }
+
   async function drop() {
     if (!created) return
     const admin = new Client({ connectionString: source.toString() })
@@ -74,5 +101,5 @@ export function isolatedCommunityDatabase() {
     await isolated.end()
   }
 
-  return { url: target.toString(), migrate, drop }
+  return { url: target.toString(), migrate, drop, reachable }
 }

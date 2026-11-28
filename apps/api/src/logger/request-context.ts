@@ -36,14 +36,21 @@ const REQUEST_ID_HEADER = 'x-request-id'
 const requestContextStorage = new AsyncLocalStorage<RequestContext>()
 export const LOOK_IDEAS_ROUTE = '/api/v1/personalization/look-ideas'
 
-export function isLookIdeasRoute(path: string | undefined): boolean {
-  return path?.split('?')[0]?.replace(/\/+$/, '').toLowerCase() === LOOK_IDEAS_ROUTE
+export const PHOTO_AI_CONSENT_ROUTE = '/api/v1/privacy/photo-ai-consent'
+
+export function isPrivateAccountRoute(path: string | undefined): boolean {
+  const normalized = path?.split('?')[0]?.replace(/\/+$/, '').toLowerCase()
+  return (
+    normalized === LOOK_IDEAS_ROUTE ||
+    normalized === PHOTO_AI_CONSENT_ROUTE ||
+    normalized === `${PHOTO_AI_CONSENT_ROUTE}/revoke`
+  )
 }
 
-export function isLookIdeasRequest(
+export function isPrivateAccountRequest(
   request: Pick<RequestLike, 'path' | 'originalUrl' | 'url'>
 ) {
-  return isLookIdeasRoute(request.path ?? request.originalUrl ?? request.url)
+  return isPrivateAccountRoute(request.path ?? request.originalUrl ?? request.url)
 }
 
 function normalizeHeaderValue(value: string | string[] | undefined): string | undefined {
@@ -82,7 +89,7 @@ export function inferFeatureFromPath(path?: string): string {
 }
 
 export function extractUserId(request: RequestLike): string | undefined {
-  if (isLookIdeasRequest(request)) return undefined
+  if (isPrivateAccountRequest(request)) return undefined
   return request.auth?.userId ?? normalizeHeaderValue(request.headers['x-user-id'])
 }
 
@@ -98,7 +105,7 @@ export function createRequestContext(request: RequestLike): RequestContext {
     (request.method === 'GET' || path.endsWith('/targets/resolve'))
   return {
     requestId,
-    ...(isLookIdeasRequest(request) && { suppressAccountContext: true }),
+    ...(isPrivateAccountRequest(request) && { suppressAccountContext: true }),
     ...(communityRead
       ? {
           communityAuthorizationDeadline:
@@ -135,7 +142,7 @@ export function bindRequestContext(
   response: Response,
   next: NextFunction
 ) {
-  const privateRoute = isLookIdeasRequest(request)
+  const privateRoute = isPrivateAccountRequest(request)
   const requestId = resolveRequestId(
     privateRoute ? undefined : request.headers[REQUEST_ID_HEADER]
   )

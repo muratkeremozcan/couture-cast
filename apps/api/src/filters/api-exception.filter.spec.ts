@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 // Learning path Step 41: Curated reactions.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
+// Learning path Step 81: Photo AI consent and processor approval.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-81-photo-ai-consent-and-processor-approval
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiExceptionFilter } from './api-exception.filter.js'
 import { HttpException, HttpStatus, type ArgumentsHost } from '@nestjs/common'
@@ -167,6 +169,20 @@ describe('ApiExceptionFilter', () => {
   }
 
   it.each([
+    {
+      url: '/api/v1/privacy/photo-ai-consent',
+      exception: new Error('Synthetic permission lookup detail'),
+      envelope: { statusCode: 500, message: 'Internal Server Error' },
+    },
+    {
+      url: '/api/v1/privacy/photo-ai-consent/revoke',
+      exception: {
+        statusCode: 400,
+        message: 'Synthetic revocation parse detail',
+        body: 'synthetic-grant',
+      },
+      envelope: { statusCode: 400, message: 'Bad Request' },
+    },
     {
       url: '/api/v1/personalization/look-ideas',
       exception: new HttpException('Invalid outfit preferences', HttpStatus.BAD_REQUEST),

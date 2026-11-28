@@ -26,6 +26,7 @@ import { WeatherModule } from './modules/weather/weather.module'
 import { LocationPreferencesModule } from './modules/location-preferences/location-preferences.module'
 import { TelemetryModule } from './modules/telemetry/telemetry.module'
 import { PersonalizationModule } from './modules/personalization/personalization.module.js'
+import { PhotoAiModule } from './modules/photo-ai/photo-ai.module.js'
 import { WardrobeModule } from './modules/wardrobe/wardrobe.module'
 import { CommerceModule } from './modules/commerce/commerce.module.js'
 import { CommunityModule } from './modules/community/community.module'
@@ -59,6 +60,7 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     WeatherModule,
     TelemetryModule,
     PersonalizationModule,
+    PhotoAiModule,
     WardrobeModule,
     CommerceModule,
     CommunityModule,

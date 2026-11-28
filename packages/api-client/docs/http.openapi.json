@@ -4811,6 +4811,99 @@
         ],
         "additionalProperties": false
       },
+      "RevokePhotoAiConsentInput": {
+        "type": "object",
+        "properties": {
+          "grantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "grantId"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoAiConsentGrant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "feature": {
+            "type": "string",
+            "enum": [
+              "community-description",
+              "garment-cutout",
+              "garment-tags",
+              "flat-lay-garments"
+            ]
+          },
+          "inputClass": {
+            "type": "string",
+            "enum": [
+              "community-photo",
+              "garment-photo",
+              "flat-lay-photo"
+            ]
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "policyVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "feature",
+          "inputClass",
+          "provider",
+          "policyVersion",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoAiConsentResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "externalProcessingEnabled": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ]
+              },
+              "grants": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PhotoAiConsentGrant"
+                }
+              }
+            },
+            "required": [
+              "externalProcessingEnabled",
+              "grants"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
       "CreateGarmentUploadUrlInput": {
         "type": "object",
         "properties": {
@@ -25058,6 +25151,235 @@
           },
           "503": {
             "description": "Account verification temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/privacy/photo-ai-consent": {
+      "get": {
+        "tags": [
+          "privacy"
+        ],
+        "summary": "List photo AI permissions for the signed-in member",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current permissions for the signed-in member.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoAiConsentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access restricted.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Account verification is temporarily unavailable.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/privacy/photo-ai-consent/revoke": {
+      "post": {
+        "tags": [
+          "privacy"
+        ],
+        "summary": "Revoke a photo AI permission held by the signed-in member",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokePhotoAiConsentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current permissions for the signed-in member.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoAiConsentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid grant identifier.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access restricted.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Account verification is temporarily unavailable.",
             "headers": {
               "Cache-Control": {
                 "schema": {

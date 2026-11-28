@@ -101,15 +101,18 @@ async function readBoundedObject(
 ): Promise<Buffer> {
   const parts: Uint8Array[] = []
   let size = 0
-  for (;;) {
-    const next = await reader.read()
-    if (signal.aborted) throw storageUnavailable()
-    if (next.done) break
-    size += next.value.byteLength
-    if (size > maxBytes) throw new CommunityObjectDownloadError('too-large')
-    parts.push(next.value)
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (!done) parts.push(value)
+      if (signal.aborted) throw storageUnavailable()
+      if (done) return Buffer.concat(parts, size)
+      size += value.byteLength
+      if (size > maxBytes) throw new CommunityObjectDownloadError('too-large')
+    }
+  } finally {
+    for (const part of parts) part.fill(0)
   }
-  return Buffer.concat(parts, size)
 }
 
 // Supabase can wrap an object 404 in HTTP 400. Bucket and proxy 404s are outages.
@@ -121,8 +124,9 @@ async function isMissingCommunityObject(
   const maxBytes = 4 * 1024
   if (!reader || ![400, 404].includes(response.status)) return false
   if (Number(response.headers.get('content-length')) > maxBytes) return false
+  let raw: Buffer | undefined
   try {
-    const raw = await readBoundedObject(reader, maxBytes, signal)
+    raw = await readBoundedObject(reader, maxBytes, signal)
     const body = JSON.parse(raw.toString('utf8')) as {
       error?: unknown
       code?: unknown
@@ -134,6 +138,8 @@ async function isMissingCommunityObject(
     return body?.error === 'not_found' || body?.code === 'NoSuchKey'
   } catch {
     return false
+  } finally {
+    raw?.fill(0)
   }
 }
 
@@ -302,6 +308,7 @@ export class SupabaseCommunityStorageAdapter implements CommunityStorage {
           headers: { Authorization: `Bearer ${key}`, apikey: key },
           signal: controller.signal,
           redirect: 'error',
+          cache: 'no-store',
         }
       )
       reader = response.body?.getReader()

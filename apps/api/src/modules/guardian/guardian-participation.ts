@@ -5,6 +5,8 @@ import { calculateAge } from '@couture/utils'
 import { resolveGuardianConsentPolicy } from '../auth/guardian-consent-policy.js'
 import { teenAccessBlocked } from '../auth/guardian-consent-state.service.js'
 
+export const activeGuardianConsentWhere = { status: 'granted', revoked_at: null } as const
+
 export async function assertWardrobeParticipationAllowed(
   tx: Prisma.TransactionClient,
   userId: string
@@ -13,7 +15,7 @@ export async function assertWardrobeParticipationAllowed(
     where: { id: userId },
     include: {
       profile: true,
-      teen_roles: { where: { status: 'granted', revoked_at: null } },
+      teen_roles: { where: activeGuardianConsentWhere },
     },
   })
   const born = user?.profile?.birthdate

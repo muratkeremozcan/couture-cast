@@ -18,8 +18,8 @@ import {
 } from '../../analytics/analytics.service'
 import { createBaseLogger } from '../../logger/pino.config'
 import { resolveGuardianConsentPolicy } from '../auth/guardian-consent-policy.js'
-import { GuardianConsentStateService } from '../auth/guardian-consent-state.service'
-import { UserSessionService } from '../auth/user-session.service'
+import { GuardianConsentStateService } from '../auth/guardian-consent-state.service.js'
+import { UserSessionService } from '../auth/user-session.service.js'
 import {
   consentLevelSchema,
   guardianConsentRevokeResponseSchema,
@@ -31,6 +31,7 @@ import {
 import { calculateAge } from '@couture/utils'
 import { z } from 'zod'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { PhotoAiAttemptRegistry } from '../photo-ai/photo-ai-attempt-registry.js'
 
 type InvitationTokenPayload = {
   sub: string
@@ -421,8 +422,12 @@ export class GuardianService {
   constructor(
     @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient,
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(GuardianConsentStateService)
     private readonly guardianConsentStateService: GuardianConsentStateService,
-    private readonly userSessionService: UserSessionService
+    @Inject(UserSessionService)
+    private readonly userSessionService: UserSessionService,
+    @Inject(PhotoAiAttemptRegistry)
+    private readonly photoAiAttempts = new PhotoAiAttemptRegistry()
   ) {}
 
   private logConsentAuditEvent(tx: Prisma.TransactionClient, event: ConsentAuditEvent) {
@@ -736,6 +741,7 @@ export class GuardianService {
           remainingActiveGuardians: number
           sessionInvalidated: boolean
           notificationQueued: true
+          revokedPhotoGrants: { id: string }[]
         }
       | undefined
 
@@ -794,6 +800,15 @@ export class GuardianService {
             })
 
             const sessionInvalidated = remainingActiveGuardians === 0
+            const revokedPhotoGrants = await tx.photoAiGrant.updateManyAndReturn({
+              where: {
+                user_id: teenId,
+                revoked_at: null,
+                ...(sessionInvalidated ? {} : { guardian_consent_id: consent.id }),
+              },
+              data: { revoked_at: revokedAt },
+              select: { id: true },
+            })
 
             // Story 6.1 HIGH-1: when the last active guardian consent goes, the
             // member's community content stops being publicly visible in the
@@ -910,6 +925,7 @@ export class GuardianService {
               remainingActiveGuardians,
               sessionInvalidated,
               notificationQueued: true as const,
+              revokedPhotoGrants,
             }
           },
           {
@@ -945,6 +961,9 @@ export class GuardianService {
       throw new Error('Failed to revoke guardian consent after retrying the transaction')
     }
 
+    const { revokedPhotoGrants, ...response } = result
+    for (const { id } of revokedPhotoGrants) this.photoAiAttempts.abort(teenId, id)
+
     if (result.sessionInvalidated) {
       await this.userSessionService.invalidateUserSessions(result.teenId)
       this.guardianConsentStateService.markTeenAccessRevoked(result.teenId)
@@ -966,7 +985,7 @@ export class GuardianService {
       },
     })
 
-    return guardianConsentRevokeResponseSchema.parse(result)
+    return guardianConsentRevokeResponseSchema.parse(response)
   }
 
   async emancipateEligibleTeens(

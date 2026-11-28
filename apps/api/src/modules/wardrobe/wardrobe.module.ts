@@ -64,6 +64,7 @@ import { WardrobeRetentionService } from './wardrobe-retention.service'
     WardrobeRetentionService,
   ],
   exports: [
+    SupabaseWardrobeStorageAdapter,
     WardrobeService,
     WardrobeCapsuleService,
     WardrobeOnboardingService,

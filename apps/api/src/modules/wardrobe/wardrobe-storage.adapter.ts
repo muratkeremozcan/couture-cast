@@ -55,7 +55,11 @@ export interface WardrobeStorage {
   createUploadSession(objectPath: string): Promise<WardrobeUploadSession>
   download(objectPath: string): Promise<Buffer>
   /** The object's bytes, read with a hard ceiling; see {@link BoundedDownload}. */
-  downloadBounded(objectPath: string, maxBytes: number): Promise<BoundedDownload>
+  downloadBounded(
+    objectPath: string,
+    maxBytes: number,
+    signal?: AbortSignal
+  ): Promise<BoundedDownload>
   /**
    * Writes verified bytes to a final path with server-owned metadata (content type and the
    * private cache policy), overwriting whatever is there. Final paths are never signed, so only
@@ -148,11 +152,14 @@ function isDuplicateObjectError(error: StorageError): boolean {
  * so does a proxy in front of storage; neither means the member's bytes are missing, so only
  * this code does. The body is read through a small ceiling.
  */
-async function isMissingObjectResponse(response: Response): Promise<boolean> {
+async function isMissingObjectResponse(
+  response: Response,
+  signal?: AbortSignal
+): Promise<boolean> {
   if (response.status !== 404 && response.status !== 400) return false
   let raw: Buffer | null
   try {
-    raw = await readBounded(response, MAX_ERROR_BODY_BYTES)
+    raw = await readBounded(response, MAX_ERROR_BODY_BYTES, signal)
   } catch {
     return false
   }
@@ -170,6 +177,8 @@ async function isMissingObjectResponse(response: Response): Promise<boolean> {
     return body.error === 'not_found' || body.code === 'NoSuchKey'
   } catch {
     return false
+  } finally {
+    raw.fill(0)
   }
 }
 
@@ -177,30 +186,48 @@ async function isMissingObjectResponse(response: Response): Promise<boolean> {
  * Reads a response body into one buffer, stopping (and cancelling the stream) the moment it
  * passes `maxBytes`, so an oversized object never sits in memory whole.
  */
-async function readBounded(response: Response, maxBytes: number): Promise<Buffer | null> {
+async function readBounded(
+  response: Response,
+  maxBytes: number,
+  signal?: AbortSignal
+): Promise<Buffer | null> {
   const declared = Number(response.headers.get('content-length'))
-  if (Number.isFinite(declared) && declared > maxBytes) {
+  if (signal?.aborted || (Number.isFinite(declared) && declared > maxBytes)) {
     await response.body?.cancel().catch(() => undefined)
+    signal?.throwIfAborted()
     return null
   }
   if (!response.body) {
     const bytes = Buffer.from(await response.arrayBuffer())
-    return bytes.length > maxBytes ? null : bytes
+    if (!signal?.aborted && bytes.length <= maxBytes) return bytes
+    bytes.fill(0)
+    signal?.throwIfAborted()
+    return null
   }
+
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
-  let total = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    total += value.byteLength
-    if (total > maxBytes) {
-      await reader.cancel().catch(() => undefined)
-      return null
-    }
-    chunks.push(value)
+  const abort = () => {
+    void reader.cancel().catch(() => undefined)
   }
-  return Buffer.concat(chunks, total)
+  signal?.addEventListener('abort', abort, { once: true })
+  let total = 0
+  try {
+    signal?.throwIfAborted()
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (!done) chunks.push(value)
+      signal?.throwIfAborted()
+      if (done) return Buffer.concat(chunks, total)
+      total += value.byteLength
+      if (total > maxBytes) return null
+    }
+  } finally {
+    signal?.removeEventListener('abort', abort)
+    for (const chunk of chunks) chunk.fill(0)
+    await reader.cancel().catch(() => undefined)
+    reader.releaseLock()
+  }
 }
 
 @Injectable()
@@ -282,7 +309,12 @@ export class SupabaseWardrobeStorageAdapter implements WardrobeStorage {
    * the whole body before returning, which would let an oversized object reach memory before
    * the verifier could refuse it.
    */
-  async downloadBounded(objectPath: string, maxBytes: number): Promise<BoundedDownload> {
+  async downloadBounded(
+    objectPath: string,
+    maxBytes: number,
+    signal?: AbortSignal
+  ): Promise<BoundedDownload> {
+    signal?.throwIfAborted()
     if (!this.url || !this.serviceRoleKey) {
       throw storageUnavailable('configure')
     }
@@ -295,9 +327,13 @@ export class SupabaseWardrobeStorageAdapter implements WardrobeStorage {
             Authorization: `Bearer ${this.serviceRoleKey}`,
             apikey: this.serviceRoleKey,
           },
+          signal,
+          redirect: 'error',
+          cache: 'no-store',
         }
       )
     } catch (error) {
+      signal?.throwIfAborted()
       throw storageUnavailable(
         'download',
         { name: error instanceof Error ? error.name : 'FetchError' },
@@ -305,9 +341,10 @@ export class SupabaseWardrobeStorageAdapter implements WardrobeStorage {
       )
     }
     if (!response.ok) {
-      if (await isMissingObjectResponse(response)) {
-        return { status: 'missing' }
-      }
+      const missing = await isMissingObjectResponse(response, signal)
+      await response.body?.cancel().catch(() => undefined)
+      signal?.throwIfAborted()
+      if (missing) return { status: 'missing' }
       // A storage fault, a missing bucket included: never "missing bytes", which would tell the
       // client to upload again while storage is down.
       throw storageUnavailable(
@@ -318,14 +355,19 @@ export class SupabaseWardrobeStorageAdapter implements WardrobeStorage {
     }
     let bytes: Buffer | null
     try {
-      bytes = await readBounded(response, maxBytes)
+      bytes = await readBounded(response, maxBytes, signal)
     } catch (error) {
+      signal?.throwIfAborted()
       // The body broke off mid-stream: a storage fault, never a verdict on the bytes.
       throw storageUnavailable(
         'download',
         { name: error instanceof Error ? error.name : 'StreamError' },
         'STORAGE_UNAVAILABLE'
       )
+    }
+    if (signal?.aborted) {
+      bytes?.fill(0)
+      signal.throwIfAborted()
     }
     return bytes ? { status: 'present', bytes } : { status: 'too_large' }
   }

@@ -10,6 +10,7 @@ import {
   publishCommunityPostResponseSchema,
   reportCommunityPostResponseSchema,
   styleProfileResponseSchema,
+  photoAiConsentResponseSchema,
   withdrawCommunityPostResponseSchema,
   type CommunityFeedItem,
 } from '@couture/api-client/contracts/http'
@@ -366,6 +367,13 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
 }
 
 export const handlers = [
+  http.get('*/api/v1/privacy/photo-ai-consent', () =>
+    HttpResponse.json(
+      photoAiConsentResponseSchema.parse({
+        data: { externalProcessingEnabled: false, grants: [] },
+      })
+    )
+  ),
   http.post('*/api/v1/personalization/look-ideas', () =>
     HttpResponse.json({ data: null })
   ),

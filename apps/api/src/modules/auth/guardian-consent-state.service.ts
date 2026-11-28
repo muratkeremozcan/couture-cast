@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 import type { GuardianConsentPolicy } from '@couture/utils'
+import { getRequestContext } from '../../logger/request-context.js'
 import { resolveGuardianConsentPolicy } from './guardian-consent-policy'
 
 type CachedTeenAccessState = {
@@ -29,6 +30,10 @@ function extractComplianceState(
   }
 
   return compliance as Record<string, unknown>
+}
+
+export function isActiveAccount(preferences: Prisma.JsonValue | null | undefined) {
+  return extractComplianceState(preferences).accountStatus === 'active'
 }
 
 /**
@@ -143,9 +148,7 @@ export class GuardianConsentStateService {
       where: { id: userId },
       select: { profile: { select: { preferences: true } } },
     })
-    return (
-      extractComplianceState(profile?.profile?.preferences).accountStatus === 'active'
-    )
+    return isActiveAccount(profile?.profile?.preferences)
   }
 
   canTeenViewPrivateGarmentPhotos(userId: string): Promise<boolean> {
@@ -183,15 +186,16 @@ export class GuardianConsentStateService {
   }
 
   private resolveTeenAccess(userId: string, user: TeenProfileLookup) {
+    const logger = getRequestContext()?.suppressAccountContext ? undefined : this.logger
     if (!user) {
-      this.logger.warn(
+      logger?.warn(
         `Blocking teen request for "${userId}" because the user record was not found`
       )
       return false
     }
 
     if (!user.profile) {
-      this.logger.warn(
+      logger?.warn(
         `Blocking teen request for "${userId}" because the profile record is missing`
       )
       return false
@@ -199,7 +203,7 @@ export class GuardianConsentStateService {
 
     if (teenAccessBlocked(user.profile.preferences)) {
       const { accountStatus } = extractComplianceState(user.profile.preferences)
-      this.logger.warn(
+      logger?.warn(
         `Blocking teen request for "${userId}" because account status is "${
           typeof accountStatus === 'string' ? accountStatus : 'unknown'
         }"`
@@ -211,15 +215,16 @@ export class GuardianConsentStateService {
   }
 
   private resolveTeenNonUploadAccess(userId: string, user: TeenProfileLookup) {
+    const logger = getRequestContext()?.suppressAccountContext ? undefined : this.logger
     if (!user) {
-      this.logger.warn(
+      logger?.warn(
         `Blocking teen non-upload request for "${userId}" because the user record was not found`
       )
       return false
     }
 
     if (!user.profile) {
-      this.logger.warn(
+      logger?.warn(
         `Blocking teen non-upload request for "${userId}" because the profile record is missing`
       )
       return false
@@ -227,7 +232,7 @@ export class GuardianConsentStateService {
 
     if (teenAccessBlocked(user.profile.preferences, 'off')) {
       const { accountStatus } = extractComplianceState(user.profile.preferences)
-      this.logger.warn(
+      logger?.warn(
         `Blocking teen non-upload request for "${userId}" because account status is "${
           typeof accountStatus === 'string' ? accountStatus : 'unknown'
         }"`

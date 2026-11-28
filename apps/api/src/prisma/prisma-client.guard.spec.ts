@@ -53,6 +53,7 @@ describe('central Prisma retry guard', () => {
     expect(callers).toEqual([
       'src/modules/community/community-comments.outbox.ts',
       'src/modules/community/community-send-guard.ts',
+      'src/modules/photo-ai/photo-ai-grant-gate.ts',
       'src/modules/telemetry/telemetry.service.ts',
       // Round 4 upload review: removes one storage object under its row lock; writes only
       // WardrobeObjectDeletion, which has no triggers. An abort leaves the row for its retry.

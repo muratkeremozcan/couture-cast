@@ -25,6 +25,7 @@ import { registerRitualContracts } from './ritual'
 import { registerComfortContracts } from './comfort'
 import { registerStyleProfileContracts } from './style-profile'
 import { registerLookIdeasContract } from './look-ideas'
+import { registerPhotoAiConsentContracts } from './photo-ai-consent'
 import { registerWardrobeContracts } from './wardrobe'
 import { registerSavedLooksContracts } from './saved-looks'
 import { registerCommerceContracts } from './commerce'
@@ -86,6 +87,7 @@ export function createHttpOpenApiRegistry() {
   registerComfortContracts(registry, commonSchemas)
   registerStyleProfileContracts(registry, commonSchemas)
   registerLookIdeasContract(registry, commonSchemas)
+  registerPhotoAiConsentContracts(registry, commonSchemas)
   registerWardrobeContracts(registry, commonSchemas)
   registerSavedLooksContracts(registry, commonSchemas)
   registerCommerceContracts(registry, commonSchemas)

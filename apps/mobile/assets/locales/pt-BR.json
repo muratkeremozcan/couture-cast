@@ -70,6 +70,23 @@
     "precipitation": "Precipitação"
   },
   "settings": {
+    "photoAi": {
+      "heading": "IA para fotos",
+      "off": "A IA externa para fotos está desativada.",
+      "manual": "Você ainda pode escrever descrições, adicionar peças e escolher etiquetas por conta própria.",
+      "revoke": "Revogar",
+      "revokeLabel": "Revogar permissão para {{feature}} ({{provider}})",
+      "loadError": "Não foi possível carregar as permissões das fotos.",
+      "revokeError": "Não foi possível confirmar a revogação. Tente novamente.",
+      "revoked": "Permissão revogada.",
+      "retry": "Tentar novamente",
+      "features": {
+        "community-description": "Descrições da Comunidade",
+        "garment-cutout": "Recortes de roupas",
+        "garment-tags": "Etiquetas de roupas",
+        "flat-lay-garments": "Detecção de roupas dispostas em uma superfície plana"
+      }
+    },
     "profile": {
       "account": "Conta",
       "places": "Lugares",
