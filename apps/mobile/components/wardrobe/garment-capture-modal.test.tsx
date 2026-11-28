@@ -6,6 +6,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Learning path Step 83: Clean garment cutouts.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-83-clean-garment-cutouts
 // Story CC-7.11 test owner (TEA): 7.11-NAT-032, 7.11-NAT-033, the capture header is the layer's
 // swipe handle beside its X. [Codex 7.11 #3]: the swipe takes the X's guarded close, so a
 // picked photo asks "Discard this photo?" first; an upload in flight keeps the sheet open (busy guard).
@@ -18,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forgetAllUploadAttempts } from '@/src/lib/upload-attempts'
 import { AccessibilityInfo, Alert, findNodeHandle, Platform } from 'react-native'
 import { getGuestPreviewStrings } from '@couture/utils'
+import { decode, encode } from 'fast-png'
 import { http, HttpResponse } from 'msw'
 import {
   createGarmentItemInputSchema,
@@ -74,6 +77,10 @@ vi.mock('react-native', async (importOriginal) => {
     findNodeHandle: vi.fn(),
     // react-native-web's Alert draws nothing; the recorded call is the discard prompt.
     Alert: { ...actual.Alert, alert: vi.fn() },
+    // The Expo file mock owns these URIs. Record which file the native view receives.
+    Image: ({ source, testID }: { source: { uri: string }; testID: string }) => (
+      <div data-testid={testID} data-source-uri={source.uri} />
+    ),
     Modal: recordModalProps(
       ({ children, visible }: { children: React.ReactNode; visible: boolean }) =>
         visible ? children : null
@@ -114,19 +121,29 @@ vi.mock('expo-image-manipulator', () => ({
 const fileSystem = vi.hoisted(() => {
   // Mutable so a test can hand back a file that busts the 10 MiB ceiling.
   const state = { bytes: new Uint8Array([1, 2, 3, 4]) }
+  const files = new Map<string, Uint8Array>()
   class MockFile {
     uri: string
     constructor(uri: string, name?: string) {
       this.uri = name ? `${uri}${name}` : uri
     }
     bytes() {
-      return Promise.resolve(state.bytes)
+      return Promise.resolve(files.get(this.uri) ?? state.bytes)
+    }
+    get exists() {
+      return files.has(this.uri)
+    }
+    write(bytes: Uint8Array) {
+      files.set(this.uri, bytes.slice())
+    }
+    delete() {
+      files.delete(this.uri)
     }
     static downloadFileAsync = vi.fn((sourceUri: string, target: MockFile) =>
       Promise.resolve(target)
     )
   }
-  return { File: MockFile, Paths: { cache: 'file:///cache/' }, state }
+  return { File: MockFile, Paths: { cache: 'file:///cache/' }, files, state }
 })
 
 vi.mock('expo-file-system', () => ({
@@ -158,7 +175,7 @@ function renderModal(
 
 async function pickLibraryPhoto() {
   fireEvent.click(screen.getByTestId('garment-source-library'))
-  await waitFor(() => screen.getByTestId('garment-crop-preview'))
+  await screen.findByTestId('garment-crop-preview')
 }
 
 async function pickLibraryPhotoAndConfirm() {
@@ -183,7 +200,7 @@ function captureSuccessfulGarmentUpload() {
           uploadSessionId: 'session-1',
           uploadUrl: `${window.location.origin}/mock-storage/session-1`,
           uploadToken: 'upload-token-1',
-          requiredHeaders: { 'content-type': 'image/jpeg' },
+          requiredHeaders: { 'content-type': seen.allocation.mimeType },
           expiresAt: '2026-08-09T01:00:00.000Z',
         },
       })
@@ -205,7 +222,7 @@ function captureSuccessfulGarmentUpload() {
           comfortRange: null,
           tagsConfirmedAt: null,
           fileSizeBytes: seen.allocation?.fileSizeBytes,
-          mimeType: 'image/jpeg',
+          mimeType: seen.allocation?.mimeType,
           retentionStatus: 'active',
           createdAt: '2026-08-09T00:00:00.000Z',
           committedAt: '2026-08-09T00:00:01.000Z',
@@ -225,11 +242,20 @@ describe('MobileGarmentCaptureModal', () => {
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => 'test-access-token')
     fileSystem.state.bytes = new Uint8Array([1, 2, 3, 4])
-    imageManipulator.manipulateAsync.mockResolvedValue({
-      uri: 'file:///cropped.png',
-      width: 512,
-      height: 512,
-    })
+    fileSystem.files.clear()
+    imageManipulator.manipulateAsync
+      .mockReset()
+      .mockImplementation(
+        (
+          _uri: string,
+          [, { resize }]: [unknown, { resize: { width: number; height: number } }],
+          { format }: { format: string }
+        ) =>
+          Promise.resolve({
+            uri: `file:///crop-${resize.width}x${resize.height}.${format}`,
+            ...resize,
+          })
+      )
     imagePicker.requestCameraPermissionsAsync.mockResolvedValue({
       granted: true,
       canAskAgain: true,
@@ -257,6 +283,7 @@ describe('MobileGarmentCaptureModal', () => {
     restoreAccessTokenResolver()
     Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
     vi.useRealTimers()
+    vi.restoreAllMocks()
     vi.clearAllMocks()
   })
 
@@ -378,18 +405,17 @@ describe('MobileGarmentCaptureModal', () => {
 
   it('4.4-MOB-CAP-06 uploads the selected portrait crop with the original background', async () => {
     const seen = captureSuccessfulGarmentUpload()
-    const cropped = { uri: 'file:///portrait-crop.jpg', width: 675, height: 900 }
-    imageManipulator.manipulateAsync.mockResolvedValue(cropped)
-    const readCrop = vi.spyOn(fileSystem.File.prototype, 'bytes')
-
     renderModal()
     await pickLibraryPhoto()
-    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('switch'))
+    expect(screen.getByRole('switch')).not.toBeChecked()
     fireEvent.click(screen.getByTestId('garment-aspect-portrait'))
+    const preview = await screen.findByTestId('garment-crop-preview')
+    expect(preview).toHaveAttribute('data-source-uri', 'file:///crop-675x900.jpeg')
     fireEvent.click(screen.getByTestId('garment-confirm-image'))
 
     expect(await screen.findByTestId('garment-capture-complete')).toBeInTheDocument()
-    expect(imageManipulator.manipulateAsync).toHaveBeenCalledExactlyOnceWith(
+    expect(imageManipulator.manipulateAsync).toHaveBeenCalledWith(
       libraryAsset.uri,
       [
         { crop: { originX: 113, originY: 0, width: 675, height: 900 } },
@@ -397,12 +423,87 @@ describe('MobileGarmentCaptureModal', () => {
       ],
       { compress: 0.9, format: 'jpeg' }
     )
-    expect(readCrop.mock.contexts).toEqual([
-      expect.objectContaining({ uri: cropped.uri }),
-    ])
     expect(seen.bytes).toEqual(fileSystem.state.bytes)
     expect(seen.allocation).toMatchObject({ widthPx: 675, heightPx: 900 })
     expect(seen.commit).toMatchObject({ hasCropping: true, hasBgCleanup: false })
+  })
+
+  it('CC-7.26 sends the prepared PNG shown in the preview and clears its temporary file', async () => {
+    const seen = captureSuccessfulGarmentUpload()
+    const uri = 'file:///cutout.png'
+    const width = 256
+    const height = 256
+    const pixels = new Uint8Array(width * height * 3).fill(245)
+    for (let y = 60; y < 205; y++) {
+      for (let x = 50; x < 205; x++) {
+        pixels.set([36, 92, 161], (y * width + x) * 3)
+      }
+    }
+    fileSystem.files.set(uri, encode({ width, height, channels: 3, data: pixels }))
+    imageManipulator.manipulateAsync.mockResolvedValueOnce({ uri, width, height })
+    renderModal()
+    await pickLibraryPhoto()
+
+    expect(screen.getByRole('switch')).toBeChecked()
+    expect(screen.getByTestId('garment-crop-preview')).toHaveAttribute(
+      'data-source-uri',
+      uri
+    )
+    expect(seen.allocation).toBeUndefined()
+    const displayed = fileSystem.files.get(uri)!
+    const cutout = decode(displayed)
+    expect(cutout.data.slice(0, 4)).toEqual(new Uint8Array([0, 0, 0, 0]))
+    const center = ((height / 2) * width + width / 2) * 4
+    expect(cutout.data.slice(center, center + 4)).toEqual(
+      new Uint8Array([36, 92, 161, 255])
+    )
+    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+
+    expect(await screen.findByTestId('garment-capture-complete')).toBeInTheDocument()
+    expect(seen.allocation).toMatchObject({
+      mimeType: 'image/png',
+      widthPx: width,
+      heightPx: height,
+    })
+    expect(seen.uploadedContentType).toBe('image/png')
+    expect(seen.bytes).toEqual(displayed)
+    expect(seen.commit).toMatchObject({ hasCropping: true, hasBgCleanup: true })
+    expect(fileSystem.files.has(uri)).toBe(false)
+  })
+
+  it('CC-7.26 discards a preview that finishes after the crop changes', async () => {
+    const seen = captureSuccessfulGarmentUpload()
+    const stale = { uri: 'file:///stale-crop.png', width: 900, height: 900 }
+    let finishStale!: (image: typeof stale) => void
+    const pendingCrop = new Promise<typeof stale>((resolve) => {
+      finishStale = resolve
+    })
+    fileSystem.files.set(stale.uri, fileSystem.state.bytes)
+    imageManipulator.manipulateAsync.mockReturnValueOnce(pendingCrop)
+    renderModal()
+    fireEvent.click(screen.getByTestId('garment-source-library'))
+
+    const confirm = await screen.findByTestId('garment-confirm-image')
+    expect(confirm).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.queryByTestId('garment-crop-preview')).not.toBeInTheDocument()
+    await waitFor(() => expect(imageManipulator.manipulateAsync).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByTestId('garment-aspect-portrait'))
+    const preview = await screen.findByTestId('garment-crop-preview')
+    expect(preview).toHaveAttribute('data-source-uri', 'file:///crop-675x900.jpeg')
+    await act(async () => {
+      finishStale(stale)
+      await pendingCrop
+    })
+    await waitFor(() => expect(fileSystem.files.has(stale.uri)).toBe(false))
+
+    expect(screen.getByTestId('garment-crop-preview')).toHaveAttribute(
+      'data-source-uri',
+      'file:///crop-675x900.jpeg'
+    )
+    fireEvent.click(confirm)
+    expect(await screen.findByTestId('garment-capture-complete')).toBeInTheDocument()
+    expect(seen.allocation).toMatchObject({ widthPx: 675, heightPx: 900 })
+    expect(seen.commit).toMatchObject({ hasBgCleanup: false })
   })
 
   it('4.4-MOB-CAP-07 uploads the garment and reports the commit with the access token', async () => {
@@ -929,6 +1030,7 @@ describe('MobileGarmentCaptureModal', () => {
     await pickLibraryPhoto()
 
     fireEvent.click(screen.getByTestId('garment-aspect-portrait'))
+    await screen.findByTestId('garment-crop-preview')
     fireEvent.click(screen.getByTestId('garment-confirm-image'))
 
     await waitFor(() => {

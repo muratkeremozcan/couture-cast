@@ -2218,6 +2218,8 @@ describe('preparedImageEncoding', () => {
   })
 })
 
+// Learning path Step 83: Clean garment cutouts.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-83-clean-garment-cutouts
 describe('prepareGarmentImage source encoding', () => {
   /**
    * Community posts keep the picked file's own format (review round 1, 2026-11-19): the
@@ -2262,6 +2264,43 @@ describe('prepareGarmentImage source encoding', () => {
 
     expect(fetchMock).not.toHaveBeenCalled()
     expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', 0.9)
+  })
+
+  it('CC-7.26 redraws the unmasked crop when the browser cannot encode the cutout', async () => {
+    const width = 5
+    const height = 5
+    const data = new Uint8ClampedArray(width * height * 4).fill(255)
+    for (const index of [6, 7, 8, 11, 12, 13, 16, 17, 18]) {
+      data.set([10, 20, 30, 255], index * 4)
+    }
+    const drawImage = vi.fn()
+    const fillRect = vi.fn()
+    const putImageData = vi.fn()
+    const context = {
+      canvas: { width, height },
+      drawImage,
+      fillRect,
+      getImageData: vi.fn().mockReturnValue({ data, width, height }),
+      putImageData,
+    } as unknown as CanvasRenderingContext2D
+    const { toBlob } = installImagePrepMocks({ context })
+    toBlob.mockImplementationOnce((callback) => callback(null))
+
+    const prepared = await prepareGarmentImage(
+      'data:image/jpeg;base64,c2FtcGxl',
+      '1:1',
+      true,
+      'compact'
+    )
+
+    expect(putImageData).toHaveBeenCalledOnce()
+    expect(toBlob).toHaveBeenNthCalledWith(1, expect.any(Function), 'image/webp', 0.9)
+    expect(toBlob).toHaveBeenNthCalledWith(2, expect.any(Function), 'image/jpeg', 0.9)
+    expect(drawImage).toHaveBeenCalledTimes(2)
+    expect(fillRect.mock.invocationCallOrder[0]).toBeLessThan(
+      drawImage.mock.invocationCallOrder[1]!
+    )
+    expect(prepared).toMatchObject({ mimeType: 'image/jpeg', backgroundRemoved: false })
   })
 })
 
