@@ -14,6 +14,8 @@
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 // Learning path Step 76: Garment subtypes.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
+// Learning path Step 87: Style this piece with my own garments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-87-style-this-piece-with-my-own-garments
 import React from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -753,6 +755,53 @@ describe('GarmentDetailScreen', () => {
 
     const panel = await screen.findByTestId('style-piece-panel')
     expect(await within(panel).findAllByTestId('style-piece-look')).toHaveLength(3)
+  })
+
+  it('[7.30-NATIVE] shows owned pieces, a photo placeholder and catalog rain protection', async () => {
+    const shoesPhoto = photo('#253019')
+    closet = [
+      blueTop,
+      {
+        ...createReadyGarmentFixture({
+          id: 'owned-warm-bottom',
+          category: 'bottom',
+          comfortRange: 'warm',
+          imageAccess: null,
+        }),
+        colorFamily: null,
+      },
+      {
+        ...createReadyGarmentFixture({
+          id: 'owned-warm-shoes',
+          category: 'shoes',
+          comfortRange: 'warm',
+          imageAccess: shoesPhoto,
+        }),
+        colorFamily: null,
+      },
+    ]
+    renderDetail()
+    await browserUser.click(await screen.findByTestId('style-piece-open'))
+    const panel = within(await screen.findByTestId('style-piece-panel'))
+    await browserUser.click(await panel.findByRole('button', { name: 'Warm and rainy' }))
+
+    expect(panel.getByRole('heading', { name: 'School' })).toBeVisible()
+    expect(panel.getByRole('heading', { name: 'Weekend' })).toBeVisible()
+    expect(panel.getByRole('heading', { name: 'Going out' })).toBeVisible()
+    const school = panel
+      .getByRole('heading', { name: 'School' })
+      .closest('[data-testid="style-piece-look"]')
+    if (!(school instanceof HTMLElement)) throw new Error('Expected the School look card')
+    const look = within(school)
+    expect(look.getAllByTestId('style-piece-owned-companion')).toHaveLength(2)
+    expect(look.getByTestId('style-piece-companion-placeholder')).toBeVisible()
+    expect(look.getByText('Rain shell', { exact: true })).toBeVisible()
+    await waitFor(() =>
+      expect(school.querySelector(`img[src="${shoesPhoto.url}"]`)).toHaveProperty(
+        'naturalWidth',
+        16
+      )
+    )
   })
 
   it('[P1] [Codex 7.11 #3] [7.11-NAT-032] a swipe down on the editor header closes it like its X and Style this piece takes focus back', async () => {

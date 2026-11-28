@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
 // Learning path Step 71: Today's outfit as a picture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
+// Learning path Step 87: Style this piece with my own garments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-87-style-this-piece-with-my-own-garments
 import {
   ConflictException,
   ForbiddenException,
@@ -393,6 +395,53 @@ describe('WardrobeSavedLookService', () => {
       'https://storage.example.test/signed.png'
     )
     expect(signReadUrl).toHaveBeenCalledWith('wardrobe/user-1/garment-1.png', 900)
+  })
+
+  it.each([
+    { reason: 'outside the member’s ready closet', companion: null },
+    {
+      reason: 'retagged for a different slot',
+      companion: { category: 'shoes', comfort_range: 'mild' },
+    },
+    {
+      reason: 'incompatible with the selected weather',
+      companion: { category: 'bottom', comfort_range: 'cold' },
+    },
+  ])('[7.30-ACCOUNT] rejects a companion $reason', async ({ companion }) => {
+    const { prisma, service, signReadUrl } = createHarness()
+    const base = makeStylePieceInput()
+    const companionId = 'unavailable-companion'
+    const input = createSavedLookInputSchema.parse({
+      ...base,
+      composition: base.composition.map((slot) =>
+        slot.category === 'bottom'
+          ? { ...slot, kind: 'garment', itemId: companionId }
+          : slot
+      ),
+    })
+    prisma.garmentItem.findMany.mockResolvedValueOnce([
+      { id: base.anchorGarmentId, category: 'top', comfort_range: 'mild' },
+      ...(companion ? [{ id: companionId, ...companion }] : []),
+    ])
+
+    await expect(service.createSavedLook(ACTOR, input)).rejects.toThrow(NotFoundException)
+
+    expect(prisma.garmentItem.findMany.mock.calls).toMatchObject([
+      [
+        {
+          where: {
+            user_id: ACTOR.userId,
+            id: { in: [base.anchorGarmentId, companionId] },
+            upload_status: 'ready',
+            retention_status: 'active',
+            deletion_requested_at: null,
+          },
+          select: { id: true },
+        },
+      ],
+    ])
+    expect(prisma.savedLook.create).not.toHaveBeenCalled()
+    expect(signReadUrl).not.toHaveBeenCalled()
   })
 
   it('replays idempotently with matching payload hash and rejects mismatched payload with 409', async () => {

@@ -1,5 +1,10 @@
+// Learning path Step 87: Style this piece with my own garments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-87-style-this-piece-with-my-own-garments
 import type { Locator, Page } from '@playwright/test'
-import type { GarmentItemContract } from '@couture/api-client/contracts/http'
+import type {
+  GarmentItemContract,
+  ParsedCreateSavedLookInput,
+} from '@couture/api-client/contracts/http'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { isNonLocalEnvironment } from '../support/helpers/api-test'
 import {
@@ -11,6 +16,7 @@ import {
 } from '../support/helpers/style-one-piece-fixtures'
 
 const openerName = 'Style this piece'
+const occasions = ['School', 'Weekend', 'Going out'] as const
 
 async function openStyleDetail(page: Page, id: string) {
   if (new URL(page.url()).searchParams.get('garment') !== id) {
@@ -53,7 +59,7 @@ test.describe('Style this piece on a phone', () => {
     expect(new URL(baseURL!).hostname).toMatch(/^(?:127\.0\.0\.1|localhost|\[::1\])$/)
   })
 
-  test('styles the selected photo in three rain-ready looks and reopens a saved swap', async ({
+  test('[7.30-CLOSET] fills a sparse closet with rain-ready catalog looks and reopens a saved swap', async ({
     baseURL,
     page,
     interceptNetworkCall,
@@ -96,13 +102,15 @@ test.describe('Style this piece on a phone', () => {
       await expect(look.getByTestId('style-piece-swap-shoes')).toBeVisible()
       await expectPinnedPhoto(look, photo)
     }
-    for (const index of [1, 2, 3]) {
+    for (const occasion of occasions) {
       await expect(
-        panel.getByRole('heading', { name: `Look ${index}`, exact: true })
+        panel.getByRole('heading', { name: occasion, exact: true })
       ).toBeVisible()
     }
     await expect(panel.getByText('Your piece', { exact: true }).first()).toBeVisible()
-    await expect(panel.getByText('Example pieces', { exact: true }).first()).toBeVisible()
+    await expect(
+      panel.getByRole('heading', { name: 'Companion pieces', exact: true }).first()
+    ).toBeVisible()
 
     const edited = looks.filter({ has: page.getByText('Midi skirt', { exact: true }) })
     await expect(edited.getByText('White sneakers', { exact: true })).toBeVisible()
@@ -116,7 +124,7 @@ test.describe('Style this piece on a phone', () => {
 
     await edited.getByRole('button', { name: 'Save look', exact: true }).click()
     const savedLooks = panel.getByRole('region', {
-      name: 'Saved on this device',
+      name: 'Saved looks',
       exact: true,
     })
     const reopen = savedLooks.getByTestId('style-piece-reopen')
@@ -157,6 +165,123 @@ test.describe('Style this piece on a phone', () => {
     ).toBe(true)
   })
 
+  test('[7.30-WEATHER] [7.30-PHOTO] [7.30-ACCOUNT] saves and reopens a mixed rain-ready look from a populated closet', async ({
+    baseURL,
+    page,
+    interceptNetworkCall,
+  }) => {
+    const anchor = photographedGarment(baseURL!, 'style-piece-owned-anchor')
+    const trousers = photographedGarment(baseURL!, 'style-piece-owned-trousers', {
+      category: 'bottom',
+      comfortRange: 'warm',
+      imageAccess: null,
+    })
+    const shoes = photographedGarment(baseURL!, 'style-piece-owned-shoes', {
+      category: 'shoes',
+      comfortRange: 'warm',
+    })
+    const coldBottom = photographedGarment(baseURL!, 'style-piece-cold-trousers', {
+      category: 'bottom',
+      comfortRange: 'cold',
+    })
+    const spareShoes = photographedGarment(baseURL!, 'style-piece-added-shoes', {
+      category: 'shoes',
+      comfortRange: 'warm',
+    })
+    const inventory = { [memberA]: [coldBottom, shoes, anchor, trousers] }
+    const inputs: ParsedCreateSavedLookInput[] = []
+    await mockStyleWardrobe(page, baseURL!, interceptNetworkCall, inventory, (input) =>
+      inputs.push(input)
+    )
+
+    await page.goto('/wardrobe')
+    const panel = await openStylePanel(page, anchor.id)
+    const rain = panel.getByRole('button', { name: 'Warm and rainy', exact: true })
+    await rain.click()
+    await expect(rain).toHaveAttribute('aria-pressed', 'true')
+    const looks = panel.getByTestId('style-piece-look')
+    await expect(looks).toHaveCount(occasions.length)
+    for (const occasion of occasions) {
+      await expect(
+        panel.getByRole('heading', { name: occasion, exact: true })
+      ).toBeVisible()
+    }
+
+    const school = looks.filter({
+      has: page.getByRole('heading', { name: 'School', exact: true }),
+    })
+    await expectPinnedPhoto(school, anchor.imageAccess!.url)
+    const owned = school.getByTestId('style-piece-owned-companion')
+    await expect(owned).toHaveCount(2)
+    const shoePhoto = school.locator(`img[src="${shoes.imageAccess!.url}"]`)
+    await expect(shoePhoto).toHaveJSProperty('naturalWidth', 256)
+    await expect(shoePhoto).toHaveAttribute('referrerpolicy', 'no-referrer')
+    await expect(school.getByTestId('style-piece-companion-placeholder')).toHaveText(
+      'Photo unavailable'
+    )
+    await expect(school.getByText('Rain shell', { exact: true })).toBeVisible()
+    await expect(looks.locator(`img[src="${coldBottom.imageAccess!.url}"]`)).toHaveCount(
+      0
+    )
+
+    await school.getByRole('button', { name: 'Save look', exact: true }).click()
+    const reopen = panel.getByTestId('style-piece-reopen')
+    await expect(reopen).toHaveCount(1)
+    expect(inputs).toHaveLength(1)
+    const [saved] = inputs
+    expect(saved).toMatchObject({
+      source: 'style_piece',
+      weather: 'warm-rainy',
+      anchorGarmentId: anchor.id,
+    })
+    expect(saved?.composition[0]).toMatchObject({
+      slotIndex: 0,
+      category: 'top',
+      kind: 'garment',
+      itemId: anchor.id,
+    })
+    expect(saved?.composition).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'bottom',
+          kind: 'garment',
+          itemId: trousers.id,
+        }),
+        expect.objectContaining({ category: 'shoes', kind: 'garment', itemId: shoes.id }),
+        expect.objectContaining({
+          category: 'outerwear',
+          kind: 'catalog',
+          itemId: 'sample:g:rain-shell',
+        }),
+      ])
+    )
+
+    inventory[memberA] = [spareShoes, anchor, coldBottom, trousers, shoes]
+    await page.reload()
+    await openStylePanel(page, anchor.id)
+    await rain.click()
+    const sparePhoto = school.locator(`img[src="${spareShoes.imageAccess!.url}"]`)
+    await expect(sparePhoto).toHaveJSProperty('naturalWidth', 256)
+    await panel.getByTestId('style-piece-weather-mild-dry').click()
+    await expect(rain).toHaveAttribute('aria-pressed', 'false')
+    await reopen.click()
+    await expect(rain).toHaveAttribute('aria-pressed', 'true')
+    await expect(school.getByTestId('style-piece-look-title')).toBeFocused()
+    await expect(owned).toHaveCount(2)
+    await expect(shoePhoto).toHaveJSProperty('naturalWidth', 256)
+    await expect(sparePhoto).toHaveCount(0)
+    await expect(school.getByTestId('style-piece-companion-placeholder')).toBeVisible()
+    await expect(school.getByText('Rain shell', { exact: true })).toBeVisible()
+
+    await school.getByTestId('style-piece-swap-shoes').click()
+    const options = school.getByTestId(/^style-piece-option-/)
+    await expect(options.first()).toHaveAttribute(
+      'data-testid',
+      `style-piece-option-${spareShoes.id}`
+    )
+    await expect(school.getByTestId('style-piece-option-sample:g:loafers')).toBeVisible()
+  })
+
   test('keeps the edited card and keyboard focus when two swaps duplicate another look', async ({
     baseURL,
     page,
@@ -170,31 +295,31 @@ test.describe('Style this piece on a phone', () => {
     const panel = await openStylePanel(page, garment.id)
     const looks = panel.getByTestId('style-piece-look')
     const first = looks.filter({
-      has: page.getByRole('heading', { name: 'Look 1', exact: true }),
+      has: page.getByRole('heading', { name: 'School', exact: true }),
     })
     const second = looks.filter({
-      has: page.getByRole('heading', { name: 'Look 2', exact: true }),
+      has: page.getByRole('heading', { name: 'Weekend', exact: true }),
     })
-    await expect(first.getByText('Pleated skirt', { exact: true })).toBeVisible()
-    await expect(first.getByText('Ankle boots', { exact: true })).toBeVisible()
-    await expect(second.getByText('Dark jeans', { exact: true })).toBeVisible()
-    await expect(second.getByText('Loafers', { exact: true })).toBeVisible()
+    await expect(first.getByText('Dark jeans', { exact: true })).toBeVisible()
+    await expect(first.getByText('Loafers', { exact: true })).toBeVisible()
+    await expect(second.getByText('Chinos', { exact: true })).toBeVisible()
+    await expect(second.getByText('White sneakers', { exact: true })).toBeVisible()
 
-    // The visual numbering can change after deduplication. Keep the actual card nodes.
+    // The ranked ideas can change after deduplication. Keep the actual card nodes.
     const originalFirst = await first.elementHandle()
     const originalSecond = await second.elementHandle()
     await second.getByTestId('style-piece-swap-bottom').press('Enter')
-    await second.getByTestId('style-piece-option-sample:g:pleated-skirt').press('Enter')
-    await expect(second.getByText('Pleated skirt', { exact: true })).toBeVisible()
+    await second.getByTestId('style-piece-option-sample:g:dark-jeans').press('Enter')
+    await expect(second.getByText('Dark jeans', { exact: true })).toBeVisible()
     await expect(second.getByTestId('style-piece-swap-bottom')).toBeFocused()
     await second.getByTestId('style-piece-swap-shoes').press('Enter')
-    const duplicate = second.getByTestId('style-piece-option-sample:g:ankle-boots')
+    const duplicate = second.getByTestId('style-piece-option-sample:g:loafers')
     await expect(duplicate).toBeVisible()
     await duplicate.press('Enter')
 
     const matching = looks
-      .filter({ has: page.getByText('Pleated skirt', { exact: true }) })
-      .filter({ has: page.getByText('Ankle boots', { exact: true }) })
+      .filter({ has: page.getByText('Dark jeans', { exact: true }) })
+      .filter({ has: page.getByText('Loafers', { exact: true }) })
     await expect(matching).toHaveCount(1)
     await expect(matching.getByTestId('style-piece-swap-shoes')).toBeFocused()
     expect(
@@ -258,7 +383,7 @@ test.describe('Style this piece on a phone', () => {
     })
   }
 
-  test('shows the empty closet without a styling entry point', async ({
+  test('[7.30-CLOSET] shows the empty closet without a styling entry point', async ({
     baseURL,
     page,
     interceptNetworkCall,

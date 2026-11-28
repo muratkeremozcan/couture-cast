@@ -139,7 +139,7 @@ const renewed = {
   },
 }
 const defaultRecipe = {
-  lookId: 'sample:l:soft-pleats',
+  lookId: 'sample:l:office-oxford',
   weather: 'mild-dry',
   swaps: {},
 } satisfies StylePieceRecipe
@@ -190,7 +190,7 @@ async function startStyling() {
   const user = userEvent.setup()
   await user.click(await openButton())
   const dialog = await screen.findByRole('dialog', dialogName)
-  await within(dialog).findByRole('heading', { name: 'Look 1' })
+  await within(dialog).findByRole('heading', { name: 'School' })
   return { user, dialog }
 }
 
@@ -279,7 +279,7 @@ describe('Wardrobe styling', () => {
       renewed.imageAccess.url
     )
     expect(
-      within(dialog).getAllByRole('heading', { name: 'Example pieces' })
+      within(dialog).getAllByRole('heading', { name: 'Companion pieces' })
     ).toHaveLength(3)
   })
 
@@ -290,6 +290,8 @@ describe('Wardrobe styling', () => {
     const { user, dialog } = await startStyling()
     await user.click(within(dialog).getByRole('button', { name: 'Warm and rainy' }))
     const look = firstLook(dialog)
+    const occasion = look.getByTestId('style-piece-look-title').textContent
+    if (!occasion) throw new Error('Expected an occasion heading for the saved look')
     const swap = look.getByTestId('style-piece-swap-shoes')
     expect(look.getByText('White sneakers')).toBeVisible()
     expect(look.getByText('Rain shell')).toBeVisible()
@@ -311,7 +313,7 @@ describe('Wardrobe styling', () => {
     expect(look.getByText('Loafers')).toBeVisible()
     await user.click(look.getByRole('button', { name: 'Save look' }))
     expect(
-      await within(dialog).findByRole('region', { name: 'Saved on this device' })
+      await within(dialog).findByRole('region', { name: 'Saved looks' })
     ).toBeVisible()
     expect(readRecipes()).toEqual([
       {
@@ -335,7 +337,7 @@ describe('Wardrobe styling', () => {
     await waitFor(() => expect(selectedWeather).toHaveAttribute('aria-pressed', 'true'))
     expect(firstLook(reopened).getByText('Loafers')).toBeVisible()
     await waitFor(() =>
-      expect(within(reopened).getByRole('heading', { name: 'Look 1' })).toHaveFocus()
+      expect(within(reopened).getByRole('heading', { name: occasion })).toHaveFocus()
     )
 
     await user.click(within(reopened).getByRole('button', { name: /remove saved look/i }))
@@ -779,6 +781,24 @@ describe('Wardrobe styling', () => {
               category: 'top',
               kind: 'garment',
               itemId: garmentId,
+              label: null,
+              missing: false,
+              imageAccess: null,
+            },
+            {
+              slotIndex: 1,
+              category: 'bottom',
+              kind: 'catalog',
+              itemId: 'sample:g:dark-jeans',
+              label: null,
+              missing: false,
+              imageAccess: null,
+            },
+            {
+              slotIndex: 2,
+              category: 'shoes',
+              kind: 'catalog',
+              itemId: 'sample:g:loafers',
               label: null,
               missing: false,
               imageAccess: null,

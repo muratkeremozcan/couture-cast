@@ -1,3 +1,5 @@
+// Learning path Step 87: Style this piece with my own garments.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-87-style-this-piece-with-my-own-garments
 import { describe, expect, it, vi } from 'vitest'
 import { SAMPLE_CATALOG } from './catalog'
 import { getStylePieceStrings } from './style-one-piece-strings'
@@ -158,7 +160,7 @@ describe('style one piece', () => {
   })
 
   it('does not apply a draft from a different weather and keeps distinct saved weather keys', () => {
-    const [base] = draftLooks(top)
+    const [base] = stylePieceLooks(top, 'mild-dry').looks
     const wrongWeather = {
       ...base!.recipe,
       weather: 'warm-rainy',
@@ -225,8 +227,10 @@ describe('style one piece', () => {
       expect(result.looks.length).toBeGreaterThan(0)
       for (const look of result.looks) {
         expect(
-          look.companions.find(({ category }) => category === 'outerwear')?.[protection]
-        ).toBe(true)
+          look.companions.find(({ category }) => category === 'outerwear')
+        ).toMatchObject({
+          [protection]: true,
+        })
         expect(
           stylePieceSwapOptions(look, 'outerwear').every((garment) => garment[protection])
         ).toBe(true)
@@ -396,7 +400,12 @@ describe('style piece inventory refresh', () => {
         await vi.advanceTimersByTimeAsync(50)
         expect(inventory.currentAnchor()).toBeNull()
         expect(onAnchor.mock.calls).toEqual(
-          stillCurrent ? [[anchor], [null]] : [[anchor]]
+          stillCurrent
+            ? [
+                [anchor, []],
+                [null, []],
+              ]
+            : [[anchor, []]]
         )
       } finally {
         inventory.stop()
@@ -423,7 +432,7 @@ describe('style piece inventory refresh', () => {
       const anchor = await inventory.refresh()
       vi.setSystemTime(100)
       expect(inventory.currentAnchor()).toBeNull()
-      expect(onAnchor.mock.calls).toEqual([[anchor]])
+      expect(onAnchor.mock.calls).toEqual([[anchor, []]])
     } finally {
       inventory.stop()
       vi.useRealTimers()
@@ -458,6 +467,56 @@ describe('style piece inventory refresh', () => {
     }
   })
 
+  it('[7.30-PHOTO] clears an expired companion photo and keeps the tagged garment until access ends', async () => {
+    vi.useFakeTimers({ now: 0 })
+    const companion = {
+      ...piece,
+      id: 'owned-bottom',
+      category: 'bottom' as const,
+      imageAccess: {
+        url: 'https://example.test/owned-bottom.png',
+        expiresAt: new Date(100).toISOString(),
+      },
+    }
+    const hidden = {
+      ...companion,
+      id: 'held-bottom',
+      retentionStatus: 'deletion_pending',
+    }
+    const untagged = { ...companion, id: 'untagged-bottom', comfortRange: null }
+    const onAnchor = vi.fn()
+    let current = true
+    const inventory = createStylePieceRefresh({
+      garmentId: piece.id,
+      load: () => Promise.resolve([piece, companion, hidden, untagged]),
+      onAnchor,
+      isCurrent: () => current,
+    })
+    try {
+      inventory.setVisible(true)
+      const anchor = await inventory.refresh()
+      expect(anchor?.photo).toEqual(piece.imageAccess)
+      expect(inventory.currentCompanions()).toMatchObject([
+        { id: companion.id, kind: 'garment', photo: companion.imageAccess },
+      ])
+
+      await vi.advanceTimersByTimeAsync(100)
+      expect(onAnchor).toHaveBeenLastCalledWith(anchor, [
+        expect.objectContaining({ id: companion.id, kind: 'garment', photo: null }),
+      ])
+      expect(inventory.currentAnchor()).toEqual(anchor)
+      expect(inventory.currentCompanions()).toMatchObject([
+        { id: companion.id, kind: 'garment', photo: null },
+      ])
+
+      current = false
+      expect(inventory.currentCompanions()).toEqual([])
+    } finally {
+      inventory.stop()
+      vi.useRealTimers()
+    }
+  })
+
   it('fails closed for a rejected load, null inventory and an invalid selected item', async () => {
     const load = vi
       .fn()
@@ -480,7 +539,12 @@ describe('style piece inventory refresh', () => {
         expect(await inventory.refresh()).toBeNull()
         expect(inventory.currentAnchor()).toBeNull()
       }
-      expect(onAnchor.mock.calls).toEqual([[anchor], [null], [null], [null]])
+      expect(onAnchor.mock.calls).toEqual([
+        [anchor, []],
+        [null, []],
+        [null, []],
+        [null, []],
+      ])
     } finally {
       inventory.stop()
     }
@@ -512,11 +576,14 @@ describe('style piece inventory refresh', () => {
       old.reject(new Error('Aborted inventory request'))
       expect(await first).toBeNull()
       expect(inventory.refresh()).toBe(resumed)
-      expect(onAnchor.mock.calls).toEqual([[undefined]])
+      expect(onAnchor.mock.calls).toEqual([[undefined, []]])
       next.resolve([piece])
       const anchor = await resumed
       expect(inventory.currentAnchor()).toMatchObject({ photo: piece.imageAccess })
-      expect(onAnchor.mock.calls).toEqual([[undefined], [anchor]])
+      expect(onAnchor.mock.calls).toEqual([
+        [undefined, []],
+        [anchor, []],
+      ])
       expect(load).toHaveBeenCalledTimes(2)
     } finally {
       inventory.stop()
@@ -545,12 +612,12 @@ describe('style piece inventory refresh', () => {
       await vi.advanceTimersByTimeAsync(60_000)
       expect(load).toHaveBeenCalledTimes(2)
       expect(inventory.currentAnchor()).toBeNull()
-      expect(onAnchor).toHaveBeenLastCalledWith(null)
+      expect(onAnchor).toHaveBeenLastCalledWith(null, [])
 
       inventory.setVisible(false)
       await vi.advanceTimersByTimeAsync(60_000)
       expect(load).toHaveBeenCalledTimes(2)
-      expect(onAnchor).toHaveBeenLastCalledWith(undefined)
+      expect(onAnchor).toHaveBeenLastCalledWith(undefined, [])
       inventory.setVisible(true)
       expect(await inventory.refresh()).toBeNull()
       expect(load).toHaveBeenCalledTimes(3)
@@ -626,7 +693,7 @@ describe('style piece inventory refresh', () => {
       inventory.setVisible(true)
       expect(await inventory.refresh()).toBeNull()
       expect(await inventory.refreshForAction()).toEqual({ status: 'revoked' })
-      expect(onAnchor).toHaveBeenLastCalledWith(null)
+      expect(onAnchor).toHaveBeenLastCalledWith(null, [])
 
       // Establish valid anchor
       load.mockResolvedValueOnce([timedPiece])
@@ -656,7 +723,7 @@ describe('style piece inventory refresh', () => {
           error: transientError,
         })
         expect(inventory.currentAnchor()).toEqual(initialAnchor)
-        expect(onAnchor).not.toHaveBeenCalledWith(null)
+        expect(onAnchor).not.toHaveBeenCalledWith(null, [])
       }
 
       // Auth, response status, message, nested cause, AbortError, and TimeoutError all revoke and clear anchor
@@ -674,7 +741,7 @@ describe('style piece inventory refresh', () => {
         onAnchor.mockClear()
         load.mockRejectedValueOnce(revokingError)
         expect(await inventory.refreshForAction()).toEqual({ status: 'revoked' })
-        expect(onAnchor).toHaveBeenLastCalledWith(null)
+        expect(onAnchor).toHaveBeenLastCalledWith(null, [])
         expect(inventory.currentAnchor()).toBeNull()
       }
 
@@ -713,8 +780,8 @@ describe('style piece inventory refresh', () => {
       pendingReject.reject(new Error('Aborted'))
       expect(await inFlightResolve).toEqual({ status: 'revoked' })
       expect(await inFlightReject).toEqual({ status: 'revoked' })
-      expect(onAnchor).toHaveBeenCalledWith(undefined)
-      expect(onAnchor).not.toHaveBeenCalledWith(null)
+      expect(onAnchor).toHaveBeenCalledWith(undefined, [])
+      expect(onAnchor).not.toHaveBeenCalledWith(null, [])
 
       // Identity switch during refreshForAction also suppresses publication
       inventory.setVisible(true)
@@ -780,7 +847,7 @@ describe('style piece inventory refresh', () => {
       expect(await periodicPromise).toBeNull()
       expect(inventory.currentAnchor()).toBeNull()
       expect(onAnchor).toHaveBeenCalledTimes(1)
-      expect(onAnchor).toHaveBeenCalledWith(null)
+      expect(onAnchor).toHaveBeenCalledWith(null, [])
 
       // 2. Re-seed anchor, start older refreshForAction(), then newer periodic refresh() revokes ([])
       load.mockResolvedValueOnce([pieceV1])
@@ -808,7 +875,7 @@ describe('style piece inventory refresh', () => {
       expect(await staleActionErrPromise).toEqual({ status: 'revoked' })
       expect(inventory.currentAnchor()).toBeNull()
       expect(onAnchor).toHaveBeenCalledTimes(1)
-      expect(onAnchor).toHaveBeenCalledWith(null)
+      expect(onAnchor).toHaveBeenCalledWith(null, [])
 
       // 3. Newer refreshForAction() publishes pieceV2; older refreshForAction() (ok & error) and older refresh() (error) do not clobber pieceV2
       load.mockResolvedValueOnce([pieceV1])

@@ -399,7 +399,7 @@ describe('Closet garment detail', () => {
     await user.click(await within(detail).findByTestId('style-piece-open'))
 
     const panel = await screen.findByRole('dialog', { name: 'Style this piece' })
-    expect(await within(panel).findByRole('heading', { name: 'Look 1' })).toBeVisible()
+    expect(await within(panel).findByRole('heading', { name: 'School' })).toBeVisible()
   })
 
   /**

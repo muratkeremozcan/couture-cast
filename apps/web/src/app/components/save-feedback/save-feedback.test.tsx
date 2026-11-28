@@ -642,7 +642,7 @@ describe('web save-feedback components', () => {
       )
 
       const dialog = await screen.findByRole('dialog', { name: 'Style this piece' })
-      await within(dialog).findByRole('heading', { name: 'Look 1' })
+      await within(dialog).findByRole('heading', { name: 'School' })
       const callsBeforeOffline = loadInventory.mock.calls.length
 
       act(() => {
@@ -655,7 +655,7 @@ describe('web save-feedback components', () => {
 
       // Did not invoke network refresh, kept looks intact, showed offline notice
       expect(loadInventory).toHaveBeenCalledTimes(callsBeforeOffline)
-      expect(within(dialog).getByRole('heading', { name: 'Look 1' })).toBeVisible()
+      expect(within(dialog).getByRole('heading', { name: 'School' })).toBeVisible()
       expect(within(dialog).getByTestId('status-feedback-bar')).toHaveTextContent(
         'You are offline. Save when you reconnect.'
       )
@@ -711,12 +711,12 @@ describe('web save-feedback components', () => {
       )
 
       const dialog = await screen.findByRole('dialog', { name: 'Style this piece' })
-      await within(dialog).findByRole('heading', { name: 'Look 1' })
+      await within(dialog).findByRole('heading', { name: 'School' })
 
       // Transient 503 on Save keeps look on screen and offers Retry
       const [firstSave] = within(dialog).getAllByTestId('style-piece-save')
       await user.click(firstSave!)
-      expect(within(dialog).getByRole('heading', { name: 'Look 1' })).toBeVisible()
+      expect(within(dialog).getByRole('heading', { name: 'School' })).toBeVisible()
       expect(firstSave).toHaveTextContent('Failed')
       const retry = within(dialog).getByTestId('status-bar-action-retry')
 
@@ -1566,7 +1566,7 @@ describe('web save-feedback components', () => {
       )
 
       const panel = await screen.findByTestId('style-piece-panel')
-      await within(panel).findByRole('heading', { name: 'Look 1' })
+      await within(panel).findByRole('heading', { name: 'School' })
 
       // Swap a companion -> Undo Swap
       const swapButtons = within(panel)
