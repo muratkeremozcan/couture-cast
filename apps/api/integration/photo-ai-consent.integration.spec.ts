@@ -130,6 +130,19 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
+function reach<T>(
+  name: string,
+  barrier: Promise<T>,
+  attempt: Promise<unknown>
+): Promise<T> {
+  return Promise.race([
+    barrier,
+    attempt.then(() => {
+      throw new Error(`Photo AI execution ended before ${name}.`)
+    }),
+  ])
+}
+
 function activeProfile() {
   return { compliance: { accountStatus: 'active', guardianConsentRequired: false } }
 }
@@ -185,8 +198,15 @@ function harness(image: Buffer, policy = FIXTURE_POLICY) {
 describe('CC-7.24 photo AI execution with persisted consent', () => {
   let image: Buffer
   let app: INestApplication
+  let databaseReady = false
 
   beforeAll(async () => {
+    if (!(await database.reachable())) {
+      if (process.env.CI === 'true' || process.env.CI === '1') {
+        throw new Error('PostgreSQL is required for photo AI consent checks in CI.')
+      }
+      return
+    }
     await database.migrate()
     await persistUser(
       prisma,
@@ -280,9 +300,14 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
     app = routes.createNestApplication()
     app.use(bindRequestContext)
     await listenHttpApp(app)
+    databaseReady = true
   }, 60_000)
 
-  beforeEach(async () => {
+  beforeEach(async (context) => {
+    if (!databaseReady) {
+      context.skip()
+      return
+    }
     await prisma.photoAiGrant.deleteMany()
     await updateGuardianConsent(
       prisma,
@@ -682,7 +707,7 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
     })
 
     const attempt = execute.execute(OWNER, SCOPE, adapter)
-    await dispatched.promise
+    await reach('processor dispatch', dispatched.promise, attempt)
     try {
       await prisma.garmentItem.update({
         where: { id: SCOPE.photoId },
@@ -719,7 +744,7 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
       const attempt = execute.execute(OWNER, SCOPE, adapter)
-      const signal = await dispatched.promise
+      const signal = await reach('processor dispatch', dispatched.promise, attempt)
       await vi.advanceTimersByTimeAsync(9_999)
       expect(signal.aborted).toBe(false)
       await vi.advanceTimersByTimeAsync(1)
@@ -744,13 +769,15 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
     })
 
     const attempt = execute.execute(OWNER, SCOPE, adapter)
-    const signal = await readStarted.promise
+    const signal = await reach('private photo read', readStarted.promise, attempt)
     await gate.revoke(OWNER.userId, GRANT_ID)
-    const lateBytes = Buffer.from(image)
-    photo.resolve(lateBytes)
 
     await expect(attempt).resolves.toBeNull()
     expect(signal.aborted).toBe(true)
+
+    const lateBytes = Buffer.from(image)
+    photo.resolve(lateBytes)
+    await photo.promise
     expect(lateBytes.equals(Buffer.alloc(lateBytes.length))).toBe(true)
     expect(process).not.toHaveBeenCalled()
   })
@@ -771,7 +798,7 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
       })
 
       const attempt = execute.execute(OWNER, SCOPE, adapter)
-      const signal = await dispatched.promise
+      const signal = await reach('processor dispatch', dispatched.promise, attempt)
       await revoker.revoke(OWNER.userId, GRANT_ID)
       expect(signal.aborted).toBe(sameInstance)
       reply.resolve(PROCESSOR_RESULT)
@@ -781,4 +808,26 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
       await expect(gate.list(OWNER.userId)).resolves.toEqual([])
     }
   )
+
+  it('discards output when the grant expires as final delivery authorization completes', async () => {
+    const { adapter, execute, gate, process } = harness(image)
+    const verifier = new PhotoAiGrantGate(prisma, FIXTURE_POLICY)
+    const clock = vi.spyOn(Date, 'now')
+    let checkpoints = 0
+    const verification = vi
+      .spyOn(gate, 'withGrant')
+      .mockImplementation(async (...args) => {
+        const decision = await verifier.withGrant(...args)
+        checkpoints += 1
+        if (checkpoints === 3) clock.mockReturnValue(+expiresAt)
+        return decision
+      })
+    try {
+      await expect(execute.execute(OWNER, SCOPE, adapter)).resolves.toBeNull()
+      expect(verification).toHaveBeenCalledTimes(3)
+      expect(process).toHaveBeenCalledOnce()
+    } finally {
+      clock.mockRestore()
+    }
+  })
 })

@@ -18,7 +18,7 @@ import {
 } from '../../analytics/analytics.service'
 import { createBaseLogger } from '../../logger/pino.config'
 import { resolveGuardianConsentPolicy } from '../auth/guardian-consent-policy.js'
-import { GuardianConsentStateService } from '../auth/guardian-consent-state.service'
+import { GuardianConsentStateService } from '../auth/guardian-consent-state.service.js'
 import { UserSessionService } from '../auth/user-session.service'
 import {
   consentLevelSchema,
@@ -422,6 +422,7 @@ export class GuardianService {
   constructor(
     @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient,
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(GuardianConsentStateService)
     private readonly guardianConsentStateService: GuardianConsentStateService,
     private readonly userSessionService: UserSessionService,
     @Inject(PhotoAiAttemptRegistry)
