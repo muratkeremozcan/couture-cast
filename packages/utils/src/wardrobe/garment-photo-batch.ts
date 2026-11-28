@@ -17,7 +17,7 @@ export type GarmentPhotoBatchRow = {
   status: RowStatus
   preview?: string
   keep: boolean
-  differentPhoto?: boolean
+  retryError?: 'invalid' | 'differentPhoto'
 }
 
 export type GarmentPhotoBatchState = {
@@ -217,16 +217,18 @@ export class GarmentPhotoBatch<Source, Image, Session, Result> {
 
   private async retry(batch: ActiveBatch<Session>, id: number, source: Source) {
     this.update({ busy: true })
-    this.updateRow(id, { status: 'preparing', differentPhoto: false })
+    this.updateRow(id, { status: 'preparing', retryError: undefined })
     const photo = await this.prepare(batch, source)
     if (!this.owns(batch)) return
-    if (photo && photo.fingerprint === this.fingerprints.get(id)) {
+    if (!photo) {
+      this.updateRow(id, { status: 'failed', retryError: 'invalid' })
+    } else if (photo.fingerprint !== this.fingerprints.get(id)) {
+      this.adapter.releasePrepared(photo)
+      this.updateRow(id, { status: 'failed', retryError: 'differentPhoto' })
+    } else {
       this.prepared.set(id, photo)
       this.updateRow(id, { preview: photo.preview })
       await this.upload(batch, id, photo)
-    } else {
-      if (photo) this.adapter.releasePrepared(photo)
-      this.updateRow(id, { status: 'failed', differentPhoto: true })
     }
     if (this.owns(batch) && !this.state.blocked) this.update({ busy: false })
   }

@@ -52,7 +52,8 @@ async function preparePhoto(asset: ImagePicker.ImagePickerAsset, signal: AbortSi
   ) {
     throw new Error('Invalid photo')
   }
-  const image = await prepareGarmentCaptureImage(asset, '1:1', true, signal)
+  // Match the original upload declaration on retry with the same square crop.
+  const image = await prepareGarmentCaptureImage(asset, '1:1', false, signal)
   if (!image) throw new Error('Photo preparation cancelled')
   try {
     return {
@@ -223,7 +224,7 @@ export function MobileGarmentPhotoBatch({
                 </Pressable>
               ) : (
                 <Text accessibilityLiveRegion="polite" style={themed.soft}>
-                  {row.differentPhoto ? strings.differentPhoto : strings[row.status]}
+                  {strings[row.retryError ?? row.status]}
                 </Text>
               )}
             </View>

@@ -671,6 +671,10 @@ export function GarmentCaptureModal({
           <WebGarmentPhotoBatch
             resetRef={resetBatchRef}
             onClose={handleClose}
+            onInitialPickerOpen={() => {
+              cancelCapture()
+              setErrorKey(null)
+            }}
             onGarmentCommitted={onBatchGarmentCommitted}
             uploadGarment={uploadGarment}
           >

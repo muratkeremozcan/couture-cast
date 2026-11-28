@@ -42,6 +42,7 @@ import { hasAppHistoryBelow } from '../../lib/app-history'
 import { LANDING_SESSION_ATTRIBUTE } from '../../lib/landing-session'
 import { hasStoredWebSession } from '../../lib/web-session'
 import { useRetryOnVerifiedSession } from '../../lib/session-retry'
+import { onUploadSessionChange } from '../../lib/upload-attempts'
 import {
   currentWebSessionBearer,
   currentWebSessionOwner,
@@ -879,8 +880,8 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
 
   useEffect(() => {
     pollingControllerRef.current?.abort()
-    batchPollingControllerRef.current?.abort()
-    batchPendingIds.current.clear()
+    // A tag save or manual refresh can finish while other batch pieces are processing.
+    // The inventory revision check coordinates this read with the continuing batch poll.
     const controller = new AbortController()
     listController.current = controller
     setIsLoading(true)
@@ -906,13 +907,18 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     return () => controller.abort()
   }, [sessionAttempt, missedSession, loadAttempt, loadInventory])
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const abortPolls = () => {
       pollingControllerRef.current?.abort()
       batchPollingControllerRef.current?.abort()
-    },
-    []
-  )
+      batchPendingIds.current.clear()
+    }
+    const unsubscribe = onUploadSessionChange(abortPolls)
+    return () => {
+      unsubscribe()
+      abortPolls()
+    }
+  }, [])
 
   const openCapture = (invoker: HTMLElement) => {
     captureInvokerRef.current = invoker
@@ -964,9 +970,14 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
   const pollCommittedGarment = (garmentId: string, batch = false) => {
     const poll = batch ? batchPollingControllerRef : pollingControllerRef
     poll.current?.abort()
-    listController.current?.abort()
-    setIsLoading(false)
+    if (!batch) {
+      listController.current?.abort()
+      setIsLoading(false)
+    }
     const controller = new AbortController()
+    const scope = currentWebSessionScope()
+    const isCurrentPoll = () =>
+      !controller.signal.aborted && currentWebSessionScope() === scope
     poll.current = controller
     setGarmentError(null)
 
@@ -981,8 +992,9 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
             Math.max(0, startedAt + offsetMs - Date.now()),
             controller.signal
           )
+          if (!isCurrentPoll()) return
           const persisted = await loadInventory(controller.signal)
-          if (controller.signal.aborted || currentWebSessionOwner() !== owner) return
+          if (!isCurrentPoll()) return
           if (batch) {
             if (settleBatchRows(persisted)) return
             continue
@@ -994,7 +1006,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
         }
         setGarmentError(t('wardrobe.hub.taggingSlow'))
       } catch (error) {
-        if (!controller.signal.aborted) {
+        if (isCurrentPoll()) {
           setGarmentError(
             error instanceof Error ? error.message : t('wardrobe.hub.statusRefreshFailed')
           )

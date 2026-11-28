@@ -45,7 +45,8 @@ async function preparePhoto(file: File, signal: AbortSignal) {
   }
   signal.addEventListener('abort', releaseOriginal, { once: true })
   try {
-    const image = await prepareGarmentImage(original, '1:1', true, 'compact')
+    // The fixed crop reproduces the declared bytes when the same photo is reselected.
+    const image = await prepareGarmentImage(original, '1:1', false, 'compact')
     signal.throwIfAborted()
     return {
       image,
@@ -62,6 +63,7 @@ type Props = {
   children: ReactNode
   resetRef: RefObject<(() => void) | null>
   onClose: () => void
+  onInitialPickerOpen: () => void
   onGarmentCommitted: (garment: GarmentItemContract) => void
   uploadGarment: (input: UploadGarmentImageInput) => Promise<GarmentItemContract>
 }
@@ -70,6 +72,7 @@ export function WebGarmentPhotoBatch({
   children,
   resetRef,
   onClose,
+  onInitialPickerOpen,
   onGarmentCommitted,
   uploadGarment,
 }: Props) {
@@ -158,10 +161,13 @@ export function WebGarmentPhotoBatch({
     cancelPick(initialPick)
     cancelPick(retryPick)
     if (id === undefined) {
+      const input = initialInput.current
+      if (!input) return
       const pick = batch.open(currentUploadSession())
       if (!pick) return
       initialPick.current = pick
-      initialInput.current?.click()
+      onInitialPickerOpen()
+      input.click()
     } else {
       const pick = batch.openRetry(id)
       if (!pick) return
@@ -265,7 +271,7 @@ export function WebGarmentPhotoBatch({
                     </label>
                   ) : (
                     <p role="status" className="text-sm text-ink-soft">
-                      {row.differentPhoto ? strings.differentPhoto : strings[row.status]}
+                      {strings[row.retryError ?? row.status]}
                     </p>
                   )}
                 </div>

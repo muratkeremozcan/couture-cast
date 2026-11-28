@@ -88,6 +88,10 @@ The batch stops on an account-wide sign-in or guardian-consent refusal.
 It releases queued photos and keeps any pieces already saved.
 The member can restart from Closet once the account can upload.
 
+The batch uses a fixed square crop that keeps the background.
+The member confirms the exact crop that will upload, and retry can recreate the same bytes.
+Single-photo capture still offers background cleanup.
+
 ## Plan Change Log
 
 ## Review Triage Log
@@ -97,16 +101,25 @@ The independent review covered all 21 changed paths from
 `a4371d83a12531544a6e2a339ecea13ffe9be018`.
 Codex Security scan `a4371d83a125_20261128T113656Z` covered 17 worklist rows and four supplemental paths, with zero findings and zero deferrals.
 
-| Finding                                | Resolution                                                                                                  |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| P0-1 Shared coverage                   | Cover localized counts and the batch guards under the utils ratchet.                                        |
-| P0-2 Native file cleanup mock          | Mock the Expo cache path and exercise the cache boundary.                                                   |
-| P1-1 Browser picker recovery           | Replace a dismissed pick on the next click and ignore events with no current ticket.                        |
-| P1-2 Browser and native coverage       | Exercise the result and retry states, then verify the Closet retains both saved pieces.                     |
-| P2-1 Poll tracking                     | Drop missing and settled IDs and clear tracking when a poll ends. Manual refresh aborts the web batch poll. |
-| P2-2 Native request and cleanup limits | Bound the storage PUT and handle unavailable cache paths.                                                   |
-| P2-3 Account refusal                   | Stop queued saves and show localized sign-in or guardian-consent guidance.                                  |
-| P3-1 Story closeout                    | Cross-link Step 85 and finish the spec and sprint status.                                                   |
+| Finding                                | Resolution                                                                                                              |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| P0-1 Shared coverage                   | Cover localized counts and the batch guards under the utils ratchet.                                                    |
+| P0-2 Native file cleanup mock          | Mock the Expo cache path and exercise the cache boundary.                                                               |
+| P1-1 Browser picker recovery           | Replace a dismissed pick on the next click and ignore events with no current ticket.                                    |
+| P1-2 Browser and native coverage       | Exercise the result and retry states, then verify the Closet retains both saved pieces.                                 |
+| P2-1 Poll tracking                     | Drop missing and settled IDs and clear tracking when a poll ends. Account changes and unmount abort the web batch poll. |
+| P2-2 Native request and cleanup limits | Bound the storage PUT and handle unavailable cache paths.                                                               |
+| P2-3 Account refusal                   | Stop queued saves and show localized sign-in or guardian-consent guidance.                                              |
+| P3-1 Story closeout                    | Cross-link Step 85 and finish the spec and sprint status.                                                               |
+
+CodeRabbit completed one review on `c4c93ee8fc76127a912e6c558b79f96ba3aa607f`.
+The review body repeated these three inline findings. Reviews were paused before pushing fixes.
+
+| Finding                                      | Resolution                                                                                      |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Camera permission can interrupt batch review | Opening the batch picker invalidates the competing camera request and releases its late stream. |
+| Tag confirmation interrupts batch polling    | Preserve unsettled garment IDs through the same-session Closet refresh.                         |
+| Cutout fallback changes the retry payload    | Use a fixed batch crop on both platforms. Show unreadable retries as preparation failures.      |
 
 ## Verification
 
