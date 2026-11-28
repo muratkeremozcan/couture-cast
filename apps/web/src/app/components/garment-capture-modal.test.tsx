@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+// Learning path Step 85: Add several photos at once.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-85-add-several-photos-at-once
 // Story 4.1 Task 8 step 3 owner: unit-test web garment capture behavior
 // @vitest-environment jsdom
 import React from 'react'
@@ -74,14 +76,16 @@ const preparedPhoto: wardrobe.PreparedImage = {
   backgroundRemoved: true,
 }
 const revokePreviewUrl = vi.fn()
+const createPreviewUrl = vi.fn()
 
 beforeEach(() => {
   vi.spyOn(wardrobe, 'prepareGarmentImage').mockResolvedValue(preparedPhoto)
   revokePreviewUrl.mockClear()
+  createPreviewUrl.mockReset().mockReturnValue('blob:prepared-photo')
   vi.stubGlobal(
     'URL',
     class extends URL {
-      static createObjectURL = vi.fn(() => 'blob:prepared-photo')
+      static createObjectURL = createPreviewUrl
       static revokeObjectURL = revokePreviewUrl
     }
   )
@@ -903,6 +907,101 @@ describe('GarmentCaptureModal account epoch', () => {
         uploadSession: expect.objectContaining({ account: 'member-a' }) as unknown,
       })
     )
+  })
+})
+
+describe('GarmentCaptureModal Closet batch', () => {
+  beforeEach(() => {
+    let urlNumber = 0
+    createPreviewUrl.mockImplementation(() => `blob:batch-${++urlNumber}`)
+    setUploadAttemptAccount('member-a')
+  })
+
+  afterEach(() => {
+    setUploadAttemptAccount(null)
+  })
+
+  function files(count: number) {
+    return Array.from(
+      { length: count },
+      (_, index) =>
+        new File([`photo-${index}`], `garment-${index}.png`, { type: 'image/png' })
+    )
+  }
+
+  it('[7.28-WEB-001] rejects six files, reviews five and releases the previews when closed', async () => {
+    const user = userEvent.setup()
+    const uploadGarment = vi.fn()
+    const onClose = vi.fn()
+    const modalProps = { onClose, uploadGarment, onBatchGarmentCommitted: vi.fn() }
+    const { rerender } = render(<GarmentCaptureModal isOpen {...modalProps} />)
+    const input = screen.getByTestId('garment-batch-input')
+    const picker = screen.getByRole('button', { name: 'Choose several photos' })
+    const openInput = vi.spyOn(input, 'click')
+    await user.click(picker)
+    fireEvent(input, new Event('cancel'))
+    await user.click(picker)
+    expect(openInput).toHaveBeenCalledTimes(2)
+    await user.upload(input, files(6))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose up to 5 photos.')
+    expect(wardrobe.prepareGarmentImage).not.toHaveBeenCalled()
+    expect(createPreviewUrl).not.toHaveBeenCalled()
+
+    await user.upload(input, files(5))
+    await screen.findByTestId('garment-batch-keep-5')
+    const keepControls = screen.getAllByRole('checkbox', { name: 'Keep piece' })
+    expect(keepControls).toHaveLength(5)
+    expect(screen.getByTestId('garment-batch-add')).toBeDisabled()
+    for (const keep of keepControls.slice(0, 4)) await user.click(keep)
+    expect(screen.getByRole('button', { name: 'Add 4 pieces' })).toBeEnabled()
+    expect(uploadGarment).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Close capture modal' }))
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(revokePreviewUrl.mock.calls.flat().sort()).toEqual(
+      Array.from({ length: 10 }, (_, index) => `blob:batch-${index + 1}`).sort()
+    )
+    expect(uploadGarment).not.toHaveBeenCalled()
+
+    rerender(<GarmentCaptureModal isOpen={false} {...modalProps} />)
+    rerender(<GarmentCaptureModal isOpen {...modalProps} />)
+    expect(screen.getByTestId('garment-batch-picker')).toBeVisible()
+    expect(screen.queryByRole('checkbox', { name: 'Keep piece' })).toBeNull()
+  })
+
+  it('[7.28-CLEANUP-001] releases the raw URL immediately when identity changes during preparation', async () => {
+    const user = userEvent.setup()
+    let finish!: (image: wardrobe.PreparedImage) => void
+    const preparing = new Promise<wardrobe.PreparedImage>((resolve) => {
+      finish = resolve
+    })
+    vi.mocked(wardrobe.prepareGarmentImage).mockReturnValueOnce(preparing)
+    const uploadGarment = vi.fn()
+    render(
+      <GarmentCaptureModal
+        isOpen
+        onClose={vi.fn()}
+        onBatchGarmentCommitted={vi.fn()}
+        uploadGarment={uploadGarment}
+      />
+    )
+    await user.upload(screen.getByTestId('garment-batch-input'), files(1))
+    expect(await screen.findByText('Preparing photo…')).toBeVisible()
+    expect(createPreviewUrl).toHaveBeenCalledOnce()
+
+    act(() => setUploadAttemptAccount('member-b'))
+    expect(screen.getByTestId('garment-batch-picker')).toBeVisible()
+    expect(revokePreviewUrl).toHaveBeenCalledExactlyOnceWith('blob:batch-1')
+    await act(async () => {
+      finish(preparedPhoto)
+      await preparing
+    })
+
+    expect(screen.queryByTestId('garment-batch-row-1')).toBeNull()
+    expect(createPreviewUrl).toHaveBeenCalledOnce()
+    expect(revokePreviewUrl).toHaveBeenCalledOnce()
+    expect(uploadGarment).not.toHaveBeenCalled()
   })
 })
 
