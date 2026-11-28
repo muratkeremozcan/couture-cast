@@ -22609,3 +22609,5 @@ for each.
 - [Gateway adapter](../../apps/api/src/modules/personalization/look-ideas.provider.spec.ts),
   [concurrent budget](../../apps/api/integration/look-ideas-budget.integration.spec.ts), and
   [shared ranking](../../packages/utils/src/sample-wardrobe/member-lookbook-ranking.spec.ts).
+- [API client](../../packages/api-client/testing/look-ideas-client.spec.ts) and
+  [web lookbook editor](../../apps/web/src/app/components/looks/member-lookbook.test.tsx).

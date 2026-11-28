@@ -15,16 +15,23 @@ export type LookIdeaBudgetOutcome =
   | 'spend_limit'
   | 'unavailable'
 
+type QuotaDeadline = { at: number; signal: AbortSignal }
+
 export interface LookIdeaBudget {
-  reserve(userId: string): Promise<LookIdeaBudgetOutcome>
+  reserve(userId: string, deadline: QuotaDeadline): Promise<LookIdeaBudgetOutcome>
+}
+
+function remainingTime({ at, signal }: QuotaDeadline) {
+  const remaining = Math.floor(at - performance.now())
+  if (signal.aborted || remaining <= 1) throw new Error('Look ideas quota deadline')
+  return remaining
 }
 
 @Injectable()
 export class DatabaseLookIdeaBudget implements LookIdeaBudget {
   constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
 
-  async reserve(userId: string): Promise<LookIdeaBudgetOutcome> {
-    const deadline = performance.now() + LOOK_IDEA_DEADLINE_MS
+  async reserve(userId: string, deadline: QuotaDeadline): Promise<LookIdeaBudgetOutcome> {
     try {
       return await interactiveTransaction(
         this.prisma,
@@ -34,6 +41,7 @@ export class DatabaseLookIdeaBudget implements LookIdeaBudget {
           const [budget] = await tx.$queryRaw<{ dispatch_count: number }[]>`
           SELECT "dispatch_count" FROM "LookIdeaBudget" WHERE "id" = 1 FOR UPDATE
         `
+          remainingTime(deadline)
           if (!budget) return 'unavailable'
           if (budget.dispatch_count >= DISPATCH_LIMIT) return 'spend_limit'
 
@@ -56,12 +64,11 @@ export class DatabaseLookIdeaBudget implements LookIdeaBudget {
             where: { id: 1 },
             data: { dispatch_count: { increment: 1 } },
           })
-          if (performance.now() >= deadline) throw new Error('Look ideas quota deadline')
+          remainingTime(deadline)
           return 'allowed'
         },
         () => {
-          const remaining = Math.floor(deadline - performance.now())
-          if (remaining <= 1) throw new Error('Look ideas quota deadline')
+          const remaining = remainingTime(deadline)
           const maxWait = Math.min(1_000, Math.floor(remaining / 2))
           return { maxWait, timeout: remaining - maxWait }
         }

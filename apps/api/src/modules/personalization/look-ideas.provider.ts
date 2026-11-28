@@ -10,6 +10,7 @@ export const LOOK_IDEA_PROVIDER = Symbol('LOOK_IDEA_PROVIDER')
 export const LOOK_IDEA_MODEL = 'anthropic/claude-haiku-5.5'
 
 const GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1/chat/completions'
+const MAX_COMPLETION_BYTES = 32_768
 const SYSTEM_PROMPT = [
   'Rank the three catalog outfits from best to least suited to the supplied weather and style choices.',
   'Catalog inputs give each outfit ID and the garment ID in each slot.',
@@ -53,19 +54,18 @@ function gatewayKey(env: NodeJS.ProcessEnv): string | undefined {
 
 @Injectable()
 export class GatewayLookIdeaProvider implements LookIdeaProvider {
-  private readonly key = gatewayKey(process.env)
-
   get enabled() {
-    return Boolean(this.key)
+    return Boolean(gatewayKey(process.env))
   }
 
   async generate(input: LookIdeaProviderInput, signal: AbortSignal): Promise<unknown> {
-    if (!this.key) return null
+    const key = gatewayKey(process.env)
+    if (!key) return null
 
     const response = await fetch(GATEWAY_URL, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${this.key}`,
+        authorization: `Bearer ${key}`,
         'content-type': 'application/json',
       },
       redirect: 'error',
@@ -124,7 +124,35 @@ export class GatewayLookIdeaProvider implements LookIdeaProvider {
       await response.body?.cancel()
       throw new Error('Look ideas provider request failed')
     }
-    const completion = completionSchema.parse(await response.json())
+    const completion = completionSchema.parse(await readCompletion(response))
     return JSON.parse(completion.choices[0].message.content)
   }
+}
+
+async function readCompletion(response: Response): Promise<unknown> {
+  const body = response.body
+  if (!body) throw new Error('Look ideas provider returned an empty response')
+  if (Number(response.headers.get('content-length')) > MAX_COMPLETION_BYTES) {
+    await body.cancel()
+    throw new Error('Look ideas provider response exceeded the size limit')
+  }
+
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let bytes = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      bytes += value.byteLength
+      if (bytes > MAX_COMPLETION_BYTES) {
+        await reader.cancel()
+        throw new Error('Look ideas provider response exceeded the size limit')
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  return JSON.parse(Buffer.concat(chunks, bytes).toString('utf8'))
 }

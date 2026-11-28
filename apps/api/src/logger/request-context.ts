@@ -28,6 +28,7 @@ export type RequestContext = {
 type RequestLike = Pick<Request, 'headers' | 'originalUrl' | 'url'> & {
   auth?: { userId?: string }
   method?: string
+  path?: string
   id?: string | number | object
 }
 
@@ -37,6 +38,12 @@ export const LOOK_IDEAS_ROUTE = '/api/v1/personalization/look-ideas'
 
 export function isLookIdeasRoute(path: string | undefined): boolean {
   return path?.split('?')[0]?.replace(/\/+$/, '').toLowerCase() === LOOK_IDEAS_ROUTE
+}
+
+export function isLookIdeasRequest(
+  request: Pick<RequestLike, 'path' | 'originalUrl' | 'url'>
+) {
+  return isLookIdeasRoute(request.path ?? request.originalUrl ?? request.url)
 }
 
 function normalizeHeaderValue(value: string | string[] | undefined): string | undefined {
@@ -75,7 +82,7 @@ export function inferFeatureFromPath(path?: string): string {
 }
 
 export function extractUserId(request: RequestLike): string | undefined {
-  if (isLookIdeasRoute(request.originalUrl ?? request.url)) return undefined
+  if (isLookIdeasRequest(request)) return undefined
   return request.auth?.userId ?? normalizeHeaderValue(request.headers['x-user-id'])
 }
 
@@ -91,7 +98,7 @@ export function createRequestContext(request: RequestLike): RequestContext {
     (request.method === 'GET' || path.endsWith('/targets/resolve'))
   return {
     requestId,
-    ...(isLookIdeasRoute(path) && { suppressAccountContext: true }),
+    ...(isLookIdeasRequest(request) && { suppressAccountContext: true }),
     ...(communityRead
       ? {
           communityAuthorizationDeadline:
@@ -128,7 +135,7 @@ export function bindRequestContext(
   response: Response,
   next: NextFunction
 ) {
-  const privateRoute = isLookIdeasRoute(request.originalUrl ?? request.url)
+  const privateRoute = isLookIdeasRequest(request)
   const requestId = resolveRequestId(
     privateRoute ? undefined : request.headers[REQUEST_ID_HEADER]
   )
@@ -143,6 +150,7 @@ export function bindRequestContext(
     headers: request.headers,
     method: request.method,
     originalUrl: request.originalUrl,
+    path: request.path,
     url: request.url,
     auth: authRequest.auth,
     id: requestId,

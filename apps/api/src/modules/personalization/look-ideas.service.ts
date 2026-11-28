@@ -20,7 +20,10 @@ const timedOut = Symbol('timeout')
 
 @Injectable()
 export class LookIdeasService {
-  private readonly logger = createBaseLogger({ includeRequestMetadata: false })
+  private readonly logger = createBaseLogger({
+    includeRequestMetadata: false,
+    productionLevel: 'info',
+  })
 
   constructor(
     @Inject(LOOK_IDEA_PROVIDER) private readonly provider: LookIdeaProvider,
@@ -32,6 +35,7 @@ export class LookIdeasService {
     input: LookIdeasInput
   ): Promise<LookIdeasResponse['data']> {
     const started = performance.now()
+    const endsAt = started + LOOK_IDEA_DEADLINE_MS
     let outcome = 'unavailable'
     const request = new AbortController()
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -46,14 +50,17 @@ export class LookIdeasService {
       )
       if (new Set(candidates.map(({ lookId }) => lookId)).size !== 3) return null
 
-      const remaining = () => LOOK_IDEA_DEADLINE_MS - (performance.now() - started)
+      const remaining = () => endsAt - performance.now()
       const deadline = new Promise<typeof timedOut>((resolve) => {
         timer = setTimeout(() => {
           resolve(timedOut)
           request.abort()
         }, remaining())
       })
-      const reserved = await Promise.race([this.budget.reserve(userId), deadline])
+      const reserved = await Promise.race([
+        this.budget.reserve(userId, { at: endsAt, signal: request.signal }),
+        deadline,
+      ])
       outcome = reserved === timedOut || remaining() <= 0 ? 'timeout' : reserved
       if (outcome !== 'allowed') return null
 

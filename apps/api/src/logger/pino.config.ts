@@ -21,6 +21,7 @@ type CreateBaseLoggerOptions = {
   destination?: DestinationStream
   env?: EnvVars
   includeRequestMetadata?: boolean
+  productionLevel?: LevelWithSilent
   traceRuntime?: TraceRuntime
 }
 
@@ -75,7 +76,10 @@ function removeUndefined<T extends Record<string, unknown>>(value: T) {
   ) as Partial<T>
 }
 
-export function resolveLogLevel(env: EnvVars = process.env): LevelWithSilent {
+export function resolveLogLevel(
+  env: EnvVars = process.env,
+  productionLevel: LevelWithSilent = 'warn'
+): LevelWithSilent {
   // 1) resolve environment-driven log level policy.
   const explicitLevel = env.LOG_LEVEL
   if (explicitLevel) {
@@ -91,7 +95,7 @@ export function resolveLogLevel(env: EnvVars = process.env): LevelWithSilent {
   ).toLowerCase()
 
   if (runtime === 'production' || runtime === 'prod') {
-    return 'warn'
+    return productionLevel
   }
 
   if (runtime === 'development' || runtime === 'dev') {
@@ -142,7 +146,7 @@ export function createBaseLogger(options: CreateBaseLoggerOptions = {}) {
 
   return pino(
     {
-      level: resolveLogLevel(env),
+      level: resolveLogLevel(env, options.productionLevel),
       messageKey: 'message',
       formatters: {
         level: (label) => ({ level: label }),

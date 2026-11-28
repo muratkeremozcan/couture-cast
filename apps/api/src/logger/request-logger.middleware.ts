@@ -6,7 +6,7 @@ import { createBaseLogger } from './pino.config'
 import {
   extractUserId,
   inferFeatureFromPath,
-  isLookIdeasRoute,
+  isLookIdeasRequest,
   resolveRequestId,
 } from './request-context'
 
@@ -65,7 +65,7 @@ export function createRequestLoggerMiddleware(
     },
     genReqId(request, response) {
       // Flow ref S0.7/T5/1: attach or reuse x-request-id on the HTTP boundary.
-      const privateRoute = isLookIdeasRoute(request.originalUrl ?? request.url)
+      const privateRoute = isLookIdeasRequest(request)
       const requestId = resolveRequestId(
         privateRoute ? undefined : request.headers['x-request-id']
       )
@@ -85,7 +85,9 @@ export function createRequestLoggerMiddleware(
     customReceivedObject(request) {
       // Flow ref S0.7/T5/2: shape request/response log payloads with feature,
       // path, status, and user context.
-      const path = normalizeRequestPath(request.originalUrl ?? request.url)
+      const path = normalizeRequestPath(
+        request.path ?? request.originalUrl ?? request.url
+      )
       return {
         feature: inferFeatureFromPath(path),
         method: request.method,
@@ -93,7 +95,9 @@ export function createRequestLoggerMiddleware(
       }
     },
     customSuccessObject(request, response, value) {
-      const path = normalizeRequestPath(request.originalUrl ?? request.url)
+      const path = normalizeRequestPath(
+        request.path ?? request.originalUrl ?? request.url
+      )
       return {
         durationMs: extractDurationMs(value),
         feature: inferFeatureFromPath(path),
@@ -104,10 +108,12 @@ export function createRequestLoggerMiddleware(
       }
     },
     customErrorObject(request, response, error, value) {
-      const path = normalizeRequestPath(request.originalUrl ?? request.url)
+      const path = normalizeRequestPath(
+        request.path ?? request.originalUrl ?? request.url
+      )
       return {
         durationMs: extractDurationMs(value),
-        ...(isLookIdeasRoute(path) ? {} : { error }),
+        ...(isLookIdeasRequest(request) ? {} : { error }),
         feature: inferFeatureFromPath(path),
         method: request.method,
         path,
