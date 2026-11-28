@@ -20822,6 +20822,12 @@ export type SuggestGarmentTagsResponseDataAnyOf1ModeEnum =
 export interface SuggestGarmentTagsResponseDataAnyOfSuggestions {
   /**
    *
+   * @type {SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtype}
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestions
+   */
+  subtype?: SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtype
+  /**
+   *
    * @type {SuggestGarmentTagsResponseDataAnyOfSuggestionsCategory}
    * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestions
    */
@@ -20960,6 +20966,54 @@ export const SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum = {
 } as const
 export type SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum =
   (typeof SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum)[keyof typeof SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum]
+
+/**
+ *
+ * @export
+ * @interface SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtype
+ */
+export interface SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtype {
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtypeValueEnum}
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtype
+   */
+  value: SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtypeValueEnum | null
+  /**
+   *
+   * @type {number}
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtype
+   */
+  confidence: number
+  /**
+   *
+   * @type {boolean}
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtype
+   */
+  isConfident: boolean
+}
+
+/**
+ * @export
+ */
+export const SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtypeValueEnum = {
+  camisole: 'camisole',
+  tank: 'tank',
+  crop_top: 'crop-top',
+  mini_skirt: 'mini-skirt',
+  midi_skirt: 'midi-skirt',
+  maxi_skirt: 'maxi-skirt',
+  leggings: 'leggings',
+  blazer: 'blazer',
+  moto_jacket: 'moto-jacket',
+  moto_boots: 'moto-boots',
+  ankle_boots: 'ankle-boots',
+  knee_boots: 'knee-boots',
+  tights: 'tights',
+  socks: 'socks',
+} as const
+export type SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtypeValueEnum =
+  (typeof SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtypeValueEnum)[keyof typeof SuggestGarmentTagsResponseDataAnyOfSuggestionsSubtypeValueEnum]
 
 /**
  *

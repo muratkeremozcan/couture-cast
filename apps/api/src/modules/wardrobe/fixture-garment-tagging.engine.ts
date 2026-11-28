@@ -31,6 +31,7 @@ export class FixtureGarmentTaggingEngine implements GarmentTaggingEngine {
     return Promise.resolve({
       analysisVersion: ANALYSIS_VERSION,
       category,
+      subtype: { value: 'tank', confidence: 1, isConfident: true },
       material,
       comfortRange,
     })

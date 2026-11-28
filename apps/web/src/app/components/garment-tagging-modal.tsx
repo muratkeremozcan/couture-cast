@@ -14,9 +14,11 @@ import type {
   UpdateGarmentTagsInput,
 } from '@couture/api-client/contracts/http'
 import {
+  confidentGarmentTag,
   garmentSubtypeMatchesCategory,
-  garmentSubtypesForCategory,
   garmentSubtypeStrings,
+  garmentTaggingStrings,
+  resolveGarmentSubtypeSelection,
   type GarmentSubtype,
 } from '@couture/utils'
 import { getI18n } from '../../i18n'
@@ -31,7 +33,8 @@ export interface GarmentTaggingModalProps {
   isOpen: boolean
   onClose: () => void
   garmentId: string | null
-  initialGarment?: Pick<GarmentWithTags, 'id' | 'category' | 'subtype'>
+  initialGarment?: Pick<GarmentWithTags, 'id' | 'category' | 'subtype'> &
+    Partial<Pick<GarmentWithTags, 'imageAccess'>>
   onTagsConfirmed?: (garment: GarmentItemContract) => void
   invokingElementRef?: React.RefObject<HTMLElement | null>
   suggestTagsFn?: (
@@ -133,8 +136,8 @@ export function GarmentTaggingModal({
   const [chosenCategory, setChosenCategory] = useState<GarmentCategory | null>(null)
   // Undefined leaves the stored subtype alone. A member's explicit None is null.
   const [chosenSubtype, setChosenSubtype] = useState<GarmentSubtype | null>()
-  const [selectedMaterial, setSelectedMaterial] = useState<GarmentMaterial | null>(null)
-  const [selectedComfort, setSelectedComfort] = useState<GarmentComfortRange | null>(null)
+  const [chosenMaterial, setChosenMaterial] = useState<GarmentMaterial | null>()
+  const [chosenComfort, setChosenComfort] = useState<GarmentComfortRange>()
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState<boolean>(false)
   const [isSaving, setIsSaving] = useState<boolean>(false)
   const [suggestionError, setSuggestionError] = useState<string | null>(null)
@@ -153,25 +156,22 @@ export function GarmentTaggingModal({
   const comfortOptionRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const saveAbortRef = useRef<AbortController | null>(null)
   const saveRequestIdRef = useRef(0)
-  const touchedFieldsRef = useRef({
-    material: false,
-    comfort: false,
-  })
+  const copy = garmentTaggingStrings(i18n.language)
 
   useEffect(() => {
-    touchedFieldsRef.current = {
-      material: false,
-      comfort: false,
-    }
     setChosenCategory(null)
     setChosenSubtype(undefined)
-    setSelectedMaterial(null)
-    setSelectedComfort(null)
+    setChosenMaterial(undefined)
+    setChosenComfort(undefined)
     setSuggestions(null)
     setIsManualMode(false)
     setSuggestionError(null)
     setSaveError(null)
     setIsAnalysisPending(false)
+    saveRequestIdRef.current += 1
+    saveAbortRef.current?.abort()
+    saveAbortRef.current = null
+    setIsSaving(false)
   }, [isOpen, garmentId])
 
   useEffect(() => {
@@ -188,19 +188,12 @@ export function GarmentTaggingModal({
       .then((data) => {
         if (!isMounted) return
         if (data.mode === 'manual') {
+          setSuggestions(null)
           setIsManualMode(true)
           return
         }
+        setIsManualMode(false)
         setSuggestions(data)
-        if (data.suggestions.material.isConfident && !touchedFieldsRef.current.material) {
-          setSelectedMaterial(data.suggestions.material.value)
-        }
-        if (
-          data.suggestions.comfortRange.isConfident &&
-          !touchedFieldsRef.current.comfort
-        ) {
-          setSelectedComfort(data.suggestions.comfortRange.value)
-        }
       })
       .catch((err: unknown) => {
         if (!isMounted) return
@@ -233,17 +226,7 @@ export function GarmentTaggingModal({
     }
   }, [isOpen, garmentId, loadAttempt, suggestTagsFn, i18n])
 
-  useEffect(() => {
-    if (isOpen) return
-    saveRequestIdRef.current += 1
-    saveAbortRef.current?.abort()
-    saveAbortRef.current = null
-    // Bumping the request id makes `handleSave`'s `finally` skip its own
-    // `setIsSaving(false)`, so the abandoned request would otherwise leave this
-    // permanently mounted dialog stuck on a disabled "Saving..." button for
-    // every garment the user opens afterwards.
-    setIsSaving(false)
-  }, [isOpen])
+  useEffect(() => () => saveAbortRef.current?.abort(), [])
 
   const moveSelection = <T extends string>(
     event: React.KeyboardEvent<HTMLButtonElement>,
@@ -269,47 +252,53 @@ export function GarmentTaggingModal({
     refs.current[nextValue]?.focus()
   }
 
-  const selectCategory = (value: GarmentCategory) => {
-    setChosenCategory(value)
-    setChosenSubtype((subtype) =>
-      subtype == null || garmentSubtypeMatchesCategory(value, subtype)
-        ? subtype
-        : undefined
-    )
-  }
-
-  const selectMaterial = (value: GarmentMaterial | null) => {
-    touchedFieldsRef.current.material = true
-    setSelectedMaterial(value)
-  }
-
-  const selectComfort = (value: GarmentComfortRange) => {
-    touchedFieldsRef.current.comfort = true
-    setSelectedComfort(value)
-  }
-
   const storedGarment = initialGarment?.id === garmentId ? initialGarment : undefined
   const storedCategory = storedGarment?.category ?? null
-  const storedSubtype = storedGarment?.subtype
-  const hasStoredSubtype = garmentSubtypeMatchesCategory(storedCategory, storedSubtype)
-  const suggestedCategory = suggestions?.suggestions.category
+  const storedSubtype = garmentSubtypeMatchesCategory(
+    storedCategory,
+    storedGarment?.subtype
+  )
+  const scoredTags = suggestions?.suggestions
   const selectedCategory =
     chosenCategory ??
-    (hasStoredSubtype ? storedCategory : null) ??
-    (suggestedCategory?.isConfident ? suggestedCategory.value : null)
-  const selectedSubtype =
-    chosenSubtype === undefined && hasStoredSubtype && selectedCategory === storedCategory
-      ? storedSubtype
-      : (chosenSubtype ?? null)
+    (storedSubtype ? storedCategory : null) ??
+    confidentGarmentTag(scoredTags?.category) ??
+    null
+  const selectedMaterial =
+    chosenMaterial !== undefined
+      ? chosenMaterial
+      : scoredTags
+        ? confidentGarmentTag(scoredTags.material)
+        : null
+  const selectedComfort = chosenComfort ?? confidentGarmentTag(scoredTags?.comfortRange)
+  const subtype = resolveGarmentSubtypeSelection(
+    selectedCategory,
+    chosenSubtype,
+    storedGarment,
+    scoredTags
+  )
+  const tagsToSave: UpdateGarmentTagsInput | null =
+    selectedCategory &&
+    selectedComfort &&
+    selectedMaterial !== undefined &&
+    subtype.selected !== undefined
+      ? {
+          category: selectedCategory,
+          ...(subtype.save !== undefined && { subtype: subtype.save }),
+          material: selectedMaterial,
+          comfortRange: selectedComfort,
+        }
+      : null
+  const isSaveDisabled =
+    !tagsToSave || isSaving || isLoadingSuggestions || isAnalysisPending
+
+  const selectCategory = (value: GarmentCategory) => {
+    setChosenCategory(value)
+    if (value !== selectedCategory) setChosenSubtype(undefined)
+  }
 
   const handleSave = async () => {
-    if (!garmentId || !selectedCategory || !selectedComfort) {
-      setSaveError(t('wardrobe.tagEditor.errors.selectionRequired'))
-      if (!selectedCategory && categoryGroupRef.current) {
-        categoryGroupRef.current.focus()
-      }
-      return
-    }
+    if (!garmentId || !tagsToSave || isSaveDisabled) return
 
     setIsSaving(true)
     setSaveError(null)
@@ -319,16 +308,7 @@ export function GarmentTaggingModal({
     const requestId = ++saveRequestIdRef.current
 
     try {
-      const updated = await updateTagsFn(
-        garmentId,
-        {
-          category: selectedCategory,
-          ...(chosenSubtype !== undefined && { subtype: chosenSubtype }),
-          material: selectedMaterial,
-          comfortRange: selectedComfort,
-        },
-        controller.signal
-      )
+      const updated = await updateTagsFn(garmentId, tagsToSave, controller.signal)
       if (saveRequestIdRef.current !== requestId || controller.signal.aborted) return
       onTagsConfirmed?.(updated)
       onClose()
@@ -344,16 +324,13 @@ export function GarmentTaggingModal({
     }
   }
 
-  const subtypes = garmentSubtypesForCategory(selectedCategory)
-  const subtypeOptions = ['none', ...subtypes] as const
+  const subtypeOptions = ['none', ...subtype.options] as const
+  const selectedSubtypeOption = subtype.selected === null ? 'none' : subtype.selected
   const subtypeStrings = garmentSubtypeStrings(i18n.language)
   const selectSubtype = (value: (typeof subtypeOptions)[number]) => {
     setChosenCategory(selectedCategory)
     setChosenSubtype(value === 'none' ? null : value)
   }
-  const isSaveDisabled =
-    !selectedCategory || !selectedComfort || isSaving || isAnalysisPending
-
   return (
     <AccessibleModal
       isOpen={isOpen}
@@ -382,6 +359,15 @@ export function GarmentTaggingModal({
       errorMessage={saveError}
     >
       <div className="mt-4 flex flex-col gap-6">
+        {storedGarment?.imageAccess && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={storedGarment.imageAccess.url}
+            alt={copy.preview}
+            referrerPolicy="no-referrer"
+            className="h-32 w-full rounded-lg bg-card-muted object-contain"
+          />
+        )}
         <SuggestionStatus
           isLoading={isLoadingSuggestions}
           loadingLabel={t('wardrobe.tagging.loading')}
@@ -404,18 +390,9 @@ export function GarmentTaggingModal({
               >
                 {t('wardrobe.tagEditor.categoryLegend')}{' '}
                 <span className="text-danger-ink">*</span>
-                {suggestions && (
-                  <span className="ml-2 text-xs font-normal text-success-ink">
-                    {t(
-                      suggestions.suggestions.category.isConfident
-                        ? 'wardrobe.tagEditor.suggestedConfident'
-                        : 'wardrobe.tagEditor.suggestedReview',
-                      {
-                        value: t(
-                          `wardrobe.tagEditor.category.${suggestions.suggestions.category.value}`
-                        ),
-                      }
-                    )}
+                {suggestions && !selectedCategory && (
+                  <span className="ml-2 text-xs font-normal text-ink-muted">
+                    {copy.pickOne}
                   </span>
                 )}
               </legend>
@@ -463,7 +440,7 @@ export function GarmentTaggingModal({
               </div>
             </fieldset>
 
-            {subtypes.length > 0 && (
+            {subtype.options.length > 0 && (
               <fieldset
                 data-testid="garment-tagging-subtype-picker"
                 className="m-0 border-0 p-0"
@@ -473,6 +450,11 @@ export function GarmentTaggingModal({
                   className="text-sm font-semibold text-ink"
                 >
                   {subtypeStrings.label}
+                  {selectedSubtypeOption === undefined && (
+                    <span className="ml-2 text-xs font-normal text-ink-muted">
+                      {copy.pickOne}
+                    </span>
+                  )}
                 </legend>
                 <div
                   role="radiogroup"
@@ -480,7 +462,7 @@ export function GarmentTaggingModal({
                   className="mt-2 flex flex-wrap gap-2"
                 >
                   {subtypeOptions.map((value) => {
-                    const selected = (selectedSubtype ?? 'none') === value
+                    const selected = selectedSubtypeOption === value
                     return (
                       <button
                         key={value}
@@ -490,7 +472,12 @@ export function GarmentTaggingModal({
                         type="button"
                         role="radio"
                         aria-checked={selected}
-                        tabIndex={selected ? 0 : -1}
+                        tabIndex={
+                          selected ||
+                          (selectedSubtypeOption === undefined && value === 'none')
+                            ? 0
+                            : -1
+                        }
                         data-testid={`garment-tagging-subtype-${value}`}
                         disabled={isSaving}
                         onClick={() => selectSubtype(value)}
@@ -498,7 +485,7 @@ export function GarmentTaggingModal({
                           moveSelection(
                             event,
                             subtypeOptions,
-                            selectedSubtype ?? 'none',
+                            selectedSubtypeOption ?? null,
                             subtypeOptionRefs,
                             selectSubtype
                           )
@@ -522,23 +509,14 @@ export function GarmentTaggingModal({
                 className="text-sm font-semibold text-ink"
               >
                 {t('wardrobe.tagEditor.materialLegend')}{' '}
-                <span className="text-xs font-normal text-ink-muted">
-                  {t('wardrobe.tagEditor.optional')}
-                </span>
-                {suggestions && (
-                  <span className="ml-2 text-xs font-normal text-success-ink">
-                    {t(
-                      suggestions.suggestions.material.isConfident
-                        ? 'wardrobe.tagEditor.suggestedConfident'
-                        : 'wardrobe.tagEditor.suggestedReview',
-                      {
-                        value: suggestions.suggestions.material.value
-                          ? t(
-                              `wardrobe.tagEditor.material.${suggestions.suggestions.material.value}`
-                            )
-                          : t('wardrobe.tagEditor.materialClear'),
-                      }
-                    )}
+                {!suggestions && (
+                  <span className="text-xs font-normal text-ink-muted">
+                    {t('wardrobe.tagEditor.optional')}
+                  </span>
+                )}
+                {suggestions && selectedMaterial === undefined && (
+                  <span className="ml-2 text-xs font-normal text-ink-muted">
+                    {copy.pickOne}
                   </span>
                 )}
               </legend>
@@ -555,8 +533,8 @@ export function GarmentTaggingModal({
                   role="radio"
                   aria-checked={selectedMaterial === null}
                   disabled={isSaving}
-                  tabIndex={selectedMaterial === null ? 0 : -1}
-                  onClick={() => selectMaterial(null)}
+                  tabIndex={selectedMaterial == null ? 0 : -1}
+                  onClick={() => setChosenMaterial(null)}
                   onKeyDown={(event) => {
                     const values = [
                       'clear',
@@ -568,7 +546,7 @@ export function GarmentTaggingModal({
                       selectedMaterial ?? 'clear',
                       materialOptionRefs,
                       (value) =>
-                        selectMaterial(
+                        setChosenMaterial(
                           value === 'clear' ? null : (value as GarmentMaterial)
                         )
                     )
@@ -594,7 +572,7 @@ export function GarmentTaggingModal({
                       aria-checked={isSelected}
                       disabled={isSaving}
                       tabIndex={isSelected ? 0 : -1}
-                      onClick={() => selectMaterial(opt.value)}
+                      onClick={() => setChosenMaterial(opt.value)}
                       onKeyDown={(event) => {
                         const values = [
                           'clear',
@@ -606,7 +584,7 @@ export function GarmentTaggingModal({
                           selectedMaterial ?? 'clear',
                           materialOptionRefs,
                           (value) =>
-                            selectMaterial(
+                            setChosenMaterial(
                               value === 'clear' ? null : (value as GarmentMaterial)
                             )
                         )
@@ -632,18 +610,9 @@ export function GarmentTaggingModal({
               >
                 {t('wardrobe.tagEditor.comfortLegend')}{' '}
                 <span className="text-danger-ink">*</span>
-                {suggestions && (
-                  <span className="ml-2 text-xs font-normal text-success-ink">
-                    {t(
-                      suggestions.suggestions.comfortRange.isConfident
-                        ? 'wardrobe.tagEditor.suggestedConfident'
-                        : 'wardrobe.tagEditor.suggestedReview',
-                      {
-                        value: t(
-                          `wardrobe.tagEditor.comfort.${suggestions.suggestions.comfortRange.value}.name`
-                        ),
-                      }
-                    )}
+                {suggestions && !selectedComfort && (
+                  <span className="ml-2 text-xs font-normal text-ink-muted">
+                    {copy.pickOne}
                   </span>
                 )}
               </legend>
@@ -667,14 +636,14 @@ export function GarmentTaggingModal({
                       tabIndex={
                         isSelected || (!selectedComfort && opt.value === 'cold') ? 0 : -1
                       }
-                      onClick={() => selectComfort(opt.value)}
+                      onClick={() => setChosenComfort(opt.value)}
                       onKeyDown={(event) =>
                         moveSelection(
                           event,
                           COMFORT_OPTIONS.map((option) => option.value),
-                          selectedComfort,
+                          selectedComfort ?? null,
                           comfortOptionRefs,
-                          selectComfort
+                          setChosenComfort
                         )
                       }
                       className={`flex min-h-11 w-full flex-col items-start justify-center rounded-lg border p-3 text-left transition ${
@@ -698,7 +667,7 @@ export function GarmentTaggingModal({
             </fieldset>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-page py-2">
               <button
                 type="button"
                 onClick={onClose}
@@ -718,7 +687,11 @@ export function GarmentTaggingModal({
                     : 'bg-inverse text-on-inverse hover:bg-inverse/90'
                 }`}
               >
-                {isSaving ? t('wardrobe.tagEditor.saving') : t('wardrobe.tagEditor.save')}
+                {isSaving
+                  ? t('wardrobe.tagEditor.saving')
+                  : suggestions
+                    ? copy.looksRight
+                    : t('wardrobe.tagEditor.save')}
               </button>
             </div>
           </>

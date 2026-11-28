@@ -22709,3 +22709,31 @@ Wait for the crop preview and check that the garment keeps its edges and fabric 
   [capture](../../maestro/garment-capture-flow.yaml) and
   [capture through tagging](../../maestro/garment-smart-tagging-flow.yaml).
 - [Step 81](#step-81-photo-ai-consent-and-processor-approval) covers external processing policy.
+
+## Step 84: Suggested tags that are right
+
+Add a garment and open its tag review. Compare the crop with the selected category,
+subtype, material, and comfort chips. Tap **Looks right** to confirm the suggestions.
+
+### Sequence to follow
+
+1. Follow the private upload through the FashionCLIP worker. Category uses scores from broad
+   and specific garment names. Subtype compares the choices within that category, including
+   examples that map to **None**.
+2. Check **Pick one** on an uncertain field. Resolve it before confirming. Switch category
+   and check that an incompatible subtype clears. Choose **Not sure** when the material is unclear.
+3. Hold a suggestion response while making a choice, then release it. Check that the choice
+   stays selected. Confirm and reopen the garment to verify the stored values.
+4. Read the results for `wardrobe-tagging-holdout-v1` in PR Checks. Every abstention is a miss.
+   The hosted 512 MB worker continues to offer manual review until model hosting is verified.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-27-suggested-tags-that-are-right.md) and
+  [acceptance plan](../test-artifacts/test-design-7-27-suggested-tags-that-are-right.md).
+- [Real-model accuracy gate](../../apps/api/src/modules/wardrobe/garment-tagging.smoke.spec.ts)
+  and [held-out labels](../../apps/api/test/fixtures/garment-tagging/holdout-v1/manifest.json).
+- [Browser capture journey](../../playwright/tests/wardrobe-smart-tagging.spec.ts) and
+  [native tag review](../../apps/mobile/components/wardrobe/garment-tagging-modal.test.tsx).
+- [Legacy wire compatibility](../../apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts)
+  and [suggestion scoring](../../apps/api/src/modules/wardrobe/garment-tagging.engine.ts).

@@ -54,7 +54,7 @@ export function createSuggestGarmentTagsDataFixture(
   return {
     mode: 'suggested',
     garmentId: overrides.garmentId ?? 'garment-1',
-    analysisVersion: snapshot.analysisVersion,
+    analysisVersion: GARMENT_TAGGING_ANALYSIS_VERSION,
     suggestions: {
       category: snapshot.category,
       material: snapshot.material,

@@ -6,8 +6,10 @@ import { createBaseLogger } from '../../logger/pino.config'
 import {
   CATEGORY_KEYS,
   CATEGORY_PROMPTS,
+  GARMENT_DETAIL_PROMPTS,
   MATERIAL_KEYS,
   MATERIAL_PROMPTS,
+  type GarmentTagLogits,
 } from './garment-tagging.engine'
 
 export type InferenceRequest = {
@@ -19,12 +21,10 @@ export type InferenceResponse =
   | {
       type: 'ready'
     }
-  | {
+  | ({
       type: 'result'
       id: string
-      categoryLogits: number[]
-      materialLogits: number[]
-    }
+    } & GarmentTagLogits)
   | {
       type: 'initialization_error'
       error: string
@@ -224,7 +224,11 @@ export async function initializeInferenceWorker(modelDir: string): Promise<void>
   const dummyRawImage = new RawImage(dummyCanvas, 64, 64, 3)
   const categoryTexts = CATEGORY_KEYS.map((k) => CATEGORY_PROMPTS[k])
   const materialTexts = MATERIAL_KEYS.map((k) => MATERIAL_PROMPTS[k])
-  const allPrompts = [...categoryTexts, ...materialTexts]
+  const allPrompts = [
+    ...categoryTexts,
+    ...materialTexts,
+    ...GARMENT_DETAIL_PROMPTS.map(({ text }) => text),
+  ]
 
   promptTextInputs = await tokenizer(allPrompts, {
     padding: true,
@@ -238,7 +242,7 @@ export async function initializeInferenceWorker(modelDir: string): Promise<void>
 
 export async function runInferenceOnImage(
   imageBuffer: Buffer
-): Promise<{ categoryLogits: number[]; materialLogits: number[] }> {
+): Promise<GarmentTagLogits> {
   if (!initialized || !processor || !model || !promptTextInputs) {
     throw new Error('Inference worker is not initialized')
   }
@@ -254,17 +258,16 @@ export async function runInferenceOnImage(
     ...promptTextInputs,
     ...imageInputs,
   })) as InferenceModelOutput
-  const expectedLogitCount = CATEGORY_KEYS.length + MATERIAL_KEYS.length
+  const materialEnd = CATEGORY_KEYS.length + MATERIAL_KEYS.length
+  const expectedLogitCount = materialEnd + GARMENT_DETAIL_PROMPTS.length
   const logits = extractLogits(output, expectedLogitCount)
   assertValidLogits(logits, expectedLogitCount)
 
   const categoryLogits = logits.slice(0, CATEGORY_KEYS.length)
-  const materialLogits = logits.slice(
-    CATEGORY_KEYS.length,
-    CATEGORY_KEYS.length + MATERIAL_KEYS.length
-  )
+  const materialLogits = logits.slice(CATEGORY_KEYS.length, materialEnd)
+  const detailLogits = logits.slice(materialEnd)
 
-  return { categoryLogits, materialLogits }
+  return { categoryLogits, materialLogits, detailLogits }
 }
 
 if (!isMainThread && parentPort) {
@@ -307,14 +310,11 @@ if (!isMainThread && parentPort) {
     if (!msg || !msg.id || !msg.imageBuffer) return
     requestQueue = requestQueue.then(async () => {
       try {
-        const { categoryLogits, materialLogits } = await runInferenceOnImage(
-          msg.imageBuffer
-        )
+        const logits = await runInferenceOnImage(msg.imageBuffer)
         parentPort?.postMessage({
           type: 'result',
           id: msg.id,
-          categoryLogits,
-          materialLogits,
+          ...logits,
         } as InferenceResponse)
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Inference execution failed'

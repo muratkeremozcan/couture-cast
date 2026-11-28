@@ -579,7 +579,7 @@ export async function suggestGarmentTagsFromWeb(
       createWebApiClient({
         accessToken,
       }).apiV1WardrobeGarmentsGarmentIdSuggestTagsPost(
-        { garmentId },
+        { garmentId, xCoutureGarmentSubtype: '1' },
         { signal: requestSignal }
       )
     )

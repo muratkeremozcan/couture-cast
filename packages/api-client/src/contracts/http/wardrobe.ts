@@ -49,9 +49,24 @@ export const capsuleOccasionEnum = z.enum([
 export const GARMENT_TAGGING_ANALYSIS_VERSION =
   'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1' as const
 
+export const GARMENT_SUBTYPE_ANALYSIS_VERSION =
+  'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v2' as const
+
+const garmentSubtypeSuggestionSchema = z
+  .object({
+    value: garmentSubtypeEnum.nullable(),
+    confidence: z.number().min(0).max(1),
+    isConfident: z.boolean(),
+  })
+  .strict()
+
 export const garmentTagSuggestionSnapshotSchema = z
   .object({
-    analysisVersion: z.literal(GARMENT_TAGGING_ANALYSIS_VERSION),
+    analysisVersion: z.enum([
+      GARMENT_TAGGING_ANALYSIS_VERSION,
+      GARMENT_SUBTYPE_ANALYSIS_VERSION,
+    ]),
+    subtype: garmentSubtypeSuggestionSchema.optional(),
     category: z
       .object({
         value: garmentCategoryEnum,
@@ -75,6 +90,12 @@ export const garmentTagSuggestionSnapshotSchema = z
       .strict(),
   })
   .strict()
+  .refine(
+    ({ category, subtype }) =>
+      subtype?.value == null ||
+      garmentSubtypeMatchesCategory(category.value, subtype.value),
+    { path: ['subtype', 'value'], message: 'Subtype must match the suggested category.' }
+  )
 
 export const createGarmentUploadUrlInputSchema = z
   .object({
@@ -206,6 +227,7 @@ export const garmentIdPathParamsSchema = z
 
 const garmentTagSuggestionGroupsSchema = z
   .object({
+    subtype: garmentSubtypeSuggestionSchema.optional(),
     category: z
       .object({
         value: garmentCategoryEnum,
@@ -234,7 +256,8 @@ const garmentTagSuggestionGroupsSchema = z
  * What the API sends. A `suggested` answer is the original wire shape, byte for byte: it carries
  * no `mode`, so a browser tab or client built before manual mode keeps parsing it (an older
  * client's strict schema rejects an unknown key, and an open tab outlives a deploy). `mode` is
- * accepted on it only so a future server may send it. A `manual` answer (the wardrobe worker
+ * accepted on it only so a future server may send it. The subtype score requires a per-request
+ * opt-in for the same strict-client compatibility. A `manual` answer (the wardrobe worker
  * runs without a model, `GARMENT_TAGGING_ENGINE=manual`, so there are no suggestions and the
  * member chooses every tag) is the one that adds `mode: 'manual'`. A garment whose model run
  * failed has no suggestions either but answers 503 `TAGGING_INFERENCE_UNAVAILABLE`, as before.
@@ -1557,6 +1580,9 @@ export function registerWardrobeContracts(
     security: [{ bearerAuth: [] }],
     request: {
       params: garmentIdPathParamsSchema,
+      headers: garmentMetadataHeaderSchema.pick({
+        [WARDROBE_GARMENT_SUBTYPE_HEADER]: true,
+      }),
     },
     responses: {
       200: {

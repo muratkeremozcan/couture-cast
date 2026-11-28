@@ -2,15 +2,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { Worker } from 'node:worker_threads'
+import type { GarmentTagSuggestionSnapshot } from '@couture/api-client/contracts/http'
 import {
-  garmentTagSuggestionSnapshotSchema,
-  type GarmentTagSuggestionSnapshot,
-} from '@couture/api-client/contracts/http'
-import {
-  ANALYSIS_VERSION,
-  classifyCategory,
-  classifyMaterial,
-  deriveComfort,
+  classifyTagSuggestions,
   GarmentTaggingOutputError,
   type GarmentTaggingEngine,
 } from './garment-tagging.engine'
@@ -209,18 +203,7 @@ export class FashionClipTaggingEngine implements GarmentTaggingEngine {
           cleanup()
           if (msg.type === 'result') {
             try {
-              const category = classifyCategory(msg.categoryLogits)
-              const material = classifyMaterial(msg.materialLogits)
-              const comfortRange = deriveComfort(category, material)
-
-              resolve(
-                garmentTagSuggestionSnapshotSchema.parse({
-                  analysisVersion: ANALYSIS_VERSION,
-                  category,
-                  material,
-                  comfortRange,
-                })
-              )
+              resolve(classifyTagSuggestions(msg))
             } catch (err) {
               reject(
                 new GarmentTaggingOutputError(
