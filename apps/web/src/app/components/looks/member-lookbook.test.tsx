@@ -3,10 +3,12 @@
 // Step 80 verifies that a superseded request cannot replace the current ideas.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-80-ai-written-look-ideas
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { ResponseError } from '@couture/api-client'
 import {
   createMemberLookbook,
   createStyleProfileStore,
   memberLookbookDraftKey,
+  type SampleWeatherKey,
 } from '@couture/utils'
 import type { LookIdeasResponse } from '@couture/api-client/contracts/http'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,6 +25,7 @@ type SaveReceipt = Pick<Awaited<ReturnType<CreateLook>>, 'id' | 'revision'>
 const api = vi.hoisted(() => ({
   ritual: vi.fn(),
   generate: vi.fn(),
+  retryable: vi.fn<(matches: boolean) => void>(),
   create: vi.fn<(...args: Parameters<CreateLook>) => Promise<SaveReceipt>>(),
   remove: vi.fn(),
   notify: vi.fn(),
@@ -46,7 +49,18 @@ vi.mock('../../../lib/use-web-session', async (importOriginal) => ({
   currentWebStyleScope: () => api.owner,
   captureWebStyleBearer: (scope: string) =>
     scope === api.owner ? 'fixture-bearer' : null,
-  readAsMember: (_owner: string, read: () => Promise<unknown>) => read(),
+  readAsMember: async (
+    _owner: string,
+    read: () => Promise<unknown>,
+    shouldRetry: (error: unknown) => boolean
+  ) => {
+    try {
+      return await read()
+    } catch (error) {
+      api.retryable(shouldRetry(error))
+      throw error
+    }
+  },
 }))
 
 const OWNER = 'lookbook-fixture-owner'
@@ -82,6 +96,25 @@ function editor(owner = OWNER) {
 
 const pin = () => screen.getByTestId('lookbook-pin-shoes')
 const save = () => screen.getByTestId('lookbook-save')
+const card = () => screen.getByTestId('looks-idea-card-current')
+
+function describeWeather(weather: SampleWeatherKey, description: string) {
+  return createMemberLookbook(weather)
+    .map(({ result }) => ({ lookId: result.look!.id, description }))
+    .reverse()
+}
+
+function moodLabels() {
+  return within(screen.getByTestId('lookbook-mood-row'))
+    .getAllByRole('button')
+    .map((button) => button.textContent)
+}
+
+function pieceIds() {
+  return within(card())
+    .getAllByTestId(/^lookbook-piece-/)
+    .map((piece) => piece.getAttribute('data-piece-id'))
+}
 
 async function openEditor() {
   const view = render(editor())
@@ -104,6 +137,7 @@ beforeEach(() => {
   api.create.mockReset().mockResolvedValue(SAVED)
   api.remove.mockReset().mockResolvedValue(undefined)
   api.generate.mockReset().mockResolvedValue({ data: null })
+  api.retryable.mockClear()
   vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
 })
 
@@ -288,16 +322,6 @@ describe('CC-7.22 web lookbook save and draft boundaries', () => {
     const newer = Promise.withResolvers<LookIdeasResponse>()
     const oldWeather = 'warm-dry'
     const newWeather = 'mild-rainy'
-    const describeWeather = (
-      weather: typeof oldWeather | typeof newWeather,
-      description: string
-    ) =>
-      createMemberLookbook(weather)
-        .map(({ result }) => ({
-          lookId: result.look!.id,
-          description,
-        }))
-        .reverse()
     const oldDescription = 'A simple mix for a warm day.'
     const newDescription = 'A polished mix for a rainy day.'
     api.generate.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise)
@@ -320,6 +344,96 @@ describe('CC-7.22 web lookbook save and draft boundaries', () => {
       await older.promise
     })
     expect(description).toHaveTextContent(newDescription)
+    expect(screen.queryByTestId('lookbook-new-ideas')).toBeNull()
+  })
+
+  it('offers a valid ranking after an edit and applies it without changing pieces or pins', async () => {
+    const response = Promise.withResolvers<LookIdeasResponse>()
+    const text = 'A polished mix for a warm day.'
+    api.generate.mockReturnValueOnce(response.promise)
+    await openEditor()
+    const selected = card().getAttribute('data-look-id')
+    expect(moodLabels()).toEqual(['Chic', 'Sporty', 'Cozy'])
+    fireEvent.click(pin())
+    const original = pieceIds()
+    fireEvent.click(screen.getByTestId('lookbook-shuffle'))
+    const edited = pieceIds()
+    expect(edited).not.toEqual(original)
+
+    await act(async () => {
+      response.resolve({ data: describeWeather('warm-dry', text) })
+      await response.promise
+    })
+    const apply = await screen.findByRole('button', { name: 'New ideas ready' })
+    expect(card()).toHaveAttribute('data-look-id', selected)
+    expect(moodLabels()).toEqual(['Chic', 'Sporty', 'Cozy'])
+    expect(pieceIds()).toEqual(edited)
+    expect(screen.queryByTestId('lookbook-ai-description')).toBeNull()
+    fireEvent.click(apply)
+
+    expect(card()).toHaveAttribute('data-look-id', selected)
+    expect(moodLabels()).toEqual(['Cozy', 'Sporty', 'Chic'])
+    expect(screen.getByTestId('lookbook-ai-description')).toHaveTextContent(text)
+    expect(pin()).toHaveAttribute('aria-pressed', 'true')
+    expect(pieceIds()).toEqual(edited)
+    expect(screen.queryByTestId('lookbook-new-ideas')).toBeNull()
+  })
+
+  it('keeps restored drafts and a newly opened style control in review mode', async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ mood: 'active', looks: {} }))
+    api.generate.mockResolvedValue({
+      data: describeWeather('warm-dry', 'A sporty mix for a warm day.'),
+    })
+    const restored = await openEditor()
+    expect(await screen.findByTestId('lookbook-new-ideas')).toBeVisible()
+    expect(screen.getByTestId('lookbook-mood-active')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    restored.unmount()
+    localStorage.removeItem(STORAGE_KEY)
+
+    const response = Promise.withResolvers<LookIdeasResponse>()
+    api.generate.mockClear().mockReturnValueOnce(response.promise)
+    await openEditor()
+    fireEvent.click(screen.getByTestId('style-day-open'))
+    await act(async () => {
+      response.resolve({
+        data: describeWeather('warm-dry', 'A cozy mix for a warm day.'),
+      })
+      await response.promise
+    })
+    expect(await screen.findByTestId('lookbook-new-ideas')).toBeVisible()
+    expect(screen.getByTestId('lookbook-mood-chic')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(screen.queryByTestId('lookbook-ai-description')).toBeNull()
+  })
+
+  it('drops an outgoing member ranking and keeps the new member’s fallback on an auth error', async () => {
+    const older = Promise.withResolvers<LookIdeasResponse>()
+    api.generate.mockReturnValueOnce(older.promise)
+    const view = await openEditor()
+    api.generate.mockRejectedValueOnce(
+      new ResponseError(new Response(null, { status: 401 }))
+    )
+    api.owner = SECOND
+    view.rerender(editor(SECOND))
+    await waitFor(() => expect(api.retryable).toHaveBeenCalledWith(true))
+    expect(api.generate).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      older.resolve({
+        data: describeWeather('warm-dry', 'A relaxed mix for a warm day.'),
+      })
+      await older.promise
+    })
+    expect(screen.getByTestId('lookbook-mood-chic')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(screen.queryByTestId('lookbook-ai-description')).toBeNull()
     expect(screen.queryByTestId('lookbook-new-ideas')).toBeNull()
   })
 })

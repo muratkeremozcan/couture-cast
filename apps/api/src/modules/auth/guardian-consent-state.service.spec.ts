@@ -139,6 +139,35 @@ describe('GuardianConsentStateService', () => {
     }
   })
 
+  it.each(['off', 'required_13_15'])(
+    'requires an active, current record for generation and private photos under %s',
+    async (policy) => {
+      vi.stubEnv('GUARDIAN_CONSENT_POLICY', policy)
+      const active = { preferences: { compliance: { accountStatus: 'active' } } }
+      const { service, findUnique } = createService(active)
+      const member = 'synthetic-teen'
+
+      await expect(service.canTeenAccessActiveSurface(member)).resolves.toBe(true)
+      await expect(service.canTeenViewPrivateGarmentPhotos(member)).resolves.toBe(true)
+
+      for (const record of [
+        {
+          profile: {
+            preferences: { compliance: { accountStatus: 'pending_guardian_consent' } },
+          },
+        },
+        { profile: { preferences: { compliance: { accountStatus: 'suspended' } } } },
+        { profile: null },
+        null,
+      ]) {
+        findUnique.mockResolvedValue(record)
+        await expect(service.canTeenAccessActiveSurface(member)).resolves.toBe(false)
+        await expect(service.canTeenViewPrivateGarmentPhotos(member)).resolves.toBe(false)
+      }
+      expect(findUnique).toHaveBeenCalledTimes(10)
+    }
+  )
+
   it('invalidateTeenAccess, markTeenAccessGranted/Revoked, and clearCache manage both caches', async () => {
     vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
     const { findUnique, service } = createService({

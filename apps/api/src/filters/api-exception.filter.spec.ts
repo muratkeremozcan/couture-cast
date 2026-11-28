@@ -166,6 +166,44 @@ describe('ApiExceptionFilter', () => {
     } as unknown as ArgumentsHost
   }
 
+  it.each([
+    {
+      url: '/api/v1/personalization/look-ideas',
+      exception: new HttpException('Invalid outfit preferences', HttpStatus.BAD_REQUEST),
+      envelope: { statusCode: 400, message: 'Invalid outfit preferences' },
+    },
+    {
+      url: '/API/V1/PERSONALIZATION/LOOK-IDEAS/?city=synthetic-location',
+      exception: new Error('Synthetic private provider detail'),
+      envelope: { statusCode: 500, message: 'Internal Server Error' },
+    },
+    {
+      url: '/api/v1/personalization/look-ideas',
+      exception: {
+        statusCode: 400,
+        message: 'Synthetic parse detail',
+        body: 'synthetic payload',
+      },
+      envelope: { statusCode: 400, message: 'Bad Request' },
+    },
+  ])(
+    'returns a private route error without logging or capturing its context ($url)',
+    ({ url, exception, envelope }) => {
+      const response = { headersSent: false }
+      filter.catch(
+        exception,
+        buildHost({ url, method: 'POST', auth: { userId: 'synthetic-member' } }, response)
+      )
+      expect(replyMock).toHaveBeenCalledExactlyOnceWith(
+        response,
+        envelope,
+        envelope.statusCode
+      )
+      expect(logErrorMock).not.toHaveBeenCalled()
+      expect(captureEventMock).not.toHaveBeenCalled()
+    }
+  )
+
   it('preserves a custom HttpException envelope', () => {
     const response = { headersSent: false }
     const envelope = {

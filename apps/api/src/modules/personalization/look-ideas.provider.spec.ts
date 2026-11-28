@@ -137,6 +137,63 @@ describe('CC-7.23 Gateway look ideas adapter', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it('uses and refreshes the OIDC credential on the same provider instance', async () => {
+    vi.stubEnv('AI_GATEWAY_API_KEY', undefined)
+    vi.stubEnv('VERCEL_OIDC_TOKEN', 'fixture-oidc-initial')
+    const provider = new GatewayLookIdeaProvider()
+    const signal = new AbortController().signal
+
+    expect(provider.enabled).toBe(true)
+    await expect(provider.generate(input, signal)).resolves.toEqual(fixtureOutput)
+    vi.stubEnv('VERCEL_OIDC_TOKEN', 'fixture-oidc-rotated')
+    await expect(provider.generate(input, signal)).resolves.toEqual(fixtureOutput)
+    expect(
+      fetch.mock.calls.map(([, init]) => new Headers(init?.headers).get('authorization'))
+    ).toEqual(['Bearer fixture-oidc-initial', 'Bearer fixture-oidc-rotated'])
+  })
+
+  it('cancels an upstream failure body and returns only a fixed diagnostic', async () => {
+    const cancelled = vi.fn()
+    const failure = new Response(new ReadableStream({ cancel: cancelled }), {
+      status: 503,
+    })
+    fetch.mockResolvedValueOnce(failure)
+
+    await expect(
+      new GatewayLookIdeaProvider().generate(input, new AbortController().signal)
+    ).rejects.toThrow('Look ideas provider request failed')
+    expect(cancelled).toHaveBeenCalledOnce()
+  })
+
+  it.each(['declared length', 'streamed bytes'] as const)(
+    'cancels an oversized response detected by %s before parsing it',
+    async (sizeSource) => {
+      const cancel = vi.fn()
+      const streamed = sizeSource === 'streamed bytes'
+      fetch.mockResolvedValueOnce(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              if (streamed) {
+                controller.enqueue(new Uint8Array(16_384))
+                controller.enqueue(new Uint8Array(16_385))
+              }
+            },
+            cancel,
+          }),
+          {
+            headers: streamed ? {} : { 'content-length': '32769' },
+          }
+        )
+      )
+
+      await expect(
+        new GatewayLookIdeaProvider().generate(input, new AbortController().signal)
+      ).rejects.toThrow('Look ideas provider response exceeded the size limit')
+      expect(cancel).toHaveBeenCalledOnce()
+    }
+  )
+
   it('rejects a truncated completion before parsing it as a ranking', async () => {
     fetch.mockResolvedValueOnce(
       Response.json({

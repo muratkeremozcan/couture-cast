@@ -366,6 +366,9 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
 }
 
 export const handlers = [
+  http.post('*/api/v1/personalization/look-ideas', () =>
+    HttpResponse.json({ data: null })
+  ),
   http.get('*/api/v1/personalization/style-profile', () =>
     HttpResponse.json(
       styleProfileResponseSchema.parse({

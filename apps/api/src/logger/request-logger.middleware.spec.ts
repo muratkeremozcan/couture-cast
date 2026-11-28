@@ -119,52 +119,65 @@ describe('request-logger middleware', () => {
     }
   })
 
-  it('keeps look-ideas account and content fields out of error and outcome logs', async () => {
-    const stream = new MemoryStream()
-    const app = express()
-    const env = { LOG_LEVEL: 'info' }
-    const logger = createBaseLogger({ destination: stream, env })
-    const generation = createBaseLogger({
-      destination: stream,
-      env,
-      includeRequestMetadata: false,
-    })
+  it.each(['path', 'parsed URL'])(
+    'keeps look-ideas account and content fields out of %s error and outcome logs',
+    async (form) => {
+      const stream = new MemoryStream()
+      const app = express()
+      const env = { LOG_LEVEL: 'info' }
+      const logger = createBaseLogger({ destination: stream, env })
+      const generation = createBaseLogger({
+        destination: stream,
+        env: { NODE_ENV: 'production' },
+        includeRequestMetadata: false,
+        productionLevel: 'info',
+      })
 
-    app.use(bindRequestContext)
-    app.use(createRequestLoggerMiddleware({ env, logger }))
-    app.post(LOOK_IDEAS_ROUTE, (req, res) => {
-      const authenticated = req as AuthenticatedRequest
-      authenticated.auth = {
-        role: 'guardian',
-        token: 'synthetic-look-token',
-        userId: 'synthetic-look-account',
+      if (form === 'parsed URL') {
+        app.use((req, _res, next) => {
+          req.originalUrl = new URL(req.originalUrl, 'https://fixture.invalid').href
+          next()
+        })
       }
-      updateRequestContext({ userId: authenticated.auth.userId })
-      generation.info({ outcome: 'unavailable', durationMs: 5 }, 'look_ideas_generation')
-      res.status(503).json({ message: 'synthetic-response-detail' })
-    })
+      app.use(bindRequestContext)
+      app.use(createRequestLoggerMiddleware({ env, logger }))
+      app.post(LOOK_IDEAS_ROUTE, (req, res) => {
+        const authenticated = req as AuthenticatedRequest
+        authenticated.auth = {
+          role: 'guardian',
+          token: 'synthetic-look-token',
+          userId: 'synthetic-look-account',
+        }
+        updateRequestContext({ userId: authenticated.auth.userId })
+        generation.info(
+          { outcome: 'unavailable', durationMs: 5 },
+          'look_ideas_generation'
+        )
+        res.status(503).json({ message: 'synthetic-response-detail' })
+      })
 
-    const response = await request(await serve(app))
-      .post(`${LOOK_IDEAS_ROUTE}?city=synthetic-location`)
-      .set('x-user-id', 'synthetic-header-member')
-      .set('x-request-id', 'synthetic-request-id')
-      .send({ note: 'synthetic-request-content' })
-      .expect(503)
-      .expect('Cache-Control', 'private, no-store')
-    expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/i)
+      const response = await request(await serve(app))
+        .post(`${LOOK_IDEAS_ROUTE}?city=synthetic-location`)
+        .set('x-user-id', 'synthetic-header-member')
+        .set('x-request-id', 'synthetic-request-id')
+        .send({ note: 'synthetic-request-content' })
+        .expect(503)
+        .expect('Cache-Control', 'private, no-store')
+      expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/i)
 
-    const logs = parseLogs(stream)
-    expect(logs).toHaveLength(3)
-    const outcome = logs.find(({ message }) => message === 'look_ideas_generation')
-    expect(outcome).toMatchObject({
-      outcome: 'unavailable',
-      durationMs: 5,
-    })
-    expect(outcome).not.toHaveProperty('requestId')
-    for (const log of logs) {
-      expect(log).not.toHaveProperty('userId')
-      expect(log).not.toHaveProperty('error')
-      expect(JSON.stringify(log)).not.toContain('synthetic-')
+      const logs = parseLogs(stream)
+      expect(logs).toHaveLength(3)
+      const outcome = logs.find(({ message }) => message === 'look_ideas_generation')
+      expect(outcome).toMatchObject({
+        outcome: 'unavailable',
+        durationMs: 5,
+      })
+      expect(outcome).not.toHaveProperty('requestId')
+      for (const log of logs) {
+        expect(log).not.toHaveProperty('userId')
+        expect(log).not.toHaveProperty('error')
+        expect(JSON.stringify(log)).not.toContain('synthetic-')
+      }
     }
-  })
+  )
 })

@@ -117,6 +117,8 @@ export const workerOnlyTables = [
   'WardrobeObjectDeletion',
   // Production follow-up round 4: the wardrobe maintenance job's state, API-only.
   'WardrobeMaintenanceState',
+  'LookIdeaDailyQuota',
+  'LookIdeaBudget',
 ] as const
 
 export const selfOnlyTables = [

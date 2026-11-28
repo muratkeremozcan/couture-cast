@@ -2,7 +2,11 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-80-ai-written-look-ideas
 import 'reflect-metadata'
 import { SAMPLE_CATALOG } from '@couture/utils'
-import type { INestApplication } from '@nestjs/common'
+import {
+  ForbiddenException,
+  type ExecutionContext,
+  type INestApplication,
+} from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,7 +14,12 @@ import type { LookIdeasInput } from '../../contracts/http.js'
 import { httpTestUrl, listenHttpApp } from '../../testing/loopback-http-app.js'
 import { AccessTokenIdentityService } from '../auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service.js'
-import { LOOK_IDEA_BUDGET, LOOK_IDEA_DEADLINE_MS } from './look-ideas.budget.js'
+import { RequestAuthGuard } from '../auth/security.guards.js'
+import {
+  LOOK_IDEA_BUDGET,
+  LOOK_IDEA_DEADLINE_MS,
+  type LookIdeaBudget,
+} from './look-ideas.budget.js'
 import { LookIdeasController } from './look-ideas.controller.js'
 import { LOOK_IDEA_PROVIDER, type LookIdeaProvider } from './look-ideas.provider.js'
 import { LookIdeasService } from './look-ideas.service.js'
@@ -59,11 +68,13 @@ describe('CC-7.23 look ideas acceptance', () => {
   let app: INestApplication
   let service: LookIdeasService
   const generate = vi.fn<LookIdeaProvider['generate']>()
-  const reserve = vi.fn()
+  const provider = { enabled: true, generate }
+  const reserve = vi.fn<LookIdeaBudget['reserve']>()
   const canTeenAccessActiveSurface = vi.fn()
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    provider.enabled = true
     generate
       .mockReset()
       .mockImplementation((input) => Promise.resolve({ ideas: ranking(input) }))
@@ -73,7 +84,7 @@ describe('CC-7.23 look ideas acceptance', () => {
       controllers: [LookIdeasController],
       providers: [
         LookIdeasService,
-        { provide: LOOK_IDEA_PROVIDER, useValue: { generate } },
+        { provide: LOOK_IDEA_PROVIDER, useValue: provider },
         { provide: LOOK_IDEA_BUDGET, useValue: { reserve } },
         {
           provide: AccessTokenIdentityService,
@@ -109,9 +120,13 @@ describe('CC-7.23 look ideas acceptance', () => {
       .expect(200)
       .expect('cache-control', 'private, no-store')
 
-    expect(reserve).toHaveBeenCalledExactlyOnceWith(OWNER)
+    expect(reserve).toHaveBeenCalledTimes(1)
+    const [reservedOwner, deadline] = reserve.mock.calls[0]!
+    expect(reservedOwner).toBe(OWNER)
+    expect(deadline.at).toBeGreaterThan(0)
     expect(generate).toHaveBeenCalledTimes(1)
     const [providerInput, signal] = generate.mock.calls[0]!
+    expect(signal).toBe(deadline.signal)
     expect(signal.aborted).toBe(false)
     const { candidates, ...preferencesAndWeather } = providerInput
     expect(preferencesAndWeather).toStrictEqual(INPUT)
@@ -127,7 +142,10 @@ describe('CC-7.23 look ideas acceptance', () => {
       }
     }
     expect(response.body).toEqual({ data: ranking(providerInput) })
-    expect(logs.create).toHaveBeenCalledWith({ includeRequestMetadata: false })
+    expect(logs.create).toHaveBeenCalledWith({
+      includeRequestMetadata: false,
+      productionLevel: 'info',
+    })
     expect(logs.info).toHaveBeenCalledTimes(1)
     const [fields, event] = logs.info.mock.calls[0]!
     expect(event).toBe('look_ideas_generation')
@@ -142,6 +160,52 @@ describe('CC-7.23 look ideas acceptance', () => {
     await api.post(PATH).set(HEADERS).send(INPUT).expect(403)
 
     expect(canTeenAccessActiveSurface).toHaveBeenCalledExactlyOnceWith(OWNER)
+    expect(reserve).not.toHaveBeenCalled()
+    expect(generate).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { form: 'no URL', url: undefined },
+    { form: 'absolute URL', url: new URL(PATH, 'https://fixture.invalid').href },
+  ])(
+    'requires an active teen account using handler metadata with $form',
+    async ({ url }) => {
+      canTeenAccessActiveSurface.mockResolvedValue(false)
+      const guard = new RequestAuthGuard(
+        app.get(GuardianConsentStateService),
+        app.get(AccessTokenIdentityService)
+      )
+      const handler: unknown = Object.getOwnPropertyDescriptor(
+        LookIdeasController.prototype,
+        'generate'
+      )?.value
+      const context = {
+        getHandler: () => handler,
+        getClass: () => LookIdeasController,
+        switchToHttp: () => ({
+          getRequest: () => ({ url, method: 'POST', headers: HEADERS }),
+        }),
+      } as unknown as ExecutionContext
+
+      await expect(guard.canActivate(context)).rejects.toBeInstanceOf(ForbiddenException)
+      expect(canTeenAccessActiveSurface).toHaveBeenCalledExactlyOnceWith(OWNER)
+      expect(reserve).not.toHaveBeenCalled()
+    }
+  )
+
+  it('returns an unavailable response when active-teen verification fails', async () => {
+    canTeenAccessActiveSurface.mockRejectedValueOnce(
+      new Error('Synthetic database failure')
+    )
+    const response = await request(httpTestUrl(app))
+      .post(PATH)
+      .set(HEADERS)
+      .send(INPUT)
+      .expect(503)
+    expect(response.body).toMatchObject({
+      statusCode: 503,
+      message: 'Account verification is temporarily unavailable',
+    })
     expect(reserve).not.toHaveBeenCalled()
     expect(generate).not.toHaveBeenCalled()
   })
@@ -191,15 +255,25 @@ describe('CC-7.23 look ideas acceptance', () => {
     await expect(service.generate(OWNER, INPUT)).resolves.toBeNull()
   })
 
-  it.each(['account_limit', 'spend_limit', 'unavailable'])(
+  it.each(['account_limit', 'spend_limit', 'unavailable'] as const)(
     'keeps the fallback without generation when the budget reports %s',
     async (outcome) => {
       reserve.mockResolvedValueOnce(outcome)
       await expect(service.generate(OWNER, INPUT)).resolves.toBeNull()
-      expect(reserve).toHaveBeenCalledExactlyOnceWith(OWNER)
+      expect(reserve).toHaveBeenCalledTimes(1)
+      expect(reserve.mock.calls[0]?.[0]).toBe(OWNER)
       expect(generate).not.toHaveBeenCalled()
     }
   )
+
+  it('leaves the rule-based fallback and reserves no spend when dispatch is disabled', async () => {
+    provider.enabled = false
+
+    await expect(service.generate(OWNER, INPUT)).resolves.toBeNull()
+    expect(reserve).not.toHaveBeenCalled()
+    expect(generate).not.toHaveBeenCalled()
+    expect(logs.info.mock.calls[0]?.[0].outcome).toBe('disabled')
+  })
 
   it('aborts a hanging provider at the deadline and answers with a fallback', async () => {
     vi.useFakeTimers()
@@ -218,13 +292,18 @@ describe('CC-7.23 look ideas acceptance', () => {
 
   it('keeps the fallback when reserving spend consumes the generation deadline', async () => {
     vi.useFakeTimers()
+    const started = performance.now()
     reserve.mockReturnValueOnce(new Promise(() => undefined))
     const pending = service.generate(OWNER, INPUT)
+    const deadline = reserve.mock.calls[0]?.[1]
+    expect(deadline?.at).toBe(started + LOOK_IDEA_DEADLINE_MS)
+    expect(deadline?.signal.aborted).toBe(false)
 
     await vi.advanceTimersByTimeAsync(LOOK_IDEA_DEADLINE_MS)
 
     await expect(pending).resolves.toBeNull()
     expect(reserve).toHaveBeenCalledTimes(1)
+    expect(deadline?.signal.aborted).toBe(true)
     expect(generate).not.toHaveBeenCalled()
   })
 
