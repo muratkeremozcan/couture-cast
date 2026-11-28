@@ -252,7 +252,7 @@ describe('7.12 Looks tab default segment (D1, P1)', () => {
     const gate = screen.getByTestId('screen-gate')
     expect(gate).not.toHaveAttribute('data-ready')
     expect(screen.queryByTestId('looks-segments')).toBeNull()
-    expect(screen.queryByTestId('looks-ideas-grid')).toBeNull()
+    expect(screen.queryByTestId('member-lookbook')).toBeNull()
     await waitFor(() => expect(capsules).toHaveBeenCalledTimes(1))
     // The capsules read answered; the gate still waits for the saved looks read.
     expect(screen.queryByTestId('looks-segments')).toBeNull()
@@ -270,7 +270,7 @@ describe('7.12 Looks tab default segment (D1, P1)', () => {
     const first = screen.getByTestId('looks-first-content')
     expect(first).toContainElement(screen.getByTestId('saved-look-card-sl-1'))
     expect(screen.getByTestId('looks-filter-all')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.queryByTestId('looks-ideas-grid')).toBeNull()
+    expect(screen.queryByTestId('member-lookbook')).toBeNull()
     expect(list).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
         owner: FIXTURE_PROFILE_ID,
@@ -335,7 +335,7 @@ describe('7.12 Looks tab default segment (D1, P1)', () => {
       'true'
     )
     expect(screen.getByTestId('looks-first-content')).toContainElement(alert)
-    expect(screen.queryByTestId('looks-ideas-grid')).toBeNull()
+    expect(screen.queryByTestId('member-lookbook')).toBeNull()
 
     fireEvent.click(screen.getByTestId('saved-looks-retry'))
 
@@ -377,7 +377,7 @@ describe('7.12 Looks tab default segment (D1, P1)', () => {
     expect(screen.getByTestId('looks-filter-empty')).toHaveTextContent(
       'Save a look to see it here'
     )
-    expect(screen.queryByTestId('looks-ideas-grid')).toBeNull()
+    expect(screen.queryByTestId('member-lookbook')).toBeNull()
   })
 })
 
@@ -394,7 +394,7 @@ describe('7.12 Looks segment and filter address (D1, D4)', () => {
     expect(router.replace).toHaveBeenLastCalledWith('/looks?segment=ideas', {
       scroll: false,
     })
-    expect(await screen.findByTestId('looks-ideas-grid')).toBeVisible()
+    expect(await screen.findByTestId('member-lookbook')).toBeVisible()
     expect(screen.getByTestId('looks-segment-ideas')).toHaveAttribute(
       'aria-selected',
       'true'
@@ -460,7 +460,7 @@ describe('7.12 Looks segment and filter address (D1, D4)', () => {
 
       render(<LooksPage />)
 
-      expect(await screen.findByTestId('looks-ideas-grid')).toBeVisible()
+      expect(await screen.findByTestId('member-lookbook')).toBeVisible()
       await waitFor(() =>
         expect(filter === 'today' ? list : capsules).toHaveBeenCalledTimes(1)
       )
@@ -476,7 +476,7 @@ describe('7.12 Looks segment and filter address (D1, D4)', () => {
 
     render(<LooksPage />)
 
-    expect(await screen.findByTestId('looks-ideas-grid')).toBeVisible()
+    expect(await screen.findByTestId('member-lookbook')).toBeVisible()
     await waitFor(() => expect(list).toHaveBeenCalled())
     expect(screen.queryByTestId('looks-ideas-empty-line')).toBeNull()
   })

@@ -7,15 +7,18 @@
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 import type { Page, Request, Route } from '@playwright/test'
 import {
+  createSavedLookInputSchema,
   outfitCapsuleListResponseSchema,
   outfitCapsuleResponseSchema,
   PREMIUM_REQUIRED_MESSAGE,
   savedLookListResponseSchema,
   savedLookResponseSchema,
+  type ParsedCreateSavedLookInput,
+  type SavedLookContract,
 } from '@couture/api-client/contracts/http'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { openFixtureShell } from './app-shell'
-import type { ShellMode } from './shell-fixtures'
+import { fixtureOwner, type ShellMode } from './shell-fixtures'
 
 const BASE = Date.parse('2026-11-20T12:00:00.000Z')
 
@@ -43,7 +46,7 @@ export interface CapsuleSeed {
   unavailable?: number
 }
 
-function lookContract(memberId: string, seed: LookSeed) {
+function lookContract(memberId: string, seed: LookSeed): SavedLookContract {
   // Real sample catalog ids (`sample:g:<slug>`), so tiles draw catalog art as members see it.
   const slots = [
     ['top', 'sample:g:oxford-shirt'],
@@ -69,8 +72,8 @@ function lookContract(memberId: string, seed: LookSeed) {
     composition: [
       ...missingIds.map((itemId, slotIndex) => ({
         slotIndex,
-        category: 'top',
-        kind: 'garment',
+        category: 'top' as const,
+        kind: 'garment' as const,
         itemId,
         label: null,
         missing: true,
@@ -79,7 +82,7 @@ function lookContract(memberId: string, seed: LookSeed) {
       ...slots.slice(missingIds.length).map(([category, itemId], index) => ({
         slotIndex: missingIds.length + index,
         category,
-        kind: 'catalog',
+        kind: 'catalog' as const,
         itemId,
         label: null,
         missing: false,
@@ -153,6 +156,7 @@ export interface LooksFixtureOptions {
   planner?: 'free' | 'premium'
   mode?: ShellMode
   memberId?: string
+  storedSession?: boolean
   /** A saved look read answers 503 (P1: a failed read still opens Saved). */
   failLooksRead?: boolean
 }
@@ -171,6 +175,7 @@ export async function openLooksFixture(
     mode: options.mode ?? 'populated',
     screen: 'looks',
     memberId,
+    storedSession: options.storedSession,
   })
   const looks = new Map(
     (options.looks ?? []).map((seed) => [seed.id, lookContract(memberId, seed)])
@@ -180,6 +185,7 @@ export async function openLooksFixture(
   /** Every list read, as `path?query`, in order. */
   const listReads: string[] = []
   const detailReads: string[] = []
+  const creates: ParsedCreateSavedLookInput[] = []
   /** Reads held until the test releases them (`hold('capsules')`). */
   const gates = new Map<'saved-looks' | 'capsules', Promise<void>>()
   const waitGate = async (kind: 'saved-looks' | 'capsules') => {
@@ -220,13 +226,52 @@ export async function openLooksFixture(
       .catch(() => undefined)
   }
 
-  await page.route('**/api/v1/wardrobe/saved-looks**', async (route, request) => {
+  const createLook = (route: Route, request: Request) => {
+    if (fixtureOwner(request.headers().authorization) !== memberId) {
+      return route.fulfill({ status: 401, json: { message: 'Unauthorized' } })
+    }
+    const input = createSavedLookInputSchema.parse(request.postDataJSON())
+    creates.push(input)
+    const createdAt = minutesAfter(1000 + creates.length)
+    const saved: SavedLookContract = {
+      ...input,
+      id: `looks-fixture-created-${creates.length}`,
+      ownerUserId: memberId,
+      source: input.source === 'today' ? 'home_sample' : input.source,
+      title: input.title ?? null,
+      anchorGarmentId: input.anchorGarmentId ?? null,
+      anchorSnapshot: input.anchorSnapshot ?? null,
+      collection: input.collection ?? null,
+      comfort: input.comfort ?? null,
+      composition: input.composition.map((piece) => ({
+        ...piece,
+        label: piece.label ?? null,
+        missing: false,
+        imageAccess: null,
+      })),
+      availabilityStatus: 'ready',
+      missingGarmentIds: [],
+      needsReviewReasons: [],
+      revision: 0,
+      createdAt,
+      updatedAt: createdAt,
+    }
+    looks.set(saved.id, saved)
+    return route.fulfill({
+      status: 201,
+      json: savedLookResponseSchema.parse({ data: saved }),
+      headers: { etag: etag(saved.id, saved.revision) },
+    })
+  }
+
+  const handleSavedLooks = async (route: Route, request: Request) => {
     const { pathname } = new URL(request.url())
     const match = /\/wardrobe\/saved-looks(?:\/([^/]+))?(\/restore)?$/.exec(pathname)
     if (!match) return route.fallback()
     const [, id, restore] = match
     const method = request.method()
     if (!id && method === 'GET') return listLooks(route, request)
+    if (!id && method === 'POST') return createLook(route, request)
     if (!id) return route.fallback()
     if (method === 'GET') {
       detailReads.push(id)
@@ -268,6 +313,14 @@ export async function openLooksFixture(
       })
     }
     return route.fallback()
+  }
+  void interceptNetworkCall({
+    url: '**/api/v1/wardrobe/saved-looks*',
+    handler: handleSavedLooks,
+  })
+  void interceptNetworkCall({
+    url: '**/api/v1/wardrobe/saved-looks/**',
+    handler: handleSavedLooks,
   })
 
   await page.route('**/api/v1/wardrobe/*/capsules**', async (route, request) => {
@@ -319,6 +372,7 @@ export async function openLooksFixture(
     /** List reads the page sent, oldest first. */
     listReads: () => [...listReads],
     detailReads: () => [...detailReads],
+    creates: () => [...creates],
     /** Holds every `kind` list read from now on until the returned release runs. */
     hold: (kind: 'saved-looks' | 'capsules') => {
       let release = () => undefined as void

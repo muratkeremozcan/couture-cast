@@ -284,7 +284,7 @@ async function looksSettled(fixture: ScreenBudgetMode, segment: Segment) {
   }
   if (segment === 'ideas')
     await waitFor(() =>
-      expect(within(first).getByTestId('looks-ideas-grid')).toBeVisible()
+      expect(within(first).getByTestId('member-lookbook')).toBeVisible()
     )
   if (segment === 'plan') {
     if (fixture === 'populated')
@@ -381,12 +381,14 @@ describe('Screen budget and first content: native Looks', () => {
         // The CC-7.11 rows are gone (D1, D6).
         expect(targets).not.toContain('looks-capsules-row')
         expect(targets).not.toContain('looks-plan-row')
-        // D10: the free Plan's Upgrade is the screen's one primary; elsewhere there is none.
+        // The member lookbook and free Plan each expose one primary action.
         const free = segment === 'plan' && fixture !== 'populated'
+        const primary =
+          segment === 'ideas' ? ['lookbook-save'] : free ? ['plan-upgrade'] : []
         expect(
           measurement.primaryButtons.map((button) => button.key),
           'primary buttons'
-        ).toEqual(free ? ['plan-upgrade'] : [])
+        ).toEqual(primary)
         expectNativeWithinBudget('looks', fixture, measurement)
       }, 30_000)
 
@@ -482,7 +484,12 @@ describe('Screen budget and first content: native Looks', () => {
     )
     renderLooks(WithTabHeader)
 
-    const first = await looksSettled('empty', 'ideas')
+    const first = await screen.findByTestId('looks-first-content')
+    expect(screen.getByTestId('looks-segment-ideas')).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+    expect(within(first).getByTestId('looks-ideas-grid')).toBeVisible()
     expect(within(first).getByTestId('looks-ideas-empty-line')).toHaveTextContent(
       i18n.t('looks.empty')
     )

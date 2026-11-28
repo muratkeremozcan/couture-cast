@@ -5,11 +5,13 @@
 // capsule, Ideas otherwise, decided once after both first reads settle, TEA P1), 7.12-NAT-002
 // (one newest-first tile grid through the shared `looks-feed` merge, state lines, filters read
 // from the server per P2, Load more, tile targets with their origin filter, T2) and
-// 7.12-NAT-003 (Ideas tiles from SAMPLE_CATALOG with no control), plus P8 (tile accessibility,
+// 7.12-NAT-003 (Ideas), plus P8 (tile accessibility,
 // photo placeholder) and P9 (a member switch paints no tile of the previous member; native has
 // no screen snapshot, so it holds by the remount per identity epoch).
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
-import { SAMPLE_CATALOG } from '@couture/utils'
+// Learning path Step 79: Lookbook with shuffle and pinned pieces.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-79-lookbook-with-shuffle-and-pinned-pieces
+import { memberLookbookDraftKey } from '@couture/utils'
 import {
   act,
   configure,
@@ -89,6 +91,7 @@ import { WithTabHeader, setBudgetViewport } from '@/src/test-utils/screen-budget
 import { AppThemeProvider } from '@/src/theme/theme-context'
 
 const MEMBER = 'looks-member'
+const OTHER_MEMBER = 'looks-member-other'
 const PLANNER_ROUTE = '*/api/v1/commerce/premium/planner'
 const PNG_PIXEL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
@@ -270,14 +273,14 @@ function renderLooks(onCommit?: () => void) {
 type IdeasCommit = { line: boolean; laidOut: boolean; top: number; lineBottom: number }
 
 /**
- * TEA round 4 #1: records, for every commit where `looks-ideas-grid` exists, whether
+ * TEA round 4 #1: records, for every commit where `member-lookbook` exists, whether
  * `looks-ideas-empty-line` exists in that same commit and where the grid sits. A
  * MutationObserver samples later and can miss an intermediate commit; this cannot.
  */
 function ideasCommitProbe() {
   const commits: IdeasCommit[] = []
   const onCommit = () => {
-    const grid = document.querySelector('[data-testid="looks-ideas-grid"]')
+    const grid = document.querySelector('[data-testid="member-lookbook"]')
     if (!grid) return
     const line = document.querySelector('[data-testid="looks-ideas-empty-line"]')
     const rect = grid.getBoundingClientRect()
@@ -369,6 +372,8 @@ describe('Native Looks tab (Story CC-7.12)', () => {
     restoreToken = undefined
     setMobileApplicationUserId(null)
     screenFocus.reset()
+    localStorage.removeItem(memberLookbookDraftKey(MEMBER))
+    localStorage.removeItem(memberLookbookDraftKey(OTHER_MEMBER))
     vi.clearAllMocks()
   })
 
@@ -408,7 +413,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       await userEvent.click(segmentTab('ideas'))
       expect(routerMock.setParams).toHaveBeenCalledExactlyOnceWith({ segment: 'ideas' })
       await waitFor(() => expectOpenSegment('ideas'))
-      expect(screen.getByTestId('looks-ideas-grid')).toBeVisible()
+      expect(await screen.findByTestId('member-lookbook')).toBeVisible()
       // A member with looks sees no "Save a look" line on Ideas.
       expect(screen.queryByTestId('looks-ideas-empty-line')).toBeNull()
       expect(screen.queryByTestId('looks-saved-grid')).toBeNull()
@@ -435,7 +440,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       expect(line).toHaveTextContent('Save a look to see it here')
       const first = screen.getByTestId('looks-first-content')
       expect(first.contains(line)).toBe(true)
-      expect(first.contains(screen.getByTestId('looks-ideas-grid'))).toBe(true)
+      expect(first.contains(await screen.findByTestId('member-lookbook'))).toBe(true)
       expect(routerMock.setParams).not.toHaveBeenCalled()
     })
 
@@ -453,8 +458,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       )
       let ideasPainted = false
       const observer = new MutationObserver(() => {
-        if (document.querySelector('[data-testid="looks-ideas-grid"]'))
-          ideasPainted = true
+        if (document.querySelector('[data-testid="member-lookbook"]')) ideasPainted = true
       })
       observer.observe(document.body, { childList: true, subtree: true })
       renderLooks()
@@ -499,7 +503,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       const first = screen.getByTestId('looks-first-content')
       expect(first).toHaveAttribute('role', 'alert')
       expect(first).toHaveTextContent(i18n.t('savedLooks.loadFailed'))
-      expect(screen.queryByTestId('looks-ideas-grid')).toBeNull()
+      expect(screen.queryByTestId('member-lookbook')).toBeNull()
 
       await userEvent.click(within(first).getByTestId('saved-looks-retry'))
       expect(await screen.findByTestId('saved-look-card-look-1')).toBeVisible()
@@ -562,7 +566,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       const reads = serveFeed({})
       await openLooks()
       expectOpenSegment('ideas')
-      expect(screen.getByTestId('looks-ideas-grid')).toBeVisible()
+      expect(await screen.findByTestId('member-lookbook')).toBeVisible()
       // Ideas from the address opens without waiting on the reads; the line for an empty Saved
       // comes once the All feed settles empty (Codex #11), so it is awaited here.
       expect(await screen.findByTestId('looks-ideas-empty-line')).toBeVisible()
@@ -616,10 +620,11 @@ describe('Native Looks tab (Story CC-7.12)', () => {
         release()
         // The All feed settled empty: the line for an empty Saved shows.
         expect(await screen.findByTestId('looks-ideas-empty-line')).toBeVisible()
+        await screen.findByTestId('member-lookbook')
         expectOpenSegment('ideas')
         const firstTop = probe.expectLineWithGridFromFirstCommit()
         expect(
-          screen.getByTestId('looks-ideas-grid').getBoundingClientRect().top
+          screen.getByTestId('member-lookbook').getBoundingClientRect().top
         ).toBeCloseTo(firstTop, 0)
       } finally {
         release()
@@ -677,7 +682,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
         expectOpenSegment('ideas')
         const pending = screen.getByTestId('looks-first-content')
         expect(within(pending).getByTestId('looks-feed-loading')).toBeVisible()
-        expect(screen.queryByTestId('looks-ideas-grid')).toBeNull()
+        expect(screen.queryByTestId('member-lookbook')).toBeNull()
         expect(screen.queryByTestId('looks-ideas-empty-line')).toBeNull()
         expect(
           screen.getByTestId('looks-segments').compareDocumentPosition(pending) &
@@ -691,11 +696,11 @@ describe('Native Looks tab (Story CC-7.12)', () => {
         release()
         // The All feed settled empty: the line for an empty Saved shows above the grid.
         expect(await screen.findByTestId('looks-ideas-empty-line')).toBeVisible()
+        const grid = await screen.findByTestId('member-lookbook')
         expect(screen.queryByTestId('looks-feed-loading')).toBeNull()
         expectOpenSegment('ideas')
         // The first commit with the grid already holds the line, and the grid never moves.
         const firstTop = probe.expectLineWithGridFromFirstCommit()
-        const grid = screen.getByTestId('looks-ideas-grid')
         expect(grid).toBeVisible()
         expect(grid.getBoundingClientRect().top).toBeCloseTo(firstTop, 0)
         expect(
@@ -753,7 +758,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
             'looks-feed-loading'
           )
         ).toBeInTheDocument()
-        expect(screen.queryByTestId('looks-ideas-grid')).toBeNull()
+        expect(screen.queryByTestId('member-lookbook')).toBeNull()
         expect(screen.queryByTestId('looks-saved-grid')).toBeNull()
 
         release()
@@ -1352,30 +1357,67 @@ describe('Native Looks tab (Story CC-7.12)', () => {
     })
   })
 
-  describe('[7.12-NAT-003] Ideas', () => {
-    it('[P0] [D9] shows every sample look as a picture tile with a name and a line, and no control', async () => {
+  describe('[7.22-NAT] Ideas', () => {
+    it('[P0] [7.22-SCOPE] restores a member’s pin on return and opens another member’s draft unpinned', async () => {
       tabParams.set({ segment: 'ideas' })
       serveFeed({ looks: [look('look-1', at(20))] })
       await openLooks()
-      const grid = screen.getByTestId('looks-ideas-grid')
-
-      const tiles = Array.from(grid.querySelectorAll('[data-testid^="looks-idea-card-"]'))
-      expect(tiles.map((tile) => tile.getAttribute('data-testid'))).toEqual(
-        SAMPLE_CATALOG.looks.map((sample) => `looks-idea-card-${sample.id}`)
-      )
-      for (const tile of tiles) {
-        const lines = Array.from(tile.querySelectorAll('div[dir="auto"]'))
-          .map((node) => node.textContent?.trim() ?? '')
-          .filter(Boolean)
-        expect(lines.length, tile.getAttribute('data-testid')!).toBeGreaterThanOrEqual(2)
-      }
-      // D9: pictures only until CC-7.22 ships the lookbook.
-      expect(
-        grid.querySelectorAll(
-          '[role="button"], [role="link"], button, a[href], [tabindex]:not([tabindex^="-"])'
-        )
-      ).toHaveLength(0)
+      const card = within(await screen.findByTestId('member-lookbook'))
+      expect(card.getAllByTestId('looks-idea-card-current')).toHaveLength(1)
+      expect(card.getByTestId('lookbook-weather-reason').textContent).toMatch(/\S/)
+      const pin = card.getByTestId('lookbook-pin-shoes')
+      const shoe = pin.getAttribute('aria-label')
+      expect(pin).toHaveAttribute('aria-pressed', 'false')
+      await userEvent.click(pin)
+      expect(pin).toHaveAttribute('aria-pressed', 'true')
+      await userEvent.click(card.getByTestId('lookbook-shuffle'))
+      expect(pin).toHaveAttribute('aria-label', shoe)
       expect(screen.queryByTestId('looks-filters')).toBeNull()
+
+      await userEvent.click(segmentTab('saved'))
+      await screen.findByTestId('saved-look-card-look-1')
+      await userEvent.click(segmentTab('ideas'))
+      const restored = await screen.findByTestId('lookbook-pin-shoes')
+      expect(restored).toHaveAttribute('aria-pressed', 'true')
+      expect(restored).toHaveAttribute('aria-label', shoe)
+
+      serveFeed({ looks: [look('other-look', at(20), { ownerUserId: OTHER_MEMBER })] })
+      act(() => setMobileApplicationUserId(OTHER_MEMBER))
+      expect(await screen.findByTestId('lookbook-pin-shoes')).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      )
+      serveFeed({ looks: [look('look-1', at(20))] })
+      act(() => setMobileApplicationUserId(MEMBER))
+      expect(await screen.findByTestId('lookbook-pin-shoes')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+    })
+
+    it('[P0] [7.22-SAVE] a failed native save keeps the selected composition and pins for retry', async () => {
+      tabParams.set({ segment: 'ideas' })
+      serveFeed({})
+      const requests: unknown[] = []
+      server.use(
+        http.post('*/api/v1/wardrobe/saved-looks', async ({ request }) => {
+          requests.push(await request.json())
+          return HttpResponse.json({ message: 'Unavailable' }, { status: 503 })
+        })
+      )
+      await openLooks()
+      const card = within(await screen.findByTestId('member-lookbook'))
+      const pin = card.getByTestId('lookbook-pin-shoes')
+      const name = pin.getAttribute('aria-label')
+      await userEvent.click(pin)
+      await userEvent.click(card.getByTestId('lookbook-save'))
+      expect(
+        await screen.findByRole('button', { name: i18n.t('feedback.retry') })
+      ).toBeVisible()
+      expect(requests).toHaveLength(1)
+      expect(requests[0]).toMatchObject({ source: 'home_sample' })
+      expect(pin).toHaveAttribute('aria-pressed', 'true')
+      expect(pin).toHaveAttribute('aria-label', name)
     })
   })
 
@@ -1394,7 +1436,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
         await waitFor(() => expectOpenSegment('ideas'))
         // setParams kept the filter in the address.
         expect(tabParams.get()).toEqual({ segment: 'ideas', filter })
-        expect(screen.getByTestId('looks-ideas-grid')).toBeVisible()
+        expect(await screen.findByTestId('member-lookbook')).toBeVisible()
         expect(screen.queryByTestId('looks-ideas-empty-line')).toBeNull()
       }
     )

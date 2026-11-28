@@ -256,19 +256,22 @@ test.describe('CC-7.20 Account style profile @local-lane', () => {
     setScreen('looks')
     await page.getByTestId('bottom-nav-looks').click()
     await page.getByTestId('looks-segment-ideas').click()
+    await expect(page.getByTestId('lookbook-mood-active')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
     await open.click()
     await expect(cool).toHaveAttribute('aria-pressed', 'true')
-    await expect(sporty).toHaveAttribute('aria-pressed', 'true')
+    await expect(sporty).toHaveCount(0)
     await page.getByTestId('style-day-reset').click()
     await expect(cool).toHaveAttribute('aria-pressed', 'false')
-    await expect(sporty).toHaveAttribute('aria-pressed', 'false')
-    await cool.click()
-    await cozy.click()
-    await expect(cozy).toHaveAttribute('aria-pressed', 'true')
 
     setScreen('home')
     await page.getByTestId('bottom-nav-home').click()
     await open.click()
+    await expect(sporty).toHaveAttribute('aria-pressed', 'false')
+    await cool.click()
+    await cozy.click()
     await expect(cozy).toHaveAttribute('aria-pressed', 'true')
     await page.clock.setFixedTime(new Date('2026-11-21T06:01:00Z'))
 
@@ -277,12 +280,13 @@ test.describe('CC-7.20 Account style profile @local-lane', () => {
     await page.getByTestId('looks-segment-ideas').click()
     await open.click()
     await expect(cool).toHaveAttribute('aria-pressed', 'false')
-    await expect(cozy).toHaveAttribute('aria-pressed', 'false')
 
     setScreen('home')
     await page.getByTestId('bottom-nav-home').click()
     await expect(page.getByTestId('today-primary-action')).toBeVisible()
     await expect(page.getByTestId('member-sample-outfit')).toBeHidden()
+    await open.click()
+    await expect(cozy).toHaveAttribute('aria-pressed', 'false')
 
     setScreen('profile')
     await page.getByTestId('bottom-nav-settings').click()
