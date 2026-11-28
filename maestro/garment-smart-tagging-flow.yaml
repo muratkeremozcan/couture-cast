@@ -82,8 +82,12 @@ tags:
 - tapOn:
     id: 'garment-e2e-fixture-source'
 
+- assertVisible:
+    id: 'garment-crop-preview'
+
 - tapOn:
     id: 'garment-confirm-image'
+    enabled: true
 
 - extendedWaitUntil:
     visible:

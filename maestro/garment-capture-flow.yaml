@@ -1,5 +1,7 @@
 # Learning path Step 29: Garment capture flow.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
+# Learning path Step 83: Clean garment cutouts.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-83-clean-garment-cutouts
 # Story 4.1 Task 9 step 1 owner: Maestro E2E test script for mobile garment capture flow
 appId: ${MAESTRO_APP_ID}
 name: 'Garment capture flow'
@@ -44,14 +46,15 @@ tags:
 - tapOn:
     id: 'garment-aspect-portrait'
 
-- assertNotVisible:
-    id: 'garment-cleanup-toggle'
+- assertVisible:
+    id: 'garment-cleanup-switch'
 
 - assertVisible:
-    id: 'garment-confirm-image'
+    id: 'garment-crop-preview'
 
 - tapOn:
     id: 'garment-confirm-image'
+    enabled: true
 
 - assertVisible:
     id: 'garment-capture-complete'
