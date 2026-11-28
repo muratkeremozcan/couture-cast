@@ -1,5 +1,7 @@
 // Learning path Step 29: Garment capture flow.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
+// Learning path Step 81: Photo AI consent and processor approval.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-81-photo-ai-consent-and-processor-approval
 import { Prisma } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -27,8 +29,22 @@ describe('GuardianService consent revocation', () => {
       id: 'guardian-revoke',
       email: 'guardian.revoke@example.com',
     })
-    const { prisma, capture, invalidateUserSessions, markTeenAccessRevoked, service } =
-      createService()
+    const {
+      prisma,
+      capture,
+      invalidateUserSessions,
+      markTeenAccessRevoked,
+      photoAiAttempts,
+      service,
+    } = createService()
+    const pendingPhoto = new AbortController()
+    const unrelatedPhoto = new AbortController()
+    photoAiAttempts.track(teen.id, 'teen-photo-grant', pendingPhoto)
+    photoAiAttempts.track('other-member', 'teen-photo-grant', unrelatedPhoto)
+    prisma.photoAiGrant.updateManyAndReturn.mockImplementationOnce(() => {
+      expect(pendingPhoto.signal.aborted).toBe(false)
+      return Promise.resolve([{ id: 'teen-photo-grant' }])
+    })
 
     prisma.users.set(teen.id, {
       id: teen.id,
@@ -61,6 +77,14 @@ describe('GuardianService consent revocation', () => {
     })
 
     const result = await service.revokeConsent(guardian.id, teen.id, '203.0.113.99')
+
+    expect(prisma.photoAiGrant.updateManyAndReturn).toHaveBeenCalledExactlyOnceWith({
+      where: { user_id: teen.id, revoked_at: null },
+      data: { revoked_at: prisma.consents.get(`${guardian.id}:${teen.id}`)?.revoked_at },
+      select: { id: true },
+    })
+    expect(pendingPhoto.signal.aborted).toBe(true)
+    expect(unrelatedPhoto.signal.aborted).toBe(false)
 
     expect(result).toMatchObject({
       guardianId: guardian.id,
@@ -174,8 +198,20 @@ describe('GuardianService consent revocation', () => {
       id: 'guardian-b',
       email: 'guardian.b@example.com',
     })
-    const { prisma, invalidateUserSessions, markTeenAccessGranted, service } =
-      createService()
+    const {
+      prisma,
+      invalidateUserSessions,
+      markTeenAccessGranted,
+      photoAiAttempts,
+      service,
+    } = createService()
+    const revokedPhoto = new AbortController()
+    const remainingPhoto = new AbortController()
+    photoAiAttempts.track(teen.id, 'withdrawn-grant', revokedPhoto)
+    photoAiAttempts.track(teen.id, 'remaining-grant', remainingPhoto)
+    prisma.photoAiGrant.updateManyAndReturn.mockResolvedValueOnce([
+      { id: 'withdrawn-grant' },
+    ])
 
     prisma.users.set(teen.id, {
       id: teen.id,
@@ -201,6 +237,7 @@ describe('GuardianService consent revocation', () => {
       profile: null,
     })
     prisma.consents.set(`${revokingGuardian.id}:${teen.id}`, {
+      id: 'withdrawn-relationship',
       guardian_id: revokingGuardian.id,
       teen_id: teen.id,
       consent_level: 'read_only',
@@ -231,6 +268,13 @@ describe('GuardianService consent revocation', () => {
       remainingActiveGuardians: 1,
       sessionInvalidated: false,
     })
+    expect(prisma.photoAiGrant.updateManyAndReturn.mock.calls[0]?.[0].where).toEqual({
+      user_id: teen.id,
+      revoked_at: null,
+      guardian_consent_id: 'withdrawn-relationship',
+    })
+    expect(revokedPhoto.signal.aborted).toBe(true)
+    expect(remainingPhoto.signal.aborted).toBe(false)
 
     const compliance = prisma.users.get(teen.id)?.profile?.preferences?.compliance as
       | Record<string, unknown>

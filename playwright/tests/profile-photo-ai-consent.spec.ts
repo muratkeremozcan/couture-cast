@@ -69,7 +69,7 @@ test.describe('CC-7.24 Profile photo AI consent @local-lane', () => {
     expect(fixtureOwner((await read).request?.headers().authorization)).toBe(MEMBER)
     const panel = page.getByTestId('photo-ai-consent')
     const status = panel.getByTestId('photo-ai-consent-status')
-    await expect(status).toHaveText('Photo AI is off.')
+    await expect(status).toHaveText('External photo AI is off.')
     await expect(
       panel.getByText(
         'You can still write descriptions and add clothes or choose tags yourself.'
@@ -84,9 +84,10 @@ test.describe('CC-7.24 Profile photo AI consent @local-lane', () => {
     expect(fixtureOwner(revocation.request?.headers().authorization)).toBe(MEMBER)
     expect(revocation.requestJson).toEqual({ grantId: GRANT_ID })
     await expect(button).toHaveCount(0)
+    await expect(panel.getByRole('status')).toHaveText('Permission revoked.')
     const retainedButton = panel.getByTestId(`photo-ai-revoke-${RETAINED_GRANT_ID}`)
     await expect(retainedButton).toBeEnabled()
-    await expect(status).toHaveText('Photo AI is off.')
+    await expect(status).toHaveText('External photo AI is off.')
     await page.reload()
     await expect(retainedButton).toBeEnabled()
     await expect(button).toHaveCount(0)

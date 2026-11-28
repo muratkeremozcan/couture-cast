@@ -8,6 +8,8 @@
 // Story CC-7.11 test owner (TEA): D15 parity for the five tab labels (nav.today|closet|looks) and
 // the Profile > Style keys (settings.style.*); nested trees now flatten to dotted keys.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
+// Learning path Step 81: Photo AI consent and processor approval.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-81-photo-ai-consent-and-processor-approval
 import { describe, expect, it } from 'vitest'
 import { SUPPORTED_LOCALES, type SupportedLocale } from './index'
 
@@ -135,6 +137,21 @@ describe('Profile and navigation locale parity (web)', () => {
       'settings.profile.languages.pt-PT': 'Português (Portugal)',
       'settings.title': 'Profile',
       'settings.account': 'Your account',
+      'settings.photoAi.heading': 'Photo AI',
+      'settings.photoAi.off': 'External photo AI is off.',
+      'settings.photoAi.manual':
+        'You can still write descriptions and add clothes or choose tags yourself.',
+      'settings.photoAi.revoke': 'Revoke',
+      'settings.photoAi.revokeLabel': 'Revoke permission for {{feature}} ({{provider}})',
+      'settings.photoAi.loadError': 'Could not load photo permissions.',
+      'settings.photoAi.revokeError':
+        'Could not confirm that the permission was revoked. Try again.',
+      'settings.photoAi.revoked': 'Permission revoked.',
+      'settings.photoAi.retry': 'Try again',
+      'settings.photoAi.features.community-description': 'Community descriptions',
+      'settings.photoAi.features.garment-cutout': 'Garment cutouts',
+      'settings.photoAi.features.garment-tags': 'Garment tags',
+      'settings.photoAi.features.flat-lay-garments': 'Flat-lay detection',
       // Story CC-7.11 D7: Profile > Style and its three rows.
       'settings.style.row': 'Style',
       'settings.style.title': 'Style',

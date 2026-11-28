@@ -85,9 +85,10 @@ describe('CC-7.24 native photo AI consent', () => {
   beforeEach(() => {
     requestConsent.mockReset()
     createClient.mockClear()
-    restoreToken = setMobileAccessTokenResolver(
-      () => `verified-${mobileApplicationUserId()}`
-    )
+    restoreToken = setMobileAccessTokenResolver(() => {
+      const owner = mobileApplicationUserId()
+      return owner ? `verified-${owner}` : undefined
+    })
     setMobileApplicationUserId(OWNER)
   })
 
@@ -144,7 +145,55 @@ describe('CC-7.24 native photo AI consent', () => {
     expect(createClient.mock.calls[2]?.[0].accessToken).toBe(`verified-${OTHER}`)
     expect(screen.getByTestId(revokeButton(OTHER_GRANT))).toBeEnabled()
     expect(screen.getByTestId('photo-ai-consent-status')).toHaveTextContent(
-      'Photo AI is off.'
+      'External photo AI is off.'
     )
+  })
+
+  it('hides consent immediately on sign-out and ignores the late read', async () => {
+    const pending = deferred<Consent>()
+    requestConsent.mockReturnValueOnce(pending.promise)
+    render(<AccountSettingsScreen />)
+    await waitFor(() => expect(requestConsent).toHaveBeenCalledTimes(1))
+
+    act(() => setMobileApplicationUserId(null))
+    expect(screen.queryByTestId('photo-ai-consent')).toBeNull()
+    await act(async () => {
+      pending.resolve(consent(OLD_GRANT))
+      await pending.promise
+    })
+
+    expect(requestConsent.mock.calls[0]?.[1].aborted).toBe(true)
+    expect(requestConsent).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('Could not load photo permissions.')).toBeNull()
+    expect(screen.queryByTestId(revokeButton(OLD_GRANT))).toBeNull()
+  })
+
+  it('recovers an unavailable bearer and preserves the grant through a failed revocation', async () => {
+    restoreToken()
+    const verifiedSession = { bearer: undefined as string | undefined }
+    restoreToken = setMobileAccessTokenResolver(() => verifiedSession.bearer)
+    requestConsent
+      .mockResolvedValueOnce(consent(OLD_GRANT))
+      .mockRejectedValueOnce(new Error('revocation unavailable'))
+      .mockResolvedValueOnce(consent())
+    render(<AccountSettingsScreen />)
+
+    await screen.findByText('Could not load photo permissions.')
+    expect(requestConsent).not.toHaveBeenCalled()
+    verifiedSession.bearer = `verified-${OWNER}`
+    await userEvent.click(await screen.findByRole('button', { name: 'Try again' }))
+    await userEvent.click(await screen.findByTestId(revokeButton(OLD_GRANT)))
+    await screen.findByText(
+      'Could not confirm that the permission was revoked. Try again.'
+    )
+    await userEvent.click(screen.getByTestId(revokeButton(OLD_GRANT)))
+
+    await screen.findByText('Permission revoked.')
+    expect(screen.queryByTestId(revokeButton(OLD_GRANT))).toBeNull()
+    expect(requestConsent.mock.calls.map(([, , id]) => id)).toEqual([
+      undefined,
+      OLD_GRANT.id,
+      OLD_GRANT.id,
+    ])
   })
 })

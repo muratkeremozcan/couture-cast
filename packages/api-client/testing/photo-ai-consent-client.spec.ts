@@ -1,6 +1,7 @@
 // Learning path Step 81: Photo AI consent and processor approval.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-81-photo-ai-consent-and-processor-approval
 import { describe, expect, it, vi } from 'vitest'
+import { revokePhotoAiConsentInputSchema } from '../src/contracts/http/photo-ai-consent'
 import { Configuration, DefaultApi } from '../src/generated'
 import { requestPhotoAiConsent } from '../src/photo-ai-consent-client'
 
@@ -25,6 +26,21 @@ function client() {
     })
   )
   return { api, fetchApi }
+}
+
+function holdFetch(fetchApi: ReturnType<typeof client>['fetchApi']) {
+  const received = deferred<AbortSignal>()
+  fetchApi.mockImplementation(
+    (_url, init) =>
+      new Promise((_resolve, reject) => {
+        const signal = init!.signal!
+        signal.addEventListener('abort', () => reject(new Error('Request aborted')), {
+          once: true,
+        })
+        received.resolve(signal)
+      })
+  )
+  return received.promise
 }
 
 describe('CC-7.24 photo AI consent SDK', () => {
@@ -69,24 +85,41 @@ describe('CC-7.24 photo AI consent SDK', () => {
   it('forwards cancellation to an in-flight authenticated read', async () => {
     const { api, fetchApi } = client()
     const caller = new AbortController()
-    const received = deferred<AbortSignal>()
-    fetchApi.mockImplementation(
-      (_url, init) =>
-        new Promise((_resolve, reject) => {
-          const signal = init!.signal!
-          signal.addEventListener('abort', () => reject(new Error('Request aborted')), {
-            once: true,
-          })
-          received.resolve(signal)
-        })
-    )
+    const received = holdFetch(fetchApi)
 
     const read = requestPhotoAiConsent(api, caller.signal)
     const rejected = expect(read).rejects.toBeInstanceOf(Error)
-    const signal = await received.promise
+    const signal = await received
     caller.abort()
 
     expect(signal.aborted).toBe(true)
     await rejected
+  })
+
+  it('aborts a stalled read at the eight-second deadline', async () => {
+    vi.useFakeTimers()
+    try {
+      const { api, fetchApi } = client()
+      const received = holdFetch(fetchApi)
+      const answer = requestPhotoAiConsent(api, new AbortController().signal)
+      const rejected = expect(answer).rejects.toBeInstanceOf(Error)
+      const signal = await received
+
+      await vi.advanceTimersByTimeAsync(7_999)
+      expect(signal.aborted).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(signal.aborted).toBe(true)
+      await rejected
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it.each([
+    { grantId: '' },
+    { grantId: 'x'.repeat(129) },
+    { grantId: 'fixture-grant', userId: 'fixture-other-member' },
+  ])('rejects an invalid revocation body', (body) => {
+    expect(revokePhotoAiConsentInputSchema.safeParse(body).success).toBe(false)
   })
 })

@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-81-photo-ai-consent-and-processor-approval
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ResponseError } from '@couture/api-client'
 import type * as ApiClient from '@couture/api-client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getI18n } from '../../i18n'
@@ -34,7 +35,18 @@ vi.mock('../../lib/use-web-session', () => ({
     scope === session.scope ? `verified-${session.owner}` : null,
   currentWebSessionOwner: () => session.owner,
   currentWebStyleScope: () => session.scope,
-  readAsMember: (_owner: string, run: () => Promise<unknown>) => run(),
+  readAsMember: async (
+    _owner: string,
+    run: () => Promise<unknown>,
+    isDenial: (error: unknown) => boolean
+  ) => {
+    try {
+      return await run()
+    } catch (error) {
+      if (isDenial(error)) return run()
+      throw error
+    }
+  },
   useWebStyleScope: () => session.scope,
 }))
 
@@ -98,12 +110,25 @@ describe('CC-7.24 web photo AI consent', () => {
     expect(button).toBeEnabled()
     await user.click(button)
     await waitFor(() => expect(screen.queryByTestId(revokeButton(FIRST))).toBeNull())
+    expect(screen.getByRole('status')).toHaveTextContent(message('revoked'))
     expect(requestConsent.mock.calls.map(([, , id]) => id)).toEqual([
       undefined,
       undefined,
       FIRST.id,
       FIRST.id,
     ])
+  })
+
+  it('classifies a 401 as a bearer denial for the member-read retry', async () => {
+    requestConsent
+      .mockRejectedValueOnce(new ResponseError(new Response(null, { status: 401 })))
+      .mockResolvedValueOnce(consent(FIRST))
+
+    render(<PhotoAiConsent />)
+
+    expect(await screen.findByTestId(revokeButton(FIRST))).toBeEnabled()
+    expect(requestConsent).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('discards a previous member’s late revocation and keeps the new member’s grant', async () => {

@@ -8,6 +8,7 @@ import type { AnalyticsClient } from '../../analytics/analytics.service'
 import type { GuardianConsentStateService } from '../../modules/auth/guardian-consent-state.service'
 import type { UserSessionService } from '../../modules/auth/user-session.service'
 import { GuardianService } from '../../modules/guardian/guardian.service'
+import { PhotoAiAttemptRegistry } from '../../modules/photo-ai/photo-ai-attempt-registry'
 import {
   type AnalyticsCapturePayload,
   InMemoryGuardianPrisma,
@@ -29,6 +30,7 @@ export const createService = (prisma = new InMemoryGuardianPrisma()) => {
   const userSessionService = {
     invalidateUserSessions,
   } as unknown as UserSessionService
+  const photoAiAttempts = new PhotoAiAttemptRegistry()
 
   return {
     prisma,
@@ -36,11 +38,13 @@ export const createService = (prisma = new InMemoryGuardianPrisma()) => {
     invalidateUserSessions,
     markTeenAccessGranted,
     markTeenAccessRevoked,
+    photoAiAttempts,
     service: new GuardianService(
       analyticsClient,
       prisma as unknown as PrismaClient,
       guardianConsentStateService,
-      userSessionService
+      userSessionService,
+      photoAiAttempts
     ),
   }
 }

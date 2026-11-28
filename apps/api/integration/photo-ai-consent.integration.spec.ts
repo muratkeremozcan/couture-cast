@@ -2,16 +2,21 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-81-photo-ai-consent-and-processor-approval
 import 'reflect-metadata'
 import { createHash } from 'node:crypto'
-import type { INestApplication } from '@nestjs/common'
+import { Logger, type INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { createUser, persistUser } from '@couture/testing'
-import { buildWardrobeObjectPath } from '@couture/utils'
+import { buildCommunityObjectPath, buildWardrobeObjectPath } from '@couture/utils'
 import { PrismaClient, type Prisma } from '@prisma/client'
 import sharp from 'sharp'
 import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PhotoAiExecutionService } from '../src/modules/photo-ai/photo-ai-execution.service.js'
 import { PhotoAiConsentController } from '../src/modules/photo-ai/photo-ai-consent.controller.js'
+import {
+  bindRequestContext,
+  getRequestContext,
+  runWithRequestContext,
+} from '../src/logger/request-context.js'
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service.js'
 import { PhotoAiGrantGate } from '../src/modules/photo-ai/photo-ai-grant-gate.js'
@@ -20,9 +25,14 @@ import {
   type PhotoAiPolicy,
 } from '../src/modules/photo-ai/photo-ai-policy.js'
 import { PhotoAiSourceService } from '../src/modules/photo-ai/photo-ai-source.service.js'
+import type { BoundedDownload } from '../src/modules/wardrobe/wardrobe-storage.adapter.js'
 import { httpTestUrl, listenHttpApp } from '../src/testing/loopback-http-app.js'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
-import { updateGuardianConsent } from './helpers/privacy-guards.js'
+import {
+  deleteMembers,
+  updateGuardianConsent,
+  updatePost,
+} from './helpers/privacy-guards.js'
 
 const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
@@ -32,6 +42,7 @@ const EMPTY = { data: { externalProcessingEnabled: false, grants: [] } }
 const OWNER = { userId: 'synthetic-photo-owner' }
 const OTHER = { userId: 'synthetic-photo-other' }
 const TEEN = { userId: 'synthetic-photo-teen' }
+const MISSING_TEEN = 'synthetic-missing-photo-teen'
 const RELATIONSHIP = 'synthetic-photo-guardian-consent'
 const GRANT_ID = 'synthetic-photo-grant'
 const TEEN_GRANT_ID = 'synthetic-photo-teen-grant'
@@ -47,6 +58,18 @@ const TEEN_SCOPE = {
   grantId: TEEN_GRANT_ID,
   photoId: '9d8026bc-d8cb-4f70-bb77-c580e8b21ec8',
 } as const
+const COMMUNITY_SCOPE = {
+  ...SCOPE,
+  grantId: 'synthetic-community-photo-grant',
+  feature: 'community-description',
+  inputClass: 'community-photo',
+  photoId: 'synthetic-photo-post',
+} as const
+const COMMUNITY_OBJECT = buildCommunityObjectPath(
+  COMMUNITY_SCOPE.photoId,
+  'fixture-upload',
+  'jpg'
+)
 const POLICY_VERSION = 'synthetic-approved-version'
 const tagRules = PRODUCTION_PHOTO_AI_POLICY.features['garment-tags']
 const FIXTURE_POLICY: PhotoAiPolicy = {
@@ -55,10 +78,15 @@ const FIXTURE_POLICY: PhotoAiPolicy = {
     'garment-tags': {
       ...tagRules,
       policyVersion: POLICY_VERSION,
-      ageBands: { ...tagRules.ageBands, '18+': true, '13-15': true },
+      ageBands: { ...tagRules.ageBands, '18+': true, '13-15': true, '16-17': true },
     },
     'garment-cutout': {
       ...PRODUCTION_PHOTO_AI_POLICY.features['garment-cutout'],
+      policyVersion: POLICY_VERSION,
+      ageBands: { ...tagRules.ageBands, '18+': true },
+    },
+    'community-description': {
+      ...PRODUCTION_PHOTO_AI_POLICY.features['community-description'],
       policyVersion: POLICY_VERSION,
       ageBands: { ...tagRules.ageBands, '18+': true },
     },
@@ -68,6 +96,12 @@ const FIXTURE_POLICY: PhotoAiPolicy = {
       feature: SCOPE.feature,
       inputClass: SCOPE.inputClass,
       provider: SCOPE.provider,
+      policyVersion: POLICY_VERSION,
+    },
+    {
+      feature: COMMUNITY_SCOPE.feature,
+      inputClass: COMMUNITY_SCOPE.inputClass,
+      provider: COMMUNITY_SCOPE.provider,
       policyVersion: POLICY_VERSION,
     },
     {
@@ -100,6 +134,10 @@ function activeProfile() {
   return { compliance: { accountStatus: 'active', guardianConsentRequired: false } }
 }
 
+function birthdate(age: number) {
+  return new Date(Date.UTC(new Date().getUTCFullYear() - age, 0, 1))
+}
+
 function grant(userId: string, id: string): Prisma.PhotoAiGrantUncheckedCreateInput {
   return {
     user_id: userId,
@@ -114,11 +152,12 @@ function grant(userId: string, id: string): Prisma.PhotoAiGrantUncheckedCreateIn
 }
 
 function harness(image: Buffer, policy = FIXTURE_POLICY) {
-  const download = vi.fn(() =>
+  const download = vi.fn<() => Promise<BoundedDownload>>(() =>
     Promise.resolve({ status: 'present' as const, bytes: Buffer.from(image) })
   )
+  const downloadCommunity = vi.fn(() => Promise.resolve(Buffer.from(image)))
   const sourceService = new PhotoAiSourceService(
-    { downloadBounded: vi.fn().mockResolvedValue(null) },
+    { downloadBounded: downloadCommunity },
     { downloadBounded: download }
   )
   const source = {
@@ -134,10 +173,12 @@ function harness(image: Buffer, policy = FIXTURE_POLICY) {
   return {
     adapter: { provider: SCOPE.provider, process },
     download,
+    downloadCommunity,
     execute,
     gate,
     process,
     source,
+    sourceService,
   }
 }
 
@@ -168,7 +209,7 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
       createUser({
         id: TEEN.userId,
         role: 'teen',
-        birthdate: new Date(Date.UTC(new Date().getUTCFullYear() - 15, 0, 1)),
+        birthdate: birthdate(15),
         profilePreferences: activeProfile(),
       })
     )
@@ -202,6 +243,18 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
         upload_status: 'ready',
       })),
     })
+    await prisma.lookbookPost.create({
+      data: {
+        id: COMMUNITY_SCOPE.photoId,
+        user_id: OWNER.userId,
+        status: 'draft',
+        upload_expires_at: expiresAt,
+        image_object_path: COMMUNITY_OBJECT,
+        image_content_type: 'image/jpeg',
+        image_byte_size: image.length,
+        image_checksum: createHash('sha256').update(image).digest('hex'),
+      },
+    })
     const routes = await Test.createTestingModule({
       controllers: [PhotoAiConsentController],
       providers: [
@@ -217,6 +270,7 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
             resolveIdentity: (token: string) => {
               if (token === OWNER.userId || token === OTHER.userId)
                 return { userId: token, role: 'guardian' }
+              if (token === MISSING_TEEN) return { userId: token, role: 'teen' }
               throw new Error('Unknown fixture bearer')
             },
           },
@@ -224,6 +278,7 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
       ],
     }).compile()
     app = routes.createNestApplication()
+    app.use(bindRequestContext)
     await listenHttpApp(app)
   }, 60_000)
 
@@ -232,8 +287,12 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
     await updateGuardianConsent(
       prisma,
       { id: RELATIONSHIP },
-      { status: 'granted', revoked_at: null }
+      { status: 'granted', revoked_at: null, consent_granted_at: grantedAt }
     )
+    await prisma.userProfile.update({
+      where: { user_id: TEEN.userId },
+      data: { birthdate: birthdate(15), preferences: activeProfile() },
+    })
     await prisma.photoAiGrant.createMany({
       data: [
         grant(OWNER.userId, GRANT_ID),
@@ -251,6 +310,35 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
     await app?.close()
     await prisma.$disconnect()
     await database.drop()
+  })
+
+  it('denies a token whose teen account is missing without logging the member identity', async () => {
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined)
+    try {
+      await request(httpTestUrl(app))
+        .get(PATH)
+        .set('authorization', `Bearer ${MISSING_TEEN}`)
+        .expect(403)
+
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(MISSING_TEEN)
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('returns service unavailable when the private route cannot verify teen access', async () => {
+    const access = vi
+      .spyOn(GuardianConsentStateService.prototype, 'canTeenAccessNonUploadSurface')
+      .mockRejectedValueOnce(new Error('Synthetic private DB outage'))
+    try {
+      await request(httpTestUrl(app))
+        .get(PATH)
+        .set('authorization', `Bearer ${MISSING_TEEN}`)
+        .expect(503)
+      expect(access).toHaveBeenCalledExactlyOnceWith(MISSING_TEEN)
+    } finally {
+      access.mockRestore()
+    }
   })
 
   it('lists and revokes only the authenticated member’s grants without exposing decision records', async () => {
@@ -341,6 +429,7 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
   )
 
   it.each([
+    ['missing member', { userId: '' }, SCOPE],
     ['missing key', OWNER, { ...SCOPE, grantId: 'missing-grant' }],
     ['different member', OTHER, SCOPE],
     ['different feature', OWNER, { ...SCOPE, feature: 'garment-cutout' }],
@@ -373,6 +462,7 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
   it.each([
     ['teen assent', { teen_assented_at: null }],
     ['scoped guardian approval', { guardian_approved_at: null }],
+    ['a linked guardian relationship', { guardian_consent: { disconnect: true } }],
   ] satisfies [string, Prisma.PhotoAiGrantUpdateInput][])(
     'requires current %s despite a granted guardian relationship',
     async (_reason, change) => {
@@ -385,17 +475,143 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
     }
   )
 
-  it('dispatches only a newly authorized, sanitized photo when scope and decisions match', async () => {
-    const { adapter, download, execute, process, source } = harness(image)
-    let sanitized: Buffer | undefined
-    process.mockImplementation(({ bytes }) => {
-      sanitized = Buffer.from(bytes)
-      return Promise.resolve(PROCESSOR_RESULT)
-    })
+  it.each([
+    ['under 13', { birthdate: birthdate(12) }],
+    ['unknown age', { birthdate: null }],
+    [
+      'pending guardian',
+      { preferences: { compliance: { accountStatus: 'pending_guardian_consent' } } },
+    ],
+    ['suspended', { preferences: { compliance: { accountStatus: 'suspended' } } }],
+    [
+      'adult with a teen-era grant',
+      {
+        birthdate: new Date(new Date().setUTCFullYear(new Date().getUTCFullYear() - 18)),
+      },
+    ],
+  ] satisfies [string, Prisma.UserProfileUpdateInput][])(
+    'denies the %s account before storage',
+    async (_reason, data) => {
+      await prisma.userProfile.update({ where: { user_id: TEEN.userId }, data })
+      const { adapter, execute, source, process } = harness(image)
 
+      await expect(execute.execute(TEEN, TEEN_SCOPE, adapter)).resolves.toBeNull()
+      expect(source.resolve).not.toHaveBeenCalled()
+      expect(process).not.toHaveBeenCalled()
+    }
+  )
+
+  it('rechecks the relationship and both decisions for a 17-year-old member', async () => {
+    await prisma.userProfile.update({
+      where: { user_id: TEEN.userId },
+      data: { birthdate: birthdate(17) },
+    })
+    const { adapter, execute, process } = harness(image)
     await expect(execute.execute(TEEN, TEEN_SCOPE, adapter)).resolves.toEqual(
       PROCESSOR_RESULT
     )
+
+    await updateGuardianConsent(
+      prisma,
+      { id: RELATIONSHIP },
+      { status: 'revoked', revoked_at: new Date() }
+    )
+    await expect(execute.execute(TEEN, TEEN_SCOPE, adapter)).resolves.toBeNull()
+
+    await updateGuardianConsent(
+      prisma,
+      { id: RELATIONSHIP },
+      {
+        status: 'granted',
+        revoked_at: null,
+        consent_granted_at: new Date(+grantedAt + 1000),
+      }
+    )
+    await expect(execute.execute(TEEN, TEEN_SCOPE, adapter)).resolves.toBeNull()
+    expect(process).toHaveBeenCalledOnce()
+  })
+
+  it('erases the grant through the account deletion cascade', async () => {
+    const account = await prisma.user.create({
+      data: { email: 'synthetic-photo-erasure@example.test' },
+    })
+    const id = 'synthetic-erased-photo-grant'
+    await prisma.photoAiGrant.create({ data: grant(account.id, id) })
+
+    await deleteMembers(prisma, { id: account.id })
+
+    await expect(prisma.photoAiGrant.findUnique({ where: { id } })).resolves.toBeNull()
+    await expect(
+      prisma.photoAiGrant.findUnique({ where: { id: GRANT_ID } })
+    ).resolves.not.toBeNull()
+  })
+
+  it('reads an authorized Community draft from its bounded private location and refuses a mismatched key', async () => {
+    const { adapter, downloadCommunity, execute, process } = harness(image)
+    await prisma.photoAiGrant.create({
+      data: {
+        ...grant(OWNER.userId, COMMUNITY_SCOPE.grantId),
+        feature: COMMUNITY_SCOPE.feature,
+        input_class: COMMUNITY_SCOPE.inputClass,
+      },
+    })
+
+    await expect(execute.execute(OWNER, COMMUNITY_SCOPE, adapter)).resolves.toEqual(
+      PROCESSOR_RESULT
+    )
+    expect(downloadCommunity).toHaveBeenCalledExactlyOnceWith(
+      COMMUNITY_OBJECT,
+      image.length,
+      expect.any(AbortSignal)
+    )
+
+    try {
+      await updatePost(prisma, COMMUNITY_SCOPE.photoId, {
+        image_object_path: buildCommunityObjectPath(
+          'different-post',
+          'fixture-upload',
+          'jpg'
+        ),
+      })
+      await expect(execute.execute(OWNER, COMMUNITY_SCOPE, adapter)).resolves.toBeNull()
+      expect(downloadCommunity).toHaveBeenCalledOnce()
+      expect(process).toHaveBeenCalledOnce()
+    } finally {
+      await updatePost(prisma, COMMUNITY_SCOPE.photoId, {
+        image_object_path: COMMUNITY_OBJECT,
+      })
+    }
+  })
+
+  it('keeps flat-lay reads closed until staging exists', async () => {
+    const { download, downloadCommunity, sourceService } = harness(image)
+
+    await expect(
+      sourceService.resolve(prisma, OWNER.userId, 'flat-lay-photo', SCOPE.photoId)
+    ).resolves.toBeNull()
+    expect(download).not.toHaveBeenCalled()
+    expect(downloadCommunity).not.toHaveBeenCalled()
+  })
+
+  it('dispatches only a newly authorized, sanitized photo when scope and decisions match', async () => {
+    const { adapter, download, execute, process, source } = harness(image)
+    let sanitized: Buffer | undefined
+    let processorContext: ReturnType<typeof getRequestContext>
+    process.mockImplementation(({ bytes }) => {
+      sanitized = Buffer.from(bytes)
+      processorContext = getRequestContext()
+      return Promise.resolve(PROCESSOR_RESULT)
+    })
+
+    await expect(
+      runWithRequestContext(
+        { requestId: 'original-photo-request', userId: TEEN.userId },
+        () => execute.execute(TEEN, TEEN_SCOPE, adapter)
+      )
+    ).resolves.toEqual(PROCESSOR_RESULT)
+    expect(processorContext).toMatchObject({ suppressAccountContext: true })
+    expect(processorContext?.userId).toBeUndefined()
+    expect(processorContext?.requestId).not.toBe('original-photo-request')
 
     expect(source.resolve).toHaveBeenCalledWith(
       expect.anything(),
@@ -442,6 +658,80 @@ describe('CC-7.24 photo AI execution with persisted consent', () => {
     await expect(execute.execute(OWNER, SCOPE, adapter)).resolves.toBeNull()
     expect(download).toHaveBeenCalledOnce()
     expect(process).not.toHaveBeenCalled()
+  })
+
+  it.each(['missing', 'too_large'] as const)(
+    'drops a %s storage response before processing',
+    async (status) => {
+      const { adapter, download, execute, process } = harness(image)
+      download.mockResolvedValueOnce({ status })
+
+      await expect(execute.execute(OWNER, SCOPE, adapter)).resolves.toBeNull()
+      expect(download).toHaveBeenCalledOnce()
+      expect(process).not.toHaveBeenCalled()
+    }
+  )
+
+  it('discards the result if the source is removed while processing', async () => {
+    const { adapter, execute, process } = harness(image)
+    const dispatched = deferred<void>()
+    const reply = deferred<typeof PROCESSOR_RESULT>()
+    process.mockImplementation(() => {
+      dispatched.resolve()
+      return reply.promise
+    })
+
+    const attempt = execute.execute(OWNER, SCOPE, adapter)
+    await dispatched.promise
+    try {
+      await prisma.garmentItem.update({
+        where: { id: SCOPE.photoId },
+        data: { committed_at: null },
+      })
+      reply.resolve(PROCESSOR_RESULT)
+      await expect(attempt).resolves.toBeNull()
+    } finally {
+      await prisma.garmentItem.update({
+        where: { id: SCOPE.photoId },
+        data: { committed_at: grantedAt },
+      })
+    }
+  })
+
+  it('handles a rejected processor and clears its in-memory buffer', async () => {
+    const { adapter, execute, process } = harness(image)
+    process.mockRejectedValueOnce(new Error('Synthetic processor failure'))
+
+    await expect(execute.execute(OWNER, SCOPE, adapter)).resolves.toBeNull()
+    expect(process).toHaveBeenCalledOnce()
+    const [{ bytes }] = process.mock.calls[0]!
+    expect(bytes.equals(Buffer.alloc(bytes.length))).toBe(true)
+  })
+
+  it('aborts a stalled processor at its deadline and clears the pending image', async () => {
+    const { adapter, execute, process } = harness(image)
+    const dispatched = deferred<AbortSignal>()
+    const reply = deferred<typeof PROCESSOR_RESULT>()
+    process.mockImplementation((_input, signal) => {
+      dispatched.resolve(signal)
+      return reply.promise
+    })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const attempt = execute.execute(OWNER, SCOPE, adapter)
+      const signal = await dispatched.promise
+      await vi.advanceTimersByTimeAsync(9_999)
+      expect(signal.aborted).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+
+      await expect(attempt).resolves.toBeNull()
+      expect(signal.aborted).toBe(true)
+      const [{ bytes }] = process.mock.calls[0]!
+      expect(bytes.equals(Buffer.alloc(bytes.length))).toBe(true)
+    } finally {
+      reply.resolve(PROCESSOR_RESULT)
+      vi.useRealTimers()
+    }
   })
 
   it('stops dispatch when the owner revokes during an outstanding read', async () => {
