@@ -96,11 +96,8 @@ onFlowComplete:
 - runFlow:
     file: subflows/today-outfit-visual-variant.yaml
     env: { TODAY_VARIANT: 'missing', NAME: 'home-missing-photo' }
-- runFlow:
-    file: subflows/today-outfit-visual-variant.yaml
-    env: { TODAY_VARIANT: 'empty', NAME: 'home-empty-closet' }
 
-# 7.14-PIC-005. The empty-closet member can wear the catalog look through the real API.
+# 7.14-PIC-005. The populated member can wear the outfit when its photo is unavailable.
 - tapOn:
     id: 'today-primary-action'
 - extendedWaitUntil:
@@ -116,6 +113,12 @@ onFlowComplete:
 
 - tapOn:
     id: 'app-top-bar-back'
+
+# CC-7.22. Today's top catalog look appears for the empty closet.
+- runFlow:
+    file: subflows/today-outfit-visual-variant.yaml
+    env: { TODAY_VARIANT: 'empty', NAME: 'home-empty-closet' }
+
 - evalScript: ${output.restoreShellLocale = true}
 - runFlow:
     file: subflows/set-locale.yaml
